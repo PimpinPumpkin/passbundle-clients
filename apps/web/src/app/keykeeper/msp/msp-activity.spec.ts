@@ -72,6 +72,14 @@ describe("MSP activity sentences", () => {
       "ben@northwind.test joined Acme Dental with the install command",
     ],
     [
+      { event: "install_domains_set", detail: "acme.test branch.acme.test" },
+      "ana@northwind.test limited Acme Dental's install command to acme.test, branch.acme.test accounts",
+    ],
+    [
+      { event: "install_domains_set", detail: "" },
+      "ana@northwind.test let anyone with Acme Dental's install command join",
+    ],
+    [
       { event: "member_confirmed" },
       "ana@northwind.test confirmed ben@northwind.test in Acme Dental",
     ],
