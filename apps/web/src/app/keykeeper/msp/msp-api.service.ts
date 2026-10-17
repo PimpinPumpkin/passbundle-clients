@@ -196,6 +196,21 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     );
   }
 
+  /** Limits a client's install command to accounts at these email domains; none lets anyone join. */
+  async setEnrollmentDomains(
+    mspId: string,
+    orgId: string,
+    domains: string[],
+  ): Promise<ClientEnrollment> {
+    return this.apiService.send(
+      "PUT",
+      `/keykeeper/msp/${mspId}/clients/${orgId}/enrollment/domains`,
+      { domains },
+      true,
+      true,
+    );
+  }
+
   /** For a client's owners and admins: the MSP that manages the organization, and its staff there. */
   async getOrganizationMsp(orgId: string): Promise<ClientMsp> {
     return this.apiService.send("GET", `/keykeeper/organizations/${orgId}/msp`, null, true, true);

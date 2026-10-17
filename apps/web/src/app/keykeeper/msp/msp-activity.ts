@@ -76,6 +76,10 @@ export function describeEvent(
       return `${actor} replaced the install token for ${org}`;
     case "joined_with_install_command":
       return `${target} joined ${org} with the install command`;
+    case "install_domains_set":
+      return e.detail
+        ? `${actor} limited ${org}'s install command to ${e.detail.split(" ").join(", ")} accounts`
+        : `${actor} let anyone with ${org}'s install command join`;
     case "member_confirmed":
       return `${actor} confirmed ${target} in ${org}`;
     case "client_removed_msp":

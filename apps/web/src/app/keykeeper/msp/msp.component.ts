@@ -195,9 +195,34 @@ const CLIENT_FEATURES = {
                       ? "1 person has"
                       : install.enrollment.joins + " people have"
                   }}
-                  joined with this command. Anyone who has it can ask to join, so treat it like a
-                  password.
+                  joined with this command.
+                  @if (install.enrollment.domains.length) {
+                    Only {{ domainList(install.enrollment.domains) }} accounts with a verified email
+                    can join with it.
+                  } @else {
+                    Anyone who has it can ask to join, so treat it like a password.
+                  }
                 </p>
+                @if (m.role === "admin") {
+                  <form
+                    [formGroup]="domainsForm"
+                    [bitSubmit]="saveDomains"
+                    class="tw-mb-3"
+                    data-testid="msp-install-domains"
+                  >
+                    <bit-form-field>
+                      <bit-label>Only these email domains can join</bit-label>
+                      <input bitInput formControlName="domains" placeholder="example.com" />
+                      <bit-hint>
+                        Separate domains with spaces or commas. Leave it empty to let anyone with
+                        the command join. People you invite by email can join from any address.
+                      </bit-hint>
+                    </bit-form-field>
+                    <button bitButton bitFormButton buttonType="secondary" type="submit">
+                      Save domains
+                    </button>
+                  </form>
+                }
                 <div class="tw-flex tw-gap-2">
                   <button
                     bitButton
@@ -570,6 +595,8 @@ export class KeykeeperMspComponent implements OnInit {
   protected readonly mspForm = this.formBuilder.group({
     name: ["", [Validators.required, Validators.maxLength(100)]],
   });
+  protected readonly domainsForm = this.formBuilder.group({ domains: [""] });
+
   protected readonly clientForm = this.formBuilder.group({
     name: ["", [Validators.required, Validators.maxLength(100)]],
     preset: ["business" as ClientPreset, Validators.required],
@@ -803,12 +830,36 @@ export class KeykeeperMspComponent implements OnInit {
     await this.attempt(async () => {
       const environment = await firstValueFrom(this.environmentService.environment$);
       this.serverUrl.set(environment.getWebVaultUrl());
-      this.installFor.set({
-        client,
-        enrollment: await this.mspApi.getEnrollment(msp.id, client.id),
-      });
+      const enrollment = await this.mspApi.getEnrollment(msp.id, client.id);
+      this.domainsForm.setValue({ domains: enrollment.domains.join(" ") });
+      this.installFor.set({ client, enrollment });
     });
   }
+
+  protected domainList(domains: string[]): string {
+    return domains.length < 2
+      ? domains.join("")
+      : `${domains.slice(0, -1).join(", ")} or ${domains[domains.length - 1]}`;
+  }
+
+  protected readonly saveDomains = async () => {
+    const msp = this.msp();
+    const install = this.installFor();
+    if (msp == null || install == null) {
+      return;
+    }
+    const domains = (this.domainsForm.value.domains ?? "").split(/[\s,;]+/).filter((d) => d !== "");
+    await this.attempt(async () => {
+      const enrollment = await this.mspApi.setEnrollmentDomains(msp.id, install.client.id, domains);
+      this.domainsForm.setValue({ domains: enrollment.domains.join(" ") });
+      this.installFor.set({ client: install.client, enrollment });
+      this.toast(
+        enrollment.domains.length
+          ? `Only ${this.domainList(enrollment.domains)} accounts can join ${install.client.name} with the command`
+          : `Anyone with the command can join ${install.client.name}`,
+      );
+    });
+  };
 
   /** The command an MSP runs from their RMM; the script's name comes from the brand. */
   protected installCommand(token: string): string {

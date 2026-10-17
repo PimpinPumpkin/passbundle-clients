@@ -92,7 +92,13 @@ export type InvitationInfo = {
   forYou: boolean;
 };
 
-export type ClientEnrollment = { token: string | null; createdAt: string | null; joins: number };
+export type ClientEnrollment = {
+  token: string | null;
+  createdAt: string | null;
+  joins: number;
+  /** Only accounts at these email domains may join with the command; none means anyone. */
+  domains: string[];
+};
 
 export type ClientMsp = {
   msp: { id: string; name: string } | null;
