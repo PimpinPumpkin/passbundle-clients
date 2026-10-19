@@ -328,6 +328,26 @@ function apply() {
     ) + "\n",
   );
   replaceAnchored("apps/web/src/index.html", /color="#175DDC"/, `color="${BRAND.color}"`);
+  replaceAnchored(
+    "apps/web/src/index.html",
+    /<meta name="theme-color" content="#175DDC" \/>/,
+    `<meta name="theme-color" content="${BRAND.color}" />`,
+  );
+  // The loading screen draws upstream's two background drawings inline, before
+  // the app (and its drawings) loads: ours instead, by their size.
+  for (const [viewBox, symbol] of [
+    ["0 0 501 226", "BackgroundLeftIllustration"],
+    ["0 0 506 297", "BackgroundRightIllustration"],
+  ]) {
+    const ours = fs.readFileSync(path.join(ROOT, "brand/artwork", `${symbol}.svg`), "utf8").trim();
+    replaceAnchored(
+      "apps/web/src/index.html",
+      new RegExp(
+        `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="${viewBox}">[\\s\\S]*?</svg>`,
+      ),
+      () => ours,
+    );
+  }
   for (const file of fs.readdirSync(path.join(GEN, "web"))) {
     const from = path.join(GEN, "web", file);
     if (file === "favicon.ico") copyInto(from, "apps/web/src/favicon.ico");

@@ -148,7 +148,7 @@ const CLIENT_FEATURES = {
                     <td bitCell data-testid="msp-client-expiring">{{ clientHealth.expiring }}</td>
                     <td bitCell data-testid="msp-client-weak">{{ clientHealth.weak }}</td>
                     <td bitCell data-testid="msp-client-reused">{{ clientHealth.reused }}</td>
-                    <td bitCell class="tw-text-right">
+                    <td bitCell class="tw-whitespace-nowrap tw-text-right">
                       @if (m.role === "admin" || m.access?.installCommands !== false) {
                         <button
                           type="button"
