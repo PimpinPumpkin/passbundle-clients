@@ -36,7 +36,9 @@ const op = (o) => ` opacity="${o}"`;
 
 /** Three bands, the logo's body: one color, fading. */
 function bands(x, y, w, bh, gap, cls = C.deep, fades = [1, 0.72, 0.45]) {
-  return fades.map((o, i) => rect(x, y + i * (bh + gap), w, bh, bh / 2, cls, o === 1 ? "" : op(o))).join("");
+  return fades
+    .map((o, i) => rect(x, y + i * (bh + gap), w, bh, bh / 2, cls, o === 1 ? "" : op(o)))
+    .join("");
 }
 
 /** The shackle as a filled shape: a rounded arch of thickness t. */
@@ -78,7 +80,9 @@ function windowCard(x, y, w, h, s = 1) {
     `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" rx="${n(7 * s)}" fill="none" stroke-width="${n(1.2 * s)}" class="tw-stroke-illustration-outline" stroke-opacity="0.18"/>` +
     rect(x, y, w, bar + 4 * s, 7 * s, C.mint) +
     rect(x, y + bar, w, 4 * s, 0, C.mint) +
-    [0, 1, 2].map((i) => circle(x + w - (8 + i * 6) * s, y + (bar + 4 * s) / 2, 1.8 * s, C.white)).join("")
+    [0, 1, 2]
+      .map((i) => circle(x + w - (8 + i * 6) * s, y + (bar + 4 * s) / 2, 1.8 * s, C.white))
+      .join("")
   );
 }
 
@@ -111,7 +115,9 @@ function badge(cx, cy, r, kind, cls = C.deep) {
       rect(cx - 1.4 * s, cy - 5.5 * s, 2.8 * s, 11 * s, 1.4 * s, C.white) +
       rect(cx - 5.5 * s, cy - 1.4 * s, 11 * s, 2.8 * s, 1.4 * s, C.white) +
       `</g>`,
-    alert: rect(cx - 1.4 * s, cy - 5.5 * s, 2.8 * s, 7 * s, 1.4 * s, C.ink) + circle(cx, cy + 4.3 * s, 1.6 * s, C.ink),
+    alert:
+      rect(cx - 1.4 * s, cy - 5.5 * s, 2.8 * s, 7 * s, 1.4 * s, C.ink) +
+      circle(cx, cy + 4.3 * s, 1.6 * s, C.ink),
   }[kind];
   const fill = kind === "alert" ? C.amber : cls;
   return circle(cx, cy, r, fill) + mark;
@@ -132,7 +138,19 @@ function envelope(x, y, w, h, { code = false } = {}) {
   const letter =
     rect(x + 9 * s, y - 12 * s, w - 18 * s, h * 0.9, 5 * s, C.white) +
     (code
-      ? [0, 1, 2, 3, 4, 5].map((i) => rect(x + 14 * s + i * 7.4 * s, y - 2 * s, 5.6 * s, 7 * s, 1.6 * s, C.deep, op(i < 3 ? 1 : 0.55))).join("")
+      ? [0, 1, 2, 3, 4, 5]
+          .map((i) =>
+            rect(
+              x + 14 * s + i * 7.4 * s,
+              y - 2 * s,
+              5.6 * s,
+              7 * s,
+              1.6 * s,
+              C.deep,
+              op(i < 3 ? 1 : 0.55),
+            ),
+          )
+          .join("")
       : lines(x + 15 * s, y - 5 * s, [40 * s, 40 * s, 26 * s], 4.4 * s, 3.2 * s, C.deep));
   return (
     rect(x, y, w, h, 7 * s, C.deep) +
@@ -162,7 +180,10 @@ function key(x, y, s, cls = C.amber, angle = 0) {
 
 /** A phone: a deep frame and a white screen. */
 function phone(x, y, w, h, s = 1) {
-  return rect(x, y, w, h, 7 * s, C.deep) + rect(x + 3.5 * s, y + 7 * s, w - 7 * s, h - 14 * s, 3.5 * s, C.white);
+  return (
+    rect(x, y, w, h, 7 * s, C.deep) +
+    rect(x + 3.5 * s, y + 7 * s, w - 7 * s, h - 14 * s, 3.5 * s, C.white)
+  );
 }
 
 /** A magnifying glass. */
@@ -182,7 +203,9 @@ function gear(cx, cy, r, teeth = 8, cls = C.deep) {
   const parts = [];
   for (let i = 0; i < teeth; i++) {
     const a = (i * 360) / teeth;
-    parts.push(`<g transform="rotate(${n(a)} ${n(cx)} ${n(cy)})">${rect(cx - r * 0.2, cy - r * 1.18, r * 0.4, r * 0.5, r * 0.12, cls)}</g>`);
+    parts.push(
+      `<g transform="rotate(${n(a)} ${n(cx)} ${n(cy)})">${rect(cx - r * 0.2, cy - r * 1.18, r * 0.4, r * 0.5, r * 0.12, cls)}</g>`,
+    );
   }
   return parts.join("") + circle(cx, cy, r * 0.9, cls) + circle(cx, cy, r * 0.38, C.white);
 }
@@ -205,8 +228,14 @@ function fingerprint(cx, cy, r) {
 function plane(x, y, s, trail = true) {
   return (
     (trail ? bands(x - 38 * s, y + 4 * s, 26 * s, 6 * s, 4 * s, C.mint) : "") +
-    path_(`M${n(x)} ${n(y + 8 * s)}L${n(x + 46 * s)} ${n(y - 14 * s)}L${n(x + 30 * s)} ${n(y + 30 * s)}L${n(x + 20 * s)} ${n(y + 16 * s)}Z`, C.deep) +
-    path_(`M${n(x + 20 * s)} ${n(y + 16 * s)}L${n(x + 46 * s)} ${n(y - 14 * s)}L${n(x + 15 * s)} ${n(y + 12 * s)}Z`, C.mint)
+    path_(
+      `M${n(x)} ${n(y + 8 * s)}L${n(x + 46 * s)} ${n(y - 14 * s)}L${n(x + 30 * s)} ${n(y + 30 * s)}L${n(x + 20 * s)} ${n(y + 16 * s)}Z`,
+      C.deep,
+    ) +
+    path_(
+      `M${n(x + 20 * s)} ${n(y + 16 * s)}L${n(x + 46 * s)} ${n(y - 14 * s)}L${n(x + 15 * s)} ${n(y + 12 * s)}Z`,
+      C.mint,
+    )
   );
 }
 
@@ -224,7 +253,19 @@ function folder(x, y, w, h, s = 1) {
 function building(x, y, w, h, s = 1) {
   return (
     rect(x, y, w, h, 6 * s, C.deep) +
-    [0, 1, 2].map((i) => rect(x + 7 * s, y + 10 * s + i * 14 * s, w - 14 * s, 7 * s, 3.5 * s, C.white, op(1 - i * 0.2))).join("") +
+    [0, 1, 2]
+      .map((i) =>
+        rect(
+          x + 7 * s,
+          y + 10 * s + i * 14 * s,
+          w - 14 * s,
+          7 * s,
+          3.5 * s,
+          C.white,
+          op(1 - i * 0.2),
+        ),
+      )
+      .join("") +
     rect(x + w / 2 - 6 * s, y + h - 16 * s, 12 * s, 16 * s, 3 * s, C.amber)
   );
 }
@@ -263,8 +304,16 @@ function draw(symbol, viewBox, content) {
     `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="${viewBox}" data-art="passbundle"><g transform="translate(${x} ${y})">${content}</g></svg>`;
 }
 
-draw("LockIcon", "0 0 80 73.33", pad(40, 40, 33) + lock(40, 40, 1) + sparkle(68, 14, 0.9) + sparkle(12, 22, 0.6));
-draw("UnlockedIcon", "0 0.99 80 73.35", pad(40, 40, 33) + lock(40, 42, 1, { open: true }) + sparkle(14, 16, 0.8) + sparkle(70, 52, 0.6));
+draw(
+  "LockIcon",
+  "0 0 80 73.33",
+  pad(40, 40, 33) + lock(40, 40, 1) + sparkle(68, 14, 0.9) + sparkle(12, 22, 0.6),
+);
+draw(
+  "UnlockedIcon",
+  "0 0.99 80 73.35",
+  pad(40, 40, 33) + lock(40, 42, 1, { open: true }) + sparkle(14, 16, 0.8) + sparkle(70, 52, 0.6),
+);
 draw(
   "VaultIcon",
   "0 8.33 80 66.67",
@@ -309,7 +358,11 @@ draw(
     sparkle(80, 18, 0.8),
 );
 draw("NoSendsIcon", "9 4 83.89 91", pad(42, 46, 38) + plane(30, 44, 0.95) + sparkle(70, 20, 0.7));
-draw("ActiveSendIcon", "5 4 87 87", pad(43, 44, 38) + plane(30, 44, 0.95) + badge(68, 66, 11, "check"));
+draw(
+  "ActiveSendIcon",
+  "5 4 87 87",
+  pad(43, 44, 38) + plane(30, 44, 0.95) + badge(68, 66, 11, "check"),
+);
 draw(
   "EmptyTrash",
   "0.22 7 95.71 88",
@@ -338,7 +391,10 @@ draw(
   "WaveIcon",
   "3.33 3.33 73.33 73.33",
   pad(37, 37, 33) +
-    path_("M14 20a8 8 0 0 1 8-8h32a8 8 0 0 1 8 8v22a8 8 0 0 1-8 8H32l-12 10V50h0a8 8 0 0 1-6-8Z", C.deep) +
+    path_(
+      "M14 20a8 8 0 0 1 8-8h32a8 8 0 0 1 8 8v22a8 8 0 0 1-8 8H32l-12 10V50h0a8 8 0 0 1-6-8Z",
+      C.deep,
+    ) +
     lines(22, 22, [30, 30, 18], 5, 4, C.white) +
     sparkle(64, 58, 0.8),
 );
@@ -360,12 +416,24 @@ draw(
     path_("M44 16l20 7v17c0 15-9 26-20 32-11-6-20-17-20-32V23Z", C.mint) +
     lock(44, 46, 0.55),
 );
-draw("RegistrationCheckEmailIcon", "3.33 0.87 76.36 76.8", pad(38, 40, 34) + envelope(6, 28, 64, 40) + sparkle(66, 14, 0.7));
-draw("TwoFactorAuthEmailIcon", "3.33 0.46 73.33 76.8", pad(36, 40, 33) + envelope(4, 28, 64, 40, { code: true }));
+draw(
+  "RegistrationCheckEmailIcon",
+  "3.33 0.87 76.36 76.8",
+  pad(38, 40, 34) + envelope(6, 28, 64, 40) + sparkle(66, 14, 0.7),
+);
+draw(
+  "TwoFactorAuthEmailIcon",
+  "3.33 0.46 73.33 76.8",
+  pad(36, 40, 33) + envelope(4, 28, 64, 40, { code: true }),
+);
 draw(
   "RegistrationUserAddIcon",
   "0 10 80 60",
-  padRect(2, 2, 76, 56) + windowCard(8, 8, 46, 34) + lines(14, 26, [30, 22], 4, 4) + person(58, 34, 0.9) + badge(30, 46, 9, "plus"),
+  padRect(2, 2, 76, 56) +
+    windowCard(8, 8, 46, 34) +
+    lines(14, 26, [30, 22], 4, 4) +
+    person(58, 34, 0.9) +
+    badge(30, 46, 9, "plus"),
 );
 draw(
   "UserLockIcon",
@@ -375,9 +443,16 @@ draw(
 draw(
   "UserVerificationBiometricsIcon",
   "4 4 88 88",
-  pad(44, 44, 40) + circle(44, 42, 24, C.white) + fingerprint(44, 40, 20) + badge(66, 66, 10, "check"),
+  pad(44, 44, 40) +
+    circle(44, 42, 24, C.white) +
+    fingerprint(44, 40, 20) +
+    badge(66, 66, 10, "check"),
 );
-draw("BiometricFingerprint", "0 0 97 97", pad(48.5, 48.5, 44) + circle(48.5, 47, 30, C.white) + fingerprint(48.5, 45, 25));
+draw(
+  "BiometricFingerprint",
+  "0 0 97 97",
+  pad(48.5, 48.5, 44) + circle(48.5, 47, 30, C.white) + fingerprint(48.5, 45, 25),
+);
 draw(
   "TwoFactorAuthAuthenticatorIcon",
   "0 10 80 66.67",
@@ -410,9 +485,16 @@ draw(
 draw(
   "TwoFactorAuthWebAuthnIcon",
   "3.33 3.33 76.49 75.83",
-  pad(38, 38, 34) + phone(16, 10, 30, 54) + fingerprint(31, 36, 11) + key(52, 56, 0.6, C.amber, -30),
+  pad(38, 38, 34) +
+    phone(16, 10, 30, 54) +
+    fingerprint(31, 36, 11) +
+    key(52, 56, 0.6, C.amber, -30),
 );
-draw("TwoFactorTimeoutIcon", "5 4 87 87", pad(43, 44, 38) + clock(42, 44, 24) + badge(66, 22, 10, "x", C.ink));
+draw(
+  "TwoFactorTimeoutIcon",
+  "5 4 87 87",
+  pad(43, 44, 38) + clock(42, 44, 24) + badge(66, 22, 10, "x", C.ink),
+);
 draw(
   "DevicesIcon",
   "0 10 80 60",
@@ -453,7 +535,15 @@ draw(
     rect(400, 40, 256, 44, 18, C.mint) +
     rect(400, 70, 256, 14, 0, C.mint) +
     lock(428, 62, 0.35) +
-    [0, 1, 2].map((i) => rect(420, 100 + i * 48, 216, 38, 12, C.pale) + circle(442, 119 + i * 48, 10, C.deep, op(1 - i * 0.25)) + rect(460, 112 + i * 48, 120, 7, 3.5, C.deep, op(0.8)) + rect(460, 124 + i * 48, 80, 6, 3, C.mint)).join(""),
+    [0, 1, 2]
+      .map(
+        (i) =>
+          rect(420, 100 + i * 48, 216, 38, 12, C.pale) +
+          circle(442, 119 + i * 48, 10, C.deep, op(1 - i * 0.25)) +
+          rect(460, 112 + i * 48, 120, 7, 3.5, C.deep, op(0.8)) +
+          rect(460, 124 + i * 48, 80, 6, 3, C.mint),
+      )
+      .join(""),
 );
 draw(
   "AutoConfirmSvg",
@@ -461,12 +551,24 @@ draw(
   rect(0, 0, 197, 232, 20, C.pale) +
     rect(18, 20, 161, 192, 16, C.white) +
     lines(34, 38, [90, 60], 8, 8, C.deep) +
-    [0, 1, 2].map((i) => person(52, 104 + i * 40, 0.55) + rect(70, 96 + i * 40, 60, 7, 3.5, C.deep, op(0.85)) + rect(70, 108 + i * 40, 40, 6, 3, C.mint) + badge(156, 104 + i * 40, 9, "check")).join(""),
+    [0, 1, 2]
+      .map(
+        (i) =>
+          person(52, 104 + i * 40, 0.55) +
+          rect(70, 96 + i * 40, 60, 7, 3.5, C.deep, op(0.85)) +
+          rect(70, 108 + i * 40, 40, 6, 3, C.mint) +
+          badge(156, 104 + i * 40, 9, "check"),
+      )
+      .join(""),
 );
 draw(
   "AccountWarning",
   "0 12.75 96 72",
-  padRect(2, 2, 92, 68) + windowCard(10, 8, 54, 40) + lines(16, 28, [36, 26], 5, 5) + person(70, 40, 1) + badge(30, 52, 11, "alert"),
+  padRect(2, 2, 92, 68) +
+    windowCard(10, 8, 54, 40) +
+    lines(16, 28, [36, 26], 5, 5) +
+    person(70, 40, 1) +
+    badge(30, 52, 11, "alert"),
 );
 draw(
   "DeactivatedOrg",
@@ -476,7 +578,11 @@ draw(
 draw(
   "BusinessWelcome",
   "4.17 0.75 91.67 95.83",
-  pad(46, 48, 42) + building(25, 18, 42, 62) + sparkle(76, 22, 1) + sparkle(16, 34, 0.7) + badge(70, 72, 10, "check"),
+  pad(46, 48, 42) +
+    building(25, 18, 42, 62) +
+    sparkle(76, 22, 1) +
+    sparkle(16, 34, 0.7) +
+    badge(70, 72, 10, "check"),
 );
 draw(
   "CreditCardIcon",
@@ -507,17 +613,40 @@ draw(
     lines(62, 58, [36, 26], 6, 6, C.deep) +
     key(92, 104, 0.8, C.amber, -20),
 );
-draw("GearIcon", "4.8 6 110.4 107.52", pad(55, 54, 50) + gear(55, 54, 30) + bands(45, 48, 20, 4, 2.5, C.deep) + sparkle(94, 20, 0.9));
+draw(
+  "GearIcon",
+  "4.8 6 110.4 107.52",
+  pad(55, 54, 50) + gear(55, 54, 30) + bands(45, 48, 20, 4, 2.5, C.deep) + sparkle(94, 20, 0.9),
+);
 draw(
   "SpotReport",
   "0 0 120 120",
   pad(60, 60, 54) +
     rect(30, 20, 60, 78, 10, C.white) +
-    [0, 1, 2, 3].map((i) => rect(40 + i * 11, 76 - [18, 30, 22, 38][i], 7, [18, 30, 22, 38][i], 3.5, C.deep, op(i === 3 ? 1 : 0.6))).join("") +
+    [0, 1, 2, 3]
+      .map((i) =>
+        rect(
+          40 + i * 11,
+          76 - [18, 30, 22, 38][i],
+          7,
+          [18, 30, 22, 38][i],
+          3.5,
+          C.deep,
+          op(i === 3 ? 1 : 0.6),
+        ),
+      )
+      .join("") +
     lines(40, 84, [40], 5, 0) +
     sparkle(98, 22, 0.9),
 );
-draw("ReportBreach", "11.6 3.33 56.67 73.33", padRect(2, 2, 52, 70) + rect(8, 8, 36, 50, 7, C.white) + lines(14, 16, [24, 18, 22], 4, 4) + badge(38, 54, 11, "alert"));
+draw(
+  "ReportBreach",
+  "11.6 3.33 56.67 73.33",
+  padRect(2, 2, 52, 70) +
+    rect(8, 8, 36, 50, 7, C.white) +
+    lines(14, 16, [24, 18, 22], 4, 4) +
+    badge(38, 54, 11, "alert"),
+);
 draw(
   "ReportExposedPasswords",
   "0.7 2.4 79.3 77.2",
@@ -529,7 +658,9 @@ draw(
 draw(
   "ReportUnsecuredWebsites",
   "0.4 10.07 79.2 60",
-  padRect(2, 2, 76, 56) + windowCard(8, 8, 60, 42) + lock(38, 32, 0.4, { open: true, cls: C.amber }),
+  padRect(2, 2, 76, 56) +
+    windowCard(8, 8, 60, 42) +
+    lock(38, 32, 0.4, { open: true, cls: C.amber }),
 );
 draw(
   "RestrictedView",
@@ -551,7 +682,9 @@ draw(
 draw(
   "BackgroundLeftIllustration",
   "0 0 501 226",
-  [0, 1, 2].map((i) => rect(40 + i * 40, 50 + i * 40, 300, 30, 15, C.mint, op(0.55 - i * 0.12))).join("") +
+  [0, 1, 2]
+    .map((i) => rect(40 + i * 40, 50 + i * 40, 300, 30, 15, C.mint, op(0.55 - i * 0.12)))
+    .join("") +
     lock(380, 110, 2.1, { cls: C.mint }) +
     sparkle(450, 40, 2) +
     sparkle(60, 190, 1.4) +
@@ -560,7 +693,9 @@ draw(
 draw(
   "BackgroundRightIllustration",
   "0 0 506 297",
-  [0, 1, 2].map((i) => rect(170 - i * 40, 170 + i * 36, 300, 26, 13, C.mint, op(0.55 - i * 0.12))).join("") +
+  [0, 1, 2]
+    .map((i) => rect(170 - i * 40, 170 + i * 36, 300, 26, 13, C.mint, op(0.55 - i * 0.12)))
+    .join("") +
     `<g opacity="0.85">${plane(150, 90, 2.2, false)}</g>` +
     key(380, 70, 1.8, C.mint, -20) +
     sparkle(60, 50, 1.6) +
@@ -576,7 +711,12 @@ const cog = (() => {
   const pts = [];
   for (let i = 0; i < 8; i++) {
     const a = (i * Math.PI) / 4;
-    for (const [da, r] of [[-0.24, 7.2], [-0.15, 9.4], [0.15, 9.4], [0.24, 7.2]]) {
+    for (const [da, r] of [
+      [-0.24, 7.2],
+      [-0.15, 9.4],
+      [0.15, 9.4],
+      [0.24, 7.2],
+    ]) {
       pts.push(`${n(12 + r * Math.sin(a + da))} ${n(12 - r * Math.cos(a + da))}`);
     }
   }
@@ -588,14 +728,24 @@ const fill = (shape) => shape.replace(/\/>$/, ` class="tw-fill-fg-brand-soft"/>`
 art.VaultInactive = icon(vaultBody);
 art.VaultActive = icon(vaultBody, fill(`<rect x="3" y="4" width="18" height="16" rx="3.5"/>`));
 art.GeneratorInactive = icon(generatorBody);
-art.GeneratorActive = icon(generatorBody, fill(`<rect x="3" y="4" width="18" height="16" rx="5"/>`));
+art.GeneratorActive = icon(
+  generatorBody,
+  fill(`<rect x="3" y="4" width="18" height="16" rx="5"/>`),
+);
 art.SendInactive = icon(sendBody);
 art.SendActive = icon(sendBody, fill(`<path d="M3.5 11.2 20.5 4l-6.6 16-3.2-6.3-7.2-2.5Z"/>`));
 art.SettingsInactive = icon(settingsBody);
 art.SettingsActive = icon(settingsBody, fill(`<path d="${cog}"/>`));
 art.HealthInactive = icon(healthBody);
-art.HealthActive = icon(healthBody, fill(`<path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.4a4.3 4.3 0 0 1 7.5 2.4C19.5 15.4 12 20 12 20Z"/>`));
+art.HealthActive = icon(
+  healthBody,
+  fill(
+    `<path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.4a4.3 4.3 0 0 1 7.5 2.4C19.5 15.4 12 20 12 20Z"/>`,
+  ),
+);
 
-for (const old of fs.readdirSync(here).filter((f) => f.endsWith(".svg"))) fs.rmSync(path.join(here, old));
-for (const [symbol, svg] of Object.entries(art)) fs.writeFileSync(path.join(here, `${symbol}.svg`), svg + "\n");
+for (const old of fs.readdirSync(here).filter((f) => f.endsWith(".svg")))
+  fs.rmSync(path.join(here, old));
+for (const [symbol, svg] of Object.entries(art))
+  fs.writeFileSync(path.join(here, `${symbol}.svg`), svg + "\n");
 console.log(`artwork: ${Object.keys(art).length} drawings`);

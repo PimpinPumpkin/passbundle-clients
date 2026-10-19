@@ -236,13 +236,16 @@ function apply() {
     const rel = `${svgDir}/${file}`;
     let source = read(rel);
     let changed = false;
-    source = source.replace(/((?:export )?const (\w+) = svg`)[\s\S]*?(`;)/g, (all, head, symbol, tail) => {
-      const drawing = drawings.get(symbol);
-      if (!drawing) return all;
-      placed.add(symbol);
-      changed = true;
-      return `${head}\n${drawing}\n${tail}`;
-    });
+    source = source.replace(
+      /((?:export )?const (\w+) = svg`)[\s\S]*?(`;)/g,
+      (all, head, symbol, tail) => {
+        const drawing = drawings.get(symbol);
+        if (!drawing) return all;
+        placed.add(symbol);
+        changed = true;
+        return `${head}\n${drawing}\n${tail}`;
+      },
+    );
     if (changed) write(rel, source);
   }
   const missing = [...drawings.keys()].filter((symbol) => !placed.has(symbol));
@@ -392,7 +395,10 @@ ${scale}
   for (const font of fs.readdirSync(fontDir).filter((f) => f.endsWith(".woff2"))) {
     addFile(path.join(fontDir, font), `libs/components/src/webfonts/${font}`);
   }
-  write(themeFile, read(themeFile) + "\n" + fs.readFileSync(path.join(ROOT, "brand/look.css"), "utf8"));
+  write(
+    themeFile,
+    read(themeFile) + "\n" + fs.readFileSync(path.join(ROOT, "brand/look.css"), "utf8"),
+  );
 
   // Older SCSS and the autofill UI injected into websites hard-code the blue.
   for (const rel of trackedFiles(
