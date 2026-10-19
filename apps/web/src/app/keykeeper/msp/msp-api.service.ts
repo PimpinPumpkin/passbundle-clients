@@ -106,28 +106,34 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
 
   /**
    * Creates an organization outside any MSP, owned by the person, with its
-   * keys made the way upstream's "New organization" makes them. Returns its id.
+   * keys made the way upstream's "New organization" makes them. The Business
+   * preset also gets "Everyone" and "Admins" collections, its policies, and an
+   * install command. Returns its id.
    */
-  async createOrganization(name: string): Promise<string> {
+  async createOrganization(name: string, preset: ClientPreset): Promise<string> {
     const account = await firstValueFrom(this.accountService.activeAccount$);
     const userId = account!.id;
     const [encryptedKey, key] = await this.keyService.makeOrgKey<OrgKey>(userId);
     const [publicKey, encryptedPrivateKey] = await this.keyService.makeKeyPair(key);
+    const business = preset === "business";
     const collectionName = await this.encryptService.encryptString(
-      this.i18nService.t("defaultCollection"),
+      business ? "Everyone" : this.i18nService.t("defaultCollection"),
       key,
     );
+    const adminsCollectionName = business
+      ? (await this.encryptService.encryptString("Admins", key)).encryptedString
+      : undefined;
     const created = await this.apiService.send(
       "POST",
-      "/organizations",
+      "/keykeeper/organizations",
       {
         name,
+        preset,
         billingEmail: account!.email,
         collectionName: collectionName.encryptedString,
+        adminsCollectionName,
         key: encryptedKey.encryptedString,
         keys: { publicKey, encryptedPrivateKey: encryptedPrivateKey.encryptedString },
-        // Free: the server has no plans or billing.
-        planType: 0,
       },
       true,
       true,
@@ -135,6 +141,42 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     await this.apiService.refreshIdentityToken();
     await this.syncService.fullSync(true);
     return created.id;
+  }
+
+  /**
+   * A company's own organization's install command, or for an MSP's client,
+   * which IT provider manages it. Anyone but its owners and admins gets "not found".
+   */
+  async getOrgEnrollment(orgId: string): Promise<ClientEnrollment | { provider: string }> {
+    return this.apiService.send(
+      "GET",
+      `/keykeeper/organizations/${orgId}/enrollment`,
+      null,
+      true,
+      true,
+    );
+  }
+
+  /** Makes a company's own install command, or replaces it so commands with the old token stop working for new joins. */
+  async replaceOrgEnrollment(orgId: string): Promise<ClientEnrollment> {
+    return this.apiService.send(
+      "POST",
+      `/keykeeper/organizations/${orgId}/enrollment`,
+      null,
+      true,
+      true,
+    );
+  }
+
+  /** Limits a company's own install command to accounts at these email domains; none lets anyone join. */
+  async setOrgEnrollmentDomains(orgId: string, domains: string[]): Promise<ClientEnrollment> {
+    return this.apiService.send(
+      "PUT",
+      `/keykeeper/organizations/${orgId}/enrollment/domains`,
+      { domains },
+      true,
+      true,
+    );
   }
 
   /** Adds a template, or changes its source or which clients get it. */
