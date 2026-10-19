@@ -53,6 +53,19 @@
 :root,
 .theme_light {
   --font-sans: "Figtree", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  /* Upstream's grays lean blue; ours lean toward the brand's green, at the same
+     lightness, so every surface built from them follows. */
+  --color-gray-050: #f8f9f9;
+  --color-gray-100: #e9efed;
+  --color-gray-200: #d9e4e0;
+  --color-gray-300: #bbcdc7;
+  --color-gray-400: #8ea69e;
+  --color-gray-500: #6c847c;
+  --color-gray-600: #4e635c;
+  --color-gray-700: #3a4f48;
+  --color-gray-800: #26342f;
+  --color-gray-900: #18221f;
+  --color-gray-950: #0b0f0e;
   --color-illustration-outline: 18 48 42;
   --color-illustration-bg-primary: 214 236 228;
   --color-illustration-bg-secondary: 143 217 193;
