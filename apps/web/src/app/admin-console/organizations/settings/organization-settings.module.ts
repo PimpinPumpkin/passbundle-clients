@@ -8,6 +8,7 @@ import { Vfo1I18nPipe } from "@bitwarden/vault";
 import { DangerZoneComponent } from "../../../auth/settings/account/danger-zone.component";
 import { AccountFingerprintComponent } from "../../../key-management/account-fingerprint/account-fingerprint.component";
 import { KeykeeperOrgJoiningComponent } from "../../../keykeeper/joining/org-joining.component";
+import { KeykeeperOrgInstallComponent } from "../../../keykeeper/organizations/org-install.component";
 import { HeaderModule } from "../../../layouts/header/header.module";
 import { SharedModule } from "../../../shared";
 
@@ -18,8 +19,9 @@ import { TwoFactorSetupComponent } from "./two-factor-setup.component";
 @NgModule({
   imports: [
     SharedModule,
-    // Keykeeper: how people join the organization.
+    // Keykeeper: how people join the organization, and its install command.
     KeykeeperOrgJoiningComponent,
+    KeykeeperOrgInstallComponent,
     OrganizationSettingsRoutingModule,
     AccountFingerprintComponent,
     DangerZoneComponent,
