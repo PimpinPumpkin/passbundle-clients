@@ -44,6 +44,14 @@ function copyInto(fromAbs, rel) {
   fs.copyFileSync(fromAbs, abs(rel));
   touched.add(rel);
 }
+// A file of ours where upstream has none; revert deletes it again.
+function addFile(fromAbs, rel) {
+  if (fs.existsSync(abs(rel))) {
+    fail(`${rel} exists upstream now. Update brand/apply.mjs.`);
+  }
+  fs.copyFileSync(fromAbs, abs(rel));
+  touched.add(rel);
+}
 function replaceAnchored(rel, pattern, replacement) {
   const source = read(rel);
   if (!pattern.test(source)) {
@@ -99,8 +107,17 @@ function revert() {
     return;
   }
   const files = JSON.parse(fs.readFileSync(STATE, "utf8"));
+  // Files we added aren't in git: delete those, restore the rest.
+  const tracked = new Set();
   for (let i = 0; i < files.length; i += 200) {
-    git("checkout", "--", ...files.slice(i, i + 200));
+    for (const f of git("ls-files", "--", ...files.slice(i, i + 200)).split("\n")) {
+      if (f) tracked.add(f);
+    }
+  }
+  const restore = files.filter((f) => tracked.has(f));
+  for (const f of files.filter((f) => !tracked.has(f))) fs.rmSync(abs(f), { force: true });
+  for (let i = 0; i < restore.length; i += 200) {
+    git("checkout", "--", ...restore.slice(i, i + 200));
   }
   fs.rmSync(STATE);
   console.log(`brand: reverted ${files.length} files`);
@@ -202,6 +219,37 @@ function apply() {
       `${declaration} = svg\`${markup}\`;`,
     );
   }
+
+  // 3b. Illustrations and tab icons: ours, drawn from the logo's shapes
+  //     (brand/artwork/draw.mjs), replace each upstream drawing by its name.
+  const artDir = path.join(ROOT, "brand/artwork");
+  const svgDir = "libs/assets/src/svg/svgs";
+  const drawings = new Map(
+    fs
+      .readdirSync(artDir)
+      .filter((f) => f.endsWith(".svg"))
+      .map((f) => [f.slice(0, -4), fs.readFileSync(path.join(artDir, f), "utf8").trim()]),
+  );
+  if (drawings.size < 50) fail(`only ${drawings.size} drawings in brand/artwork. Run draw.mjs.`);
+  const placed = new Set();
+  for (const file of fs.readdirSync(abs(svgDir)).filter((f) => f.endsWith(".ts"))) {
+    const rel = `${svgDir}/${file}`;
+    let source = read(rel);
+    let changed = false;
+    source = source.replace(
+      /((?:export )?const (\w+) = svg`)[\s\S]*?(`;)/g,
+      (all, head, symbol, tail) => {
+        const drawing = drawings.get(symbol);
+        if (!drawing) return all;
+        placed.add(symbol);
+        changed = true;
+        return `${head}\n${drawing}\n${tail}`;
+      },
+    );
+    if (changed) write(rel, source);
+  }
+  const missing = [...drawings.keys()].filter((symbol) => !placed.has(symbol));
+  if (missing.length) fail(`no upstream drawing named ${missing.join(", ")}. Upstream renamed it?`);
 
   // 4. Cloud regions: ours replace Bitwarden's US, EU, and Gov clouds.
   const u = BRAND.urls;
@@ -341,6 +389,17 @@ ${scale}
 }
 `,
   );
+  // 8b. The look: Figtree, green-tinted darks, the brand's illustration colors,
+  //     and the translucent Glass theme (DESIGN.md, "The look").
+  const fontDir = path.join(ROOT, "brand/assets/fonts");
+  for (const font of fs.readdirSync(fontDir).filter((f) => f.endsWith(".woff2"))) {
+    addFile(path.join(fontDir, font), `libs/components/src/webfonts/${font}`);
+  }
+  write(
+    themeFile,
+    read(themeFile) + "\n" + fs.readFileSync(path.join(ROOT, "brand/look.css"), "utf8"),
+  );
+
   // Older SCSS and the autofill UI injected into websites hard-code the blue.
   for (const rel of trackedFiles(
     "apps/browser/src/**/*.scss",

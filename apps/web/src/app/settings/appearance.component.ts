@@ -77,10 +77,11 @@ export class AppearanceComponent implements OnInit {
     localeOptions.sort(Utils.getSortFunction(i18nService, "name"));
     localeOptions.splice(0, 0, { name: i18nService.t("default"), value: null });
     this.localeOptions = localeOptions;
+    // Keykeeper: the System setting is the "Glass" look, and it comes first.
     this.themeOptions = [
+      { name: i18nService.t("keykeeperThemeGlass"), value: ThemeTypes.System },
       { name: i18nService.t("themeLight"), value: ThemeTypes.Light },
       { name: i18nService.t("themeDark"), value: ThemeTypes.Dark },
-      { name: i18nService.t("themeSystem"), value: ThemeTypes.System },
     ];
   }
 

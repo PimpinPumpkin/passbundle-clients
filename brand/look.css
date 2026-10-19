@@ -1,0 +1,259 @@
+/* PassBundle's look, appended to the component library's theme by
+   brand/apply.mjs. See DESIGN.md, "The look".
+
+   Every theme gets the identity: Figtree, green-tinted darks, and the brand's
+   illustration colors. The Glass theme (upstream's System setting, so light or
+   dark like the device) adds translucent surfaces over a soft color field;
+   html.pb-glass turns it on. Light and Dark stay solid, for legibility.
+
+   Rules target upstream's components (bit-*, popup-*) rather than its utility
+   classes, so changes to the markup inside them don't break the look. */
+
+@font-face {
+  font-family: "Figtree";
+  font-style: normal;
+  font-weight: 300 900;
+  font-display: swap;
+  src: url("~@bitwarden/components/src/webfonts/figtree-latin-normal.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Figtree";
+  font-style: normal;
+  font-weight: 300 900;
+  font-display: swap;
+  src: url("~@bitwarden/components/src/webfonts/figtree-latin-ext-normal.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+@font-face {
+  font-family: "Figtree";
+  font-style: italic;
+  font-weight: 300 900;
+  font-display: swap;
+  src: url("~@bitwarden/components/src/webfonts/figtree-latin-italic.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Figtree";
+  font-style: italic;
+  font-weight: 300 900;
+  font-display: swap;
+  src: url("~@bitwarden/components/src/webfonts/figtree-latin-ext-italic.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+/* Identity, in every theme. Figtree covers Latin scripts; Inter, upstream's
+   font, still draws Cyrillic and Greek. */
+:root,
+.theme_light {
+  --font-sans: "Figtree", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  /* Upstream's grays lean blue; ours lean toward the brand's green, at the same
+     lightness, so every surface built from them follows. */
+  --color-gray-050: #f8f9f9;
+  --color-gray-100: #e9efed;
+  --color-gray-200: #d9e4e0;
+  --color-gray-300: #bbcdc7;
+  --color-gray-400: #8ea69e;
+  --color-gray-500: #6c847c;
+  --color-gray-600: #4e635c;
+  --color-gray-700: #3a4f48;
+  --color-gray-800: #26342f;
+  --color-gray-900: #18221f;
+  --color-gray-950: #0b0f0e;
+  --color-illustration-outline: 18 48 42;
+  --color-illustration-bg-primary: 214 236 228;
+  --color-illustration-bg-secondary: 143 217 193;
+  --color-illustration-bg-tertiary: 255 255 255;
+  --color-illustration-tertiary: 232 163 61;
+  --color-illustration-logo: 31 111 92;
+}
+:root.theme_dark,
+.theme_dark {
+  --color-background: 20 32 29;
+  --color-background-alt: 12 21 19;
+  --color-text-main: 232 242 238;
+  --color-text-muted: 160 182 174;
+  --color-nav-bg-primary: #0e211d;
+  --color-nav-bg-secondary: #0e211d;
+  --color-nav-bg-primary-strong: #1d4a3f;
+  --color-nav-bg-secondary-strong: #1d4a3f;
+  --color-illustration-outline: 143 217 193;
+  --color-illustration-bg-primary: 22 60 52;
+  --color-illustration-bg-secondary: 46 156 128;
+  --color-illustration-bg-tertiary: 20 32 29;
+  --color-illustration-tertiary: 232 163 61;
+  --color-illustration-logo: 255 255 255;
+  /* The wordmark: the brand palette's green is too dark on dark surfaces. */
+  --color-marketing-logo: 143 217 193;
+}
+
+/* Glass. */
+.pb-glass {
+  --frost-field:
+    radial-gradient(80vmax 70vmax at -5% -5%, rgb(38 150 120 / 0.78), transparent 64%),
+    radial-gradient(80vmax 70vmax at 112% 36%, rgb(86 120 214 / 0.62), transparent 64%),
+    radial-gradient(70vmax 60vmax at 22% 114%, rgb(236 176 104 / 0.62), transparent 64%), #d9e7e2;
+  --frost-surface: rgb(255 255 255 / 0.5);
+  --frost-surface-strong: rgb(255 255 255 / 0.78);
+  --frost-bar: rgb(255 255 255 / 0.34);
+  --frost-edge: rgb(255 255 255 / 0.8);
+  --frost-line: rgb(18 52 44 / 0.08);
+  --frost-shadow: 0 1px 0 rgb(255 255 255 / 0.6) inset, 0 10px 30px rgb(18 52 44 / 0.1);
+  --frost-nav: rgb(14 52 44 / 0.74);
+  --frost-nav-sticky: rgb(14 52 44 / 0.55);
+  --frost-blur: blur(22px) saturate(170%);
+  --frost-radius: 16px;
+}
+.pb-glass.theme_dark {
+  --frost-field:
+    radial-gradient(80vmax 70vmax at -5% -5%, rgb(46 156 128 / 0.46), transparent 64%),
+    radial-gradient(80vmax 70vmax at 112% 36%, rgb(84 104 214 / 0.4), transparent 64%),
+    radial-gradient(70vmax 60vmax at 22% 114%, rgb(170 110 60 / 0.3), transparent 64%), #0a1412;
+  --frost-surface: rgb(24 38 35 / 0.55);
+  --frost-surface-strong: rgb(28 44 40 / 0.82);
+  --frost-bar: rgb(18 30 27 / 0.45);
+  --frost-edge: rgb(255 255 255 / 0.09);
+  --frost-line: rgb(255 255 255 / 0.07);
+  --frost-shadow: 0 1px 0 rgb(255 255 255 / 0.05) inset, 0 12px 32px rgb(0 0 0 / 0.35);
+  --frost-nav: rgb(8 22 19 / 0.62);
+  --frost-nav-sticky: rgb(8 22 19 / 0.5);
+}
+
+.pb-glass,
+.pb-glass body {
+  background: var(--frost-field) fixed !important;
+}
+
+/* The page shows the field; bars, groups, cards, and panels are glass. */
+.pb-glass popup-page main,
+.pb-glass .tw-bg-background-alt,
+.pb-glass bit-layout main {
+  background-color: transparent !important;
+}
+.pb-glass popup-header header,
+.pb-glass popup-footer footer,
+.pb-glass bit-bottom-navigation footer {
+  background: var(--frost-bar) !important;
+  -webkit-backdrop-filter: var(--frost-blur);
+  backdrop-filter: var(--frost-blur);
+  border-color: var(--frost-line) !important;
+}
+.pb-glass bit-item-group,
+.pb-glass bit-card,
+.pb-glass bit-table,
+.pb-glass app-vault-filter > div,
+.pb-glass app-vault-onboarding > div,
+.pb-glass bit-layout main .tw-rounded-lg.tw-border {
+  display: block;
+  background: var(--frost-surface) !important;
+  -webkit-backdrop-filter: var(--frost-blur);
+  backdrop-filter: var(--frost-blur);
+  border: 1px solid var(--frost-edge) !important;
+  border-radius: var(--frost-radius) !important;
+  box-shadow: var(--frost-shadow);
+  overflow: hidden;
+}
+.pb-glass bit-item-group > h3 {
+  margin: 0;
+  padding: 10px 14px 4px;
+}
+.pb-glass bit-item-group [class*="tw-bg-background"],
+.pb-glass bit-card [class*="tw-bg-background"],
+.pb-glass bit-table table,
+.pb-glass bit-table tr,
+.pb-glass bit-table td,
+.pb-glass bit-table th {
+  background-color: transparent !important;
+}
+.pb-glass bit-item-group bit-item,
+.pb-glass bit-card bit-item {
+  background: transparent !important;
+  border-color: var(--frost-line) !important;
+  border-radius: 0 !important;
+}
+.pb-glass bit-item + bit-item {
+  border-top: 1px solid var(--frost-line);
+}
+.pb-glass bit-item:hover {
+  background: rgb(var(--color-primary-600) / 0.07) !important;
+}
+.pb-glass bit-table td {
+  border-color: var(--frost-line) !important;
+}
+.pb-glass bit-card input,
+.pb-glass bit-card textarea {
+  background-color: rgb(var(--color-background) / 0.35) !important;
+}
+
+/* Fields, search, and filter menus: lighter glass. */
+.pb-glass bit-search input,
+.pb-glass popup-page button[bitbutton][buttontype="secondary"],
+.pb-glass app-vault-list-filters button {
+  background-color: var(--frost-surface-strong) !important;
+  border-color: var(--frost-edge) !important;
+}
+.pb-glass bit-search input {
+  border-radius: 13px !important;
+}
+
+/* Primary buttons: a pill with a soft glow, in every theme. */
+button[bitbutton][buttontype="primary"],
+a[bitbutton][buttontype="primary"] {
+  border-radius: 999px !important;
+}
+.pb-glass button[bitbutton][buttontype="primary"],
+.pb-glass a[bitbutton][buttontype="primary"] {
+  box-shadow: 0 6px 16px rgb(var(--color-primary-600) / 0.28);
+}
+
+/* Banners and callouts: tinted glass instead of solid color. */
+.pb-glass bit-callout > div,
+.pb-glass bit-banner > div {
+  background: var(--frost-surface) !important;
+  -webkit-backdrop-filter: var(--frost-blur);
+  backdrop-filter: var(--frost-blur);
+  border: 1px solid var(--frost-edge) !important;
+  border-radius: var(--frost-radius) !important;
+}
+
+/* Dialogs and menus float above everything: the strongest glass. */
+.pb-glass bit-dialog > section,
+.pb-glass bit-simple-dialog > section,
+.pb-glass .cdk-overlay-pane [role="menu"] {
+  background: var(--frost-surface-strong) !important;
+  -webkit-backdrop-filter: var(--frost-blur);
+  backdrop-filter: var(--frost-blur);
+  border: 1px solid var(--frost-edge) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 24px 60px rgb(0 0 0 / 0.18);
+}
+
+/* The web vault's side nav: smoked glass, so its white text reads in both
+   modes. Its sticky parts sit over scrolled items, so they keep a tint. */
+.pb-glass bit-side-nav > div > nav {
+  background: var(--frost-nav) !important;
+  -webkit-backdrop-filter: var(--frost-blur);
+  backdrop-filter: var(--frost-blur);
+}
+.pb-glass bit-side-nav > div > nav > div > div > [class*="tw-bg-bg-nav"],
+.pb-glass bit-side-nav > div > nav > [class*="tw-bg-bg-nav"] {
+  background: var(--frost-nav-sticky) !important;
+}
+.pb-glass bit-side-nav bit-nav-item [class*="tw-bg-bg-nav"],
+.pb-glass bit-side-nav bit-nav-group [class*="tw-bg-bg-nav"],
+.pb-glass bit-side-nav bit-nav-logo [class*="tw-bg-bg-nav"] {
+  background: transparent !important;
+}
+.pb-glass.theme_dark bit-side-nav > div > nav {
+  border-right: 1px solid var(--frost-line);
+}
