@@ -89,6 +89,8 @@
   --color-illustration-bg-tertiary: 20 32 29;
   --color-illustration-tertiary: 232 163 61;
   --color-illustration-logo: 255 255 255;
+  /* The wordmark: the brand palette's green is too dark on dark surfaces. */
+  --color-marketing-logo: 143 217 193;
 }
 
 /* Glass. */
