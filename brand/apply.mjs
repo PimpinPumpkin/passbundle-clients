@@ -220,6 +220,34 @@ function apply() {
     );
   }
 
+  // 3b. Illustrations and tab icons: ours, drawn from the logo's shapes
+  //     (brand/artwork/draw.mjs), replace each upstream drawing by its name.
+  const artDir = path.join(ROOT, "brand/artwork");
+  const svgDir = "libs/assets/src/svg/svgs";
+  const drawings = new Map(
+    fs
+      .readdirSync(artDir)
+      .filter((f) => f.endsWith(".svg"))
+      .map((f) => [f.slice(0, -4), fs.readFileSync(path.join(artDir, f), "utf8").trim()]),
+  );
+  if (drawings.size < 50) fail(`only ${drawings.size} drawings in brand/artwork. Run draw.mjs.`);
+  const placed = new Set();
+  for (const file of fs.readdirSync(abs(svgDir)).filter((f) => f.endsWith(".ts"))) {
+    const rel = `${svgDir}/${file}`;
+    let source = read(rel);
+    let changed = false;
+    source = source.replace(/((?:export )?const (\w+) = svg`)[\s\S]*?(`;)/g, (all, head, symbol, tail) => {
+      const drawing = drawings.get(symbol);
+      if (!drawing) return all;
+      placed.add(symbol);
+      changed = true;
+      return `${head}\n${drawing}\n${tail}`;
+    });
+    if (changed) write(rel, source);
+  }
+  const missing = [...drawings.keys()].filter((symbol) => !placed.has(symbol));
+  if (missing.length) fail(`no upstream drawing named ${missing.join(", ")}. Upstream renamed it?`);
+
   // 4. Cloud regions: ours replace Bitwarden's US, EU, and Gov clouds.
   const u = BRAND.urls;
   replaceAnchored(
