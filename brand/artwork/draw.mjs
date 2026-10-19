@@ -7,7 +7,8 @@
 // Colors come from the theme's classes, so the art follows light, dark, and
 // glass: brand green, its soft tint, the illustration fills (pale, mint,
 // white), the outline ink, and the amber accent. Only classes upstream's own
-// art already uses, so the build has them.
+// art already uses, so the build has them. Each drawing says data-art="passbundle",
+// so tests can tell it from upstream's.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -252,14 +253,14 @@ function clock(cx, cy, r) {
 /** A tab bar icon: 24 by 24, drawn in the label's color (currentColor), the
  *  active one with a soft brand fill behind. */
 const icon = (body, fill = "") =>
-  `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">${fill}<g stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none">${body}</g></svg>`;
+  `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" data-art="passbundle">${fill}<g stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none">${body}</g></svg>`;
 
 // Drawings: each [symbol, viewBox, content], content in the viewBox's units.
 const art = {};
 function draw(symbol, viewBox, content) {
   const [x, y] = viewBox.split(" ").map(Number);
   art[symbol] =
-    `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="${viewBox}"><g transform="translate(${x} ${y})">${content}</g></svg>`;
+    `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="${viewBox}" data-art="passbundle"><g transform="translate(${x} ${y})">${content}</g></svg>`;
 }
 
 draw("LockIcon", "0 0 80 73.33", pad(40, 40, 33) + lock(40, 40, 1) + sparkle(68, 14, 0.9) + sparkle(12, 22, 0.6));
