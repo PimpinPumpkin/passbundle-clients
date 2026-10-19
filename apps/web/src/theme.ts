@@ -17,6 +17,8 @@ const setTheme = () => {
   let theme = defaultTheme;
 
   const themeFromState = window.localStorage.getItem("global_theming_selection");
+  // Keykeeper: the System setting, the default, is the translucent "Glass" look.
+  htmlEl.classList.toggle("pb-glass", !themeFromState || themeFromState.indexOf("system") > -1);
 
   if (themeFromState) {
     if (themeFromState.indexOf("system") > -1) {
