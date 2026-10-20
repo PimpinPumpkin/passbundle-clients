@@ -44,7 +44,7 @@ type Options = {
   managedServer?: string | null;
   accountServer?: string;
   saved?: EnrollmentState;
-  answer?: boolean | null;
+  answer?: boolean | null | undefined;
   msps?: unknown[];
   organizations?: Partial<Organization>[];
 };
@@ -55,10 +55,11 @@ function setUp(options: Options = {}) {
     managedServer = server,
     accountServer = server,
     saved = {},
-    answer = true,
     msps = [],
     organizations = [],
   } = options;
+  // An explicit undefined means the window couldn't open.
+  const answer = "answer" in options ? options.answer : true;
   const apiService = mock<ApiService>();
   const keyService = mock<KeyService>();
   const encryptService = mock<EncryptService>();
@@ -244,6 +245,15 @@ describe("Keykeeper enrollment through the install command", () => {
     });
     weekAgo.respond(weekAgo.info(false));
     expect(await weekAgo.enrollment.run(userId)).toBe("joined");
+  });
+
+  it("tries again later when it couldn't ask, rather than taking it as not now", async () => {
+    const t = setUp({ answer: undefined });
+    t.respond(t.info(false));
+
+    expect(await t.enrollment.run(userId)).toBe("failed");
+    expect(t.paths()).not.toContain("/keykeeper/enrollment/join");
+    expect(t.state()[userId].result).toEqual({ error: expect.stringContaining("Couldn't open") });
   });
 
   it("leaves MSP staff alone: they sign in on clients' computers but never join this way", async () => {

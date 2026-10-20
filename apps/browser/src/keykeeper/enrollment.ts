@@ -62,8 +62,11 @@ export interface EnrollmentPlatform {
   load(): Promise<EnrollmentState>;
   save(state: EnrollmentState): Promise<void>;
   notify(title: string, message: string): Promise<void>;
-  /** Asks the person whether to join: true to join, false or null (closed) for not now. */
-  ask(request: JoinRequest, userId: UserId, tokenHash: string): Promise<boolean | null>;
+  /**
+   * Asks the person whether to join: true to join, false or null (closed) for
+   * not now, undefined when the window couldn't open.
+   */
+  ask(request: JoinRequest, userId: UserId, tokenHash: string): Promise<boolean | null | undefined>;
   /**
    * Calls back when the person answers. The background can sleep while the
    * prompt is open, and then nothing is waiting for the answer anymore.
@@ -132,9 +135,9 @@ export const chromeEnrollmentPlatform: EnrollmentPlatform = {
     const stored: StoredJoinRequest = { ...request, id: Utils.newGuid(), userId, tokenHash };
     await chrome.storage.session.remove(JOIN_ANSWER_KEY);
     await chrome.storage.session.set({ [JOIN_REQUEST_KEY]: stored });
-    return new Promise<boolean | null>((resolve) => {
+    return new Promise<boolean | null | undefined>((resolve) => {
       let windowId: number | undefined;
-      const finish = (answer: boolean | null) => {
+      const finish = (answer: boolean | null | undefined) => {
         BrowserApi.removeListener(chrome.storage.onChanged, onChanged);
         BrowserApi.removeListener(chrome.windows.onRemoved, onRemoved);
         void chrome.storage.session.remove([JOIN_REQUEST_KEY, JOIN_ANSWER_KEY]);
@@ -157,12 +160,23 @@ export const chromeEnrollmentPlatform: EnrollmentPlatform = {
       BrowserApi.addListener(chrome.storage.onChanged, onChanged);
       BrowserApi.addListener(chrome.windows.onRemoved, onRemoved);
       // A prompt left open from before shows an older question; replace it.
-      BrowserPopupUtils.openPopout("popup/index.html#/keykeeper-join", {
-        singleActionKey: "keykeeper-join",
-        forceCloseExistingWindows: true,
-      })
-        .then((opened: chrome.windows.Window | undefined) => (windowId = opened?.id))
-        .catch(() => finish(null));
+      // Upstream places the window by the browser's; a place partly off the
+      // screen fails, and then the browser places it.
+      const url = "popup/index.html#/keykeeper-join";
+      const options = { singleActionKey: "keykeeper-join", forceCloseExistingWindows: true };
+      void (async () => {
+        const opened: chrome.windows.Window | undefined =
+          (await BrowserPopupUtils.openPopout(url, options)) ??
+          (await BrowserPopupUtils.openPopout(url, {
+            ...options,
+            windowOptions: { left: undefined, top: undefined },
+          }));
+        if (opened?.id == null) {
+          finish(undefined);
+        } else {
+          windowId = opened.id;
+        }
+      })().catch(() => finish(undefined));
     });
   },
 };
@@ -317,6 +331,11 @@ export class KeykeeperEnrollment {
         userId,
         tokenHash,
       );
+      if (answer === undefined) {
+        throw new Error(
+          `Couldn't open the window asking whether to join ${info.organizationName}. Unlock again to see it.`,
+        );
+      }
       if (answer !== true) {
         state[userId] = { tokenHash, result: "declined", at: Date.now() };
         await this.platform.save(state);
