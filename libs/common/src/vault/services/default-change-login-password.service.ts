@@ -4,6 +4,7 @@ import { ApiService } from "../../abstractions/api.service";
 import { DomainSettingsService } from "../../autofill/services/domain-settings.service";
 import { EnvironmentService } from "../../platform/abstractions/environment.service";
 import { Utils } from "../../platform/misc/utils";
+import { changePasswordUrlFor } from "../../tools/keykeeper/change-password-urls";
 import { ChangeLoginPasswordService } from "../abstractions/change-login-password.service";
 import { CipherType } from "../enums";
 import { ChangePasswordUriResponse } from "../models/response/change-password-uri.response";
@@ -32,6 +33,15 @@ export class DefaultChangeLoginPasswordService implements ChangeLoginPasswordSer
 
     if (urls.length === 0) {
       return null;
+    }
+
+    // Keykeeper: a site's own change-password page from a published list, found
+    // on the device without asking a server (ours doesn't answer the lookup below).
+    for (const url of urls) {
+      const known = changePasswordUrlFor(url.hostname);
+      if (known) {
+        return known;
+      }
     }
 
     const enableFaviconChangePassword = await firstValueFrom(
