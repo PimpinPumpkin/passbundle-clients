@@ -213,6 +213,37 @@ export function isMspTemplateCopy(item: ItemLike): boolean {
   return templateDefinition(item)?.from != null;
 }
 
+/**
+ * The starting fields for a new custom template made from an item ("Save as
+ * template"): its definition (logins for a login, notes otherwise) and the
+ * item's own custom fields by label and kind, never their values, which belong
+ * to that item. The editor opens these as a new note, so nothing is saved
+ * until the person saves it. Null for an item that's already a template, or a
+ * kind of item templates don't cover.
+ */
+export function templateFieldsFromItem(item: {
+  type?: CipherType | null;
+  fields?: FieldLike[] | null;
+}): FieldView[] | null {
+  if (
+    (item.type !== CipherType.Login && item.type !== CipherType.SecureNote) ||
+    templateDefinition(item) != null
+  ) {
+    return null;
+  }
+  const fields = visibleCustomFields(item.fields).flatMap((f): FieldView[] => {
+    if (f.type !== FieldType.Text && f.type !== FieldType.Hidden && f.type !== FieldType.Boolean) {
+      return [];
+    }
+    const field = new FieldView();
+    field.name = f.name ?? "";
+    field.type = f.type;
+    field.value = f.type === FieldType.Boolean ? "false" : "";
+    return [field];
+  });
+  return [...fields, newTemplateDefinitionField(item.type === CipherType.Login ? "login" : "note")];
+}
+
 type TemplateItem = {
   id?: string | null;
   name?: string | null;

@@ -11,6 +11,7 @@ import {
   templateCipherType,
   templateDefinition,
   templateFields,
+  templateFieldsFromItem,
   templateGroups,
   templateOf,
 } from "./templates";
@@ -258,5 +259,42 @@ describe("Keykeeper custom templates", () => {
     });
     expect(templateDefinition(withFrom("   "))).toEqual({ id: "t1", base: "note" });
     expect(templateDefinition(withFrom("x".repeat(101)))).toEqual({ id: "t1", base: "note" });
+  });
+});
+
+describe("templateFieldsFromItem", () => {
+  const field = (name: string, type: FieldType, value: string) =>
+    Object.assign(new FieldView(), { name, type, value });
+
+  it("takes a login's own custom fields by label and kind, never their values", () => {
+    const fields = templateFieldsFromItem({
+      type: CipherType.Login,
+      fields: [
+        field("Tenant", FieldType.Text, "contoso.onmicrosoft.com"),
+        field("Break-glass PIN", FieldType.Hidden, "8462"),
+        field("MFA enforced", FieldType.Boolean, "true"),
+        field("Linked", FieldType.Linked, "100"),
+        field("keykeeper.expires", FieldType.Text, "2027-01-01"),
+      ],
+    })!;
+
+    expect(fields.slice(0, -1).map((f) => [f.name, f.type, f.value])).toEqual([
+      ["Tenant", FieldType.Text, ""],
+      ["Break-glass PIN", FieldType.Hidden, ""],
+      ["MFA enforced", FieldType.Boolean, "false"],
+    ]);
+    expect(templateDefinition({ fields })).toEqual({ id: expect.any(String), base: "login" });
+  });
+
+  it("makes a note template from a note", () => {
+    const fields = templateFieldsFromItem({ type: CipherType.SecureNote, fields: [] })!;
+    expect(fields).toHaveLength(1);
+    expect(templateDefinition({ fields })?.base).toBe("note");
+  });
+
+  it("makes nothing from a template, or from a kind of item templates don't cover", () => {
+    const template = { type: CipherType.SecureNote, fields: [newTemplateDefinitionField("login")] };
+    expect(templateFieldsFromItem(template)).toBeNull();
+    expect(templateFieldsFromItem({ type: CipherType.Card, fields: [] })).toBeNull();
   });
 });

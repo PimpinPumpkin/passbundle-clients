@@ -25,6 +25,7 @@ import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/pl
 import { CipherId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
+import { templateDefinition } from "@bitwarden/common/vault/keykeeper/templates";
 import {
   CipherViewLike,
   CipherViewLikeUtils,
@@ -473,6 +474,23 @@ export class VaultCipherRowComponent<C extends CipherViewLike> implements OnInit
 
   protected clone() {
     this.onEvent.emit({ type: "clone", item: this.cipher });
+  }
+
+  /**
+   * Keykeeper: "Save as template" for a login or note that isn't a template,
+   * where cloning is allowed (it makes a new item from this one's fields).
+   */
+  protected get showSaveAsTemplate() {
+    const type = CipherViewLikeUtils.getType(this.cipher);
+    return (
+      this.showClone &&
+      (type === CipherType.Login || type === CipherType.SecureNote) &&
+      templateDefinition(this.cipher) == null
+    );
+  }
+
+  protected saveAsTemplate() {
+    this.onEvent.emit({ type: "keykeeperSaveAsTemplate", item: this.cipher });
   }
 
   protected events() {

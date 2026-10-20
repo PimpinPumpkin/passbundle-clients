@@ -18,6 +18,7 @@ import { CipherArchiveService } from "@bitwarden/common/vault/abstractions/ciphe
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { PremiumUpgradePromptService } from "@bitwarden/common/vault/abstractions/premium-upgrade-prompt.service";
 import { CipherRepromptType, CipherType } from "@bitwarden/common/vault/enums";
+import { templateDefinition } from "@bitwarden/common/vault/keykeeper/templates";
 import { CipherAuthorizationService } from "@bitwarden/common/vault/services/cipher-authorization.service";
 import { RestrictedItemTypesService } from "@bitwarden/common/vault/services/restricted-item-types.service";
 import {
@@ -288,6 +289,31 @@ export class ItemMoreOptionsComponent {
    * A password reprompt is attempted if the cipher requires it.
    * A confirmation dialog is shown if the cipher has FIDO2 credentials.
    */
+  /** Keykeeper: a login or note that isn't a template can be saved as one. */
+  protected get canSaveAsTemplate(): boolean {
+    const type = CipherViewLikeUtils.getType(this.cipher);
+    return (
+      (type === CipherType.Login || type === CipherType.SecureNote) &&
+      templateDefinition(this.cipher) == null
+    );
+  }
+
+  /** Keykeeper: opens a new custom template with this item's fields and name, unsaved. */
+  async saveAsTemplate() {
+    if (
+      this.cipher.reprompt === CipherRepromptType.Password &&
+      !(await this.passwordRepromptService.showPasswordPrompt())
+    ) {
+      return;
+    }
+    await this.router.navigate(["/add-cipher"], {
+      queryParams: {
+        type: CipherType.SecureNote.toString(),
+        keykeeperTemplateFrom: this.cipher.id,
+      } as AddEditQueryParams,
+    });
+  }
+
   async clone() {
     if (
       this.cipher.reprompt === CipherRepromptType.Password &&

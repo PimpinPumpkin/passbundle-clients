@@ -111,6 +111,7 @@ import {
   FolderFilter,
   KeykeeperTemplatePickerDialogComponent,
   newTemplateDefinitionField,
+  templateFieldsFromItem,
   openBulkMoveDialog,
   OrganizationFilter,
   PasswordRepromptService,
@@ -691,6 +692,10 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
         case "clone":
           await this.cloneCipher(event.item);
           break;
+        // Keykeeper: a new custom template from an item's fields.
+        case "keykeeperSaveAsTemplate":
+          await this.saveAsTemplate(event.item);
+          break;
         case "restore":
           if (event.items.length === 1) {
             await this.restore(event.items[0]);
@@ -1070,7 +1075,16 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
     }
   }
 
-  async addCipher(cipherType?: CipherType, keykeeperFields?: FieldView[]) {
+  /** Keykeeper: opens a new custom template with an item's fields and name, unsaved. */
+  async saveAsTemplate(item: C) {
+    const view = await this.cipherService.getFullCipherView(item);
+    const fields = templateFieldsFromItem(view);
+    if (fields != null) {
+      await this.addCipher(CipherType.SecureNote, fields, view.name);
+    }
+  }
+
+  async addCipher(cipherType?: CipherType, keykeeperFields?: FieldView[], keykeeperName?: string) {
     const type = cipherType ?? this.activeFilter.cipherType;
     const cipherFormConfig = await this.cipherFormConfigService.buildConfig("add", undefined, type);
     const collectionId =
@@ -1104,6 +1118,7 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
       collectionIds: [collectionId as CollectionId],
       folderId: this.activeFilter.folderId,
       fields: keykeeperFields,
+      name: keykeeperName,
     };
 
     await this.openVaultItemDialog("form", cipherFormConfig);
