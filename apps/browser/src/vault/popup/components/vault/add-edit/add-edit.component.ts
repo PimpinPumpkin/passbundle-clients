@@ -46,6 +46,7 @@ import {
   DefaultCipherFormConfigService,
   ItemTemplate,
   newTemplateDefinitionField,
+  templateFieldsFromItem,
   OptionalInitialValues,
   TemplateBase,
   templateFields,
@@ -107,6 +108,7 @@ class QueryParams {
       params.keykeeperNewTemplate === "login" || params.keykeeperNewTemplate === "note"
         ? params.keykeeperNewTemplate
         : undefined;
+    this.keykeeperTemplateFrom = params.keykeeperTemplateFrom;
   }
 
   /**
@@ -180,6 +182,9 @@ class QueryParams {
 
   /** Keykeeper: the new item is a custom template for logins or notes. */
   keykeeperNewTemplate?: TemplateBase;
+
+  /** Keykeeper: the new item is a custom template made from this item's fields. */
+  keykeeperTemplateFrom?: string;
 }
 
 export type AddEditQueryParams = Partial<Record<keyof QueryParams, string>>;
@@ -538,6 +543,13 @@ export class AddEditComponent implements OnInit, OnDestroy {
       initialValues.fields = templateFields(template);
     } else if (params.keykeeperNewTemplate) {
       initialValues.fields = [newTemplateDefinitionField(params.keykeeperNewTemplate)];
+    } else if (params.keykeeperTemplateFrom) {
+      const from = await this.keykeeperItem(params.keykeeperTemplateFrom);
+      const fields = from ? templateFieldsFromItem(from) : null;
+      if (from && fields) {
+        initialValues.fields = fields;
+        initialValues.name = from.name;
+      }
     }
 
     if (params.prefillNameAndURIFromTab) {
@@ -548,6 +560,11 @@ export class AddEditComponent implements OnInit, OnDestroy {
     }
 
     return initialValues;
+  }
+
+  private async keykeeperItem(id: string): Promise<CipherView | undefined> {
+    const userId = await firstValueFrom(this.userId$);
+    return (await this.cipherService.getAllDecrypted(userId)).find((c) => c.id === id);
   }
 
   private async keykeeperTemplate(params: QueryParams): Promise<ItemTemplate | null> {

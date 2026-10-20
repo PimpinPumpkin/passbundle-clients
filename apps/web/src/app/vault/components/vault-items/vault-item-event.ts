@@ -14,4 +14,6 @@ export type VaultItemEvent<C extends CipherViewLike> =
       readonly: boolean;
       initialPermission?: CollectionPermission;
     }
-  | { type: "editCollection"; item: CollectionView; readonly: boolean };
+  | { type: "editCollection"; item: CollectionView; readonly: boolean }
+  // Keykeeper: a new custom template from an item's fields.
+  | { type: "keykeeperSaveAsTemplate"; item: C };

@@ -32,6 +32,10 @@
             {{ "clone" | i18n }}
           </a>
         }
+        <!-- Keykeeper: a new custom template from this item's fields -->
+        @if ((canClone$ | async) && canSaveAsTemplate) {
+          <a bitMenuItem (click)="saveAsTemplate()">Save as template</a>
+        }
         @if (canAssignCollections$ | async) {
           <a bitMenuItem (click)="conditionallyNavigateToAssignCollections()">
             {{ "assignToCollections" | vfo1I18n: "addToSharedFolder" }}
