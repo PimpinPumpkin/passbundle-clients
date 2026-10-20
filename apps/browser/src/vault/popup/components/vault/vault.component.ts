@@ -59,6 +59,7 @@ import {
 } from "@bitwarden/vault";
 
 import { CurrentAccountComponent } from "../../../../auth/popup/account-switching/current-account.component";
+import { KeykeeperTwoStepNeededComponent } from "../../../../keykeeper/popup/two-step-needed.component";
 import { PopOutComponent } from "../../../../platform/popup/components/pop-out.component";
 import { PopupHeaderComponent } from "../../../../platform/popup/layout/popup-header.component";
 import { PopupPageComponent } from "../../../../platform/popup/layout/popup-page.component";
@@ -96,6 +97,7 @@ type VaultState = UnionOfValues<typeof VaultState>;
   selector: "app-vault",
   templateUrl: "vault.component.html",
   imports: [
+    KeykeeperTwoStepNeededComponent,
     BlockedInjectionBanner,
     FillAssistActiveBannerComponent,
     PopupPageComponent,

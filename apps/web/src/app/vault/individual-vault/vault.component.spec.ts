@@ -73,6 +73,7 @@ import {
 } from "@bitwarden/vault";
 
 import { OrganizationWarningsService } from "../../billing/organizations/warnings/services";
+import { KeykeeperMspApiService } from "../../keykeeper/msp/msp-api.service";
 import { ProductSwitcherService } from "../../layouts/product-switcher/shared/product-switcher.service";
 import { VaultItemsComponent } from "../components/vault-items/vault-items.component";
 import { WebVaultExtensionPromptService } from "../services/web-vault-extension-prompt.service";
@@ -163,6 +164,8 @@ describe("VaultComponent", () => {
         { provide: SearchService, useValue: mock<SearchService>() },
         { provide: SearchPipe, useValue: mock<SearchPipe>() },
         { provide: ApiService, useValue: mock<ApiService>() },
+        // Keykeeper: the two-step login notice asks who's waiting.
+        { provide: KeykeeperMspApiService, useValue: { twoStepNeeded: () => Promise.resolve([]) } },
         { provide: ToastService, useValue: mock<ToastService>() },
         { provide: BillingApiServiceAbstraction, useValue: mock<BillingApiServiceAbstraction>() },
         { provide: OrganizationWarningsService, useValue: mock<OrganizationWarningsService>() },

@@ -39,7 +39,7 @@
     (removed)="load(organization)"
   ></app-keykeeper-client-msp-banner>
   <!-- Keykeeper: opening this page lets in anyone waiting. -->
-  <app-keykeeper-members-joining (joined)="load(organization)" />
+  <app-keykeeper-members-joining [organization]="organization" (joined)="load(organization)" />
 
   <div class="tw-mb-4">
     @if (showUserManagementControls()) {
