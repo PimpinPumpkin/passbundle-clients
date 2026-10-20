@@ -448,15 +448,17 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
   }
 
   /** Changes a default, and with it every client that follows it. */
+  /** Changes a default; `keep` names following clients to leave as they are. */
   async setDefaultPolicy(
     mspId: string,
     type: number,
     policy: { enabled: boolean; data: any },
+    keep: string[] = [],
   ): Promise<DefaultPolicyResult> {
     return this.apiService.send(
       "PUT",
       `/keykeeper/msp/${mspId}/policies/${type}`,
-      policy,
+      { ...policy, keep },
       true,
       true,
     );

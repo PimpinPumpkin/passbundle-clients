@@ -149,7 +149,10 @@ export class KeykeeperDefaultPoliciesComponent {
     if (definition == null) {
       return;
     }
-    const followers = this.policies().clients.length - row.own.length;
+    const own = new Set(row.own.map((c) => c.id));
+    const followers = this.policies()
+      .clients.filter((c) => !own.has(c.id))
+      .map(({ id, name }) => ({ id, name }));
     const saved = await firstValueFrom(
       KeykeeperDefaultPolicyDialogComponent.open(this.dialogService, {
         definition,
@@ -161,10 +164,11 @@ export class KeykeeperDefaultPoliciesComponent {
     if (saved == null) {
       return;
     }
+    const reached = followers.length - saved.keep.length;
     const revokes = REVOKING[row.type as PolicyType];
-    if (saved.enabled && !row.default.enabled && revokes && followers > 0) {
+    if (saved.enabled && !row.default.enabled && revokes && reached > 0) {
       const confirmed = await this.dialogService.openSimpleDialog({
-        title: `Turn on ${this.nameOf(row.type)} in ${followers === 1 ? "1 client" : followers + " clients"}?`,
+        title: `Turn on ${this.nameOf(row.type)} in ${reached === 1 ? "1 client" : reached + " clients"}?`,
         content: `${revokes} MSP staff aren't affected.`,
         acceptButtonText: "Turn it on",
         type: "warning",
@@ -174,7 +178,12 @@ export class KeykeeperDefaultPoliciesComponent {
       }
     }
     await this.attempt(async () => {
-      const result = await this.mspApi.setDefaultPolicy(this.mspId(), row.type, saved);
+      const result = await this.mspApi.setDefaultPolicy(
+        this.mspId(),
+        row.type,
+        { enabled: saved.enabled, data: saved.data },
+        saved.keep,
+      );
       this.report(`Saved the default. ${describePolicyResult(result)}`, result.refused.length);
     });
   }
