@@ -3,7 +3,7 @@ import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
 import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
 
-import { clientHealth, StrengthScorer, usernameHints } from "./client-health";
+import { clientHealth, expiringItems, StrengthScorer, usernameHints } from "./client-health";
 
 const today = new Date(2026, 9, 15);
 
@@ -86,5 +86,41 @@ describe("MSP client health", () => {
 
     expect(seen).toEqual([["jane", "doe"], null]);
     expect(usernameHints("Front.Desk-01")).toEqual(["front", "desk"]);
+  });
+});
+
+describe("Expiring across clients", () => {
+  const named = (cipher: CipherView, id: string, name: string) =>
+    Object.assign(cipher, { id, name });
+  const clients = [
+    { id: "acme", name: "Acme Dental" },
+    { id: "baker", name: "Baker Law" },
+  ];
+
+  it("lists expired and soon-expiring items in the clients' vaults, soonest first", () => {
+    const list = expiringItems(
+      [
+        named(expiringNote("baker", "2026-10-30"), "1", "Wildcard certificate"),
+        named(expiringNote("acme", "2026-09-30"), "2", "Old license"),
+        named(expiringNote("acme", "2026-10-15"), "3", "Domain"),
+        named(expiringNote("acme", "2027-03-01"), "4", "Far off"),
+        named(expiringNote("elsewhere", "2026-10-01"), "5", "Not a client's"),
+        named(login("acme", "x"), "6", "No date"),
+      ],
+      clients,
+      today,
+    );
+
+    expect(list.map((i) => [i.name, i.client, i.status.state])).toEqual([
+      ["Old license", "Acme Dental", "expired"],
+      ["Domain", "Acme Dental", "today"],
+      ["Wildcard certificate", "Baker Law", "soon"],
+    ]);
+  });
+
+  it("leaves out the trash", () => {
+    const trashed = named(expiringNote("acme", "2026-10-01"), "1", "Trashed");
+    trashed.deletedDate = new Date(2026, 9, 2);
+    expect(expiringItems([trashed], clients, today)).toEqual([]);
   });
 });
