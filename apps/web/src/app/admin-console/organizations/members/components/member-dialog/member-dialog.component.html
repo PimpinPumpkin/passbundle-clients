@@ -115,6 +115,8 @@
                 <bit-form-control>
                   <input type="checkbox" bitCheckbox formControlName="accessImportExport" />
                   <bit-label>{{ "accessImportExport" | i18n }}</bit-label>
+                  <!-- Keykeeper: what the permission covers here. -->
+                  <bit-hint>{{ "keykeeperImportExportHint" | i18n }}</bit-hint>
                 </bit-form-control>
                 <!-- Keykeeper: our server doesn't support the reports, groups, and SSO
                      permissions yet, so they aren't offered. -->
@@ -152,6 +154,8 @@
                   <bit-form-control>
                     <input type="checkbox" bitCheckbox formControlName="manageResetPassword" />
                     <bit-label>{{ "manageAccountRecovery" | i18n }}</bit-label>
+                    <!-- Keykeeper: what the permission lets someone do. -->
+                    <bit-hint>{{ "keykeeperManageAccountRecoveryHint" | i18n }}</bit-hint>
                   </bit-form-control>
                 </div>
               </div>

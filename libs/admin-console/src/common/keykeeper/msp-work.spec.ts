@@ -64,11 +64,12 @@ const member = (organizationId: string, memberId: string, autoConfirm = true): P
 });
 
 describe("MSP background work", () => {
-  it("confirms members waiting in clients the person has the key for, and reports the ones it couldn't", async () => {
+  it("confirms members waiting in clients the person has the key for, leaves the ones needing approval, and reports the ones it couldn't", async () => {
     const { work, requests, organizationUserService } = setup();
     requests.pending.mockResolvedValue([
       member("dental", "ana"),
       member("dental", "ben"),
+      member("dental", "dee", false),
       member("unknown-org", "cy"),
     ]);
     organizationUserService.confirmUser.mockImplementation((_org, memberId) =>
@@ -84,6 +85,7 @@ describe("MSP background work", () => {
       failed: ["ben@example.test in Acme Dental: Already confirmed"],
     });
     expect(organizationUserService.confirmUser).toHaveBeenCalledTimes(2);
+    expect(organizationUserService.confirmUser.mock.calls.map((c) => c[1])).toEqual(["ana", "ben"]);
     expect(updated).toHaveBeenCalledTimes(1);
   });
 

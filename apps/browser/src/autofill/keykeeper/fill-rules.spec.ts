@@ -52,7 +52,11 @@ function loginItem(fields: FieldView[] = []): CipherView {
   return cipher;
 }
 
-const rule = (field: FillRule["field"], fill: FillSource): FillRule => ({ v: 1, field, fill });
+const HOST = "bank.example.com";
+const PAGE = `https://${HOST}/login`;
+
+const rule = (field: FillRule["field"], fill: FillSource, host: string | null = HOST): FillRule =>
+  host == null ? { v: 1, field, fill } : { v: 1, host, field, fill };
 
 function fill(fillScript: AutofillScript, field: AutofillField, value: string) {
   fillScript.script.push(["fill_by_opid", field.opid, value]);
@@ -83,6 +87,18 @@ describe("Keykeeper fill rules", () => {
   });
 
   describe("fieldMatches", () => {
+    it("lets the id decide whenever the rule has one", () => {
+      expect(
+        fieldMatches(
+          { id: "custno", name: "customer", label: "customer number" },
+          pageField({ htmlName: "customer", "label-tag": "Customer number" }),
+        ),
+      ).toBe(false);
+      expect(fieldMatches({ name: "pin", label: "pin" }, pageField({ "label-tag": "PIN" }))).toBe(
+        false,
+      );
+    });
+
     it("lets the id decide when both sides have one", () => {
       const fingerprint = { id: "custno", label: "customer number" };
 
@@ -132,6 +148,17 @@ describe("Keykeeper fill rules", () => {
       ]);
     });
 
+    it("keeps rules for the same field on different hosts apart", () => {
+      const cipher = loginItem();
+      upsertFillRule(cipher, rule({ id: "pin" }, { from: "password" }));
+      upsertFillRule(cipher, rule({ id: "pin" }, { from: "never" }, "other.example.com"));
+
+      expect(readFillRules(cipher)).toEqual([
+        rule({ id: "pin" }, { from: "password" }),
+        rule({ id: "pin" }, { from: "never" }, "other.example.com"),
+      ]);
+    });
+
     it("stores a rule as a hidden field and replaces an older rule for the same field", () => {
       const cipher = loginItem([customField("Customer ID", "C-12345")]);
 
@@ -160,6 +187,7 @@ describe("Keykeeper fill rules", () => {
       const cipher = loginItem([customField("Customer ID", "C-12345")]);
       upsertFillRule(cipher, rule({ id: "custno" }, { from: "field", name: "Customer ID" }));
       const pageDetails = {
+        url: PAGE,
         fields: [pageField({ opid: "__1", htmlID: "custno" })],
       } as AutofillPageDetails;
       const fillScript = new AutofillScript();
@@ -175,6 +203,7 @@ describe("Keykeeper fill rules", () => {
       const cipher = loginItem();
       upsertFillRule(cipher, rule({ id: "pin" }, { from: "never" }));
       const pageDetails = {
+        url: PAGE,
         fields: [pageField({ opid: "__2", htmlID: "pin", type: "password" })],
       } as AutofillPageDetails;
       const fillScript = new AutofillScript();
@@ -198,6 +227,7 @@ describe("Keykeeper fill rules", () => {
       const cipher = loginItem();
       upsertFillRule(cipher, rule({ name: "otp" }, { from: "totp" }));
       const pageDetails = {
+        url: PAGE,
         fields: [pageField({ opid: "__3", htmlName: "otp" })],
       } as AutofillPageDetails;
       const fillScript = new AutofillScript();
@@ -212,6 +242,7 @@ describe("Keykeeper fill rules", () => {
       upsertFillRule(cipher, rule({ id: "a" }, { from: "password" }));
       upsertFillRule(cipher, rule({ id: "b" }, { from: "field", name: "Deleted field" }));
       const pageDetails = {
+        url: PAGE,
         fields: [pageField({ opid: "__4", htmlID: "a" }), pageField({ opid: "__5", htmlID: "b" })],
       } as AutofillPageDetails;
       const fillScript = new AutofillScript();
@@ -229,6 +260,88 @@ describe("Keykeeper fill rules", () => {
       expect(fillScript.script).toEqual([]);
     });
 
+    const run = async (cipher: CipherView, fields: AutofillField[], url = PAGE) => {
+      const fillScript = new AutofillScript();
+      const neverFill = await applyFillRules(
+        cipher,
+        { url, fields } as AutofillPageDetails,
+        fillScript,
+        {},
+        valueFor(cipher),
+        fill,
+      );
+      return { script: fillScript.script, neverFill: [...neverFill] };
+    };
+
+    it("fills only on the host the rule was made on", async () => {
+      const cipher = loginItem([customField("Customer ID", "C-12345")]);
+      upsertFillRule(cipher, rule({ id: "custno" }, { from: "field", name: "Customer ID" }));
+      const field = pageField({ opid: "__1", htmlID: "custno" });
+
+      expect((await run(cipher, [field], "https://evil.example.com/login")).script).toEqual([]);
+      expect((await run(cipher, [field], "https://sub.bank.example.com/login")).script).toEqual([]);
+      expect((await run(cipher, [field], "https://bank.example.com:8443/login")).script).toEqual(
+        [],
+      );
+      expect((await run(cipher, [field])).script).toEqual([["fill_by_opid", "__1", "C-12345"]]);
+    });
+
+    it("fills nothing from a rule without a host, though its never-fill still holds", async () => {
+      const cipher = loginItem();
+      upsertFillRule(cipher, rule({ id: "a" }, { from: "password" }, null));
+      upsertFillRule(cipher, rule({ id: "b" }, { from: "never" }, null));
+      const result = await run(cipher, [
+        pageField({ opid: "__1", htmlID: "a", type: "password" }),
+        pageField({ opid: "__2", htmlID: "b" }),
+      ]);
+
+      expect(result).toEqual({ script: [], neverFill: ["__2"] });
+    });
+
+    it("never fills a field the person can't see", async () => {
+      const cipher = loginItem([customField("Customer ID", "C-12345")]);
+      upsertFillRule(
+        cipher,
+        rule({ label: "customer id" }, { from: "field", name: "Customer ID" }),
+      );
+
+      expect(
+        (
+          await run(cipher, [
+            pageField({ opid: "__1", "label-tag": "Customer ID", viewable: false }),
+            pageField({ opid: "__2", "label-tag": "Customer ID", type: "hidden" }),
+          ])
+        ).script,
+      ).toEqual([]);
+    });
+
+    it("puts a hidden value only into a password field for someone who can't see passwords", async () => {
+      const cipher = loginItem([customField("PIN", "4321", FieldType.Hidden)]);
+      cipher.viewPassword = false;
+      upsertFillRule(cipher, rule({ id: "pw" }, { from: "password" }));
+      upsertFillRule(cipher, rule({ id: "pin" }, { from: "field", name: "PIN" }));
+
+      expect(
+        (
+          await run(cipher, [
+            pageField({ opid: "__1", htmlID: "pw", type: "text" }),
+            pageField({ opid: "__2", htmlID: "pin", type: "text" }),
+          ])
+        ).script,
+      ).toEqual([]);
+      expect(
+        (
+          await run(cipher, [
+            pageField({ opid: "__1", htmlID: "pw", type: "password" }),
+            pageField({ opid: "__2", htmlID: "pin", type: "password" }),
+          ])
+        ).script,
+      ).toEqual([
+        ["fill_by_opid", "__1", "correct-password"],
+        ["fill_by_opid", "__2", "4321"],
+      ]);
+    });
+
     it("does nothing for an item without rules", async () => {
       const cipher = loginItem([customField("Customer ID", "C-12345")]);
       const fillScript = new AutofillScript();
@@ -236,7 +349,7 @@ describe("Keykeeper fill rules", () => {
 
       await applyFillRules(
         cipher,
-        { fields: [pageField({})] } as AutofillPageDetails,
+        { url: PAGE, fields: [pageField({})] } as AutofillPageDetails,
         fillScript,
         {},
         valueForSpy,
