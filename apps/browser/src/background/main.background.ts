@@ -276,6 +276,7 @@ import {
   createCredentialGeneratorService,
   createRandomizer,
   CredentialGeneratorService,
+  forSiteRules,
   Type,
 } from "@bitwarden/generator-core";
 import {
@@ -364,7 +365,6 @@ import {
 } from "../autofill/fido2/services/browser-fido2-user-interface.service";
 import { keykeeperSiteFixes as siteFixHooks } from "../autofill/keykeeper/fill-rules";
 import { KeykeeperSiteFixes } from "../autofill/keykeeper/site-fixes";
-import { forSiteRules } from "../autofill/keykeeper/site-password-rules";
 import { AutofillLifecycleService } from "../autofill/services/abstractions/autofill-lifecycle.service";
 import { AutofillService as AutofillServiceAbstraction } from "../autofill/services/abstractions/autofill.service";
 import { AutofillBadgeUpdaterService } from "../autofill/services/autofill-badge-updater.service";

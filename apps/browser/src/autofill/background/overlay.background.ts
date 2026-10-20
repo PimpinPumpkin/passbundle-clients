@@ -54,7 +54,12 @@ import { Fido2CredentialView } from "@bitwarden/common/vault/models/view/fido2-c
 import { IdentityView } from "@bitwarden/common/vault/models/view/identity.view";
 import { LoginUriView } from "@bitwarden/common/vault/models/view/login-uri.view";
 import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
-import { CredentialGeneratorService, GenerateRequest, Type } from "@bitwarden/generator-core";
+import {
+  CredentialGeneratorService,
+  forSiteRules,
+  GenerateRequest,
+  Type,
+} from "@bitwarden/generator-core";
 import { GeneratorHistoryService } from "@bitwarden/generator-history";
 
 // FIXME (PM-22628): Popup imports are forbidden in background
@@ -76,7 +81,6 @@ import {
   InlineMenuFillTypes,
   MAX_SUB_FRAME_DEPTH,
 } from "../enums/autofill-overlay.enum";
-import { forSiteRules } from "../keykeeper/site-password-rules";
 import AutofillField from "../models/autofill-field";
 import { AutofillService, PageDetail } from "../services/abstractions/autofill.service";
 import { InlineMenuFieldQualificationService } from "../services/abstractions/inline-menu-field-qualifications.service";

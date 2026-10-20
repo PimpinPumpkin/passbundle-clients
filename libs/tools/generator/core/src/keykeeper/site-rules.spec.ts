@@ -1,7 +1,8 @@
 import { meetsRules, rulesForHost } from "@bitwarden/common/tools/keykeeper/password-rules";
-import { GeneratedCredential } from "@bitwarden/generator-core";
 
-import { forSiteRules } from "./site-password-rules";
+import { GeneratedCredential } from "../types";
+
+import { forSiteRules, websiteHost } from "./site-rules";
 
 const at = new Date(2026, 9, 20);
 
@@ -33,5 +34,24 @@ describe("forSiteRules", () => {
     expect(forSiteRules(username, "https://chase.com/")).toBe(username);
     const email = new GeneratedCredential("a^^^^b@example.test", "email", at);
     expect(forSiteRules(email, "https://chase.com/")).toBe(email);
+  });
+});
+
+describe("websiteHost", () => {
+  it.each([
+    ["https://www.Chase.com/login?x=1", "www.chase.com"],
+    ["chase.com", "chase.com"],
+    ["chase.com/login", "chase.com"],
+    ["http://intranet.example:8080/", "intranet.example:8080"],
+    ["", ""],
+    [null, ""],
+    ["androidapp://com.example.app", ""],
+  ])("%s is %s", (website, host) => {
+    expect(websiteHost(website)).toBe(host);
+  });
+
+  it("lets an item's website without a scheme get its site's rules", () => {
+    const generated = new GeneratedCredential("abc^^^DEF&*123xy", "password", at);
+    expect(forSiteRules(generated, "chase.com").credential).not.toBe(generated.credential);
   });
 });
