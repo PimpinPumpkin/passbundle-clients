@@ -4,6 +4,8 @@ import {
   CollectionAdminService,
   KeykeeperJoinChecks,
   KeykeeperMspWork,
+  KeykeeperScriptCopies,
+  KeykeeperScriptRefresher,
   KeykeeperTemplateSender,
   OrganizationUserService,
 } from "@bitwarden/admin-console/common";
@@ -63,6 +65,8 @@ export class KeykeeperMspWorkService extends KeykeeperMspWork {
     syncService: SyncService,
     joinChecks: KeykeeperJoinChecksService,
     toastService: ToastService,
+    encryptService: EncryptService,
+    keyService: KeyService,
   ) {
     super(
       mspApi,
@@ -74,6 +78,13 @@ export class KeykeeperMspWorkService extends KeykeeperMspWork {
       organizationUserService,
       syncService,
       joinChecks,
+      new KeykeeperScriptRefresher(
+        mspApi,
+        new KeykeeperScriptCopies(encryptService),
+        keyService,
+        cipherService,
+        accountService,
+      ),
     );
     // Said on this device, so an unexpected one is seen where it happened.
     this.letIn$.subscribe(({ email, organizationName }) =>

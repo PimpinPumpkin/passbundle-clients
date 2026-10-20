@@ -34,10 +34,11 @@
       {{ "save" | i18n }}
     </button>
   </form>
-  <!-- Keykeeper: how people join this organization, and its install command. -->
+  <!-- Keykeeper: how people join this organization, its install command, and script access. -->
   @if (org && !loading) {
     <app-keykeeper-org-joining [organizationId]="organizationId" />
     <app-keykeeper-org-install [organizationId]="organizationId" />
+    <app-keykeeper-script-access [organizationId]="organizationId" />
   }
   <ng-container *ngIf="canUseApi">
     <h1 bitTypography="h1" class="tw-mt-16 tw-pb-2.5">{{ "apiKey" | i18n }}</h1>

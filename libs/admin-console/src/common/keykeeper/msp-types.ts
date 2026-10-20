@@ -226,3 +226,62 @@ export type MspSiteFixes = {
 
 /** An organization that can't confirm the person until they turn on two-step login. */
 export type TwoStepNeeded = { organizationId: string; name: string };
+
+/** A script token as its organization's admins see it (docs/script-access.md). */
+export type ScriptTokenView = {
+  id: string;
+  organizationId: string;
+  name: string;
+  createdBy: string | null;
+  createdAt: string;
+  expiresAt: string;
+  revokedAt: string | null;
+  networks: string[];
+  /** The token key, sealed with the organization key. */
+  sealedKey: string;
+  lastUsedAt: string | null;
+  lastUsedIp: string | null;
+  grants: {
+    itemId: string;
+    revision: string;
+    sealedSpec: string;
+    itemDeleted: boolean;
+    upToDate: boolean;
+  }[];
+};
+
+/** A grant as an app sends it: the copy, the item revision it was made from, and its sealed spec. */
+export type ScriptGrantData = {
+  itemId: string;
+  copy: string;
+  revision: string;
+  sealedSpec: string;
+};
+
+export type NewScriptToken = {
+  id: string;
+  name: string;
+  expiresAt: string;
+  networks: string[];
+  authHash: string;
+  sealedKey: string;
+  grants: ScriptGrantData[];
+};
+
+export type ScriptReadView = {
+  itemId: string | null;
+  at: string;
+  ip: string;
+  allowed: boolean;
+  reason: string;
+};
+
+/** A grant whose copy is behind its item, with what an app needs to refresh it. */
+export type StaleScriptGrant = {
+  organizationId: string;
+  tokenId: string;
+  itemId: string;
+  revision: string;
+  sealedKey: string;
+  sealedSpec: string;
+};

@@ -10,8 +10,12 @@ import {
   MspJoining,
   MspSummary,
   MspTemplates,
+  NewScriptToken,
   OrgJoining,
   PendingMember,
+  ScriptReadView,
+  ScriptTokenView,
+  StaleScriptGrant,
   TemplateCopy,
   TwoStepNeeded,
 } from "./msp-types";
@@ -139,5 +143,91 @@ export class KeykeeperMspRequests {
       true,
       true,
     );
+  }
+
+  // Script access (docs/script-access.md in the meta repo).
+
+  async scriptTokens(orgId: string): Promise<ScriptTokenView[]> {
+    return (
+      await this.apiService.send(
+        "GET",
+        `/keykeeper/organizations/${orgId}/script-tokens`,
+        null,
+        true,
+        true,
+      )
+    ).data;
+  }
+
+  async createScriptToken(orgId: string, token: NewScriptToken): Promise<ScriptTokenView> {
+    return this.apiService.send(
+      "POST",
+      `/keykeeper/organizations/${orgId}/script-tokens`,
+      token,
+      true,
+      true,
+    );
+  }
+
+  async revokeScriptToken(orgId: string, tokenId: string): Promise<ScriptTokenView> {
+    return this.apiService.send(
+      "DELETE",
+      `/keykeeper/organizations/${orgId}/script-tokens/${tokenId}`,
+      null,
+      true,
+      true,
+    );
+  }
+
+  /** Adds a grant, or refreshes its copy. */
+  async setScriptGrant(
+    orgId: string,
+    tokenId: string,
+    itemId: string,
+    grant: { copy: string; revision: string; sealedSpec: string },
+  ): Promise<ScriptTokenView> {
+    return this.apiService.send(
+      "PUT",
+      `/keykeeper/organizations/${orgId}/script-tokens/${tokenId}/grants/${itemId}`,
+      grant,
+      true,
+      true,
+    );
+  }
+
+  async removeScriptGrant(
+    orgId: string,
+    tokenId: string,
+    itemId: string,
+  ): Promise<ScriptTokenView> {
+    return this.apiService.send(
+      "DELETE",
+      `/keykeeper/organizations/${orgId}/script-tokens/${tokenId}/grants/${itemId}`,
+      null,
+      true,
+      true,
+    );
+  }
+
+  async scriptReads(orgId: string, tokenId: string): Promise<ScriptReadView[]> {
+    return (
+      await this.apiService.send(
+        "GET",
+        `/keykeeper/organizations/${orgId}/script-tokens/${tokenId}/reads`,
+        null,
+        true,
+        true,
+      )
+    ).data;
+  }
+
+  /** Grants whose copies are behind their items, on items this person can edit. None from an older server. */
+  async staleScriptGrants(): Promise<StaleScriptGrant[]> {
+    try {
+      return (await this.apiService.send("GET", "/keykeeper/script-grants/stale", null, true, true))
+        .data;
+    } catch {
+      return [];
+    }
   }
 }

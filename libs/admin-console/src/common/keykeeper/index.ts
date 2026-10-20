@@ -7,3 +7,5 @@ export * from "./msp-requests";
 export * from "./msp-template-status";
 export * from "./msp-template-sender";
 export * from "./msp-work";
+export * from "./script-access";
+export * from "./script-refresh";
