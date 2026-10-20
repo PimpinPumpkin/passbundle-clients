@@ -9,6 +9,7 @@ import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherViewLikeUtils } from "@bitwarden/common/vault/utils/cipher-view-like-utils";
 import { TypographyModule } from "@bitwarden/components";
 
+import { KeykeeperSiteProblemLinkComponent } from "../../../../../autofill/keykeeper/popup/site-problem-link.component";
 import BrowserPopupUtils from "../../../../../platform/browser/browser-popup-utils";
 import { VaultPopupAutofillService } from "../../../services/vault-popup-autofill.service";
 import { VaultPopupItemsService } from "../../../services/vault-popup-items.service";
@@ -25,6 +26,7 @@ import { VaultListItemsContainerComponent } from "../vault-list-items-container/
     VaultListItemsContainerComponent,
     JslibModule,
     SimplifiedAutofillInfoComponent,
+    KeykeeperSiteProblemLinkComponent,
   ],
   selector: "app-autofill-vault-list-items",
   templateUrl: "autofill-vault-list-items.component.html",

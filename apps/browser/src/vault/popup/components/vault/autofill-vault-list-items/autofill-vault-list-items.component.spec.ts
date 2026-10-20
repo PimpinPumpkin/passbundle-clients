@@ -16,6 +16,7 @@ import { CompactModeService, DialogService, ToastService } from "@bitwarden/comp
 import { StateProvider } from "@bitwarden/state";
 import { PasswordRepromptService } from "@bitwarden/vault";
 
+import { KeykeeperSiteProblemLinkComponent } from "../../../../../autofill/keykeeper/popup/site-problem-link.component";
 import BrowserPopupUtils from "../../../../../platform/browser/browser-popup-utils";
 import { VaultPopupAutofillService } from "../../../services/vault-popup-autofill.service";
 import { VaultPopupItemsService } from "../../../services/vault-popup-items.service";
@@ -112,6 +113,38 @@ describe("AutofillVaultListItemsComponent", () => {
       expect(
         fixture.debugElement.query(By.directive(SimplifiedAutofillInfoComponent)),
       ).not.toBeNull();
+    });
+  });
+
+  // Keykeeper: "Report a problem with this site" goes with the section.
+  describe("app-keykeeper-site-problem-link visibility", () => {
+    const reportLink = () =>
+      fixture.debugElement.query(By.directive(KeykeeperSiteProblemLinkComponent));
+
+    it("is rendered under the suggestions", async () => {
+      autoFillCiphers$.next([{ type: CipherType.Login } as PopupCipherViewLike]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(reportLink()).not.toBeNull();
+    });
+
+    it("is rendered with the tip when nothing matches the site", async () => {
+      autoFillCiphers$.next([]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(reportLink()).not.toBeNull();
+    });
+
+    it("is not rendered when the section isn't", async () => {
+      hasFilterApplied$.next(true);
+      autoFillCiphers$.next([]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(reportLink()).toBeNull();
+      hasFilterApplied$.next(false);
     });
   });
 });
