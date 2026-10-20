@@ -207,4 +207,21 @@ describe("DefaultChangeLoginPasswordService", () => {
     expect(url).toBe("https://example.com/");
     expect(mockApiService.fetch).not.toHaveBeenCalled();
   });
+
+  // Keykeeper: a published change-password page wins, found without a request.
+  it("returns a site's published change-password page without asking a server", async () => {
+    showFavicons$.next(false);
+    const cipher = {
+      type: CipherType.Login,
+      login: Object.assign(new LoginView(), {
+        uris: [{ uri: "https://example.com" }, { uri: "https://www.1800contacts.com/login" }],
+      }),
+    } as CipherView;
+
+    const url = await service.getChangePasswordUrl(cipher);
+
+    expect(url).toBe("https://www.1800contacts.com/account/settings");
+    expect(mockApiService.fetch).not.toHaveBeenCalled();
+    showFavicons$.next(true);
+  });
 });
