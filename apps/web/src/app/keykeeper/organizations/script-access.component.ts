@@ -67,6 +67,10 @@ type Made = { name: string; tokenString: string; firstItem: string };
               class="tw-whitespace-pre-wrap tw-break-all tw-rounded tw-bg-background-alt tw-p-3 tw-text-sm"
               data-testid="script-token-usage"
               >{{ usage(m) }}</pre>
+            <p class="tw-mb-2 tw-text-sm" data-testid="script-token-signing">
+              The module isn't signed yet. RMMs usually run scripts with an execution policy that
+              allows it; if yours doesn't, run the script with -ExecutionPolicy Bypass.
+            </p>
             <div class="tw-flex tw-gap-2">
               <button bitButton buttonType="primary" type="button" (click)="copy(m.tokenString)">
                 Copy token
