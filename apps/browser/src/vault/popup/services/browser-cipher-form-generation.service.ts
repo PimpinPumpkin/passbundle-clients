@@ -14,9 +14,10 @@ export class BrowserCipherFormGenerationService implements CipherFormGenerationS
   private dialogService = inject(DialogService);
   private overlay = inject(Overlay);
 
-  async generatePassword(): Promise<string> {
+  // Keykeeper: with the item's website, so the password follows the site's own rules.
+  async generatePassword(uri?: string | null): Promise<string> {
     const dialogRef = VaultGeneratorDialogComponent.open(this.dialogService, this.overlay, {
-      data: { type: "password" },
+      data: { type: "password", uri: uri ?? undefined },
     });
 
     const result = await firstValueFrom(dialogRef.closed);

@@ -258,7 +258,10 @@ export class LoginDetailsSectionComponent implements OnInit {
    * TODO: Browser extension needs a means to cache the current form so values are not lost upon navigating to the generator.
    */
   generatePassword = async () => {
-    const newPassword = await this.generationService.generatePassword();
+    // Keykeeper: for the item's website, so the password follows the site's own rules.
+    const newPassword = await this.generationService.generatePassword(
+      this.cipherFormContainer.website,
+    );
 
     if (newPassword) {
       this.loginDetailsForm.controls.password.patchValue(newPassword);

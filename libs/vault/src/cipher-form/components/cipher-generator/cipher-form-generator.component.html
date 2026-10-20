@@ -1,5 +1,6 @@
 @if (type === "password") {
   <tools-password-generator
+    [website]="uri"
     [disableMargin]="disableMargin"
     (onGenerated)="onCredentialGenerated($event)"
     (onAlgorithm)="onAlgorithmSelected($event)"

@@ -60,6 +60,7 @@ import {
   Type,
   GeneratorProfile,
   Profile,
+  forSiteRules,
 } from "@bitwarden/generator-core";
 import { GeneratorHistoryService } from "@bitwarden/generator-history";
 import { I18nPipe } from "@bitwarden/ui-common";
@@ -157,6 +158,11 @@ export class PasswordGeneratorComponent implements OnInit, OnChanges, OnDestroy 
   @Input({ transform: coerceBooleanProperty })
   disableMargin = false;
 
+  /** Keykeeper: the website the password is for; it then follows that site's own password rules. */
+  // eslint-disable-next-line @angular-eslint/prefer-signals
+  @Input()
+  website: string | null = null;
+
   /** tracks the currently selected credential type */
   protected credentialType$ = new BehaviorSubject<CredentialAlgorithm | null>(null);
 
@@ -249,7 +255,9 @@ export class PasswordGeneratorComponent implements OnInit, OnChanges, OnDestroy 
         withLatestFrom(this.account$, this.algorithm$),
         takeUntil(this.destroyed),
       )
-      .subscribe(([generated, account, algorithm]) => {
+      .subscribe(([found, account, algorithm]) => {
+        // Keykeeper: shown, kept, and copied as the site's own rules allow.
+        const generated = forSiteRules(found, this.website);
         this.log.debug({ source: generated.source ?? null }, "credential generated");
 
         this.generatorHistoryService

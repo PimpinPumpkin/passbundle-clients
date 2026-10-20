@@ -276,6 +276,7 @@ import {
   createCredentialGeneratorService,
   createRandomizer,
   CredentialGeneratorService,
+  forSiteRules,
   Type,
 } from "@bitwarden/generator-core";
 import {
@@ -1578,7 +1579,11 @@ export default class MainBackground {
       this,
       this.platformUtilsService,
       this.authService,
-      () => this.generatePasswordToClipboard(),
+      // Keykeeper: for the page in front, so the password follows its site's rules.
+      () =>
+        from(BrowserApi.getTabFromCurrentWindow()).pipe(
+          switchMap((tab) => this.generatePasswordToClipboard(tab ?? undefined)),
+        ),
       this.accountService,
       this.lockService,
     );
@@ -1641,8 +1646,9 @@ export default class MainBackground {
 
     const contextMenuClickedHandler = new ContextMenuClickedHandler(
       (options) => this.platformUtilsService.copyToClipboard(options.text),
-      async (_tab) => {
-        await firstValueFrom(this.generatePasswordToClipboard(), { defaultValue: undefined });
+      async (tab) => {
+        // Keykeeper: the page's site, for its password rules.
+        await firstValueFrom(this.generatePasswordToClipboard(tab), { defaultValue: undefined });
       },
       async (tab, cipher) => {
         this.loginToAutoFill = cipher;
@@ -2418,7 +2424,8 @@ export default class MainBackground {
     await this.atRiskCipherUpdaterService.init();
   }
 
-  generatePasswordToClipboard = () => {
+  /** Keykeeper: with the tab it's for, the password follows that site's own rules. */
+  generatePasswordToClipboard = (tab?: chrome.tabs.Tab) => {
     // FIXME: `credentialGeneratorService` and `generatorHistoryService` are initialized in
     // `initOverlayAndTabsBackground()`, which only runs for authenticated users. Returning EMPTY
     // here preserves the pre-migration behavior (unauthenticated users could not generate passwords
@@ -2437,7 +2444,8 @@ export default class MainBackground {
         account$: this.accountService.activeAccount$,
       })
       .pipe(
-        concatMap(async (generated) => {
+        concatMap(async (found) => {
+          const generated = forSiteRules(found, tab?.url);
           this.platformUtilsService.copyToClipboard(generated.credential);
           try {
             await trackGeneratedCredential(

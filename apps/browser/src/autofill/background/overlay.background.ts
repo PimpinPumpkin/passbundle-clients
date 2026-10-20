@@ -54,7 +54,12 @@ import { Fido2CredentialView } from "@bitwarden/common/vault/models/view/fido2-c
 import { IdentityView } from "@bitwarden/common/vault/models/view/identity.view";
 import { LoginUriView } from "@bitwarden/common/vault/models/view/login-uri.view";
 import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
-import { CredentialGeneratorService, GenerateRequest, Type } from "@bitwarden/generator-core";
+import {
+  CredentialGeneratorService,
+  forSiteRules,
+  GenerateRequest,
+  Type,
+} from "@bitwarden/generator-core";
 import { GeneratorHistoryService } from "@bitwarden/generator-history";
 
 // FIXME (PM-22628): Popup imports are forbidden in background
@@ -292,6 +297,8 @@ export class OverlayBackground implements OverlayBackgroundInterface {
             if (!generated) {
               return "";
             }
+            // Keykeeper: one the focused page's site accepts, by its own password rules.
+            generated = forSiteRules(generated, this.keykeeperFocusedPageUrl());
             // Track all inline menu credentials — both InlineMenuInit and InlineMenu
             // are shown to the user. InlineMenuInit fires inside handlePortOnConnect,
             // so the password is rendered in the same async turn it is generated.
@@ -2197,6 +2204,16 @@ export class OverlayBackground implements OverlayBackgroundInterface {
    */
   private waitForNextCredential() {
     return firstValueFrom(this.credential$.pipe(skip(1), filter(Boolean), timeout(10_000)));
+  }
+
+  /** Keykeeper: the address of the page (or frame) with the focused field. */
+  private keykeeperFocusedPageUrl(): string | undefined {
+    const { tabId, frameId } = this.focusedFieldData ?? {};
+    if (tabId == null || frameId == null) {
+      return undefined;
+    }
+    const pageDetail = this.pageDetailsForTab[tabId]?.get(frameId);
+    return pageDetail?.details?.url ?? pageDetail?.tab?.url;
   }
 
   /**

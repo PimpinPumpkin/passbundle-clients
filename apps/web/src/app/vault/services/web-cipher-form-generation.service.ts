@@ -12,9 +12,10 @@ import { WebVaultGeneratorDialogComponent } from "../components/web-generator-di
 export class WebCipherFormGenerationService implements CipherFormGenerationService {
   private dialogService = inject(DialogService);
 
-  async generatePassword(): Promise<string> {
+  // Keykeeper: with the item's website, so the password follows the site's own rules.
+  async generatePassword(uri?: string | null): Promise<string> {
     const dialogRef = WebVaultGeneratorDialogComponent.open(this.dialogService, {
-      data: { type: "password" },
+      data: { type: "password", uri: uri ?? undefined },
     });
 
     const result = await firstValueFrom(dialogRef.closed);

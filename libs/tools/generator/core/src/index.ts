@@ -4,6 +4,8 @@ export * from "./data";
 export { createRandomizer, createCredentialGeneratorService } from "./factories";
 export * from "./types";
 export { DefaultCredentialGeneratorService } from "./services";
+// Keykeeper: generated passwords that follow the site's own password rules.
+export { forSiteRules, websiteHost } from "./keykeeper/site-rules";
 export {
   CredentialType,
   CredentialAlgorithm,
