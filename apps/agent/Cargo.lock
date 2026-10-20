@@ -1736,6 +1736,7 @@ dependencies = [
  "cbc",
  "hkdf",
  "hmac",
+ "libc",
  "minisign",
  "minisign-verify",
  "plist",

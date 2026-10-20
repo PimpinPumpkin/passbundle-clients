@@ -26,6 +26,11 @@ fn main() -> ExitCode {
         // and reports the desktop app as not running.
         return ExitCode::FAILURE;
     };
+    // Only the agent installed next to this host, never a program that made
+    // the pipe or socket first: it would get the user key on enrollment.
+    if !ipc::reached_installed_agent(&agent) {
+        return ExitCode::FAILURE;
+    }
     let args: Vec<String> = std::env::args().skip(1).collect();
     let browser = if args.iter().any(|a| a.starts_with("chrome-extension://")) {
         "your browser"

@@ -93,6 +93,33 @@ pub use unix::{connect, ClientStream, Listener, ServerStream};
 #[cfg(windows)]
 pub use windows::{connect, ClientStream, Listener, ServerStream};
 
+/// The agent this host was installed with: `passbundle-agent`, next to the
+/// host's own program.
+pub fn installed_agent() -> io::Result<PathBuf> {
+    let host = std::env::current_exe()?;
+    Ok(host.with_file_name(format!("passbundle-agent{}", std::env::consts::EXE_SUFFIX)))
+}
+
+/// Whether the program at the other end of `stream` is the agent installed
+/// next to this host. A program running as the same person could make the
+/// pipe or socket first while the agent isn't running, and would then be
+/// handed the user key when someone turns on unlock with Windows Hello or
+/// Touch ID; so the host asks the operating system who it reached.
+pub fn reached_installed_agent(stream: &ClientStream) -> bool {
+    let (Ok(expected), Some(peer)) = (installed_agent(), peer_program(stream)) else {
+        return false;
+    };
+    match (std::fs::canonicalize(expected), std::fs::canonicalize(peer)) {
+        (Ok(expected), Ok(peer)) => expected == peer,
+        _ => false,
+    }
+}
+
+#[cfg(unix)]
+use unix::peer_program;
+#[cfg(windows)]
+use windows::peer_program;
+
 #[cfg(unix)]
 mod unix {
     use std::{
@@ -130,6 +157,55 @@ mod unix {
 
     pub fn connect(address: &Path) -> io::Result<ClientStream> {
         UnixStream::connect(address)
+    }
+
+    /// The program at the other end of a socket: its process, from the
+    /// socket, and that process's executable.
+    #[cfg(target_os = "macos")]
+    pub fn peer_program(stream: &UnixStream) -> Option<std::path::PathBuf> {
+        use std::os::{fd::AsRawFd, unix::ffi::OsStringExt};
+        let mut pid: libc::pid_t = 0;
+        let mut length = std::mem::size_of::<libc::pid_t>() as libc::socklen_t;
+        let ok = unsafe {
+            libc::getsockopt(
+                stream.as_raw_fd(),
+                libc::SOL_LOCAL,
+                libc::LOCAL_PEERPID,
+                (&mut pid as *mut libc::pid_t).cast(),
+                &mut length,
+            )
+        };
+        if ok != 0 || pid <= 0 {
+            return None;
+        }
+        let mut path = vec![0u8; libc::PROC_PIDPATHINFO_MAXSIZE as usize];
+        let written =
+            unsafe { libc::proc_pidpath(pid, path.as_mut_ptr().cast(), path.len() as u32) };
+        if written <= 0 {
+            return None;
+        }
+        path.truncate(written as usize);
+        Some(std::ffi::OsString::from_vec(path).into())
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    pub fn peer_program(stream: &UnixStream) -> Option<std::path::PathBuf> {
+        use std::os::fd::AsRawFd;
+        let mut credentials: libc::ucred = unsafe { std::mem::zeroed() };
+        let mut length = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
+        let ok = unsafe {
+            libc::getsockopt(
+                stream.as_raw_fd(),
+                libc::SOL_SOCKET,
+                libc::SO_PEERCRED,
+                (&mut credentials as *mut libc::ucred).cast(),
+                &mut length,
+            )
+        };
+        if ok != 0 || credentials.pid <= 0 {
+            return None;
+        }
+        fs::read_link(format!("/proc/{}/exe", credentials.pid)).ok()
     }
 }
 
@@ -296,6 +372,29 @@ mod windows {
         Err(io::Error::new(io::ErrorKind::TimedOut, "the agent is busy"))
     }
 
+    /// The program at the other end of the pipe: the process that made it,
+    /// and that process's executable.
+    pub fn peer_program(stream: &ClientStream) -> Option<std::path::PathBuf> {
+        use std::os::windows::ffi::OsStringExt;
+        use windows_sys::Win32::System::Threading::{
+            OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION,
+        };
+        let pid = stream.server_process_id()?;
+        let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+        if process.is_null() {
+            return None;
+        }
+        let mut path = vec![0u16; 32_768];
+        let mut length = path.len() as u32;
+        let ok = unsafe { QueryFullProcessImageNameW(process, 0, path.as_mut_ptr(), &mut length) };
+        unsafe { CloseHandle(process) };
+        if ok == 0 {
+            return None;
+        }
+        path.truncate(length as usize);
+        Some(std::ffi::OsString::from_wide(&path).into())
+    }
+
     /// The host's end. The host waits on the agent and the browser at once,
     /// from two threads, and Windows runs blocking I/O on one pipe handle one
     /// operation at a time, so a pending read would hold up every write. With
@@ -305,7 +404,8 @@ mod windows {
     unsafe impl Send for ClientStream {}
 
     impl ClientStream {
-        /// The agent's process, which the host lets bring prompts to the front.
+        /// The agent's process, which the host checks and lets bring prompts
+        /// to the front.
         pub fn server_process_id(&self) -> Option<u32> {
             let mut pid = 0u32;
             (unsafe { GetNamedPipeServerProcessId(self.0, &mut pid) } != 0).then_some(pid)
@@ -462,6 +562,24 @@ mod windows {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn a_socket_another_program_made_isnt_the_agent() {
+        let dir = std::env::temp_dir().join(format!("passbundle-ipc-{}", std::process::id()));
+        let address = dir.join("agent.sock");
+        let listener = Listener::bind(&address).unwrap();
+        let client = connect(&address).unwrap();
+        let _server = listener.accept().unwrap();
+        // The other end is this test program, which the OS names.
+        let peer = std::fs::canonicalize(unix::peer_program(&client).unwrap()).unwrap();
+        assert_eq!(
+            peer,
+            std::fs::canonicalize(std::env::current_exe().unwrap()).unwrap()
+        );
+        assert!(!reached_installed_agent(&client));
+        let _ = std::fs::remove_dir_all(dir);
+    }
 
     #[test]
     fn frames_round_trip_and_oversized_ones_are_refused() {

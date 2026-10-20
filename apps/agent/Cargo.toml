@@ -78,6 +78,10 @@ windows-sys = { version = "0.61", features = [
 [target.'cfg(target_os = "macos")'.dependencies]
 plist = "1"
 
+# Who's at the other end of the agent's socket (ipc::peer_program).
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [features]
 # A stand-in for Windows Hello, for end-to-end tests. Debug builds only:
 # release builds refuse to compile with it.
