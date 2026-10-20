@@ -19,6 +19,10 @@ import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/pl
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { PasswordStrengthServiceAbstraction } from "@bitwarden/common/tools/password-strength";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
+import {
+  expirationBadgeVariant,
+  expirationLabel,
+} from "@bitwarden/common/vault/keykeeper/expiration";
 import { DialogService, ToastService } from "@bitwarden/components";
 import { templateDefinition } from "@bitwarden/vault";
 
@@ -30,7 +34,7 @@ import { HeaderModule } from "../../layouts/header/header.module";
 import { SharedModule } from "../../shared";
 import { KeykeeperJoinSealer } from "../joining/join-sealer.service";
 
-import { ClientHealth, clientHealth } from "./client-health";
+import { ClientHealth, clientHealth, ExpiringItem, expiringItems } from "./client-health";
 import { KeykeeperDefaultPoliciesComponent } from "./default-policies.component";
 import { describeEvent, MspEvent } from "./msp-activity";
 import {
@@ -299,6 +303,48 @@ const CLIENT_FEATURES = {
             </form>
           }
         </section>
+
+        @if (expiring(); as soon) {
+          @if (soon.length > 0) {
+            <section class="tw-mb-8" aria-label="Expiring soon" data-testid="msp-expiring">
+              <h2 bitTypography="h3">Expiring soon</h2>
+              <p bitTypography="body2">
+                Items in your clients' vaults that have expired or expire within 30 days, soonest
+                first.
+              </p>
+              <bit-table>
+                <ng-container header>
+                  <tr>
+                    <th bitCell>Item</th>
+                    <th bitCell>Client</th>
+                    <th bitCell>Expires</th>
+                  </tr>
+                </ng-container>
+                <ng-template body>
+                  @for (item of soon; track item.id) {
+                    <tr bitRow [attr.data-testid]="'msp-expiring-' + item.name">
+                      <td bitCell>
+                        <a
+                          bitLink
+                          [routerLink]="['/organizations', item.organizationId, 'vault']"
+                          [queryParams]="{ itemId: item.id, action: 'view' }"
+                          >{{ item.name }}</a
+                        >
+                      </td>
+                      <td bitCell>{{ item.client }}</td>
+                      <td bitCell>
+                        <span bitBadge [variant]="badgeVariant(item)">{{ badgeLabel(item) }}</span>
+                        <span class="tw-ml-2 tw-text-muted">{{
+                          item.expires | date: "mediumDate"
+                        }}</span>
+                      </td>
+                    </tr>
+                  }
+                </ng-template>
+              </bit-table>
+            </section>
+          }
+        }
 
         @if (policies(); as p) {
           <app-keykeeper-default-policies
@@ -602,6 +648,8 @@ export class KeykeeperMspComponent implements OnInit {
 
   /** Password health per client, computed here from items MSP staff can decrypt. */
   protected readonly health = signal<Map<string, ClientHealth> | null>(null);
+  /** Expired and soon-expiring items across the clients, from the same items. */
+  protected readonly expiring = signal<ExpiringItem[] | null>(null);
   protected readonly installFor = signal<{
     client: MspClient;
     enrollment: ClientEnrollment;
@@ -1029,6 +1077,12 @@ export class KeykeeperMspComponent implements OnInit {
           }),
         ),
       );
+      this.expiring.set(
+        expiringItems(
+          ciphers,
+          msp.clients.map(({ id, name }) => ({ id, name })),
+        ),
+      );
       this.health.set(
         clientHealth(
           ciphers,
@@ -1040,6 +1094,14 @@ export class KeykeeperMspComponent implements OnInit {
     } catch (e) {
       this.showError(e);
     }
+  }
+
+  protected badgeLabel(item: ExpiringItem) {
+    return expirationLabel(item.status);
+  }
+
+  protected badgeVariant(item: ExpiringItem) {
+    return expirationBadgeVariant(item.status);
   }
 
   /** A client's health figures for the table: a dash where you can't see its items. */

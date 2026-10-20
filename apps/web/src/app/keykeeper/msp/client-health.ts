@@ -5,7 +5,11 @@
 // out of 4 is weak.
 
 import { CipherType } from "@bitwarden/common/vault/enums";
-import { expirationStatus, itemExpiration } from "@bitwarden/common/vault/keykeeper/expiration";
+import {
+  ExpirationStatus,
+  expirationStatus,
+  itemExpiration,
+} from "@bitwarden/common/vault/keykeeper/expiration";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 
 export type ClientHealth = {
@@ -69,4 +73,53 @@ export function clientHealth(
     health.get(orgId)!.reused = [...uses.values()].filter((n) => n > 1).reduce((a, n) => a + n, 0);
   }
   return health;
+}
+
+/** An item in a client's vault that has expired or expires soon. */
+export type ExpiringItem = {
+  id: string;
+  name: string;
+  organizationId: string;
+  client: string;
+  expires: Date;
+  status: ExpirationStatus;
+};
+
+/**
+ * Every item in the clients' vaults that has expired or expires within 30
+ * days, soonest first (the longest expired at the top), so an MSP sees what
+ * to renew across all its clients in one list. See DESIGN.md, "Expiration
+ * dates" (MSP view).
+ */
+export function expiringItems(
+  ciphers: CipherView[],
+  clients: { id: string; name: string }[],
+  today: Date = new Date(),
+): ExpiringItem[] {
+  const names = new Map(clients.map((c) => [c.id, c.name]));
+  const found: ExpiringItem[] = [];
+  for (const cipher of ciphers) {
+    const client = cipher.organizationId ? names.get(cipher.organizationId) : undefined;
+    const expires = itemExpiration(cipher);
+    if (client == null || cipher.isDeleted || expires == null) {
+      continue;
+    }
+    const status = expirationStatus(expires, today);
+    if (status.state !== "later") {
+      found.push({
+        id: cipher.id,
+        name: cipher.name,
+        organizationId: cipher.organizationId,
+        client,
+        expires,
+        status,
+      });
+    }
+  }
+  return found.sort(
+    (a, b) =>
+      a.expires.getTime() - b.expires.getTime() ||
+      a.client.localeCompare(b.client) ||
+      a.name.localeCompare(b.name),
+  );
 }
