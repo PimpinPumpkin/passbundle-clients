@@ -17,4 +17,8 @@
       <app-simplified-autofill-info slot="title-end" />
     }
   </app-vault-list-items-container>
+  <!-- Keykeeper: report a site that doesn't fill right -->
+  @if (ciphers.length || showTip) {
+    <app-keykeeper-site-problem-link />
+  }
 }

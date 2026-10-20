@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
+import { ActivatedRoute } from "@angular/router";
 
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
@@ -53,8 +54,8 @@ export type ReportedField = {
           </bit-callout>
         } @else if (host(); as site) {
           <p bitTypography="body2">
-            This sends your server the site, <strong>{{ site }}</strong>, and these fields'
-            types, ids, names, and labels. Never what's in them.
+            This sends your server the site, <strong>{{ site }}</strong
+            >, and these fields' types, ids, names, and labels. Never what's in them.
           </p>
           <ul class="tw-mb-3 tw-ps-4 tw-text-sm" data-testid="site-problem-fields">
             @for (field of fields(); track $index) {
@@ -85,10 +86,17 @@ export class KeykeeperSiteProblemPageComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly note = "";
 
-  constructor(private readonly apiService: ApiService) {}
+  constructor(
+    private readonly apiService: ApiService,
+    private readonly route: ActivatedRoute,
+  ) {}
 
   async ngOnInit() {
-    const tab = await BrowserApi.getTabFromCurrentWindow();
+    // The current-tab list names its tab (a popout's isn't the current window's).
+    const tabId = Number.parseInt(this.route.snapshot.queryParamMap.get("tabId") ?? "", 10);
+    const tab = Number.isInteger(tabId)
+      ? await BrowserApi.getTab(tabId).catch((): null => null)
+      : await BrowserApi.getTabFromCurrentWindow();
     if (tab?.url == null || !/^https?:/.test(tab.url)) {
       return;
     }
@@ -126,7 +134,9 @@ export class KeykeeperSiteProblemPageComponent implements OnInit {
       );
       this.sent.set(true);
     } catch (e) {
-      this.error.set(e instanceof ErrorResponse ? e.getSingleMessage() : "Couldn't send the report.");
+      this.error.set(
+        e instanceof ErrorResponse ? e.getSingleMessage() : "Couldn't send the report.",
+      );
     }
   }
 }

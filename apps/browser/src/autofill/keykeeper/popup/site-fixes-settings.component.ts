@@ -53,8 +53,8 @@ import { SHARE_SITE_FIXES } from "../site-fixes";
           <bit-label for="share-site-fixes">Share fixes I make with the fill picker</bit-label>
           <bit-hint>
             Sends your server the site, how to find the field, and whether it gets the username,
-            password, or code. Never what's in it, and never custom fields. A fix three people
-            share fills for everyone on your server.
+            password, or code. Never what's in it, and never custom fields. A fix three people share
+            fills for everyone on your server.
           </bit-hint>
         </bit-form-control>
         <a bitLink routerLink="/keykeeper-site-problem" data-testid="site-problem-link">
