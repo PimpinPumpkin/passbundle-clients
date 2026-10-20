@@ -49,6 +49,7 @@ import {
 } from "./msp-api.service";
 import { KeykeeperMspJoiningComponent } from "./msp-joining.component";
 import { clientPolicySummary } from "./msp-policies";
+import { KeykeeperMspSiteFixesComponent } from "./msp-site-fixes.component";
 import { KeykeeperMspTemplatesComponent } from "./msp-templates.component";
 import { KeykeeperMspWorkService } from "./msp-work.service";
 import { DEFAULT_ACCESS, describeAccess, reachesEveryClient } from "./technician-access";
@@ -82,6 +83,7 @@ const CLIENT_FEATURES = {
     HeaderModule,
     KeykeeperDefaultPoliciesComponent,
     KeykeeperMspJoiningComponent,
+    KeykeeperMspSiteFixesComponent,
     KeykeeperMspTemplatesComponent,
     KeykeeperTechnicianAccessEditorComponent,
   ],
@@ -318,6 +320,10 @@ const CLIENT_FEATURES = {
           [isAdmin]="m.role === 'admin'"
           (changed)="reload(m.id)"
         />
+
+        @if (m.role === "admin") {
+          <app-keykeeper-msp-site-fixes [mspId]="m.id" />
+        }
 
         <section aria-label="Staff">
           <h2 bitTypography="h3">Staff</h2>

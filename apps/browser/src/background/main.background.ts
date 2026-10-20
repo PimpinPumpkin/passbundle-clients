@@ -362,6 +362,8 @@ import {
   BrowserFido2ParentWindowReference,
   BrowserFido2UserInterfaceService,
 } from "../autofill/fido2/services/browser-fido2-user-interface.service";
+import { keykeeperSiteFixes as siteFixHooks } from "../autofill/keykeeper/fill-rules";
+import { KeykeeperSiteFixes } from "../autofill/keykeeper/site-fixes";
 import { AutofillLifecycleService } from "../autofill/services/abstractions/autofill-lifecycle.service";
 import { AutofillService as AutofillServiceAbstraction } from "../autofill/services/abstractions/autofill.service";
 import { AutofillBadgeUpdaterService } from "../autofill/services/autofill-badge-updater.service";
@@ -596,6 +598,7 @@ export default class MainBackground {
   private overlayNotificationsBackground: OverlayNotificationsBackgroundInterface;
   // Keykeeper
   keykeeperExpirationReminders: KeykeeperExpirationReminders;
+  keykeeperSiteFixes: KeykeeperSiteFixes;
   keykeeperEnrollment: KeykeeperEnrollment;
   keykeeperMspWork: KeykeeperMspWork;
   keykeeperAgentBiometrics: KeykeeperAgentBiometrics;
@@ -1849,6 +1852,16 @@ export default class MainBackground {
       this.stateProvider,
     );
     this.keykeeperExpirationReminders.init();
+    // Keykeeper: site fixes for autofill, and sharing the ones people make.
+    this.keykeeperSiteFixes = new KeykeeperSiteFixes(
+      this.apiService,
+      this.accountService,
+      this.authService,
+      this.stateProvider,
+    );
+    this.keykeeperSiteFixes.init();
+    siteFixHooks.rulesFor = (url) => this.keykeeperSiteFixes.rulesFor(url);
+    siteFixHooks.share = (rule) => this.keykeeperSiteFixes.share(rule);
     // Keykeeper: join the client organization named by the MSP's install command.
     this.keykeeperEnrollment = new KeykeeperEnrollment(
       this.accountService,

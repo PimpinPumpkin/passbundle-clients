@@ -205,3 +205,16 @@ export type MspJoining = {
   /** For MSP admins: the clients that follow the default, with what's resealed when it changes. */
   following?: { organizationId: string; domains: string[]; seal: string | null }[];
 };
+
+/** A site fix: a site, how to recognize a field there, and which kind of value goes in it. See DESIGN.md, "Site fixes (opt-in)". */
+export type SiteFixView = {
+  host: string;
+  field: { id: string; name: string; label: string };
+  fill: "username" | "password" | "totp" | "never";
+};
+
+/** An MSP's site rules, and the fixes its staff shared. */
+export type MspSiteFixes = {
+  rules: (SiteFixView & { id: string; createdAt: string })[];
+  shared: (SiteFixView & { id: string; reportedBy: string; reportedAt: string })[];
+};
