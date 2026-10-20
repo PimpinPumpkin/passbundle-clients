@@ -43,6 +43,7 @@ import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { FolderService } from "@bitwarden/common/vault/abstractions/folder/folder.service.abstraction";
 import { CipherType } from "@bitwarden/common/vault/enums";
+import { isMspTemplateCopy } from "@bitwarden/common/vault/keykeeper/templates";
 import { ITreeNodeObject, TreeNode } from "@bitwarden/common/vault/models/domain/tree-node";
 import { FolderView } from "@bitwarden/common/vault/models/view/folder.view";
 import { ServiceUtils } from "@bitwarden/common/vault/service-utils";
@@ -256,6 +257,11 @@ export class VaultPopupListFiltersService {
               filters.collection &&
               !cipher.collectionIds?.includes(asUuid(filters.collection.id!))
             ) {
+              return false;
+            }
+
+            // Keykeeper: an MSP's template copies show only in their collection.
+            if (!filters.collection && isMspTemplateCopy(cipher)) {
               return false;
             }
 

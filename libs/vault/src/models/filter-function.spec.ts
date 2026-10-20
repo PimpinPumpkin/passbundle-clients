@@ -1,7 +1,9 @@
 import { Unassigned } from "@bitwarden/common/admin-console/models/collections";
 import { CollectionId, OrganizationId } from "@bitwarden/common/types/guid";
 import { CipherType } from "@bitwarden/common/vault/enums";
+import { TEMPLATE_DEFINITION_FIELD_NAME } from "@bitwarden/common/vault/keykeeper/templates";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
+import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
 
 import { createFilterFunction } from "./filter-function";
 import { All } from "./routed-vault-filter.model";
@@ -258,6 +260,42 @@ describe("createFilter", () => {
 
       expect(result).toBe(true);
     });
+  });
+});
+
+// Keykeeper: an MSP's template copies show only in their collection.
+describe("given a template copy an MSP keeps up to date", () => {
+  const templates = "1bd2e94a-0d4a-4bd3-9d5c-5d5bb6d0b001" as CollectionId;
+  const definition = (value: object) =>
+    Object.assign(new FieldView(), {
+      name: TEMPLATE_DEFINITION_FIELD_NAME,
+      value: JSON.stringify({ id: "wifi-1", base: "note", v: 1, ...value }),
+    });
+  const copy = createCipher({
+    type: CipherType.SecureNote,
+    organizationId: "org" as OrganizationId,
+    collectionIds: [templates],
+  });
+  copy.fields = [definition({ from: "Northwind IT" })];
+  const ownTemplate = createCipher({ type: CipherType.SecureNote });
+  ownTemplate.fields = [definition({})];
+
+  it("leaves it out of the vault's lists", () => {
+    for (const filter of [
+      {},
+      { type: "note" as const },
+      { organizationId: "org" as OrganizationId },
+    ]) {
+      expect(createFilterFunction(filter)(copy)).toBe(false);
+    }
+  });
+
+  it("shows it in its collection", () => {
+    expect(createFilterFunction({ collectionId: templates })(copy)).toBe(true);
+  });
+
+  it("keeps someone's own templates in the lists, since they edit them there", () => {
+    expect(createFilterFunction({})(ownTemplate)).toBe(true);
   });
 });
 
