@@ -1,6 +1,12 @@
 <app-header></app-header>
 
 <bit-container>
+  <!-- Keykeeper: the guided way in from a browser. -->
+  <bit-callout type="info" [title]="null" data-testid="browser-import-offer">
+    Moving from Chrome, Edge, Firefox, Brave, or Safari?
+    <a bitLink routerLink="/tools/import-from-browser">Import from your browser</a> walks you
+    through it.
+  </bit-callout>
   <tools-import
     (formDisabled)="this.disabled = $event"
     (formLoading)="this.loading = $event"

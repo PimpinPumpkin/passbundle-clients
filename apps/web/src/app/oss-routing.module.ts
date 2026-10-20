@@ -764,6 +764,17 @@ const routes: Routes = [
             } satisfies RouteDataProperties,
           },
           {
+            // Keykeeper: guided import from a browser's own password manager.
+            path: "import-from-browser",
+            loadComponent: () =>
+              import("./keykeeper/import/browser-import-web.component").then(
+                (mod) => mod.KeykeeperBrowserImportWebComponent,
+              ),
+            data: {
+              titleId: "keykeeperImportFromBrowser",
+            } satisfies RouteDataProperties,
+          },
+          {
             path: "export",
             loadComponent: () =>
               import("./tools/vault-export/export-web.component").then(

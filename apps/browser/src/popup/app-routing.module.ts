@@ -69,6 +69,7 @@ import { NotificationsSettingsComponent } from "../autofill/popup/settings/notif
 import { PremiumV2Component } from "../billing/popup/settings/premium-v2.component";
 import { PhishingWarningComponent } from "../dirt/phishing-detection/popup/phishing-warning.component";
 import { ProtectedByComponent } from "../dirt/phishing-detection/popup/protected-by-component";
+import { KeykeeperBrowserImportPageComponent } from "../keykeeper/popup/browser-import-page.component";
 import { KeykeeperJoinPageComponent } from "../keykeeper/popup/join-page.component";
 import BrowserPopupUtils from "../platform/browser/browser-popup-utils";
 import { popupRouterCacheGuard } from "../platform/popup/view-cache/popup-router-cache.service";
@@ -297,6 +298,13 @@ const routes: Routes = [
   {
     path: "import",
     component: ImportBrowserV2Component,
+    canActivate: [authGuard, filePickerPopoutGuard()],
+    data: { elevation: 1 } satisfies RouteDataProperties,
+  },
+  {
+    // Keykeeper: guided import from the browser's own password manager
+    path: "keykeeper-browser-import",
+    component: KeykeeperBrowserImportPageComponent,
     canActivate: [authGuard, filePickerPopoutGuard()],
     data: { elevation: 1 } satisfies RouteDataProperties,
   },
