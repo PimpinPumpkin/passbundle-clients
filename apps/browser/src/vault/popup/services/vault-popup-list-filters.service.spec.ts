@@ -581,6 +581,33 @@ describe("VaultPopupListFiltersService", () => {
       service.filterForm.patchValue({ collection });
     });
 
+    // Keykeeper: an MSP's template copies show only in their collection.
+    it("leaves an MSP's template copies out unless their collection is chosen", (done) => {
+      const templates = "1bd2e94a-0d4a-4bd3-9d5c-5d5bb6d0b001";
+      const copy = {
+        type: CipherType.SecureNote,
+        collectionIds: [asUuid(templates)],
+        organizationId: "8978" as any,
+        fields: [
+          {
+            name: "keykeeper.template-definition",
+            value: JSON.stringify({ id: "wifi-1", base: "note", v: 1, from: "Northwind IT" }),
+          },
+        ],
+      } as unknown as CipherView;
+      const results: CipherView[][] = [];
+      service.filterFunction$.subscribe((filterFunction) => {
+        results.push(filterFunction([...ciphers, copy]) as CipherView[]);
+        if (results.length === 2) {
+          expect(results[0]).not.toContain(copy);
+          expect(results[1]).toEqual([copy]);
+          done();
+        }
+      });
+
+      service.filterForm.patchValue({ collection: { id: templates } as CollectionView });
+    });
+
     it("filters by folder", (done) => {
       const folder = { id: "5432" } as FolderView;
 

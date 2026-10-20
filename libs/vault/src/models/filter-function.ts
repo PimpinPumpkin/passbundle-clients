@@ -1,5 +1,6 @@
 import { Unassigned } from "@bitwarden/common/admin-console/models/collections";
 import { CipherType } from "@bitwarden/common/vault/enums";
+import { isMspTemplateCopy } from "@bitwarden/common/vault/keykeeper/templates";
 import {
   CipherViewLike,
   CipherViewLikeUtils,
@@ -106,6 +107,11 @@ export function createFilterFunction(filter: RoutedVaultFilterModel): FilterFunc
       filter.organizationId !== Unassigned &&
       cipher.organizationId !== filter.organizationId
     ) {
+      return false;
+    }
+
+    // Keykeeper: an MSP's template copies show only in their collection.
+    if (filter.collectionId === undefined && isMspTemplateCopy(cipher)) {
       return false;
     }
 

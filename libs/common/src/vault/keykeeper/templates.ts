@@ -203,6 +203,16 @@ export function templateDefinition(
     : { id: definition.id, base: definition.base };
 }
 
+/**
+ * Whether an item is a template copy an MSP keeps up to date in a client's
+ * Templates collection. Every member of the client has one, and nobody edits
+ * it, so vault lists show it only when that collection is open; the template
+ * picker lists it as always. See DESIGN.md, "MSP templates".
+ */
+export function isMspTemplateCopy(item: ItemLike): boolean {
+  return templateDefinition(item)?.from != null;
+}
+
 type TemplateItem = {
   id?: string | null;
   name?: string | null;
