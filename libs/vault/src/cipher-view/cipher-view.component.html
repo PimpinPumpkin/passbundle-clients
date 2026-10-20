@@ -119,6 +119,9 @@
     <app-custom-fields-v2 [cipher]="cipher()"> </app-custom-fields-v2>
   }
 
+  <!-- Keykeeper: fill rules made with the extension's fill picker -->
+  <app-keykeeper-fill-rules [cipher]="cipher()"></app-keykeeper-fill-rules>
+
   <!-- ATTACHMENTS SECTION -->
   @if (cipher()?.hasAttachments) {
     <app-attachments-v2-view

@@ -7,6 +7,15 @@
 // compatible: they store and sync it like any other field.
 
 import { FieldType } from "@bitwarden/common/vault/enums";
+import {
+  FieldFingerprint,
+  FILL_RULE_FIELD_NAME,
+  FillRule,
+  FillSource,
+  isFillRule,
+  readFillRules,
+  sameField,
+} from "@bitwarden/common/vault/keykeeper/fill-rules";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
 
@@ -14,33 +23,10 @@ import AutofillField from "../models/autofill-field";
 import AutofillPageDetails from "../models/autofill-page-details";
 import AutofillScript from "../models/autofill-script";
 
-export const FILL_RULE_FIELD_NAME = "keykeeper.fill";
-
-/** How a rule recognizes a field on a page. The first present key that matches wins. */
-export type FieldFingerprint = {
-  id?: string;
-  name?: string;
-  label?: string;
-};
-
-export type FillSource =
-  | { from: "username" }
-  | { from: "password" }
-  | { from: "totp" }
-  | { from: "field"; name: string }
-  | { from: "never" };
-
-export type FillRule = {
-  v: 1;
-  /**
-   * The host (with any port) of the page or frame the rule was made on. A rule
-   * fills only there, so a rule on an item that matches several sites, or one
-   * someone else with edit rights added, can't send a value anywhere else.
-   */
-  host?: string;
-  field: FieldFingerprint;
-  fill: FillSource;
-};
+// The stored form lives in @bitwarden/common, so the item view and editor can
+// show rules too.
+export { FILL_RULE_FIELD_NAME, readFillRules };
+export type { FieldFingerprint, FillRule, FillSource };
 
 /** A page's host, with any port, or "" for a page without one. */
 export function hostOf(url: string | null | undefined): string {
@@ -125,47 +111,6 @@ function mayFill(cipher: CipherView, source: FillSource, field: AutofillField): 
   return !hidden || cipher.viewPassword || field.type === "password";
 }
 
-function isFillRule(value: unknown): value is FillRule {
-  const rule = value as FillRule;
-  if (
-    rule?.v !== 1 ||
-    typeof rule.field !== "object" ||
-    typeof rule.fill !== "object" ||
-    (rule.host != null && typeof rule.host !== "string")
-  ) {
-    return false;
-  }
-  const from = rule.fill.from;
-  if (from === "field") {
-    return typeof (rule.fill as { name?: unknown }).name === "string";
-  }
-  return from === "username" || from === "password" || from === "totp" || from === "never";
-}
-
-/** The fill rules stored on an item. Anything unreadable is ignored. */
-export function readFillRules(cipher: CipherView): FillRule[] {
-  const rules: FillRule[] = [];
-  for (const field of cipher.fields ?? []) {
-    if (field.name !== FILL_RULE_FIELD_NAME || !field.value) {
-      continue;
-    }
-    try {
-      const parsed = JSON.parse(field.value);
-      if (isFillRule(parsed)) {
-        rules.push(parsed);
-      }
-    } catch {
-      // Not a rule we understand; leave it alone.
-    }
-  }
-  return rules;
-}
-
-const sameField = (a: FieldFingerprint, b: FieldFingerprint) =>
-  (a.id ?? null) === (b.id ?? null) &&
-  (a.name ?? null) === (b.name ?? null) &&
-  (a.label ?? null) === (b.label ?? null);
-
 /**
  * Adds a rule to an item, replacing any existing rule for the same field on
  * the same host. The caller saves the item.
@@ -231,8 +176,10 @@ export async function applyFillRules(
   const host = hostOf(pageDetails.url);
   // The item's own rules first, then site fixes for this host: a field the
   // item has a rule for is the item's.
-  const rules = [...readFillRules(cipher), ...(await keykeeperSiteFixes.rulesFor(pageDetails.url))]
-    .filter((r) => (r.host == null ? r.fill.from === "never" : r.host === host && host !== ""));
+  const rules = [
+    ...readFillRules(cipher),
+    ...(await keykeeperSiteFixes.rulesFor(pageDetails.url)),
+  ].filter((r) => (r.host == null ? r.fill.from === "never" : r.host === host && host !== ""));
   if (!rules.length) {
     return neverFill;
   }

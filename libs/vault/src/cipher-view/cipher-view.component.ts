@@ -38,6 +38,7 @@ import {
 } from "@bitwarden/components";
 
 import { KeykeeperExpirationViewComponent } from "../keykeeper/expiration-view.component";
+import { KeykeeperFillRulesViewComponent } from "../keykeeper/fill-rules-view.component";
 import { visibleCustomFields } from "../keykeeper/reserved-fields";
 import { KeykeeperTemplateLabelComponent } from "../keykeeper/template-label.component";
 
@@ -62,6 +63,7 @@ import { ViewIdentitySectionsComponent } from "./view-identity-sections/view-ide
   templateUrl: "cipher-view.component.html",
   imports: [
     KeykeeperExpirationViewComponent,
+    KeykeeperFillRulesViewComponent,
     KeykeeperTemplateLabelComponent,
     CalloutModule,
     CommonModule,

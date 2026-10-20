@@ -2,27 +2,16 @@ import { ChangeDetectionStrategy, Component, computed, effect, input, signal } f
 
 import { MspSiteFixes, SiteFixView } from "@bitwarden/admin-console/common";
 import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
+import { describeFingerprint, describeSource } from "@bitwarden/common/vault/keykeeper/fill-rules";
 import { ToastService } from "@bitwarden/components";
 
 import { SharedModule } from "../../shared";
 
 import { KeykeeperMspApiService } from "./msp-api.service";
 
-const FILLS: Record<SiteFixView["fill"], string> = {
-  username: "the username",
-  password: "the password",
-  totp: "the one-time code",
-  never: "nothing (never fill)",
-};
-
-/** How a fix finds its field, in a few words. */
+/** How a fix finds its field, in a few words (the same words as an item's fill rules). */
 export function describeField(fix: SiteFixView): string {
-  const { id, name, label } = fix.field;
-  return id
-    ? `the field with id ${id}`
-    : name
-      ? `the field named ${name}`
-      : `the field labeled "${label}"`;
+  return describeFingerprint(fix.field);
 }
 
 /** Whether two fixes are the same one. */
@@ -136,7 +125,7 @@ export class KeykeeperMspSiteFixesComponent {
   }
 
   protected fill(fix: SiteFixView) {
-    return FILLS[fix.fill];
+    return describeSource({ from: fix.fill });
   }
 
   private async load(mspId: string) {
