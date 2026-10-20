@@ -12,6 +12,13 @@
         <i slot="end" class="bwi bwi-angle-right" aria-hidden="true"></i>
       </a>
     </bit-item>
+    <!-- Keykeeper: the guided way in from this browser's own password manager. -->
+    <bit-item>
+      <a bit-item-content routerLink="/keykeeper-browser-import" data-testid="browser-import-entry">
+        Import from your browser
+        <i slot="end" class="bwi bwi-angle-right" aria-hidden="true"></i>
+      </a>
+    </bit-item>
     <bit-item>
       <button type="button" bit-item-content (click)="import()" [title]="'popOutNewWindow' | i18n">
         <div class="tw-flex tw-items-center tw-justify-center tw-gap-2">

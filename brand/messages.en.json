@@ -1,4 +1,7 @@
 {
+  "keykeeperImportFromBrowser": {
+    "message": "Import from your browser"
+  },
   "keykeeperExpiringItemsReport": {
     "message": "Expiring items"
   },
