@@ -12,6 +12,7 @@
 
 import { distinctUntilChanged, filter, firstValueFrom, map, of, switchMap } from "rxjs";
 
+import { JOIN_SECRET, KeykeeperJoinSeals } from "@bitwarden/admin-console/common";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
@@ -59,6 +60,12 @@ export interface EnrollmentPlatform {
   managedToken(): Promise<string | null>;
   /** The server browser policy points the extension to, which the token belongs to. */
   managedServer(): Promise<string | null>;
+  /**
+   * The install command's join secret and the fingerprint of the
+   * organization's public key, from browser policy. Commands made before
+   * these have neither. See DESIGN.md, "Joins a hacked server can't forge".
+   */
+  managedJoinParts(): Promise<{ secret: string | null; orgKey: string | null }>;
   load(): Promise<EnrollmentState>;
   save(state: EnrollmentState): Promise<void>;
   notify(title: string, message: string): Promise<void>;
@@ -96,6 +103,13 @@ export const chromeEnrollmentPlatform: EnrollmentPlatform = {
     return typeof environment?.base === "string" && environment.base !== ""
       ? environment.base
       : null;
+  },
+  async managedJoinParts() {
+    const part = async (key: string) => {
+      const value = await managed(key);
+      return typeof value === "string" && JOIN_SECRET.test(value.trim()) ? value.trim() : null;
+    };
+    return { secret: await part("joinSecret"), orgKey: await part("orgKeyFingerprint") };
   },
   async load() {
     return (await chrome.storage.local.get(STORAGE_KEY))[STORAGE_KEY] ?? {};
@@ -216,6 +230,7 @@ export class KeykeeperEnrollment {
     private readonly organizationService: OrganizationService,
     private readonly cryptoFunctionService: CryptoFunctionService,
     private readonly platform: EnrollmentPlatform = chromeEnrollmentPlatform,
+    private readonly seals = new KeykeeperJoinSeals(),
   ) {}
 
   /** Tries to join whenever an account is unlocked, and when the person answers the prompt. */
@@ -293,6 +308,7 @@ export class KeykeeperEnrollment {
 
     try {
       // MSP staff sign in on clients' computers; they never join a client this way.
+      const parts = await this.platform.managedJoinParts();
       const msps: { data: unknown[] } = await this.apiService.send(
         "GET",
         "/keykeeper/msp",
@@ -310,6 +326,23 @@ export class KeykeeperEnrollment {
         true,
         true,
       );
+      // The organization's key must be the one the install command names, so
+      // a hacked server can't swap in its own and get people's user keys.
+      if (parts.orgKey != null) {
+        const fingerprint =
+          info.publicKey == null
+            ? null
+            : await this.seals.fingerprint(Utils.fromB64ToArray(info.publicKey));
+        if (fingerprint !== parts.orgKey) {
+          throw new Error(
+            `${info.organizationName}'s key isn't the one your IT's install command names. Ask your IT before joining.`,
+          );
+        }
+      } else if (info.accountRecovery) {
+        throw new Error(
+          `Joining ${info.organizationName} needs a newer install command. Ask your IT to run it again.`,
+        );
+      }
       const organizations = await firstValueFrom(this.organizationService.organizations$(userId));
       if (organizations.some((o) => o.id === info.organizationId)) {
         state[userId] = { tokenHash, result: "joined" };
@@ -347,7 +380,7 @@ export class KeykeeperEnrollment {
       const joined: { status: number } = await this.apiService.send(
         "POST",
         "/keykeeper/enrollment/join",
-        { token, resetPasswordKey },
+        { token, resetPasswordKey, proof: await this.proof(userId, info, parts.secret) },
         true,
         true,
       );
@@ -375,6 +408,23 @@ export class KeykeeperEnrollment {
       await this.platform.save(state);
       return "failed";
     }
+  }
+
+  /**
+   * That this join knew the install command's secret, bound to the person's
+   * public key as this device derives it from their private key, never as the
+   * server says. Apps that confirm on their own check it.
+   */
+  private async proof(
+    userId: UserId,
+    info: EnrollmentInfo,
+    secret: string | null,
+  ): Promise<string | undefined> {
+    const publicKey = await firstValueFrom(this.keyService.userPublicKey$(userId));
+    if (secret == null || publicKey == null) {
+      return undefined;
+    }
+    return this.seals.joinProof(secret, info.organizationId, userId, publicKey);
   }
 
   /** The user key encrypted to the organization's public key, as upstream's enrollment does. */

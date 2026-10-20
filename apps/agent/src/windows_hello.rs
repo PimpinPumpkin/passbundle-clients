@@ -112,7 +112,7 @@ impl Biometrics for WindowsHello {
         let signature = match sign(&challenge) {
             Answer::Approved(signature) => signature,
             Answer::Canceled => return Answer::Canceled,
-            Answer::Failed(e) => return Answer::Failed(e),
+            Answer::Failed(e) | Answer::Lost(e) => return Answer::Failed(e),
         };
         match self.write(
             user_id,
@@ -125,20 +125,21 @@ impl Biometrics for WindowsHello {
 
     fn unlock(&self, user_id: &str, _reason: &str) -> Answer<Zeroizing<Vec<u8>>> {
         let Some(sealed) = self.read(user_id) else {
-            return Answer::Failed("no stored key".into());
+            return Answer::Lost("no stored key".into());
         };
         let Some(challenge) = sealed.challenge() else {
-            return Answer::Failed("stored key is malformed".into());
+            return Answer::Lost("stored key is malformed".into());
         };
         match sign(&challenge) {
+            // A signature that doesn't open it comes from a different Windows
+            // Hello key: Windows Hello was set up again since.
             Answer::Approved(signature) => match sealed.open(user_id, &signature) {
                 Some(key) => Answer::Approved(key),
-                None => {
-                    Answer::Failed("the stored key doesn't open with this Windows Hello".into())
-                }
+                None => Answer::Lost("the stored key doesn't open with this Windows Hello".into()),
             },
             Answer::Canceled => Answer::Canceled,
             Answer::Failed(e) => Answer::Failed(e),
+            Answer::Lost(e) => Answer::Lost(e),
         }
     }
 

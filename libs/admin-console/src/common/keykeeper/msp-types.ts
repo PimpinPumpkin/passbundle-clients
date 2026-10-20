@@ -101,6 +101,8 @@ export type ClientEnrollment = {
   joins: number;
   /** Only accounts at these email domains may join with the command; none means anyone. */
   domains: string[];
+  /** The command's join secret, encrypted with the organization's key. Older servers leave it out. */
+  secret?: string | null;
 };
 
 export type ClientMsp = {
@@ -162,10 +164,25 @@ export type TemplateCopy = { organizationId: string; cipherId: string; sourceRev
 export type PendingMember = {
   organizationId: string;
   memberId: string;
+  userId: string;
   email: string;
   publicKey: string;
   /** Whether the organization confirms automatically, or wants an admin to approve. */
   autoConfirm: boolean;
+  /** An MSP staff member's place in a client. */
+  fromMsp?: boolean;
+  /**
+   * What lets an app let them in on its own without trusting the server: the
+   * organization's sealed joining setting, and whatever vouches for the
+   * person. Older servers leave these out, and then an admin approves. See
+   * DESIGN.md, "Joins a hacked server can't forge".
+   */
+  joining?: { autoConfirm: boolean; domains: string[]; seal: string | null };
+  inviteSeal?: string | null;
+  staffSeal?: string | null;
+  joinProof?: string | null;
+  /** The install command's join secret, encrypted with the organization's key. */
+  enrollmentSecret?: string | null;
 };
 
 /** How people join an organization. See DESIGN.md, "Joining". */
@@ -176,10 +193,15 @@ export type OrgJoining = Joining & {
   source: "own" | "msp" | "server";
   mspName?: string;
   default: Joining;
+  /** The email domains and the seal over them with the setting. Older servers leave these out. */
+  domains?: string[];
+  seal?: string | null;
 };
 
 /** An MSP's default, and the clients with their own setting. */
 export type MspJoining = {
   default: Joining;
   ownSettings: (Joining & { organizationId: string; name: string })[];
+  /** For MSP admins: the clients that follow the default, with what's resealed when it changes. */
+  following?: { organizationId: string; domains: string[]; seal: string | null }[];
 };

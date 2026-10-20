@@ -23,6 +23,7 @@ import { KeyService } from "@bitwarden/key-management";
 import { OrganizationUserStatusType } from "@bitwarden/sdk-internal";
 import { ProviderUser } from "@bitwarden/web-vault/app/admin-console/common/people-table-data-source";
 
+import { KeykeeperJoinSealer } from "../../../../../keykeeper/joining/join-sealer.service";
 import { OrganizationUserView } from "../../../core/views/organization-user.view";
 import { UserConfirmComponent } from "../../../manage/user-confirm.component";
 import { MemberDialogManagerService } from "../member-dialog-manager/member-dialog-manager.service";
@@ -41,6 +42,8 @@ export class MemberActionsService {
   private orgManagementPrefs = inject(OrganizationManagementPreferencesService);
   private userNamePipe = inject(UserNamePipe);
   private memberDialogManager = inject(MemberDialogManagerService);
+  // Keykeeper: invitations carry the inviter's seals.
+  private keykeeperJoinSealer = inject(KeykeeperJoinSealer);
 
   readonly isProcessing = signal(false);
 
@@ -68,6 +71,10 @@ export class MemberActionsService {
   ): Promise<MemberActionResult> {
     this.startProcessing();
     try {
+      request.keykeeperSeals = await this.keykeeperJoinSealer.inviteSeals(
+        organizationId,
+        request.emails,
+      );
       await this.organizationUserApiService.postOrganizationUserInvite(organizationId, request);
       return { success: true };
     } catch (error) {

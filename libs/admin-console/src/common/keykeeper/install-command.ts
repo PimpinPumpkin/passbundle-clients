@@ -12,15 +12,33 @@ const SERVER_URL =
 const SCRIPT = /^[A-Za-z0-9._-]+\.ps1$/;
 
 /**
+ * What the command carries besides the token: the join secret, and the
+ * fingerprint of the organization's public key, each 32 bytes in base64url.
+ * See DESIGN.md, "Joins a hacked server can't forge".
+ */
+export type InstallCommandParts = { secret: string; fingerprint: string };
+
+/**
  * The command to show and copy, or null when any part isn't what it should
  * be. Callers show an error instead of the command then.
  */
-export function installCommand(script: string, serverUrl: string, token: string): string | null {
+export function installCommand(
+  script: string,
+  serverUrl: string,
+  token: string,
+  parts?: InstallCommandParts | null,
+): string | null {
   const url = serverUrl.replace(/\/+$/, "");
   if (!SCRIPT.test(script) || !SERVER_URL.test(url) || !TOKEN.test(token)) {
     return null;
   }
-  return `.\\${script} -ServerUrl ${quote(url)} -EnrollmentToken ${quote(token)}`;
+  if (parts != null && (!TOKEN.test(parts.secret) || !TOKEN.test(parts.fingerprint))) {
+    return null;
+  }
+  const command = `.\\${script} -ServerUrl ${quote(url)} -EnrollmentToken ${quote(token)}`;
+  return parts == null
+    ? command
+    : `${command} -JoinSecret ${quote(parts.secret)} -OrgKey ${quote(parts.fingerprint)}`;
 }
 
 /** A PowerShell literal string. The checks above already rule out quotes. */

@@ -25,6 +25,7 @@ import { DialogService } from "@bitwarden/components";
 import { newGuid } from "@bitwarden/guid";
 import { KeyService } from "@bitwarden/key-management";
 
+import { KeykeeperJoinSealer } from "../../../../../keykeeper/joining/join-sealer.service";
 import { OrganizationUserView } from "../../../core/views/organization-user.view";
 import { MemberDialogManagerService } from "../member-dialog-manager/member-dialog-manager.service";
 
@@ -37,6 +38,7 @@ describe("MemberActionsService", () => {
   let organizationUserService: MockProxy<OrganizationUserService>;
   let organizationMetadataService: MockProxy<OrganizationMetadataServiceAbstraction>;
   let memberDialogManager: MockProxy<MemberDialogManagerService>;
+  let keykeeperJoinSealer: MockProxy<KeykeeperJoinSealer>;
 
   const organizationId = newGuid() as OrganizationId;
   const userIdToManage = newGuid();
@@ -49,6 +51,8 @@ describe("MemberActionsService", () => {
     organizationUserService = mock<OrganizationUserService>();
     organizationMetadataService = mock<OrganizationMetadataServiceAbstraction>();
     memberDialogManager = mock<MemberDialogManagerService>();
+    keykeeperJoinSealer = mock<KeykeeperJoinSealer>();
+    keykeeperJoinSealer.inviteSeals.mockResolvedValue({ "test@example.com": "seal" });
 
     mockOrganization = {
       id: organizationId,
@@ -85,6 +89,7 @@ describe("MemberActionsService", () => {
         },
         { provide: UserNamePipe, useValue: mock<UserNamePipe>() },
         { provide: MemberDialogManagerService, useValue: memberDialogManager },
+        { provide: KeykeeperJoinSealer, useValue: keykeeperJoinSealer },
         { provide: I18nService, useValue: mock<I18nService>() },
       ],
     });
@@ -112,6 +117,8 @@ describe("MemberActionsService", () => {
         organizationId,
         request,
       );
+      // Keykeeper: the invitation carries the inviter's seal.
+      expect(request.keykeeperSeals).toEqual({ "test@example.com": "seal" });
     });
 
     it("should handle invite errors", async () => {

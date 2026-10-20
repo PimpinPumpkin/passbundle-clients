@@ -111,7 +111,7 @@ mod test {
             }
             match self.keys.lock().unwrap().get(user_id) {
                 Some(key) => Answer::Approved(Zeroizing::new(key.clone())),
-                None => Answer::Failed("not enrolled".into()),
+                None => Answer::Lost("not enrolled".into()),
             }
         }
         fn authenticate(&self, reason: &str) -> Answer<()> {

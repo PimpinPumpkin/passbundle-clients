@@ -49,23 +49,23 @@ export class KeykeeperMspRequests {
     );
   }
 
-  /** Sets the organization's own setting. */
-  async setOrgJoining(orgId: string, joining: Joining): Promise<OrgJoining> {
+  /** Sets the organization's own setting, with the seal over it and the domains. */
+  async setOrgJoining(orgId: string, joining: Joining, seal?: string): Promise<OrgJoining> {
     return this.apiService.send(
       "PUT",
       `/keykeeper/organizations/${orgId}/joining`,
-      joining,
+      { ...joining, seal },
       true,
       true,
     );
   }
 
-  /** Puts the organization back on its MSP's default, or the server's. */
-  async resetOrgJoining(orgId: string): Promise<OrgJoining> {
+  /** Puts the organization back on its MSP's default, or the server's, with its seal. */
+  async resetOrgJoining(orgId: string, seal?: string): Promise<OrgJoining> {
     return this.apiService.send(
       "DELETE",
       `/keykeeper/organizations/${orgId}/joining`,
-      null,
+      { seal },
       true,
       true,
     );
@@ -75,8 +75,19 @@ export class KeykeeperMspRequests {
     return this.apiService.send("GET", `/keykeeper/msp/${mspId}/joining`, null, true, true);
   }
 
-  async setMspJoining(mspId: string, joining: Joining): Promise<MspJoining> {
-    return this.apiService.send("PUT", `/keykeeper/msp/${mspId}/joining`, joining, true, true);
+  /** Sets the MSP's default, with a seal for each client that follows it. */
+  async setMspJoining(
+    mspId: string,
+    joining: Joining,
+    seals?: Record<string, string>,
+  ): Promise<MspJoining> {
+    return this.apiService.send(
+      "PUT",
+      `/keykeeper/msp/${mspId}/joining`,
+      { ...joining, seals },
+      true,
+      true,
+    );
   }
 
   async getTemplates(mspId: string): Promise<MspTemplates> {

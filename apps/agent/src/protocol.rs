@@ -13,7 +13,7 @@ use std::{
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde_json::{json, Value};
-use zeroize::Zeroizing;
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::channel::SessionKey;
 
@@ -42,13 +42,24 @@ pub enum BiometricsStatus {
     NativeMessagingPermissionMissing = 9,
 }
 
+/// Overwrites the user key in a message or reply before it's dropped.
+fn forget_key(message: &mut Value) {
+    if let Some(Value::String(key)) = message.get_mut("userKeyB64") {
+        key.zeroize();
+    }
+}
+
 /// The person's answer to a prompt.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Answer<T> {
     Approved(T),
     Canceled,
-    /// The prompt couldn't be shown or the key couldn't be opened.
+    /// The prompt couldn't be shown or didn't finish: a locked or busy
+    /// device, say. The stored key stays; the next try may work.
     Failed(String),
+    /// The stored key can't be opened and never will be: Windows Hello was
+    /// set up again, the fingerprints changed, or the stored key is damaged.
+    Lost(String),
 }
 
 /// Windows Hello or Touch ID, and where enrolled keys are kept.
@@ -81,7 +92,10 @@ impl PromptGate {
         // Waits for a prompt already showing, rather than stacking two.
         let _showing = self.showing.lock().unwrap();
         let answer = show();
-        if matches!(answer, Answer::Canceled | Answer::Failed(_)) {
+        if matches!(
+            answer,
+            Answer::Canceled | Answer::Failed(_) | Answer::Lost(_)
+        ) {
             *self.last_cancel.lock().unwrap() = Some(Instant::now());
         }
         answer
@@ -146,11 +160,13 @@ impl<'a> Connection<'a> {
         let Some(session) = self.sessions.get(&app_id) else {
             return Some(invalidate(&app_id));
         };
-        let Ok(plaintext) = session.decrypt(encrypted) else {
+        // Messages can carry the user key: every copy here is overwritten
+        // before it's dropped (serde_json's own buffers are gone by then).
+        let Ok(plaintext) = session.decrypt(encrypted).map(Zeroizing::new) else {
             self.sessions.remove(&app_id);
             return Some(invalidate(&app_id));
         };
-        let inner: Value = serde_json::from_str(&plaintext).ok()?;
+        let mut inner: Value = serde_json::from_str(&plaintext).ok()?;
         if !self.fresh(&inner) {
             return None;
         }
@@ -161,14 +177,19 @@ impl<'a> Connection<'a> {
             .and_then(Value::as_str)
             .unwrap_or_default()
             .to_owned();
-        let mut reply = self.command(&command, &user_id, &inner)?;
+        let reply = self.command(&command, &user_id, &inner);
+        forget_key(&mut inner);
+        let mut reply = reply?;
         reply.insert("command".into(), json!(command));
         reply.insert("messageId".into(), json!(message_id));
         // Stamped as it's sent: a prompt can take most of the extension's
         // 60 seconds, and it drops replies more than 10 seconds old.
         reply.insert("timestamp".into(), json!((self.now_ms)()));
         let session = self.sessions.get(&app_id)?;
-        let enc_string = session.encrypt(&Value::Object(reply).to_string());
+        let mut reply = Value::Object(reply);
+        let plain = Zeroizing::new(reply.to_string());
+        forget_key(&mut reply);
+        let enc_string = session.encrypt(&plain);
         Some(
             json!({
                 "appId": app_id,
@@ -252,12 +273,13 @@ impl<'a> Connection<'a> {
                             reply.insert("userKeyB64".into(), json!(STANDARD.encode(&*key)));
                             unlocked = true;
                         }
-                        Answer::Canceled => {}
-                        // The stored key can't be opened (the person's
-                        // Windows Hello or fingerprints changed, say).
-                        // Forget it, so the extension asks for the master
-                        // password and offers to turn this on again.
-                        Answer::Failed(_) => self.biometrics.remove(user_id),
+                        // Nothing lost: the person can try again.
+                        Answer::Canceled | Answer::Failed(_) => {}
+                        // The stored key can't be opened any more (the
+                        // person's Windows Hello or fingerprints changed,
+                        // say). Forget it, so the extension asks for the
+                        // master password and offers to turn this on again.
+                        Answer::Lost(_) => self.biometrics.remove(user_id),
                     }
                 }
                 reply.insert("response".into(), json!(unlocked));
@@ -356,7 +378,8 @@ mod tests {
             self.reasons.lock().unwrap().push(reason.to_owned());
             match self.answers.lock().unwrap().pop() {
                 Some("yes") => Answer::Approved(value()),
-                Some("fail") => Answer::Failed("no Windows Hello key".into()),
+                Some("fail") => Answer::Failed("the device is locked".into()),
+                Some("lost") => Answer::Lost("Windows Hello was set up again".into()),
                 _ => Answer::Canceled,
             }
         }
@@ -553,8 +576,8 @@ mod tests {
     }
 
     #[test]
-    fn a_key_that_cant_be_opened_is_forgotten() {
-        let fake = Fake::new(&["yes", "fail"]);
+    fn a_key_that_cant_be_opened_any_more_is_forgotten() {
+        let fake = Fake::new(&["yes", "lost"]);
         let gate = PromptGate::default();
         let mut connection = Connection::new(&fake, &gate, context()).with_clock(|| NOW);
         let mut extension = Extension::new();
@@ -566,6 +589,23 @@ mod tests {
             false
         );
         assert!(!fake.is_enrolled(USER));
+    }
+
+    #[test]
+    fn a_prompt_that_fails_for_now_keeps_the_key() {
+        let fake = Fake::new(&["yes", "fail"]);
+        let gate = PromptGate::default();
+        let mut connection = Connection::new(&fake, &gate, context()).with_clock(|| NOW);
+        let mut extension = Extension::new();
+        extension.setup(&mut connection, NOW).unwrap();
+        extension.call(&mut connection, enroll_message()).unwrap();
+        let unlock = json!({ "command": "unlockWithBiometricsForUser" });
+        assert_eq!(
+            extension.call(&mut connection, unlock).unwrap()["response"],
+            false
+        );
+        // A locked or busy device isn't a reason to make the person set this up again.
+        assert!(fake.is_enrolled(USER));
     }
 
     #[test]

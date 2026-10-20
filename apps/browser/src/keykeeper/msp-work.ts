@@ -14,6 +14,16 @@ const EVERY_MINUTES = 5;
 
 export function startMspWork(work: KeykeeperMspWork) {
   work.start();
+  // Said on this device, so an unexpected one is seen where it happened.
+  work.letIn$.subscribe(({ email, organizationName }) => {
+    void chrome.notifications?.create(`${MSP_WORK_ALARM}-${email}-${organizationName}`, {
+      type: "basic",
+      iconUrl: chrome.runtime.getURL("images/icon128.png"),
+      title: `Let ${email} into ${organizationName}`,
+      message: "This browser let them in. If you don't know them, remove them on the Members page.",
+      priority: 1,
+    });
+  });
   if (!chrome.alarms) {
     return;
   }

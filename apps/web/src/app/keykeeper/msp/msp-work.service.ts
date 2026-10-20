@@ -2,6 +2,7 @@ import { Injectable } from "@angular/core";
 
 import {
   CollectionAdminService,
+  KeykeeperJoinChecks,
   KeykeeperMspWork,
   KeykeeperTemplateSender,
   OrganizationUserService,
@@ -9,8 +10,12 @@ import {
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { AuthService } from "@bitwarden/common/auth/abstractions/auth.service";
+import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
+import { StateProvider } from "@bitwarden/common/platform/state";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
+import { ToastService } from "@bitwarden/components";
+import { KeyService } from "@bitwarden/key-management";
 
 import { KeykeeperMspApiService } from "./msp-api.service";
 
@@ -25,6 +30,18 @@ export class KeykeeperTemplateSenderService extends KeykeeperTemplateSender {
     syncService: SyncService,
   ) {
     super(mspApi, cipherService, collectionAdminService, accountService, syncService);
+  }
+}
+
+/** Keykeeper: who the web vault lets in on its own, with the web vault's services. */
+@Injectable({ providedIn: "root" })
+export class KeykeeperJoinChecksService extends KeykeeperJoinChecks {
+  constructor(
+    keyService: KeyService,
+    encryptService: EncryptService,
+    stateProvider: StateProvider,
+  ) {
+    super(keyService, encryptService, stateProvider);
   }
 }
 
@@ -44,6 +61,8 @@ export class KeykeeperMspWorkService extends KeykeeperMspWork {
     organizationService: OrganizationService,
     organizationUserService: OrganizationUserService,
     syncService: SyncService,
+    joinChecks: KeykeeperJoinChecksService,
+    toastService: ToastService,
   ) {
     super(
       mspApi,
@@ -54,6 +73,11 @@ export class KeykeeperMspWorkService extends KeykeeperMspWork {
       organizationService,
       organizationUserService,
       syncService,
+      joinChecks,
+    );
+    // Said on this device, so an unexpected one is seen where it happened.
+    this.letIn$.subscribe(({ email, organizationName }) =>
+      toastService.showToast({ variant: "info", message: `Let ${email} into ${organizationName}` }),
     );
   }
 }

@@ -10,6 +10,7 @@ import {
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { Guid, OrganizationId } from "@bitwarden/common/types/guid";
 
+import { KeykeeperJoinSealer } from "../../../../keykeeper/joining/join-sealer.service";
 import { CoreOrganizationModule } from "../core-organization.module";
 import { OrganizationUserAdminView } from "../views/organization-user-admin-view";
 
@@ -18,6 +19,7 @@ export class UserAdminService {
   constructor(
     private organizationUserApiService: OrganizationUserApiService,
     private organizationUserService: OrganizationUserService,
+    private keykeeperJoinSealer: KeykeeperJoinSealer,
   ) {}
 
   async get(
@@ -73,6 +75,11 @@ export class UserAdminService {
       accessSecretsManager: user.accessSecretsManager,
     });
 
+    // Keykeeper: invitations carry the inviter's seals.
+    request.keykeeperSeals = await this.keykeeperJoinSealer.inviteSeals(
+      user.organizationId,
+      emails,
+    );
     await this.organizationUserApiService.postOrganizationUserInvite(user.organizationId, request);
   }
 }
