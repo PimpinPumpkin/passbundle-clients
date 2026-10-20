@@ -58,11 +58,18 @@ describe("Keykeeper fill picker menu", () => {
       ]);
     });
 
-    it("hides the password when the item doesn't allow viewing it", () => {
+    it("hides the password and hidden fields when the item doesn't allow viewing them", () => {
       const cipher = bankItem();
+      const pin = new FieldView();
+      pin.name = "PIN";
+      pin.value = "4321";
+      pin.type = FieldType.Hidden;
+      cipher.fields = [...cipher.fields, pin];
+      expect(choicesFor(cipher).map((c) => c.title)).toContain("PIN");
+
       cipher.viewPassword = false;
 
-      expect(choicesFor(cipher).map((c) => c.key)).not.toContain("p");
+      expect(choicesFor(cipher).map((c) => c.key)).toEqual(["u", "f0", "n"]);
     });
   });
 
@@ -137,11 +144,16 @@ describe("Keykeeper fill picker menu", () => {
       accountService: AccountService;
       cipherService: ReturnType<typeof mock<CipherService>>;
       totpService: ReturnType<typeof mock<TotpService>>;
+      passwordRepromptRequired: jest.Mock<Promise<boolean>, [CipherView]>;
+      fillAfterReprompt: jest.Mock<Promise<void>, [chrome.tabs.Tab, CipherView]>;
     };
     let tabSendMessage: jest.SpyInstance;
+    /** The page or frame the right-clicked field is in. */
+    let frameUrl: string;
 
     beforeEach(() => {
       cipher = bankItem();
+      frameUrl = tab.url!;
       deps = {
         authService: mock<AuthService>(),
         accountService: {
@@ -149,6 +161,8 @@ describe("Keykeeper fill picker menu", () => {
         } as unknown as AccountService,
         cipherService: mock<CipherService>(),
         totpService: mock<TotpService>(),
+        passwordRepromptRequired: jest.fn<Promise<boolean>, [CipherView]>(async () => false),
+        fillAfterReprompt: jest.fn<Promise<void>, [chrome.tabs.Tab, CipherView]>(async () => {}),
       };
       deps.authService.getAuthStatus.mockResolvedValue(AuthenticationStatus.Unlocked);
       deps.cipherService.getAllDecrypted.mockResolvedValue([cipher]);
@@ -159,7 +173,7 @@ describe("Keykeeper fill picker menu", () => {
         .mockImplementation(async (_tab, message) => {
           if ((message as { command: string }).command === "collectAutofillTriage") {
             return {
-              pageDetails: { url: tab.url, fields: [customerNumberField] },
+              pageDetails: { url: frameUrl, fields: [customerNumberField] },
               targetOpid: "__3",
             };
           }
@@ -200,10 +214,52 @@ describe("Keykeeper fill picker menu", () => {
       expect(readFillRules(cipher)).toEqual([
         {
           v: 1,
+          host: "bank.example.test",
           field: { id: "custno", name: "customer_number", label: "customer number" },
           fill: { from: "field", name: "Customer ID" },
         },
       ]);
+    });
+
+    const filled = () =>
+      tabSendMessage.mock.calls.some(([, message]) => message.command === "fillForm");
+
+    it("asks for the master password before filling a secret of an item that wants it", async () => {
+      deps.passwordRepromptRequired.mockResolvedValue(true);
+
+      await click("p");
+
+      expect(filled()).toBe(false);
+      expect(readFillRules(cipher)[0].fill).toEqual({ from: "password" });
+      expect(deps.fillAfterReprompt).toHaveBeenCalledWith(tab, cipher);
+    });
+
+    it("fills the username of such an item at once, as upstream copies it", async () => {
+      deps.passwordRepromptRequired.mockResolvedValue(true);
+
+      await click("u");
+
+      expect(filled()).toBe(true);
+      expect(deps.fillAfterReprompt).not.toHaveBeenCalled();
+    });
+
+    it("never puts a secret into a frame from another site, and remembers nothing", async () => {
+      frameUrl = "https://ads.example.net/frame";
+
+      await click("p");
+
+      expect(filled()).toBe(false);
+      expect(readFillRules(cipher)).toEqual([]);
+      expect(deps.cipherService.updateWithServer).not.toHaveBeenCalled();
+    });
+
+    it("fills a frame on another part of the same site", async () => {
+      frameUrl = "https://login.example.test/frame";
+
+      await click("p");
+
+      expect(filled()).toBe(true);
+      expect(readFillRules(cipher)[0].host).toBe("login.example.test");
     });
 
     it("saves never-fill without filling anything", async () => {

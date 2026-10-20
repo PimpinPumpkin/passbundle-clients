@@ -32,9 +32,24 @@ export type FillSource =
 
 export type FillRule = {
   v: 1;
+  /**
+   * The host (with any port) of the page or frame the rule was made on. A rule
+   * fills only there, so a rule on an item that matches several sites, or one
+   * someone else with edit rights added, can't send a value anywhere else.
+   */
+  host?: string;
   field: FieldFingerprint;
   fill: FillSource;
 };
+
+/** A page's host, with any port, or "" for a page without one. */
+export function hostOf(url: string | null | undefined): string {
+  try {
+    return new URL(url ?? "").host.toLowerCase();
+  } catch {
+    return "";
+  }
+}
 
 const normalize = (text: string | null | undefined) =>
   (text ?? "").replace(/\s+/g, " ").trim().toLowerCase();
@@ -62,15 +77,14 @@ export function fingerprintField(field: AutofillField): FieldFingerprint {
 
 /**
  * Whether a field on a page is the one a rule describes. The id decides when
- * the rule has one, then the name, then the visible label, so a rule survives
- * small page changes but never matches a different field just by label when
- * the id says otherwise.
+ * the rule has one, then the name, then the visible label: a field without
+ * the rule's id or name is never matched by its label alone.
  */
 export function fieldMatches(fingerprint: FieldFingerprint, field: AutofillField): boolean {
-  if (fingerprint.id && field.htmlID) {
+  if (fingerprint.id) {
     return fingerprint.id === field.htmlID;
   }
-  if (fingerprint.name && field.htmlName) {
+  if (fingerprint.name) {
     return fingerprint.name === field.htmlName;
   }
   if (fingerprint.label) {
@@ -79,9 +93,46 @@ export function fieldMatches(fingerprint: FieldFingerprint, field: AutofillField
   return false;
 }
 
+/**
+ * Whether a source is something the item can hide: the password, a
+ * verification code, or a hidden custom field.
+ */
+export function isSecretSource(cipher: CipherView, source: FillSource): boolean {
+  switch (source.from) {
+    case "password":
+    case "totp":
+      return true;
+    case "field":
+      return (
+        visibleCustomFields(cipher).find((f) => f.name === source.name)?.type === FieldType.Hidden
+      );
+    default:
+      return false;
+  }
+}
+
+/**
+ * Whether a rule may fill this field. Never into a field the person can't
+ * see, and for someone who can't see the item's passwords, a password or
+ * hidden field only into a password field, where they can't read it either.
+ */
+function mayFill(cipher: CipherView, source: FillSource, field: AutofillField): boolean {
+  if (!field.viewable || field.type === "hidden") {
+    return false;
+  }
+  const hidden =
+    source.from === "password" || (source.from === "field" && isSecretSource(cipher, source));
+  return !hidden || cipher.viewPassword || field.type === "password";
+}
+
 function isFillRule(value: unknown): value is FillRule {
   const rule = value as FillRule;
-  if (rule?.v !== 1 || typeof rule.field !== "object" || typeof rule.fill !== "object") {
+  if (
+    rule?.v !== 1 ||
+    typeof rule.field !== "object" ||
+    typeof rule.fill !== "object" ||
+    (rule.host != null && typeof rule.host !== "string")
+  ) {
     return false;
   }
   const from = rule.fill.from;
@@ -116,8 +167,8 @@ const sameField = (a: FieldFingerprint, b: FieldFingerprint) =>
   (a.label ?? null) === (b.label ?? null);
 
 /**
- * Adds a rule to an item, replacing any existing rule for the same field.
- * The caller saves the item.
+ * Adds a rule to an item, replacing any existing rule for the same field on
+ * the same host. The caller saves the item.
  */
 export function upsertFillRule(cipher: CipherView, rule: FillRule): void {
   const others = (cipher.fields ?? []).filter((field) => {
@@ -126,7 +177,11 @@ export function upsertFillRule(cipher: CipherView, rule: FillRule): void {
     }
     try {
       const existing = JSON.parse(field.value ?? "");
-      return !(isFillRule(existing) && sameField(existing.field, rule.field));
+      return !(
+        isFillRule(existing) &&
+        (existing.host ?? null) === (rule.host ?? null) &&
+        sameField(existing.field, rule.field)
+      );
     } catch {
       return true;
     }
@@ -145,7 +200,9 @@ export function visibleCustomFields(cipher: CipherView): FieldView[] {
 
 /**
  * Applies an item's fill rules to a fill script, before upstream's own
- * matching runs. Value rules fill their field. Never rules claim their field
+ * matching runs. Only rules made on this page's host apply; a never rule from
+ * before rules had a host applies anywhere, since it only holds a value back.
+ * Value rules fill their field. Never rules claim their field
  * without filling it. Fields claimed here are added to `filledFields`, which
  * upstream's matching skips. Returns the never-fill fields' opids, which the
  * caller also hides from upstream's field selection, so a password meant for
@@ -160,7 +217,10 @@ export async function applyFillRules(
   fill: (fillScript: AutofillScript, field: AutofillField, value: string) => void,
 ): Promise<Set<string>> {
   const neverFill = new Set<string>();
-  const rules = readFillRules(cipher);
+  const host = hostOf(pageDetails.url);
+  const rules = readFillRules(cipher).filter((r) =>
+    r.host == null ? r.fill.from === "never" : r.host === host && host !== "",
+  );
   if (!rules.length) {
     return neverFill;
   }
@@ -175,6 +235,9 @@ export async function applyFillRules(
     if (rule.fill.from === "never") {
       filledFields[field.opid] = field;
       neverFill.add(field.opid);
+      continue;
+    }
+    if (!mayFill(cipher, rule.fill, field)) {
       continue;
     }
     const value = await valueFor(rule.fill);

@@ -33,7 +33,7 @@ import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { OrganizationUserService } from "../organization-user";
 
 import { KeykeeperMspRequests } from "./msp-requests";
-import { KeykeeperTemplateSender } from "./msp-template-sender";
+import { KeykeeperTemplateSender, templateSourceProblem } from "./msp-template-sender";
 import { knownItems, templateRows } from "./msp-template-status";
 import { MspDetails, MspTemplates, PendingMember } from "./msp-types";
 
@@ -162,11 +162,13 @@ export class KeykeeperMspWork {
   }
 
   /**
-   * Confirms every membership waiting in an MSP's clients that this person
-   * can confirm, approval required or not: the MSP console's Confirm.
+   * Confirms the memberships waiting in an MSP's clients that this person can
+   * confirm, when the MSP console opens. Clients set to require approval are
+   * left for an admin's Confirm on their Members page, which shows the
+   * person's fingerprint.
    */
   async confirmPending(mspId: string): Promise<ConfirmResult> {
-    return this.confirm(await this.requests.pending(mspId));
+    return this.confirm((await this.requests.pending(mspId)).filter((p) => p.autoConfirm));
   }
 
   /**
@@ -230,6 +232,18 @@ export class KeykeeperMspWork {
     for (const row of rows) {
       const source = items.find((c) => c.id === row.sourceCipherId);
       if (!row.sourceVisible || source == null) {
+        continue;
+      }
+      const problem = templateSourceProblem(
+        source,
+        msp.clients.map((c) => c.id),
+      );
+      if (problem != null) {
+        // Said once a session, like a failed copy.
+        if (!this.failed.has(`${row.templateId}:source`)) {
+          this.failed.add(`${row.templateId}:source`);
+          outcome.failures.push(`${source.name}: ${problem}`);
+        }
         continue;
       }
       const revision = source.revisionDate.toISOString();

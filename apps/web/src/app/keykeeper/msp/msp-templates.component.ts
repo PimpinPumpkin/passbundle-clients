@@ -17,6 +17,7 @@ import {
   knownItems,
   TemplateRow,
   templateRows,
+  templateSourceProblem,
   templateStatus,
   templateTargets,
 } from "@bitwarden/admin-console/common";
@@ -184,12 +185,9 @@ export class KeykeeperMspTemplatesComponent {
 
   /** Templates an admin can add: their own and their organizations', never a client's copy. */
   protected readonly candidates = computed(() => {
-    const clients = new Set(this.msp().clients.map((c) => c.id));
+    const clients = this.msp().clients.map((c) => c.id);
     return this.items()
-      .filter(
-        (c) =>
-          customTemplate(c) != null && !(c.organizationId != null && clients.has(c.organizationId)),
-      )
+      .filter((c) => customTemplate(c) != null && templateSourceProblem(c, clients) == null)
       .sort((a, b) => a.name.localeCompare(b.name));
   });
 

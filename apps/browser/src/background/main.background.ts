@@ -1845,6 +1845,7 @@ export default class MainBackground {
       this.authService,
       this.accountService,
       this.cipherService,
+      this.stateProvider,
     );
     this.keykeeperExpirationReminders.init();
     // Keykeeper: join the client organization named by the MSP's install command.
@@ -1855,6 +1856,9 @@ export default class MainBackground {
       this.keyService,
       this.encryptService,
       this.syncService,
+      this.environmentService,
+      this.organizationService,
+      this.cryptoFunctionService,
     );
     this.keykeeperEnrollment.init();
     // Keykeeper: biometric unlock through the desktop agent.

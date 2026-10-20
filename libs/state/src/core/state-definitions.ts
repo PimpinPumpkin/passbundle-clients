@@ -276,3 +276,8 @@ export const CRYPTO_MEMORY = new StateDefinition("crypto", "memory");
 export const KDF_CONFIG_DISK = new StateDefinition("kdfConfig", "disk");
 export const KEY_CONNECTOR_DISK = new StateDefinition("keyConnector", "disk");
 export const SHARED_UNLOCK_SETTINGS_DISK = new StateDefinition("sharedUnlockSettings", "disk");
+
+// Keykeeper
+
+/** Which expiry reminders the extension already showed, per account. */
+export const KEYKEEPER_REMINDERS_DISK = new StateDefinition("keykeeperReminders", "disk");

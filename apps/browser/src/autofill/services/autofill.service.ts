@@ -53,7 +53,12 @@ import { getWebExtSender } from "../../platform/utils/web-ext-sender";
 import { openVaultItemPasswordRepromptPopout } from "../../vault/popup/utils/vault-popout-window";
 import { AutofillMessageCommand, AutofillMessageSender } from "../enums/autofill-message.enums";
 import { InlineMenuFillTypes, type InlineMenuFillType } from "../enums/autofill-overlay.enum";
-import { applyFillRules, FillSource, staticValueFor } from "../keykeeper/fill-rules";
+import {
+  applyFillRules,
+  FillSource,
+  staticValueFor,
+  visibleCustomFields,
+} from "../keykeeper/fill-rules";
 import AutofillField from "../models/autofill-field";
 import AutofillPageDetails from "../models/autofill-page-details";
 import AutofillScript from "../models/autofill-script";
@@ -828,7 +833,8 @@ export default class AutofillService implements AutofillServiceInterface {
         fields: pageDetails.fields.filter((field) => !neverFill.has(field.opid)),
       };
     }
-    const fields = options.cipher.fields;
+    // Keykeeper: our own fields (fill rules, expiry dates) never fill a page field by name.
+    const fields = visibleCustomFields(options.cipher);
 
     if (fields && fields.length) {
       const fieldNames: string[] = [];

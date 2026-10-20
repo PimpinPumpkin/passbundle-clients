@@ -2,7 +2,11 @@ import { ChangeDetectionStrategy, Component, effect, input, signal } from "@angu
 import { FormBuilder } from "@angular/forms";
 import { firstValueFrom } from "rxjs";
 
-import { ClientEnrollment } from "@bitwarden/admin-console/common";
+import {
+  ClientEnrollment,
+  INSTALL_COMMAND_REFUSED,
+  installCommand,
+} from "@bitwarden/admin-console/common";
 import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
@@ -43,10 +47,20 @@ type InstallState =
             the organization.
           </p>
           @if (s.enrollment.token; as token) {
-            <pre
-              class="tw-whitespace-pre-wrap tw-break-all tw-rounded tw-bg-background-alt tw-p-3 tw-text-sm"
-              data-testid="org-install-command"
-              >{{ installCommand(token) }}</pre>
+            @if (installCommand(token); as command) {
+              <pre
+                class="tw-whitespace-pre-wrap tw-break-all tw-rounded tw-bg-background-alt tw-p-3 tw-text-sm"
+                data-testid="org-install-command"
+                >{{ command }}</pre>
+            } @else {
+              <p
+                bitTypography="body2"
+                class="tw-text-danger"
+                data-testid="org-install-command-refused"
+              >
+                {{ refusedCommand }}
+              </p>
+            }
             <p bitTypography="helper" data-testid="org-install-joins">
               {{ s.enrollment.joins === 1 ? "1 person has" : s.enrollment.joins + " people have" }}
               joined with this command.
@@ -54,7 +68,8 @@ type InstallState =
                 Only {{ domainList(s.enrollment.domains) }} accounts with a verified email can join
                 with it.
               } @else {
-                Anyone who has it can ask to join, so treat it like a password.
+                Anyone who has it can ask to join, and an owner or admin approves each one, so treat
+                it like a password.
               }
             </p>
             <form
@@ -142,10 +157,11 @@ export class KeykeeperOrgInstallComponent {
   }
 
   /** The command to run on each computer; the script's name comes from the brand. */
-  protected installCommand(token: string): string {
-    const script = this.i18nService.t("keykeeperInstallScript");
-    return `.\\${script} -ServerUrl ${this.serverUrl()} -EnrollmentToken ${token}`;
+  protected installCommand(token: string): string | null {
+    return installCommand(this.i18nService.t("keykeeperInstallScript"), this.serverUrl(), token);
   }
+
+  protected readonly refusedCommand = INSTALL_COMMAND_REFUSED;
 
   protected domainList(domains: string[]): string {
     return domains.length < 2
@@ -154,7 +170,12 @@ export class KeykeeperOrgInstallComponent {
   }
 
   protected copyCommand(token: string) {
-    this.platformUtilsService.copyToClipboard(this.installCommand(token));
+    const command = this.installCommand(token);
+    if (command == null) {
+      this.toastService.showToast({ variant: "error", message: INSTALL_COMMAND_REFUSED });
+      return;
+    }
+    this.platformUtilsService.copyToClipboard(command);
     this.toastService.showToast({ variant: "success", message: "Copied the install command" });
   }
 
@@ -170,7 +191,7 @@ export class KeykeeperOrgInstallComponent {
         variant: "success",
         message: enrollment.domains.length
           ? `Only ${this.domainList(enrollment.domains)} accounts can join with the command`
-          : "Anyone with the command can join",
+          : "Anyone with the command can ask to join",
       });
     });
   };

@@ -20,6 +20,12 @@
   "keykeeperMspConsole": {
     "message": "MSP console"
   },
+  "keykeeperManageAccountRecoveryHint": {
+    "message": "Can reset the master password of members in account recovery, and so sign in as them and see everything they can."
+  },
+  "keykeeperImportExportHint": {
+    "message": "Covers import. Exporting the organization's vault needs access to all items, which custom roles can't have yet."
+  },
   "keykeeperCustomRoleNoCollections": {
     "message": "With these permissions, a custom role can't also manage all collections yet. Give them collections on the Collections tab."
   },

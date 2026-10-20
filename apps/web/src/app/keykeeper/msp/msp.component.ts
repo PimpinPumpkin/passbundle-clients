@@ -3,6 +3,7 @@ import { FormBuilder, Validators } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { firstValueFrom } from "rxjs";
 
+import { INSTALL_COMMAND_REFUSED, installCommand } from "@bitwarden/admin-console/common";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
@@ -185,10 +186,20 @@ const CLIENT_FEATURES = {
                   browsers' password managers, and anyone who then signs in joins
                   {{ install.client.name }}.
                 </p>
-                <pre
-                  class="tw-whitespace-pre-wrap tw-break-all tw-rounded tw-bg-background-alt tw-p-3 tw-text-sm"
-                  data-testid="msp-install-command"
-                  >{{ installCommand(token) }}</pre>
+                @if (installCommand(token); as command) {
+                  <pre
+                    class="tw-whitespace-pre-wrap tw-break-all tw-rounded tw-bg-background-alt tw-p-3 tw-text-sm"
+                    data-testid="msp-install-command"
+                    >{{ command }}</pre>
+                } @else {
+                  <p
+                    bitTypography="body2"
+                    class="tw-text-danger"
+                    data-testid="msp-install-command-refused"
+                  >
+                    {{ refusedCommand }}
+                  </p>
+                }
                 <p bitTypography="helper">
                   {{
                     install.enrollment.joins === 1
@@ -200,7 +211,8 @@ const CLIENT_FEATURES = {
                     Only {{ domainList(install.enrollment.domains) }} accounts with a verified email
                     can join with it.
                   } @else {
-                    Anyone who has it can ask to join, so treat it like a password.
+                    Anyone who has it can ask to join, and an owner or admin approves each one, so
+                    treat it like a password.
                   }
                 </p>
                 @if (m.role === "admin") {
@@ -433,11 +445,12 @@ const CLIENT_FEATURES = {
           @if (lastInvite(); as invite) {
             <bit-callout type="success" [title]="null" data-testid="msp-invite-link">
               <p>
-                {{ invite.email }} doesn't have an account yet, so they're invited.
+                {{ invite.email }} is invited, and joins once they accept.
                 @if (invite.emailed) {
                   We emailed them this link.
                 } @else {
-                  Send them this link. They create an account with that email address, then open it.
+                  Send them this link. They sign in with that email address, or create an account
+                  with it, then open it.
                 }
               </p>
               <pre class="tw-whitespace-pre-wrap tw-break-all tw-text-sm">{{
@@ -856,19 +869,25 @@ export class KeykeeperMspComponent implements OnInit {
       this.toast(
         enrollment.domains.length
           ? `Only ${this.domainList(enrollment.domains)} accounts can join ${install.client.name} with the command`
-          : `Anyone with the command can join ${install.client.name}`,
+          : `Anyone with the command can ask to join ${install.client.name}`,
       );
     });
   };
 
   /** The command an MSP runs from their RMM; the script's name comes from the brand. */
-  protected installCommand(token: string): string {
-    const script = this.i18nService.t("keykeeperInstallScript");
-    return `.\\${script} -ServerUrl ${this.serverUrl()} -EnrollmentToken ${token}`;
+  protected installCommand(token: string): string | null {
+    return installCommand(this.i18nService.t("keykeeperInstallScript"), this.serverUrl(), token);
   }
 
+  protected readonly refusedCommand = INSTALL_COMMAND_REFUSED;
+
   protected copyCommand(token: string) {
-    this.platformUtilsService.copyToClipboard(this.installCommand(token));
+    const command = this.installCommand(token);
+    if (command == null) {
+      this.toastService.showToast({ variant: "error", message: INSTALL_COMMAND_REFUSED });
+      return;
+    }
+    this.platformUtilsService.copyToClipboard(command);
     this.toast("Copied the install command");
   }
 

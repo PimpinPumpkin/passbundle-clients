@@ -69,6 +69,7 @@ import { NotificationsSettingsComponent } from "../autofill/popup/settings/notif
 import { PremiumV2Component } from "../billing/popup/settings/premium-v2.component";
 import { PhishingWarningComponent } from "../dirt/phishing-detection/popup/phishing-warning.component";
 import { ProtectedByComponent } from "../dirt/phishing-detection/popup/protected-by-component";
+import { KeykeeperJoinPageComponent } from "../keykeeper/popup/join-page.component";
 import BrowserPopupUtils from "../platform/browser/browser-popup-utils";
 import { popupRouterCacheGuard } from "../platform/popup/view-cache/popup-router-cache.service";
 import { RouteCacheOptions } from "../platform/services/popup-view-cache-background.service";
@@ -241,6 +242,13 @@ const routes: Routes = [
       authGuard,
       canAccessFeature(FeatureFlag.PM32009NewItemTypes, true, undefined, false),
     ],
+    data: { elevation: 1 } satisfies RouteDataProperties,
+  },
+  {
+    // Keykeeper: asks before joining the organization the install command named
+    path: "keykeeper-join",
+    component: KeykeeperJoinPageComponent,
+    canActivate: [authGuard],
     data: { elevation: 1 } satisfies RouteDataProperties,
   },
   {

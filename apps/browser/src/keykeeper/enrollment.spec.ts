@@ -1,12 +1,21 @@
+import { createHash } from "node:crypto";
+
 import { mock } from "jest-mock-extended";
 import { BehaviorSubject } from "rxjs";
 
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
+import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
+import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { AuthService } from "@bitwarden/common/auth/abstractions/auth.service";
+import { CryptoFunctionService } from "@bitwarden/common/key-management/crypto/abstractions/crypto-function.service";
 import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
 import { EncString } from "@bitwarden/common/key-management/crypto/models/enc-string";
 import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
+import {
+  Environment,
+  EnvironmentService,
+} from "@bitwarden/common/platform/abstractions/environment.service";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { UserId } from "@bitwarden/common/types/guid";
@@ -14,25 +23,67 @@ import { UserKey } from "@bitwarden/common/types/key";
 import { KeyService } from "@bitwarden/key-management";
 
 import { EnrollmentPlatform, EnrollmentState, KeykeeperEnrollment } from "./enrollment";
+import { JoinRequest } from "./join-request";
 
 const userId = "user-1" as UserId;
 const token = "t".repeat(43);
+const server = "https://vault.example.test";
 const orgPublicKey = Utils.fromBufferToB64(new Uint8Array([1, 2, 3, 4]).buffer);
 
-function setUp(managedToken: string | null = token, saved: EnrollmentState = {}) {
+const cryptoFunctionService = mock<CryptoFunctionService>();
+cryptoFunctionService.hash.mockImplementation(
+  async (value) => new Uint8Array(createHash("sha256").update(value).digest()),
+);
+
+async function hash(value: string) {
+  return Utils.fromBufferToHex((await cryptoFunctionService.hash(value, "sha256")).buffer);
+}
+
+type Options = {
+  managedToken?: string | null;
+  managedServer?: string | null;
+  accountServer?: string;
+  saved?: EnrollmentState;
+  answer?: boolean | null | undefined;
+  msps?: unknown[];
+  organizations?: Partial<Organization>[];
+};
+
+function setUp(options: Options = {}) {
+  const {
+    managedToken = token,
+    managedServer = server,
+    accountServer = server,
+    saved = {},
+    msps = [],
+    organizations = [],
+  } = options;
+  // An explicit undefined means the window couldn't open.
+  const answer = "answer" in options ? options.answer : true;
   const apiService = mock<ApiService>();
   const keyService = mock<KeyService>();
   const encryptService = mock<EncryptService>();
   const syncService = mock<SyncService>();
+  const environmentService = mock<EnvironmentService>();
+  environmentService.getEnvironment$.mockReturnValue(
+    new BehaviorSubject({ getWebVaultUrl: () => accountServer } as Environment),
+  );
+  const organizationService = mock<OrganizationService>();
+  organizationService.organizations$.mockReturnValue(
+    new BehaviorSubject(organizations as Organization[]),
+  );
   const userKey = { key: "user-key" } as unknown as UserKey;
   keyService.userKey$.mockReturnValue(new BehaviorSubject(userKey));
+  keyService.getFingerprint.mockResolvedValue(["alpha", "bravo", "charlie"]);
   encryptService.encapsulateKeyUnsigned.mockResolvedValue({
     encryptedString: "4.recovery",
   } as EncString);
   let state = saved;
   const notices: [string, string][] = [];
+  const asked: JoinRequest[] = [];
   const platform: EnrollmentPlatform = {
     managedToken: async () => managedToken,
+    managedServer: async () => managedServer,
     load: async () => JSON.parse(JSON.stringify(state)),
     save: async (next) => {
       state = next;
@@ -40,6 +91,11 @@ function setUp(managedToken: string | null = token, saved: EnrollmentState = {})
     notify: async (title, message) => {
       notices.push([title, message]);
     },
+    ask: async (request) => {
+      asked.push(request);
+      return answer;
+    },
+    onAnswered: () => {},
   };
   const enrollment = new KeykeeperEnrollment(
     mock<AccountService>(),
@@ -48,14 +104,34 @@ function setUp(managedToken: string | null = token, saved: EnrollmentState = {})
     keyService,
     encryptService,
     syncService,
+    environmentService,
+    organizationService,
+    cryptoFunctionService,
     platform,
   );
+  /** Answers the server's endpoints: the person's MSPs, the token's organization, then the join. */
+  const respond = (
+    info: object,
+    join: Promise<{ status: number }> = Promise.resolve({ status: 1 }),
+  ) =>
+    apiService.send.mockImplementation(async (_method, path) => {
+      switch (path) {
+        case "/keykeeper/msp":
+          return { data: msps };
+        case "/keykeeper/enrollment/info":
+          return info;
+        case "/keykeeper/enrollment/join":
+          return join;
+      }
+      throw new Error(`unexpected ${path}`);
+    });
   const info = (accountRecovery: boolean, publicKey: string | null = orgPublicKey) => ({
     organizationId: "org-1",
     organizationName: "Acme Dental",
     publicKey,
     accountRecovery,
   });
+  const paths = () => apiService.send.mock.calls.map((c) => c[1]);
   return {
     enrollment,
     apiService,
@@ -63,6 +139,9 @@ function setUp(managedToken: string | null = token, saved: EnrollmentState = {})
     syncService,
     userKey,
     notices,
+    asked,
+    paths,
+    respond,
     state: () => state,
     info,
   };
@@ -70,88 +149,181 @@ function setUp(managedToken: string | null = token, saved: EnrollmentState = {})
 
 describe("Keykeeper enrollment through the install command", () => {
   it("does nothing without a token from browser policy", async () => {
-    const { enrollment, apiService } = setUp(null);
+    const { enrollment, apiService } = setUp({ managedToken: null });
 
     expect(await enrollment.run(userId)).toBe("no-token");
     expect(apiService.send).not.toHaveBeenCalled();
   });
 
-  it("joins with the user key encrypted to the organization's public key when it uses account recovery", async () => {
-    const { enrollment, apiService, encryptService, syncService, userKey, notices, state, info } =
-      setUp();
-    apiService.send.mockResolvedValueOnce(info(true)).mockResolvedValueOnce({ status: 1 });
+  it("never sends the token to a server other than the one browser policy names", async () => {
+    for (const options of [
+      { accountServer: "https://vault.other.test" },
+      { accountServer: "https://vault.example.test:8443" },
+      { managedServer: null },
+      { managedServer: "not a url" },
+    ]) {
+      const { enrollment, apiService } = setUp(options);
+      expect(await enrollment.run(userId)).toBe("other-server");
+      expect(apiService.send).not.toHaveBeenCalled();
+    }
+  });
 
-    expect(await enrollment.run(userId)).toBe("joined");
+  it("asks first, then joins with the user key encrypted to the organization's public key when it uses account recovery", async () => {
+    const t = setUp();
+    t.respond(t.info(true));
 
-    expect(apiService.send).toHaveBeenNthCalledWith(
-      1,
-      "POST",
+    expect(await t.enrollment.run(userId)).toBe("joined");
+
+    expect(t.asked).toEqual([
+      {
+        organizationName: "Acme Dental",
+        accountRecovery: true,
+        fingerprint: ["alpha", "bravo", "charlie"],
+        adminElsewhere: [],
+      },
+    ]);
+    expect(t.paths()).toEqual([
+      "/keykeeper/msp",
       "/keykeeper/enrollment/info",
-      { token },
-      true,
-      true,
-    );
-    expect(encryptService.encapsulateKeyUnsigned).toHaveBeenCalledWith(
-      userKey,
+      "/keykeeper/enrollment/join",
+    ]);
+    expect(t.encryptService.encapsulateKeyUnsigned).toHaveBeenCalledWith(
+      t.userKey,
       Utils.fromB64ToArray(orgPublicKey),
     );
-    expect(apiService.send).toHaveBeenNthCalledWith(
-      2,
+    expect(t.apiService.send).toHaveBeenLastCalledWith(
       "POST",
       "/keykeeper/enrollment/join",
       { token, resetPasswordKey: "4.recovery" },
       true,
       true,
     );
-    expect(notices).toEqual([
-      [
-        "You joined Acme Dental",
-        "An admin will confirm you shortly. Its admins can recover your account if you forget your master password.",
-      ],
-    ]);
-    expect(state()[userId]).toEqual({ token, result: "joined" });
-    expect(syncService.fullSync).toHaveBeenCalledWith(true);
+    expect(t.notices).toEqual([["You joined Acme Dental", "An admin will confirm you shortly."]]);
+    // Remembered by the token's hash, never the token.
+    expect(t.state()[userId]).toEqual({ tokenHash: await hash(token), result: "joined" });
+    expect(JSON.stringify(t.state())).not.toContain(token);
+    expect(t.syncService.fullSync).toHaveBeenCalledWith(true);
   });
 
   it("sends no recovery key when the organization doesn't use account recovery", async () => {
-    const { enrollment, apiService, encryptService, notices, info } = setUp();
-    apiService.send.mockResolvedValueOnce(info(false)).mockResolvedValueOnce({ status: 1 });
+    const t = setUp();
+    t.respond(t.info(false));
 
-    await enrollment.run(userId);
+    await t.enrollment.run(userId);
 
-    expect(encryptService.encapsulateKeyUnsigned).not.toHaveBeenCalled();
-    expect(apiService.send).toHaveBeenLastCalledWith(
+    expect(t.encryptService.encapsulateKeyUnsigned).not.toHaveBeenCalled();
+    expect(t.apiService.send).toHaveBeenLastCalledWith(
       "POST",
       "/keykeeper/enrollment/join",
       { token, resetPasswordKey: undefined },
       true,
       true,
     );
-    expect(notices[0][1]).toBe("An admin will confirm you shortly.");
   });
 
-  it("joins once per account and token, and again for a new token", async () => {
-    const done = setUp(token, { [userId]: { token, result: "joined" } });
+  it("joins nothing and escrows nothing when the person says not now, and asks again a week later", async () => {
+    for (const answer of [false, null]) {
+      const t = setUp({ answer });
+      t.respond(t.info(true));
+
+      expect(await t.enrollment.run(userId)).toBe("declined");
+
+      expect(t.paths()).not.toContain("/keykeeper/enrollment/join");
+      expect(t.encryptService.encapsulateKeyUnsigned).not.toHaveBeenCalled();
+      expect(t.state()[userId].result).toBe("declined");
+    }
+
+    const tokenHash = await hash(token);
+    const recently = setUp({
+      saved: { [userId]: { tokenHash, result: "declined", at: Date.now() - 60_000 } },
+    });
+    expect(await recently.enrollment.run(userId)).toBe("declined");
+    expect(recently.apiService.send).not.toHaveBeenCalled();
+
+    const weekAgo = setUp({
+      saved: { [userId]: { tokenHash, result: "declined", at: Date.now() - 8 * 86_400_000 } },
+    });
+    weekAgo.respond(weekAgo.info(false));
+    expect(await weekAgo.enrollment.run(userId)).toBe("joined");
+  });
+
+  it("tries again later when it couldn't ask, rather than taking it as not now", async () => {
+    const t = setUp({ answer: undefined });
+    t.respond(t.info(false));
+
+    expect(await t.enrollment.run(userId)).toBe("failed");
+    expect(t.paths()).not.toContain("/keykeeper/enrollment/join");
+    expect(t.state()[userId].result).toEqual({ error: expect.stringContaining("Couldn't open") });
+  });
+
+  it("leaves MSP staff alone: they sign in on clients' computers but never join this way", async () => {
+    const t = setUp({ msps: [{ id: "msp-1", name: "Northwind IT", role: "technician" }] });
+    t.respond(t.info(true));
+
+    expect(await t.enrollment.run(userId)).toBe("msp-staff");
+    expect(t.paths()).toEqual(["/keykeeper/msp"]);
+    expect(t.asked).toEqual([]);
+  });
+
+  it("tells someone who is an owner or admin elsewhere that account recovery would reach it too", async () => {
+    const t = setUp({
+      organizations: [
+        { id: "family", name: "Family", isOwner: true, isAdmin: true } as Partial<Organization>,
+        { id: "club", name: "Book Club", isOwner: false, isAdmin: false } as Partial<Organization>,
+      ],
+    });
+    t.respond(t.info(true));
+
+    await t.enrollment.run(userId);
+
+    expect(t.asked[0].adminElsewhere).toEqual(["Family"]);
+  });
+
+  it("doesn't ask someone already in the organization", async () => {
+    const t = setUp({
+      organizations: [{ id: "org-1", name: "Acme Dental" } as Partial<Organization>],
+    });
+    t.respond(t.info(true));
+
+    expect(await t.enrollment.run(userId)).toBe("already-done");
+    expect(t.asked).toEqual([]);
+  });
+
+  it("joins once per account and token, and asks again for a new token", async () => {
+    const tokenHash = await hash(token);
+    const done = setUp({ saved: { [userId]: { tokenHash, result: "joined" } } });
     expect(await done.enrollment.run(userId)).toBe("already-done");
     expect(done.apiService.send).not.toHaveBeenCalled();
 
-    const replaced = setUp("n".repeat(43), { [userId]: { token, result: "joined" } });
-    replaced.apiService.send
-      .mockResolvedValueOnce(replaced.info(false))
-      .mockResolvedValueOnce({ status: 2 });
+    const replaced = setUp({
+      managedToken: "n".repeat(43),
+      saved: { [userId]: { tokenHash, result: "joined" } },
+    });
+    replaced.respond(replaced.info(false), Promise.resolve({ status: 2 }));
     expect(await replaced.enrollment.run(userId)).toBe("joined");
+    expect(replaced.asked).toHaveLength(1);
     // Already a member: nothing to announce.
     expect(replaced.notices).toEqual([]);
   });
 
   it("never sends a recovery key without the organization's public key", async () => {
-    const { enrollment, apiService, encryptService, notices, info } = setUp();
-    apiService.send.mockResolvedValueOnce(info(true, null));
+    const t = setUp();
+    t.respond(t.info(true, null));
 
-    expect(await enrollment.run(userId)).toBe("failed");
-    expect(encryptService.encapsulateKeyUnsigned).not.toHaveBeenCalled();
-    expect(apiService.send).toHaveBeenCalledTimes(1);
-    expect(notices[0][1]).toContain("no public key");
+    expect(await t.enrollment.run(userId)).toBe("failed");
+    expect(t.encryptService.encapsulateKeyUnsigned).not.toHaveBeenCalled();
+    expect(t.paths()).not.toContain("/keykeeper/enrollment/join");
+    expect(t.notices[0][1]).toContain("no public key");
+  });
+
+  it("runs once at a time for an account", async () => {
+    const t = setUp();
+    t.respond(t.info(false));
+
+    const [first, second] = await Promise.all([t.enrollment.run(userId), t.enrollment.run(userId)]);
+
+    expect([first, second]).toEqual(["joined", "joined"]);
+    expect(t.asked).toHaveLength(1);
   });
 
   it("tells the person about a problem once, not at every unlock", async () => {
@@ -159,18 +331,18 @@ describe("Keykeeper enrollment through the install command", () => {
       { message: "Cannot join because another organization policy forbids it" },
       400,
     );
-    const { enrollment, apiService, notices, info, state } = setUp();
-    apiService.send.mockResolvedValueOnce(info(false)).mockRejectedValueOnce(refused);
-    expect(await enrollment.run(userId)).toBe("failed");
-    expect(notices).toEqual([
+    const t = setUp();
+    t.respond(t.info(false), Promise.reject(refused));
+    expect(await t.enrollment.run(userId)).toBe("failed");
+    expect(t.notices).toEqual([
       [
         "Couldn't join your organization",
         "Cannot join because another organization policy forbids it",
       ],
     ]);
 
-    const again = setUp(token, state());
-    again.apiService.send.mockResolvedValueOnce(again.info(false)).mockRejectedValueOnce(refused);
+    const again = setUp({ saved: t.state() });
+    again.respond(again.info(false), Promise.reject(refused));
     expect(await again.enrollment.run(userId)).toBe("failed");
     expect(again.notices).toEqual([]);
   });

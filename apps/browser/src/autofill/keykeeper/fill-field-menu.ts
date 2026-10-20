@@ -10,6 +10,7 @@ import { AuthService } from "@bitwarden/common/auth/abstractions/auth.service";
 import { AuthenticationStatus } from "@bitwarden/common/auth/enums/authentication-status";
 import { getOptionalUserId } from "@bitwarden/common/auth/services/account.service";
 import { ROOT_ID } from "@bitwarden/common/autofill/constants";
+import { Utils } from "@bitwarden/common/platform/misc/utils";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { CipherType, FieldType } from "@bitwarden/common/vault/enums";
@@ -21,8 +22,11 @@ import AutofillScript from "../models/autofill-script";
 import { AutofillTriageResponse } from "../types/autofill-triage";
 
 import {
+  FillRule,
   FillSource,
   fingerprintField,
+  hostOf,
+  isSecretSource,
   staticValueFor,
   upsertFillRule,
   visibleCustomFields,
@@ -55,6 +59,10 @@ export function choicesFor(cipher: CipherView): FillChoice[] {
     choices.push({ key: "t", title: STRINGS.verificationCode, source: { from: "totp" } });
   }
   visibleCustomFields(cipher).forEach((field, index) => {
+    // Hidden fields stay hidden from someone who can't see the item's passwords.
+    if (field.type === FieldType.Hidden && !cipher.viewPassword) {
+      return;
+    }
     if (field.name && field.type !== FieldType.Boolean && field.type !== FieldType.Linked) {
       choices.push({
         key: `f${index}`,
@@ -123,7 +131,17 @@ export type FillFieldMenuDependencies = {
   accountService: AccountService;
   cipherService: CipherService;
   totpService: TotpService;
+  /** Whether the item asks for the master password before its secrets are used. */
+  passwordRepromptRequired: (cipher: CipherView) => Promise<boolean>;
+  /** Asks for the master password, then fills the item into the page, rules first. */
+  fillAfterReprompt: (tab: chrome.tabs.Tab, cipher: CipherView) => Promise<void>;
 };
+
+/** Whether a frame belongs to the same site as the tab it's in. */
+export function sameSite(frameUrl: string, tabUrl: string | undefined): boolean {
+  const frame = Utils.getDomain(frameUrl);
+  return frame != null && frame !== "" && frame === Utils.getDomain(tabUrl ?? "");
+}
 
 /** Asks the page which field was right-clicked, with the page details it belongs to. */
 async function rightClickedField(
@@ -169,6 +187,26 @@ export async function handleFillFieldMenuClick(
   if (!target) {
     return true;
   }
+  const secret = isSecretSource(cipher, choice.source);
+  // A secret never goes into a frame from another site, such as an ad.
+  if (secret && !sameSite(target.url, tab.url)) {
+    return true;
+  }
+  const rule: FillRule = {
+    v: 1,
+    host: hostOf(target.url),
+    field: fingerprintField(target.field),
+    fill: choice.source,
+  };
+
+  // Like upstream's menu: secrets of an item that asks for the master password
+  // wait for it. The rule is saved now, and the fill after the prompt uses it.
+  if (secret && (await deps.passwordRepromptRequired(cipher))) {
+    upsertFillRule(cipher, rule);
+    await deps.cipherService.updateWithServer(cipher, userId);
+    await deps.fillAfterReprompt(tab, cipher);
+    return true;
+  }
 
   if (choice.source.from !== "never") {
     const value =
@@ -194,7 +232,7 @@ export async function handleFillFieldMenuClick(
     }
   }
 
-  upsertFillRule(cipher, { v: 1, field: fingerprintField(target.field), fill: choice.source });
+  upsertFillRule(cipher, rule);
   await deps.cipherService.updateWithServer(cipher, userId);
   return true;
 }

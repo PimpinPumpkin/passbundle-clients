@@ -72,7 +72,10 @@ export type MspDetails = MspSummary & {
   clients: MspClient[];
 };
 
-/** Adding staff: added at once, or invited when they don't have an account yet. */
+/**
+ * Adding staff. Current servers always invite, so joining a staff is the
+ * person's to accept; older ones added someone with an account at once.
+ */
 export type AddStaffResult =
   | { invited: false; email: string; role: MspRole }
   | {

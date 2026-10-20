@@ -1,8 +1,8 @@
 // Keykeeper: on-device reminders before items expire. The extension checks
 // every few hours while the vault is unlocked and shows a browser notification
 // at 30, 7, and 1 day before an item expires, and once when it has expired.
-// Nothing leaves the device; what was already shown is remembered locally so
-// each step notifies once.
+// Nothing leaves the device; what was already shown is remembered on it, per
+// account and cleared at logout, so each step notifies once.
 
 import { firstValueFrom } from "rxjs";
 
@@ -17,11 +17,13 @@ import {
   expirationStatus,
   itemExpiration,
 } from "@bitwarden/common/vault/keykeeper/expiration";
+import { KEYKEEPER_REMINDERS_DISK, StateProvider, UserKeyDefinition } from "@bitwarden/state";
 
 import { BrowserApi } from "../platform/browser/browser-api";
 
 export const REMINDER_ALARM = "keykeeper-expiration-reminders";
-const STORAGE_KEY = "keykeeper.expirationReminders";
+/** Where earlier versions kept every account's reminders together. */
+const OLD_STORAGE_KEY = "keykeeper.expirationReminders";
 const CHECK_EVERY_MINUTES = 6 * 60;
 
 /** How urgent a reminder is, from least to most. */
@@ -48,6 +50,12 @@ export function reminderLevel(status: ExpirationStatus): ReminderLevel | null {
 /** What was already shown for an item: its expiry date and the last step. */
 export type ShownReminders = Record<string, { date: string; level: ReminderLevel }>;
 
+export const SHOWN_REMINDERS = new UserKeyDefinition<ShownReminders>(
+  KEYKEEPER_REMINDERS_DISK,
+  "shown",
+  { deserializer: (shown) => shown ?? {}, clearOn: ["logout"] },
+);
+
 /**
  * Whether to notify: when an item reaches a more urgent step than the last one
  * shown for the same expiry date. A new date starts over.
@@ -71,9 +79,11 @@ export class KeykeeperExpirationReminders {
     private authService: AuthService,
     private accountService: AccountService,
     private cipherService: CipherService,
+    private stateProvider: StateProvider,
   ) {}
 
   init() {
+    void chrome.storage?.local?.remove(OLD_STORAGE_KEY);
     if (!chrome.alarms) {
       return;
     }
@@ -98,7 +108,8 @@ export class KeykeeperExpirationReminders {
       return [];
     }
 
-    const shown: ShownReminders = (await chrome.storage.local.get(STORAGE_KEY))[STORAGE_KEY] ?? {};
+    const state = this.stateProvider.getUser(userId, SHOWN_REMINDERS);
+    const shown: ShownReminders = { ...((await firstValueFrom(state.state$)) ?? {}) };
     const titles: string[] = [];
     for (const cipher of await this.cipherService.getAllDecrypted(userId)) {
       const expires = itemExpiration(cipher);
@@ -122,7 +133,7 @@ export class KeykeeperExpirationReminders {
       shown[cipher.id] = { date, level };
       titles.push(title);
     }
-    await chrome.storage.local.set({ [STORAGE_KEY]: shown });
+    await state.update(() => shown);
     return titles;
   }
 }

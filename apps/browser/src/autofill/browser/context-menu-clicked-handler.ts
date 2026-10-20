@@ -116,6 +116,12 @@ export class ContextMenuClickedHandler {
             accountService: this.accountService,
             cipherService: this.cipherService,
             totpService: this.totpService,
+            passwordRepromptRequired: (cipher) => this.isPasswordRepromptRequired(cipher),
+            fillAfterReprompt: (tab, cipher) =>
+              openVaultItemPasswordRepromptPopout(tab, {
+                cipherId: cipher.id,
+                action: AUTOFILL_ID,
+              }),
           })
         ) {
           break;
