@@ -4,8 +4,9 @@ export interface ImportOption {
 }
 
 export const featuredImportOptions = [
-  { id: "bitwardenjson", name: "Bitwarden (json)" },
-  { id: "bitwardencsv", name: "Bitwarden (csv)" },
+  // Keykeeper: our own exports use this format too.
+  { id: "bitwardenjson", name: "PassBundle or Bitwarden (json)" },
+  { id: "bitwardencsv", name: "PassBundle or Bitwarden (csv)" },
   { id: "chromecsv", name: "Chrome" },
   { id: "dashlanecsv", name: "Dashlane (csv)" },
   { id: "firefoxcsv", name: "Firefox (csv)" },
