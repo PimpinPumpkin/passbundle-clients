@@ -13,6 +13,7 @@ import {
   OrgJoining,
   PendingMember,
   TemplateCopy,
+  TwoStepNeeded,
 } from "./msp-types";
 
 export class KeykeeperMspRequests {
@@ -37,6 +38,26 @@ export class KeykeeperMspRequests {
   async organizationsPending(): Promise<PendingMember[]> {
     return (await this.apiService.send("GET", "/keykeeper/organizations/pending", null, true, true))
       .data;
+  }
+
+  /**
+   * The person's organizations that can't confirm them until they turn on
+   * two-step login. None from a server that doesn't say.
+   */
+  async twoStepNeeded(): Promise<TwoStepNeeded[]> {
+    try {
+      return (
+        await this.apiService.send(
+          "GET",
+          "/keykeeper/organizations/two-step-needed",
+          null,
+          true,
+          true,
+        )
+      ).data;
+    } catch {
+      return [];
+    }
   }
 
   async getOrgJoining(orgId: string): Promise<OrgJoining> {

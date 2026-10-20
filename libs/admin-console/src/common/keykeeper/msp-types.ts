@@ -169,6 +169,11 @@ export type PendingMember = {
   publicKey: string;
   /** Whether the organization confirms automatically, or wants an admin to approve. */
   autoConfirm: boolean;
+  /**
+   * Whether the organization requires two-step login and they haven't turned
+   * it on, so confirming them fails until they do. Apps don't try, and say so.
+   */
+  needsTwoStep?: boolean;
   /** An MSP staff member's place in a client. */
   fromMsp?: boolean;
   /**
@@ -218,3 +223,6 @@ export type MspSiteFixes = {
   rules: (SiteFixView & { id: string; createdAt: string })[];
   shared: (SiteFixView & { id: string; reportedBy: string; reportedAt: string })[];
 };
+
+/** An organization that can't confirm the person until they turn on two-step login. */
+export type TwoStepNeeded = { organizationId: string; name: string };

@@ -138,6 +138,7 @@ import {
   CollectionDialogTabType,
   openCollectionDialog,
 } from "../../admin-console/organizations/shared/components/collection-dialog";
+import { KeykeeperTwoStepNeededComponent } from "../../keykeeper/joining/two-step-needed.component";
 import { SharedModule } from "../../shared/shared.module";
 import { AssignCollectionsWebComponent } from "../components/assign-collections";
 import { AssignCollectionsWebDialogAdapter } from "../components/assign-collections/assign-collections-web-dialog.adapter";
@@ -173,6 +174,7 @@ type EmptyStateMap = Record<EmptyStateType, EmptyStateItem>;
   selector: "app-vault",
   templateUrl: "vault.component.html",
   imports: [
+    KeykeeperTwoStepNeededComponent,
     VaultOrganizationUserNotificationsComponent,
     VaultHeaderComponent,
     VaultOnboardingComponent,

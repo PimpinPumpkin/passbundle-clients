@@ -156,4 +156,16 @@ describe("Who an app lets in on its own", () => {
     const tomorrow = new Date("2026-10-21T09:00:00Z");
     expect(await checks.onItsOwn(USER, many.slice(-3), tomorrow)).toHaveLength(3);
   });
+
+  it("nobody who must turn on two-step login first, and they don't use up the day's limit", async () => {
+    const { checks } = setUp();
+    const today = new Date("2026-10-20T09:00:00Z");
+    const waitingForTwoStep = await invited("bo@acmedental.example", { needsTwoStep: true });
+    // Every run of the background work sees them again until they turn it on.
+    for (let run = 0; run < MAX_ON_ITS_OWN_PER_DAY + 5; run++) {
+      expect(await checks.onItsOwn(USER, [waitingForTwoStep], today)).toEqual([]);
+    }
+    const ana = await invited("ana@acmedental.example");
+    expect(emails(await checks.onItsOwn(USER, [ana], today))).toEqual(["ana@acmedental.example"]);
+  });
 });

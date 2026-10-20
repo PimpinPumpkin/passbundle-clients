@@ -41,6 +41,7 @@ import {
   VaultOrganizationUserNotificationsComponent,
 } from "@bitwarden/vault";
 
+import { KeykeeperTwoStepNeededComponent } from "../../../../keykeeper/popup/two-step-needed.component";
 import { BrowserApi } from "../../../../platform/browser/browser-api";
 import BrowserPopupUtils from "../../../../platform/browser/browser-popup-utils";
 import { IntroCarouselService } from "../../services/intro-carousel.service";
@@ -135,6 +136,15 @@ class VaultAtRiskCalloutStubComponent {}
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 class VaultOrganizationUserNotificationsStubComponent {}
+
+// Keykeeper
+@Component({
+  selector: "app-keykeeper-two-step-needed",
+  standalone: true,
+  template: "",
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class KeykeeperTwoStepNeededStubComponent {}
 
 @Component({
   selector: "app-autofill-vault-list-items",
@@ -346,6 +356,8 @@ describe("VaultComponent", () => {
           AutofillVaultListItemsComponent,
           VaultListItemsContainerComponent,
           VaultOrganizationUserNotificationsComponent,
+          // Keykeeper
+          KeykeeperTwoStepNeededComponent,
         ],
         providers: [
           { provide: VaultItemsTransferService, useValue: DefaultVaultItemsTransferService },
@@ -364,6 +376,7 @@ describe("VaultComponent", () => {
           AutofillVaultListItemsStubComponent,
           VaultListItemsContainerStubComponent,
           VaultOrganizationUserNotificationsStubComponent,
+          KeykeeperTwoStepNeededStubComponent,
         ],
         providers: [{ provide: VaultItemsTransferService, useValue: vaultItemsTransferSvc }],
       },

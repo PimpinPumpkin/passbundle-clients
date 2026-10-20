@@ -81,6 +81,8 @@
         </button>
       </bit-callout>
     }
+    <!-- Keykeeper: organizations waiting for this person to turn on two-step login -->
+    <app-keykeeper-two-step-needed class="tw-mb-3 tw-block" />
     @if (vaultState === VaultStateEnum.Empty) {
       <vault-organization-user-notifications
         class="-tw-mx-5 -tw-mt-3 tw-flex tw-flex-col tw-px-2 tw-mb-3"

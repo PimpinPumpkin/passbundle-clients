@@ -90,7 +90,8 @@ export class KeykeeperJoinChecks {
 
   /**
    * Those waiting whom this device may let in on its own now, within today's
-   * limit for each organization. The rest wait for an owner or admin.
+   * limit for each organization. The rest wait for an owner or admin, or, if
+   * they must turn on two-step login first, for themselves.
    */
   async onItsOwn(
     userId: UserId,
@@ -107,7 +108,14 @@ export class KeykeeperJoinChecks {
     const letIn: PendingMember[] = [];
     for (const p of pending) {
       const key = organizationKeys[p.organizationId as OrganizationId];
-      if (!p.autoConfirm || key == null || !(await this.vouchedFor(p, key).catch(() => false))) {
+      // Not someone who must turn on two-step login first: confirming them would
+      // fail, and count against the day's limit for nothing.
+      if (
+        p.needsTwoStep ||
+        !p.autoConfirm ||
+        key == null ||
+        !(await this.vouchedFor(p, key).catch(() => false))
+      ) {
         continue;
       }
       const count = counts[p.organizationId]?.day === day ? counts[p.organizationId].count : 0;
