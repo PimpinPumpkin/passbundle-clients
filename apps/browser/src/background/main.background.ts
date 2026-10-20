@@ -30,6 +30,8 @@ import {
   KeykeeperJoinChecks,
   KeykeeperMspRequests,
   KeykeeperMspWork,
+  KeykeeperScriptCopies,
+  KeykeeperScriptRefresher,
   KeykeeperTemplateSender,
   OrganizationUserApiService,
   OrganizationUserService,
@@ -1911,6 +1913,13 @@ export default class MainBackground {
       this.organizationUserService,
       this.syncService,
       new KeykeeperJoinChecks(this.keyService, this.encryptService, this.stateProvider),
+      new KeykeeperScriptRefresher(
+        mspRequests,
+        new KeykeeperScriptCopies(this.encryptService),
+        this.keyService,
+        this.cipherService,
+        this.accountService,
+      ),
     );
     startMspWork(this.keykeeperMspWork);
     this.commandsBackground.init();

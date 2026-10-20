@@ -9,6 +9,7 @@ import { DangerZoneComponent } from "../../../auth/settings/account/danger-zone.
 import { AccountFingerprintComponent } from "../../../key-management/account-fingerprint/account-fingerprint.component";
 import { KeykeeperOrgJoiningComponent } from "../../../keykeeper/joining/org-joining.component";
 import { KeykeeperOrgInstallComponent } from "../../../keykeeper/organizations/org-install.component";
+import { KeykeeperScriptAccessComponent } from "../../../keykeeper/organizations/script-access.component";
 import { HeaderModule } from "../../../layouts/header/header.module";
 import { SharedModule } from "../../../shared";
 
@@ -22,6 +23,7 @@ import { TwoFactorSetupComponent } from "./two-factor-setup.component";
     // Keykeeper: how people join the organization, and its install command.
     KeykeeperOrgJoiningComponent,
     KeykeeperOrgInstallComponent,
+    KeykeeperScriptAccessComponent,
     OrganizationSettingsRoutingModule,
     AccountFingerprintComponent,
     DangerZoneComponent,

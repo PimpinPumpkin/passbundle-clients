@@ -38,6 +38,7 @@ import { KeykeeperMspRequests } from "./msp-requests";
 import { KeykeeperTemplateSender, templateSourceProblem } from "./msp-template-sender";
 import { knownItems, templateRows } from "./msp-template-status";
 import { MspDetails, MspTemplates, PendingMember } from "./msp-types";
+import { KeykeeperScriptRefresher } from "./script-refresh";
 
 const CONFIRMED = 2;
 /** Waits for a burst of changes, such as a sync, to settle. */
@@ -79,6 +80,8 @@ export class KeykeeperMspWork {
     private readonly organizationUserService: OrganizationUserService,
     private readonly syncService: SyncService,
     private readonly joinChecks: KeykeeperJoinChecks,
+    /** Keeps script tokens' copies current, in any app that can (docs/script-access.md). */
+    private readonly scripts?: KeykeeperScriptRefresher,
   ) {}
 
   /**
@@ -141,6 +144,7 @@ export class KeykeeperMspWork {
     let changed = false;
     // confirmWaiting tells listeners itself when it confirmed someone.
     failures.push(...(await this.confirmWaiting()).failed);
+    failures.push(...((await this.scripts?.refresh()) ?? []));
     for (const summary of await this.requests.list()) {
       if (summary.role === "admin") {
         const templates = await this.updateTemplates(summary.id);

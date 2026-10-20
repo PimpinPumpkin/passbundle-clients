@@ -88,6 +88,17 @@ export function describeEvent(
       return `${actor} confirmed ${target} in ${org}`;
     case "client_removed_msp":
       return `${org} removed this MSP (${actor})`;
+    case "script_token_created": {
+      // "<token name>: <n> items"
+      const split = detail.lastIndexOf(": ");
+      return split < 0
+        ? `${actor} made a script token for ${org}`
+        : `${actor} made the script token "${detail.slice(0, split)}" for ${org} (${detail.slice(split + 2)})`;
+    }
+    case "script_token_revoked":
+      return `${actor} revoked the script token "${detail}" for ${org}`;
+    case "script_token_new_address":
+      return `The script token "${detail}" for ${org} was used from a new address, ${e.ip ?? "unknown"}`;
     default:
       return `${e.event} by ${actor}`;
   }

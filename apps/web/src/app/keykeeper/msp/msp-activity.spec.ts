@@ -88,6 +88,27 @@ describe("MSP activity sentences", () => {
       "Acme Dental removed this MSP (owner@acme.test)",
     ],
     [
+      { event: "script_token_created", detail: "Join domain: 2 items" },
+      'ana@northwind.test made the script token "Join domain" for Acme Dental (2 items)',
+    ],
+    [
+      { event: "script_token_created", detail: "Backup: nightly: 1 item" },
+      'ana@northwind.test made the script token "Backup: nightly" for Acme Dental (1 item)',
+    ],
+    [
+      { event: "script_token_revoked", detail: "Join domain" },
+      'ana@northwind.test revoked the script token "Join domain" for Acme Dental',
+    ],
+    [
+      {
+        event: "script_token_new_address",
+        actorEmail: null,
+        detail: "Join domain",
+        ip: "203.0.113.7",
+      },
+      'The script token "Join domain" for Acme Dental was used from a new address, 203.0.113.7',
+    ],
+    [
       { event: "staff_invited", detail: "admin" },
       "ana@northwind.test invited ben@northwind.test to join as an admin",
     ],
