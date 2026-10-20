@@ -22,8 +22,10 @@ import {
   MspJoining,
   MspPolicies,
   MspRole,
+  MspSiteFixes,
   MspSummary,
   OrgJoining,
+  SiteFixView,
   TechnicianAccess,
 } from "@bitwarden/admin-console/common";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
@@ -556,6 +558,33 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
         await this.sealStaff(mspId, email, role, null);
       }
     }
+  }
+
+  /** An MSP's site rules and the fixes its staff shared. MSP admins. */
+  async getSiteFixes(mspId: string): Promise<MspSiteFixes> {
+    return this.apiService.send("GET", `/keykeeper/msp/${mspId}/site-fixes`, null, true, true);
+  }
+
+  /** Applies a fix to every client at once. */
+  async addSiteRule(mspId: string, fix: SiteFixView): Promise<void> {
+    const { host, field, fill } = fix;
+    await this.apiService.send(
+      "POST",
+      `/keykeeper/msp/${mspId}/site-rules`,
+      { host, field, fill },
+      true,
+      true,
+    );
+  }
+
+  async removeSiteRule(mspId: string, ruleId: string): Promise<void> {
+    await this.apiService.send(
+      "DELETE",
+      `/keykeeper/msp/${mspId}/site-rules/${ruleId}`,
+      null,
+      true,
+      false,
+    );
   }
 
   async removeStaff(mspId: string, userId: string): Promise<void> {

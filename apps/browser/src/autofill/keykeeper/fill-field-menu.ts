@@ -27,6 +27,7 @@ import {
   fingerprintField,
   hostOf,
   isSecretSource,
+  keykeeperSiteFixes,
   staticValueFor,
   upsertFillRule,
   visibleCustomFields,
@@ -204,6 +205,7 @@ export async function handleFillFieldMenuClick(
   if (secret && (await deps.passwordRepromptRequired(cipher))) {
     upsertFillRule(cipher, rule);
     await deps.cipherService.updateWithServer(cipher, userId);
+    void keykeeperSiteFixes.share(rule).catch(() => {});
     await deps.fillAfterReprompt(tab, cipher);
     return true;
   }
@@ -234,5 +236,7 @@ export async function handleFillFieldMenuClick(
 
   upsertFillRule(cipher, rule);
   await deps.cipherService.updateWithServer(cipher, userId);
+  // For people who share fixes; custom fields never leave the device.
+  void keykeeperSiteFixes.share(rule).catch(() => {});
   return true;
 }

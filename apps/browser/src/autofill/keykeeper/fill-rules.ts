@@ -199,8 +199,9 @@ export function visibleCustomFields(cipher: CipherView): FieldView[] {
 }
 
 /**
- * Applies an item's fill rules to a fill script, before upstream's own
- * matching runs. Only rules made on this page's host apply; a never rule from
+ * Applies an item's fill rules, then any site fixes for the page, to a fill
+ * script, before upstream's own matching runs. Only rules made on this page's
+ * host apply; a never rule from
  * before rules had a host applies anywhere, since it only holds a value back.
  * Value rules fill their field. Never rules claim their field
  * without filling it. Fields claimed here are added to `filledFields`, which
@@ -208,6 +209,16 @@ export function visibleCustomFields(cipher: CipherView): FieldView[] {
  * caller also hides from upstream's field selection, so a password meant for
  * a never-fill field goes to the next fitting field instead of nowhere.
  */
+/**
+ * Site fixes (site-fixes.ts): rules that apply to everyone on the server for a
+ * site, and sharing a rule someone made. The extension's background fills
+ * these in; until then there are none.
+ */
+export const keykeeperSiteFixes = {
+  rulesFor: async (_url: string): Promise<FillRule[]> => [],
+  share: async (_rule: FillRule): Promise<void> => {},
+};
+
 export async function applyFillRules(
   cipher: CipherView,
   pageDetails: AutofillPageDetails,
@@ -218,9 +229,10 @@ export async function applyFillRules(
 ): Promise<Set<string>> {
   const neverFill = new Set<string>();
   const host = hostOf(pageDetails.url);
-  const rules = readFillRules(cipher).filter((r) =>
-    r.host == null ? r.fill.from === "never" : r.host === host && host !== "",
-  );
+  // The item's own rules first, then site fixes for this host: a field the
+  // item has a rule for is the item's.
+  const rules = [...readFillRules(cipher), ...(await keykeeperSiteFixes.rulesFor(pageDetails.url))]
+    .filter((r) => (r.host == null ? r.fill.from === "never" : r.host === host && host !== ""));
   if (!rules.length) {
     return neverFill;
   }

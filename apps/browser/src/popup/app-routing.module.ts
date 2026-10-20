@@ -58,6 +58,7 @@ import { platformPopoutGuard } from "../auth/popup/guards/platform-popout.guard"
 import { AccountSecurityComponent } from "../auth/popup/settings/account-security.component";
 import { ChangePasswordPageComponent } from "../auth/popup/settings/change-password-page.component";
 import { ExtensionDeviceManagementComponent } from "../auth/popup/settings/extension-device-management.component";
+import { KeykeeperSiteProblemPageComponent } from "../autofill/keykeeper/popup/site-problem-page.component";
 import { AutofillTriageComponent } from "../autofill/popup/autofill-triage/autofill-triage.component";
 import { DefaultPasswordManagerPromptComponent } from "../autofill/popup/default-password-manager/default-password-manager-prompt.component";
 import { DefaultPasswordManagerPromptGuard } from "../autofill/popup/default-password-manager/default-password-manager-prompt.guard";
@@ -249,6 +250,13 @@ const routes: Routes = [
     // Keykeeper: asks before joining the organization the install command named
     path: "keykeeper-join",
     component: KeykeeperJoinPageComponent,
+    canActivate: [authGuard],
+    data: { elevation: 1 } satisfies RouteDataProperties,
+  },
+  {
+    // Keykeeper: "Report a problem with this site"
+    path: "keykeeper-site-problem",
+    component: KeykeeperSiteProblemPageComponent,
     canActivate: [authGuard],
     data: { elevation: 1 } satisfies RouteDataProperties,
   },

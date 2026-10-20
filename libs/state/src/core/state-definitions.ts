@@ -283,3 +283,5 @@ export const SHARED_UNLOCK_SETTINGS_DISK = new StateDefinition("sharedUnlockSett
 export const KEYKEEPER_REMINDERS_DISK = new StateDefinition("keykeeperReminders", "disk");
 /** How many people an app let into each organization on its own today, per account. */
 export const KEYKEEPER_JOINS_DISK = new StateDefinition("keykeeperJoins", "disk");
+/** Whether someone shares site fixes, and the fixes that apply on their server. */
+export const KEYKEEPER_SITE_FIXES_DISK = new StateDefinition("keykeeperSiteFixes", "disk");

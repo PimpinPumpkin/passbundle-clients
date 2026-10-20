@@ -76,6 +76,10 @@ export function describeEvent(
       return `${actor} replaced the install token for ${org}`;
     case "joined_with_install_command":
       return `${target} joined ${org} with the install command`;
+    case "site_rule_added":
+      return `${actor} applied a site fix to every client: ${e.detail ?? ""}`.trim();
+    case "site_rule_removed":
+      return `${actor} removed a site fix: ${e.detail ?? ""}`.trim();
     case "install_domains_set":
       return e.detail
         ? `${actor} limited ${org}'s install command to ${e.detail.split(" ").join(", ")} accounts`

@@ -69,6 +69,7 @@ import { BrowserApi } from "../../../platform/browser/browser-api";
 import { PopOutComponent } from "../../../platform/popup/components/pop-out.component";
 import { PopupHeaderComponent } from "../../../platform/popup/layout/popup-header.component";
 import { PopupPageComponent } from "../../../platform/popup/layout/popup-page.component";
+import { KeykeeperSiteFixesSettingsComponent } from "../../keykeeper/popup/site-fixes-settings.component";
 
 import { FillAssistPopoverComponent } from "./fill-assist-popover/fill-assist-popover.component";
 
@@ -84,6 +85,7 @@ import { FillAssistPopoverComponent } from "./fill-assist-popover/fill-assist-po
     CommonModule,
     FillAssistPopoverComponent,
     FormFieldModule,
+    KeykeeperSiteFixesSettingsComponent,
     FormsModule,
     IconButtonModule,
     ItemModule,
