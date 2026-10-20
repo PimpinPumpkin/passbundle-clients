@@ -9,6 +9,11 @@ export class OrganizationUserInviteRequest {
   collections: SelectionReadOnlyRequest[] = [];
   groups: string[];
   permissions: PermissionsApi;
+  /**
+   * Keykeeper: seals the inviter's browser made over each invitation, by
+   * email. See DESIGN.md, "Joins a hacked server can't forge".
+   */
+  keykeeperSeals?: Record<string, string>;
 
   constructor(c: {
     emails: string[];

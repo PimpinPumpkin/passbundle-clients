@@ -3,7 +3,11 @@ import { FormBuilder, Validators } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { firstValueFrom } from "rxjs";
 
-import { INSTALL_COMMAND_REFUSED, installCommand } from "@bitwarden/admin-console/common";
+import {
+  INSTALL_COMMAND_REFUSED,
+  InstallCommandParts,
+  installCommand,
+} from "@bitwarden/admin-console/common";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
@@ -24,6 +28,7 @@ import {
 } from "../../admin-console/organizations/policies";
 import { HeaderModule } from "../../layouts/header/header.module";
 import { SharedModule } from "../../shared";
+import { KeykeeperJoinSealer } from "../joining/join-sealer.service";
 
 import { ClientHealth, clientHealth } from "./client-health";
 import { KeykeeperDefaultPoliciesComponent } from "./default-policies.component";
@@ -594,6 +599,7 @@ export class KeykeeperMspComponent implements OnInit {
   protected readonly installFor = signal<{
     client: MspClient;
     enrollment: ClientEnrollment;
+    parts: InstallCommandParts | null;
   } | null>(null);
   private readonly serverUrl = signal("");
 
@@ -623,6 +629,7 @@ export class KeykeeperMspComponent implements OnInit {
     private readonly mspApi: KeykeeperMspApiService,
     private readonly formBuilder: FormBuilder,
     private readonly toastService: ToastService,
+    private readonly sealer: KeykeeperJoinSealer,
     private readonly i18nService: I18nService,
     private readonly environmentService: EnvironmentService,
     private readonly platformUtilsService: PlatformUtilsService,
@@ -845,8 +852,25 @@ export class KeykeeperMspComponent implements OnInit {
       this.serverUrl.set(environment.getWebVaultUrl());
       const enrollment = await this.mspApi.getEnrollment(msp.id, client.id);
       this.domainsForm.setValue({ domains: enrollment.domains.join(" ") });
-      this.installFor.set({ client, enrollment });
+      await this.showInstall(msp.id, client, enrollment);
     });
+  }
+
+  /**
+   * Shows a client's install command with its join secret and the client's
+   * key fingerprint. A command made before join secrets gets one the first
+   * time an MSP admin opens it, keeping its token.
+   */
+  private async showInstall(mspId: string, client: MspClient, enrollment: ClientEnrollment) {
+    let parts = await this.sealer.commandParts(client.id, enrollment.secret);
+    if (parts == null && enrollment.token != null && enrollment.secret == null) {
+      if (this.msp()?.role === "admin") {
+        await this.mspApi.setEnrollmentSecret(mspId, client.id);
+        enrollment = await this.mspApi.getEnrollment(mspId, client.id);
+        parts = await this.sealer.commandParts(client.id, enrollment.secret);
+      }
+    }
+    this.installFor.set({ client, enrollment, parts });
   }
 
   protected domainList(domains: string[]): string {
@@ -865,7 +889,7 @@ export class KeykeeperMspComponent implements OnInit {
     await this.attempt(async () => {
       const enrollment = await this.mspApi.setEnrollmentDomains(msp.id, install.client.id, domains);
       this.domainsForm.setValue({ domains: enrollment.domains.join(" ") });
-      this.installFor.set({ client: install.client, enrollment });
+      this.installFor.set({ ...install, enrollment });
       this.toast(
         enrollment.domains.length
           ? `Only ${this.domainList(enrollment.domains)} accounts can join ${install.client.name} with the command`
@@ -876,7 +900,12 @@ export class KeykeeperMspComponent implements OnInit {
 
   /** The command an MSP runs from their RMM; the script's name comes from the brand. */
   protected installCommand(token: string): string | null {
-    return installCommand(this.i18nService.t("keykeeperInstallScript"), this.serverUrl(), token);
+    return installCommand(
+      this.i18nService.t("keykeeperInstallScript"),
+      this.serverUrl(),
+      token,
+      this.installFor()?.parts,
+    );
   }
 
   protected readonly refusedCommand = INSTALL_COMMAND_REFUSED;
@@ -910,7 +939,7 @@ export class KeykeeperMspComponent implements OnInit {
     }
     await this.attempt(async () => {
       const enrollment = await this.mspApi.replaceEnrollment(msp.id, client.id);
-      this.installFor.set({ client, enrollment });
+      await this.showInstall(msp.id, client, enrollment);
       this.toast(hadToken ? "Replaced the install token" : "Created the install command");
     });
   }

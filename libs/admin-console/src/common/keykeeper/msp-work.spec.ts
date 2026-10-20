@@ -14,6 +14,7 @@ import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 
 import { OrganizationUserService } from "../organization-user";
 
+import { KeykeeperJoinChecks } from "./join-checks";
 import { KeykeeperMspRequests } from "./msp-requests";
 import { KeykeeperTemplateSender } from "./msp-template-sender";
 import { MspTemplates, PendingMember } from "./msp-types";
@@ -42,6 +43,11 @@ function setup() {
   const organizationUserService = mock<OrganizationUserService>();
   organizationUserService.confirmUser.mockReturnValue(of(undefined));
   const syncService = mock<SyncService>();
+  // What the checks vouch for is join-checks.spec.ts's; here, whoever the server lets in automatically.
+  const joinChecks = mock<KeykeeperJoinChecks>();
+  joinChecks.onItsOwn.mockImplementation(async (_userId, pending) =>
+    pending.filter((p) => p.autoConfirm),
+  );
   const work = new KeykeeperMspWork(
     requests,
     sender,
@@ -51,13 +57,15 @@ function setup() {
     organizationService,
     organizationUserService,
     syncService,
+    joinChecks,
   );
-  return { work, requests, authService, organizationService, organizationUserService };
+  return { work, requests, authService, organizationService, organizationUserService, joinChecks };
 }
 
 const member = (organizationId: string, memberId: string, autoConfirm = true): PendingMember => ({
   organizationId,
   memberId,
+  userId: `user-${memberId}`,
   email: `${memberId}@example.test`,
   publicKey: "AAEC",
   autoConfirm,
@@ -87,6 +95,20 @@ describe("MSP background work", () => {
     expect(organizationUserService.confirmUser).toHaveBeenCalledTimes(2);
     expect(organizationUserService.confirmUser.mock.calls.map((c) => c[1])).toEqual(["ana", "ben"]);
     expect(updated).toHaveBeenCalledTimes(1);
+  });
+
+  it("confirms only those the checks let in, and announces each on this device", async () => {
+    const { work, requests, organizationUserService, joinChecks } = setup();
+    requests.pending.mockResolvedValue([member("dental", "ana"), member("dental", "ben")]);
+    joinChecks.onItsOwn.mockImplementation(async (_userId, pending) =>
+      pending.filter((p) => p.memberId === "ben"),
+    );
+    const letIn: unknown[] = [];
+    work.letIn$.subscribe((l) => letIn.push(l));
+
+    expect(await work.confirmPending("msp-1")).toEqual({ confirmed: 1, failed: [] });
+    expect(organizationUserService.confirmUser.mock.calls.map((c) => c[1])).toEqual(["ben"]);
+    expect(letIn).toEqual([{ email: "ben@example.test", organizationName: "Acme Dental" }]);
   });
 
   it("does nothing while the vault is locked", async () => {

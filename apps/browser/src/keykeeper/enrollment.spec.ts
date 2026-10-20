@@ -1,8 +1,9 @@
-import { createHash } from "node:crypto";
+import { createHash, webcrypto } from "node:crypto";
 
 import { mock } from "jest-mock-extended";
 import { BehaviorSubject } from "rxjs";
 
+import { KeykeeperJoinSeals } from "@bitwarden/admin-console/common";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
@@ -29,6 +30,11 @@ const userId = "user-1" as UserId;
 const token = "t".repeat(43);
 const server = "https://vault.example.test";
 const orgPublicKey = Utils.fromBufferToB64(new Uint8Array([1, 2, 3, 4]).buffer);
+const seals = new KeykeeperJoinSeals(webcrypto.subtle as unknown as SubtleCrypto);
+const joinSecret = "QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8";
+const userPublicKey = new Uint8Array([9, 8, 7, 6]);
+const fingerprintOf = (b64: string) =>
+  createHash("sha256").update(Buffer.from(b64, "base64")).digest("base64url");
 
 const cryptoFunctionService = mock<CryptoFunctionService>();
 cryptoFunctionService.hash.mockImplementation(
@@ -47,6 +53,7 @@ type Options = {
   answer?: boolean | null | undefined;
   msps?: unknown[];
   organizations?: Partial<Organization>[];
+  joinParts?: { secret: string | null; orgKey: string | null };
 };
 
 function setUp(options: Options = {}) {
@@ -57,6 +64,7 @@ function setUp(options: Options = {}) {
     saved = {},
     msps = [],
     organizations = [],
+    joinParts = { secret: joinSecret, orgKey: fingerprintOf(orgPublicKey) },
   } = options;
   // An explicit undefined means the window couldn't open.
   const answer = "answer" in options ? options.answer : true;
@@ -75,6 +83,7 @@ function setUp(options: Options = {}) {
   const userKey = { key: "user-key" } as unknown as UserKey;
   keyService.userKey$.mockReturnValue(new BehaviorSubject(userKey));
   keyService.getFingerprint.mockResolvedValue(["alpha", "bravo", "charlie"]);
+  keyService.userPublicKey$.mockReturnValue(new BehaviorSubject(userPublicKey));
   encryptService.encapsulateKeyUnsigned.mockResolvedValue({
     encryptedString: "4.recovery",
   } as EncString);
@@ -84,6 +93,7 @@ function setUp(options: Options = {}) {
   const platform: EnrollmentPlatform = {
     managedToken: async () => managedToken,
     managedServer: async () => managedServer,
+    managedJoinParts: async () => joinParts,
     load: async () => JSON.parse(JSON.stringify(state)),
     save: async (next) => {
       state = next;
@@ -108,6 +118,7 @@ function setUp(options: Options = {}) {
     organizationService,
     cryptoFunctionService,
     platform,
+    seals,
   );
   /** Answers the server's endpoints: the person's MSPs, the token's organization, then the join. */
   const respond = (
@@ -194,7 +205,11 @@ describe("Keykeeper enrollment through the install command", () => {
     expect(t.apiService.send).toHaveBeenLastCalledWith(
       "POST",
       "/keykeeper/enrollment/join",
-      { token, resetPasswordKey: "4.recovery" },
+      {
+        token,
+        resetPasswordKey: "4.recovery",
+        proof: await seals.joinProof(joinSecret, "org-1", userId, userPublicKey),
+      },
       true,
       true,
     );
@@ -215,7 +230,7 @@ describe("Keykeeper enrollment through the install command", () => {
     expect(t.apiService.send).toHaveBeenLastCalledWith(
       "POST",
       "/keykeeper/enrollment/join",
-      { token, resetPasswordKey: undefined },
+      expect.objectContaining({ token, resetPasswordKey: undefined }),
       true,
       true,
     );
@@ -254,6 +269,37 @@ describe("Keykeeper enrollment through the install command", () => {
     expect(await t.enrollment.run(userId)).toBe("failed");
     expect(t.paths()).not.toContain("/keykeeper/enrollment/join");
     expect(t.state()[userId].result).toEqual({ error: expect.stringContaining("Couldn't open") });
+  });
+
+  it("refuses an organization key that isn't the one the install command names, before asking", async () => {
+    const t = setUp({ joinParts: { secret: joinSecret, orgKey: fingerprintOf("AAAA") } });
+    t.respond(t.info(true));
+
+    expect(await t.enrollment.run(userId)).toBe("failed");
+    expect(t.asked).toEqual([]);
+    expect(t.paths()).not.toContain("/keykeeper/enrollment/join");
+    expect(t.encryptService.encapsulateKeyUnsigned).not.toHaveBeenCalled();
+    expect(t.notices[0][1]).toContain("isn't the one your IT's install command names");
+  });
+
+  it("needs a command that names the organization's key before escrowing for account recovery", async () => {
+    const old = setUp({ joinParts: { secret: null, orgKey: null } });
+    old.respond(old.info(true));
+    expect(await old.enrollment.run(userId)).toBe("failed");
+    expect(old.encryptService.encapsulateKeyUnsigned).not.toHaveBeenCalled();
+    expect(old.notices[0][1]).toContain("needs a newer install command");
+
+    // Without account recovery, an older command still joins, with no proof: an admin approves.
+    const noRecovery = setUp({ joinParts: { secret: null, orgKey: null } });
+    noRecovery.respond(noRecovery.info(false));
+    expect(await noRecovery.enrollment.run(userId)).toBe("joined");
+    expect(noRecovery.apiService.send).toHaveBeenLastCalledWith(
+      "POST",
+      "/keykeeper/enrollment/join",
+      { token, resetPasswordKey: undefined, proof: undefined },
+      true,
+      true,
+    );
   });
 
   it("leaves MSP staff alone: they sign in on clients' computers but never join this way", async () => {
@@ -313,7 +359,8 @@ describe("Keykeeper enrollment through the install command", () => {
     expect(await t.enrollment.run(userId)).toBe("failed");
     expect(t.encryptService.encapsulateKeyUnsigned).not.toHaveBeenCalled();
     expect(t.paths()).not.toContain("/keykeeper/enrollment/join");
-    expect(t.notices[0][1]).toContain("no public key");
+    // The command names a key, and the server gave none.
+    expect(t.notices[0][1]).toContain("isn't the one your IT's install command names");
   });
 
   it("runs once at a time for an account", async () => {

@@ -10,6 +10,19 @@ describe("installCommand", () => {
     );
   });
 
+  it("carries the join secret and the organization's key fingerprint, checked and quoted", () => {
+    const parts = { secret: token.replace("a", "s"), fingerprint: token.replace("a", "f") };
+    expect(installCommand(script, "https://vault.example.com", token, parts)).toBe(
+      `.\\Install-PassBundle.ps1 -ServerUrl 'https://vault.example.com' -EnrollmentToken '${token}' -JoinSecret '${parts.secret}' -OrgKey '${parts.fingerprint}'`,
+    );
+    expect(
+      installCommand(script, "https://vault.example.com", token, { ...parts, secret: "x'; calc" }),
+    ).toBeNull();
+    expect(
+      installCommand(script, "https://vault.example.com", token, { ...parts, fingerprint: "" }),
+    ).toBeNull();
+  });
+
   it("takes a port, a path, and an IPv6 address", () => {
     expect(installCommand(script, "https://127.0.0.1:8443/vault", token)).toContain(
       "-ServerUrl 'https://127.0.0.1:8443/vault'",

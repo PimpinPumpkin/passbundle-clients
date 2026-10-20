@@ -31,6 +31,14 @@
     "enrollmentToken": {
       "type": "string",
       "description": "Joins this client organization after sign-in. Set by the MSP's install command."
+    },
+    "joinSecret": {
+      "type": "string",
+      "description": "Proves a join came from the install command. Set by the install command; the server never sees it."
+    },
+    "orgKeyFingerprint": {
+      "type": "string",
+      "description": "The organization key the extension accepts for joining. Set by the install command."
     }
   }
 }

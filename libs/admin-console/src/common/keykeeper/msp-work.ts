@@ -2,7 +2,8 @@
 // without anyone opening a console. It confirms members waiting for their org
 // key in every organization where the person is an owner or admin and that
 // confirms automatically (giving the org key the normal way, encrypted to the
-// member's public key), and keeps MSP clients' copies of the MSP's templates
+// member's public key), when something the server can't forge vouches for
+// them (join-checks.ts), and keeps MSP clients' copies of the MSP's templates
 // current. Both need the person's unlocked keys, so this runs in the web vault
 // and the browser extension while they're unlocked.
 // See DESIGN.md, "Joining", "MSP console", and "MSP templates".
@@ -32,6 +33,7 @@ import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 
 import { OrganizationUserService } from "../organization-user";
 
+import { KeykeeperJoinChecks } from "./join-checks";
 import { KeykeeperMspRequests } from "./msp-requests";
 import { KeykeeperTemplateSender, templateSourceProblem } from "./msp-template-sender";
 import { knownItems, templateRows } from "./msp-template-status";
@@ -44,6 +46,9 @@ const SETTLE_MS = 3000;
 const EVERY_MS = 5 * 60 * 1000;
 
 export type ConfirmResult = { confirmed: number; failed: string[] };
+
+/** Someone an app let in on its own, for the notice on that device. */
+export type LetIn = { email: string; organizationName: string };
 
 const message = (e: unknown) =>
   e instanceof ErrorResponse ? e.getSingleMessage() : e instanceof Error ? e.message : String(e);
@@ -60,6 +65,9 @@ export class KeykeeperMspWork {
   private readonly updated = new Subject<void>();
   /** Emits after members were confirmed or template copies written. */
   readonly updated$: Observable<void> = this.updated.asObservable();
+  private readonly letIn = new Subject<LetIn>();
+  /** Each person let in on its own, so the device can say so. */
+  readonly letIn$: Observable<LetIn> = this.letIn.asObservable();
 
   constructor(
     private readonly requests: KeykeeperMspRequests,
@@ -70,6 +78,7 @@ export class KeykeeperMspWork {
     private readonly organizationService: OrganizationService,
     private readonly organizationUserService: OrganizationUserService,
     private readonly syncService: SyncService,
+    private readonly joinChecks: KeykeeperJoinChecks,
   ) {}
 
   /**
@@ -147,8 +156,8 @@ export class KeykeeperMspWork {
 
   /**
    * Confirms everyone waiting in the organizations where this person is an
-   * owner or admin and that confirm automatically. Organizations set to
-   * require approval are left for an admin.
+   * owner or admin and that confirm automatically, when something the server
+   * can't forge vouches for them. The rest are left for an admin.
    */
   private async confirmWaiting(): Promise<ConfirmResult> {
     const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
@@ -157,32 +166,33 @@ export class KeykeeperMspWork {
     if (!organizations.some((o) => o.isOwner || o.isAdmin)) {
       return { confirmed: 0, failed: [] };
     }
-    const pending = (await this.requests.organizationsPending()).filter((p) => p.autoConfirm);
-    return this.confirm(pending);
+    return this.confirm((await this.requests.organizationsPending()).filter((p) => p.autoConfirm));
   }
 
   /**
    * Confirms the memberships waiting in an MSP's clients that this person can
-   * confirm, when the MSP console opens. Clients set to require approval are
-   * left for an admin's Confirm on their Members page, which shows the
-   * person's fingerprint.
+   * confirm, when the MSP console opens, on the same terms as the background.
+   * The rest are left for an admin's Confirm on their client's Members page,
+   * which shows the person's fingerprint.
    */
   async confirmPending(mspId: string): Promise<ConfirmResult> {
     return this.confirm((await this.requests.pending(mspId)).filter((p) => p.autoConfirm));
   }
 
   /**
-   * Confirms memberships with upstream's confirm request. A member someone
-   * else confirmed in the meantime fails and is reported.
+   * Confirms, with upstream's confirm request, those of `pending` that this
+   * device may let in on its own (join-checks.ts). A member someone else
+   * confirmed in the meantime fails and is reported.
    */
-  private async confirm(pending: PendingMember[]): Promise<ConfirmResult> {
-    if (pending.length === 0) {
+  private async confirm(waiting: PendingMember[]): Promise<ConfirmResult> {
+    if (waiting.length === 0) {
       return { confirmed: 0, failed: [] };
     }
     // Org keys for organizations created or joined since the last sync.
     await this.syncService.fullSync(false);
     const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
     const organizations = await firstValueFrom(this.organizationService.organizations$(userId));
+    const pending = await this.joinChecks.onItsOwn(userId, waiting);
     const result: ConfirmResult = { confirmed: 0, failed: [] };
     for (const p of pending) {
       const organization = organizations.find((o) => o.id === p.organizationId);
@@ -198,6 +208,7 @@ export class KeykeeperMspWork {
           ),
         );
         result.confirmed++;
+        this.letIn.next({ email: p.email, organizationName: organization.name });
       } catch (e) {
         result.failed.push(`${p.email} in ${organization.name}: ${message(e)}`);
       }

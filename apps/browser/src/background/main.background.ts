@@ -27,6 +27,7 @@ import {
   DefaultCollectionService,
   DefaultOrganizationUserApiService,
   DefaultOrganizationUserService,
+  KeykeeperJoinChecks,
   KeykeeperMspRequests,
   KeykeeperMspWork,
   KeykeeperTemplateSender,
@@ -1890,6 +1891,7 @@ export default class MainBackground {
       this.organizationService,
       this.organizationUserService,
       this.syncService,
+      new KeykeeperJoinChecks(this.keyService, this.encryptService, this.stateProvider),
     );
     startMspWork(this.keykeeperMspWork);
     this.commandsBackground.init();

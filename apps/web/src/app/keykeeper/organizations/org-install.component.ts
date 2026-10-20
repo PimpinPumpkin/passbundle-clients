@@ -5,6 +5,7 @@ import { firstValueFrom } from "rxjs";
 import {
   ClientEnrollment,
   INSTALL_COMMAND_REFUSED,
+  InstallCommandParts,
   installCommand,
 } from "@bitwarden/admin-console/common";
 import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
@@ -14,10 +15,11 @@ import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/pl
 import { DialogService, ToastService } from "@bitwarden/components";
 
 import { SharedModule } from "../../shared";
+import { KeykeeperJoinSealer } from "../joining/join-sealer.service";
 import { KeykeeperMspApiService } from "../msp/msp-api.service";
 
 type InstallState =
-  | { kind: "own"; enrollment: ClientEnrollment }
+  | { kind: "own"; enrollment: ClientEnrollment; parts: InstallCommandParts | null }
   /** An MSP's client: its install command is in the MSP's console. */
   | { kind: "provider"; provider: string };
 
@@ -123,6 +125,7 @@ export class KeykeeperOrgInstallComponent {
     private readonly platformUtilsService: PlatformUtilsService,
     private readonly dialogService: DialogService,
     private readonly toastService: ToastService,
+    private readonly sealer: KeykeeperJoinSealer,
   ) {
     effect(() => {
       const id = this.organizationId();
@@ -138,7 +141,7 @@ export class KeykeeperOrgInstallComponent {
       if ("provider" in found) {
         this.state.set({ kind: "provider", provider: found.provider });
       } else {
-        this.show(found);
+        await this.show(found);
       }
     } catch {
       // Not an owner or admin: the server says not found, and the card stays hidden.
@@ -146,8 +149,23 @@ export class KeykeeperOrgInstallComponent {
     }
   }
 
-  private show(enrollment: ClientEnrollment) {
-    this.state.set({ kind: "own", enrollment });
+  /**
+   * Shows the command with its join secret and the organization's key
+   * fingerprint. A command made before join secrets gets one now, keeping
+   * its token: only owners and admins see this card.
+   */
+  private async show(enrollment: ClientEnrollment) {
+    const orgId = this.organizationId();
+    let parts = await this.sealer.commandParts(orgId, enrollment.secret);
+    if (parts == null && enrollment.token != null && enrollment.secret == null) {
+      await this.api.setOrgEnrollmentSecret(orgId);
+      const found = await this.api.getOrgEnrollment(orgId);
+      if (!("provider" in found)) {
+        enrollment = found;
+        parts = await this.sealer.commandParts(orgId, enrollment.secret);
+      }
+    }
+    this.state.set({ kind: "own", enrollment, parts });
     this.domainsForm.setValue({ domains: enrollment.domains.join(" ") });
   }
 
@@ -158,7 +176,13 @@ export class KeykeeperOrgInstallComponent {
 
   /** The command to run on each computer; the script's name comes from the brand. */
   protected installCommand(token: string): string | null {
-    return installCommand(this.i18nService.t("keykeeperInstallScript"), this.serverUrl(), token);
+    const s = this.state();
+    return installCommand(
+      this.i18nService.t("keykeeperInstallScript"),
+      this.serverUrl(),
+      token,
+      s?.kind === "own" ? s.parts : null,
+    );
   }
 
   protected readonly refusedCommand = INSTALL_COMMAND_REFUSED;
@@ -186,7 +210,7 @@ export class KeykeeperOrgInstallComponent {
       .filter((d) => d !== "");
     await this.attempt(async () => {
       const enrollment = await this.api.setOrgEnrollmentDomains(this.organizationId(), domains);
-      this.show(enrollment);
+      await this.show(enrollment);
       this.toastService.showToast({
         variant: "success",
         message: enrollment.domains.length
@@ -211,7 +235,7 @@ export class KeykeeperOrgInstallComponent {
       }
     }
     await this.attempt(async () => {
-      this.show(await this.api.replaceOrgEnrollment(this.organizationId()));
+      await this.show(await this.api.replaceOrgEnrollment(this.organizationId()));
       this.toastService.showToast({
         variant: "success",
         message: hadToken ? "Replaced the install token" : "Created the install command",

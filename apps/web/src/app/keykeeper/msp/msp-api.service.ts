@@ -1,7 +1,10 @@
 // Keykeeper: the MSP API (/api/keykeeper/msp on the server). Creating a client
 // organization makes its keys in the browser the same way upstream's "New
 // organization" does, and confirming members uses upstream's confirm request,
-// so the server never sees a key it could decrypt with.
+// so the server never sees a key it could decrypt with. Changes to staff, how
+// people join, and install commands carry this browser's seals and join
+// secrets (KeykeeperJoinSealer), so other apps can let people in on their own
+// without trusting the server. See DESIGN.md, "Joins a hacked server can't forge".
 
 import { Injectable } from "@angular/core";
 import { firstValueFrom } from "rxjs";
@@ -13,10 +16,14 @@ import {
   ClientPreset,
   DefaultPolicyResult,
   InvitationInfo,
+  Joining,
+  KeykeeperJoinSeals,
   KeykeeperMspRequests,
+  MspJoining,
   MspPolicies,
   MspRole,
   MspSummary,
+  OrgJoining,
   TechnicianAccess,
 } from "@bitwarden/admin-console/common";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
@@ -28,7 +35,31 @@ import { SyncService } from "@bitwarden/common/platform/sync";
 import { OrgKey } from "@bitwarden/common/types/key";
 import { KeyService } from "@bitwarden/key-management";
 
+import { KeykeeperJoinSealer, ReportedJoining } from "../joining/join-sealer.service";
+
 import { MspEvent } from "./msp-activity";
+import { reachesEveryClient } from "./technician-access";
+
+/** Email domains as the server keeps them, so a seal covers exactly those. */
+export function normalizeDomains(entries: string[]): string[] {
+  const domains: string[] = [];
+  for (const entry of entries) {
+    const domain = entry.trim().replace(/^@+/, "").replace(/\.+$/, "").toLowerCase();
+    if (domain !== "" && !domains.includes(domain)) {
+      domains.push(domain);
+    }
+  }
+  return domains;
+}
+
+/** What the server reports about an organization's joining, as the sealer reads it. */
+function reported(joining: OrgJoining): ReportedJoining {
+  return {
+    autoConfirm: joining.autoConfirm,
+    domains: joining.domains ?? [],
+    seal: joining.seal ?? null,
+  };
+}
 
 export type {
   MspRole,
@@ -60,8 +91,103 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     private readonly encryptService: EncryptService,
     private readonly i18nService: I18nService,
     private readonly syncService: SyncService,
+    private readonly sealer: KeykeeperJoinSealer,
   ) {
     super(apiService);
+  }
+
+  /** Leaves an MSP admin's seals and join secrets for its clients. */
+  private async putMspSeals(
+    mspId: string,
+    seals: {
+      staff?: { organizationId: string; email: string; seal: string }[];
+      joining?: { organizationId: string; seal: string }[];
+      secrets?: { organizationId: string; secret: string }[];
+    },
+  ): Promise<void> {
+    await this.apiService.send("PUT", `/keykeeper/msp/${mspId}/seals`, seals, true, false);
+  }
+
+  /** Seals a staff member's place in the clients they reach. */
+  private async sealStaff(
+    mspId: string,
+    email: string,
+    role: MspRole,
+    access: TechnicianAccess | null | undefined,
+  ): Promise<void> {
+    const clients = (await this.get(mspId)).clients.map((c) => c.id);
+    const reached =
+      role === "admin" || reachesEveryClient(access ?? undefined)
+        ? clients
+        : clients.filter((c) => access!.clients.includes(c));
+    const staff = await this.sealer.staffSeals(reached, email);
+    if (staff.length > 0) {
+      await this.putMspSeals(mspId, { staff });
+    }
+  }
+
+  /**
+   * Seals a new organization whose key this browser just made: how people
+   * join it (approval or not, no domains yet), its install command's join
+   * secret, and the places of staff who reach every client.
+   */
+  private async sealNew(
+    key: OrgKey,
+    orgId: string,
+    autoConfirm: boolean,
+    withSecret: boolean,
+    staffEmails: string[],
+  ) {
+    const seals = new KeykeeperJoinSeals();
+    const joinKey = await seals.joinKey(key.toEncoded());
+    return {
+      joining: await seals.joiningSeal(joinKey, orgId, autoConfirm, []),
+      secret: withSecret
+        ? (await this.encryptService.encryptString(seals.newJoinSecret(), key)).encryptedString
+        : undefined,
+      staff: await Promise.all(
+        staffEmails.map(async (email) => ({
+          organizationId: orgId,
+          email,
+          seal: await seals.staffSeal(joinKey, orgId, email),
+        })),
+      ),
+    };
+  }
+
+  /** Sets the organization's own setting, sealed. */
+  override async setOrgJoining(orgId: string, joining: Joining): Promise<OrgJoining> {
+    const current = await this.getOrgJoining(orgId);
+    const seal = await this.sealer.resealJoining(orgId, joining.autoConfirm, reported(current));
+    return super.setOrgJoining(orgId, joining, seal);
+  }
+
+  /** Puts the organization back on its MSP's default, or the server's, sealed. */
+  override async resetOrgJoining(orgId: string): Promise<OrgJoining> {
+    const current = await this.getOrgJoining(orgId);
+    const seal = await this.sealer.resealJoining(
+      orgId,
+      current.default.autoConfirm,
+      reported(current),
+    );
+    return super.resetOrgJoining(orgId, seal);
+  }
+
+  /** Sets the MSP's default, with a seal for each client that follows it. */
+  override async setMspJoining(mspId: string, joining: Joining): Promise<MspJoining> {
+    const current = await this.getMspJoining(mspId);
+    const seals: Record<string, string> = {};
+    for (const client of current.following ?? []) {
+      const seal = await this.sealer.resealJoining(client.organizationId, joining.autoConfirm, {
+        autoConfirm: current.default.autoConfirm,
+        domains: client.domains,
+        seal: client.seal,
+      });
+      if (seal != null) {
+        seals[client.organizationId] = seal;
+      }
+    }
+    return super.setMspJoining(mspId, joining, seals);
   }
 
   async create(name: string): Promise<MspSummary> {
@@ -101,6 +227,27 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     );
     await this.apiService.refreshIdentityToken();
     await this.syncService.fullSync(true);
+    // Sealed with the key made here: the MSP's default for how people join,
+    // a join secret for the install command, and the staff who reach every
+    // client, as the console lists them.
+    const msp = await this.get(mspId);
+    const joining = await this.getMspJoining(mspId);
+    const everyClient = [
+      ...msp.staff.filter((s) => s.role === "admin" || reachesEveryClient(s.access ?? undefined)),
+      ...msp.invites.filter((i) => i.role === "admin" || reachesEveryClient(i.access ?? undefined)),
+    ].map((s) => s.email);
+    const sealed = await this.sealNew(
+      key,
+      created.id,
+      joining.default.autoConfirm,
+      true,
+      everyClient,
+    );
+    await this.putMspSeals(mspId, {
+      staff: sealed.staff,
+      joining: [{ organizationId: created.id, seal: sealed.joining }],
+      secrets: [{ organizationId: created.id, secret: sealed.secret! }],
+    });
     return created.id;
   }
 
@@ -140,6 +287,17 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     );
     await this.apiService.refreshIdentityToken();
     await this.syncService.fullSync(true);
+    // Sealed with the key made here: people are let in on their own (the
+    // server's default), and the Business preset's install command gets a
+    // join secret.
+    const sealed = await this.sealNew(key, created.id, true, business, []);
+    await this.apiService.send(
+      "PUT",
+      `/keykeeper/organizations/${created.id}/seals`,
+      { joining: sealed.joining, secret: sealed.secret },
+      true,
+      false,
+    );
     return created.id;
   }
 
@@ -162,9 +320,20 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     return this.apiService.send(
       "POST",
       `/keykeeper/organizations/${orgId}/enrollment`,
-      null,
+      { secret: await this.sealer.newSecret(orgId) },
       true,
       true,
+    );
+  }
+
+  /** Gives a company's own install command a join secret, keeping its token. */
+  async setOrgEnrollmentSecret(orgId: string): Promise<void> {
+    await this.apiService.send(
+      "PUT",
+      `/keykeeper/organizations/${orgId}/seals`,
+      { secret: await this.sealer.newSecret(orgId) },
+      true,
+      false,
     );
   }
 
@@ -173,10 +342,16 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     return this.apiService.send(
       "PUT",
       `/keykeeper/organizations/${orgId}/enrollment/domains`,
-      { domains },
+      { domains, seal: await this.domainsSeal(orgId, domains) },
       true,
       true,
     );
+  }
+
+  /** The seal for an organization's new email domains, as the server will keep them. */
+  private async domainsSeal(orgId: string, domains: string[]): Promise<string | undefined> {
+    const current = await this.getOrgJoining(orgId);
+    return this.sealer.sealDomains(orgId, normalizeDomains(domains), reported(current));
   }
 
   /** Adds a template, or changes its source or which clients get it. */
@@ -232,10 +407,18 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     return this.apiService.send(
       "POST",
       `/keykeeper/msp/${mspId}/clients/${orgId}/enrollment`,
-      null,
+      { secret: await this.sealer.newSecret(orgId) },
       true,
       true,
     );
+  }
+
+  /** Gives a client's install command a join secret, keeping its token. MSP admins. */
+  async setEnrollmentSecret(mspId: string, orgId: string): Promise<void> {
+    const secret = await this.sealer.newSecret(orgId);
+    if (secret != null) {
+      await this.putMspSeals(mspId, { secrets: [{ organizationId: orgId, secret }] });
+    }
   }
 
   /** Limits a client's install command to accounts at these email domains; none lets anyone join. */
@@ -247,7 +430,7 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     return this.apiService.send(
       "PUT",
       `/keykeeper/msp/${mspId}/clients/${orgId}/enrollment/domains`,
-      { domains },
+      { domains, seal: await this.domainsSeal(orgId, domains) },
       true,
       true,
     );
@@ -310,13 +493,15 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     role: MspRole,
     access?: TechnicianAccess,
   ): Promise<AddStaffResult> {
-    return this.apiService.send(
+    const result: AddStaffResult = await this.apiService.send(
       "POST",
       `/keykeeper/msp/${mspId}/staff`,
       { email, role, access: role === "technician" ? access : undefined },
       true,
       true,
     );
+    await this.sealStaff(mspId, email, role, role === "technician" ? access : null);
+    return result;
   }
 
   /** Changes a technician's access, in every client at once. */
@@ -325,13 +510,18 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     userId: string,
     access: TechnicianAccess,
   ): Promise<TechnicianAccess> {
-    return this.apiService.send(
+    const saved: TechnicianAccess = await this.apiService.send(
       "PUT",
       `/keykeeper/msp/${mspId}/staff/${userId}/access`,
       access,
       true,
       true,
     );
+    const email = (await this.get(mspId)).staff.find((s) => s.userId === userId)?.email;
+    if (email != null) {
+      await this.sealStaff(mspId, email, "technician", saved);
+    }
+    return saved;
   }
 
   async cancelInvite(mspId: string, inviteId: string): Promise<void> {
@@ -360,6 +550,12 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
       true,
       false,
     );
+    if (role === "admin") {
+      const email = (await this.get(mspId)).staff.find((s) => s.userId === userId)?.email;
+      if (email != null) {
+        await this.sealStaff(mspId, email, role, null);
+      }
+    }
   }
 
   async removeStaff(mspId: string, userId: string): Promise<void> {
