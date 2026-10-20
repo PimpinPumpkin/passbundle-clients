@@ -34,6 +34,7 @@ import { SharedModule } from "../../shared";
 import { KeykeeperMspApiService, MspDetails, MspTemplates } from "./msp-api.service";
 import { clientList } from "./msp-policies";
 import { KeykeeperMspWorkService, KeykeeperTemplateSenderService } from "./msp-work.service";
+import { KeykeeperTemplateClientsDialogComponent } from "./template-clients-dialog.component";
 
 /**
  * Keykeeper: the item templates an MSP's clients get. A template here applies
@@ -51,7 +52,7 @@ import { KeykeeperMspWorkService, KeykeeperTemplateSenderService } from "./msp-w
       <p bitTypography="body2">
         Templates here apply to your clients automatically, including clients you add later. Each
         client has them in its Templates collection. To change one, edit it, and your clients get
-        the change.
+        the change. Use Clients to change which clients get one.
       </p>
       @if (rows().length === 0) {
         <p bitTypography="body2" class="tw-text-muted">No templates yet.</p>
@@ -84,6 +85,15 @@ import { KeykeeperMspWorkService, KeykeeperTemplateSenderService } from "./msp-w
                       >
                         Edit
                       </a>
+                      <button
+                        type="button"
+                        bitLink
+                        class="tw-mr-3"
+                        [attr.aria-label]="'Change clients for ' + name"
+                        (click)="changeClients(row)"
+                      >
+                        Clients
+                      </button>
                       @if (row.behind.length > 0) {
                         <button
                           type="button"
@@ -279,6 +289,59 @@ export class KeykeeperMspTemplatesComponent {
       );
     });
   };
+
+  /**
+   * Changes which clients get a template. Copies in clients that no longer get
+   * it can go to their trash, or stay as those clients' own templates.
+   */
+  protected async changeClients(row: TemplateRow) {
+    const template = this.templates().templates.find((t) => t.templateId === row.templateId);
+    const m = this.msp();
+    if (template == null) {
+      return;
+    }
+    const name = row.name ?? "this template";
+    const choice = await firstValueFrom(
+      KeykeeperTemplateClientsDialogComponent.open(this.dialogService, {
+        name,
+        clients: m.clients.map(({ id, name }) => ({ id, name })),
+        allClients: template.allClients,
+        chosen: template.clients,
+      }).closed,
+    );
+    if (choice == null) {
+      return;
+    }
+    const targets = choice.allClients ? m.clients.map((c) => c.id) : choice.clients;
+    const dropped = this.templates()
+      .copies.filter((c) => c.templateId === row.templateId && !targets.includes(c.organizationId))
+      .map((c) => c.cipherId)
+      .filter((id) => this.items().some((i) => i.id === id && !i.isDeleted));
+    const removeCopies =
+      dropped.length > 0 &&
+      (await this.dialogService.openSimpleDialog({
+        title: "Remove it from the clients that no longer get it?",
+        content: `${dropped.length === 1 ? "1 of them has" : dropped.length + " of them have"} it. Removing moves it to the client's trash; keeping leaves it as that client's own template.`,
+        acceptButtonText: "Remove from those clients",
+        cancelButtonText: "Keep it there",
+        type: "warning",
+      }));
+    await this.attempt(async () => {
+      await this.mspApi.setTemplate(m.id, row.templateId, {
+        sourceCipherId: row.sourceCipherId,
+        allClients: choice.allClients,
+        clients: choice.clients,
+      });
+      if (removeCopies) {
+        await this.sender.removeCopies(dropped);
+      }
+      const names = m.clients.filter((c) => choice.clients.includes(c.id));
+      this.report(
+        `${name} now applies to ${choice.allClients ? "every client" : clientList(names)}.`,
+        await this.work.run(true),
+      );
+    });
+  }
 
   /** Tries again for clients that don't have the latest version. */
   protected async update(row: TemplateRow) {
