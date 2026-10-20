@@ -16,6 +16,7 @@ import { ErrorResponse } from "@bitwarden/common/models/response/error.response"
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { SymmetricCryptoKey } from "@bitwarden/common/platform/models/domain/symmetric-crypto-key";
+import { SyncService } from "@bitwarden/common/platform/sync";
 import { OrganizationId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
@@ -187,6 +188,7 @@ export class KeykeeperScriptAccessComponent {
     private readonly platformUtilsService: PlatformUtilsService,
     private readonly dialogService: DialogService,
     private readonly toastService: ToastService,
+    private readonly syncService: SyncService,
     encryptService: EncryptService,
   ) {
     this.copies = new KeykeeperScriptCopies(encryptService);
@@ -246,10 +248,24 @@ export class KeykeeperScriptAccessComponent {
     ].join("\n");
   }
 
+  /**
+   * The organization's items this browser has. Items saved from the Admin
+   * Console reach it at the next sync, so sync first (nothing happens when
+   * nothing changed).
+   */
+  private async organizationItems(orgId: string): Promise<CipherView[]> {
+    try {
+      await this.syncService.fullSync(false);
+    } catch {
+      // What this browser already has will do.
+    }
+    const all = await this.cipherService.getAllDecrypted(await this.userId());
+    return all.filter((c) => c.organizationId === orgId && !c.isDeleted);
+  }
+
   protected async newToken() {
     const orgId = this.organizationId();
-    const all = await this.cipherService.getAllDecrypted(await this.userId());
-    this.items.set(all.filter((c) => c.organizationId === orgId && !c.isDeleted));
+    this.items.set(await this.organizationItems(orgId));
     const choice = await firstValueFrom(
       KeykeeperScriptTokenDialogComponent.open(this.dialogService, { items: this.items() }).closed,
     );
@@ -311,8 +327,7 @@ export class KeykeeperScriptAccessComponent {
 
   protected async showReads(t: ScriptTokenView) {
     if (this.items().length === 0) {
-      const all = await this.cipherService.getAllDecrypted(await this.userId());
-      this.items.set(all.filter((c) => c.organizationId === this.organizationId()));
+      this.items.set(await this.organizationItems(this.organizationId()));
     }
     await this.attempt(async () => {
       this.reads.set({ token: t, reads: await this.api.scriptReads(this.organizationId(), t.id) });
