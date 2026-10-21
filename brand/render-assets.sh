@@ -31,7 +31,7 @@ render "#000000" 36 "$OUT/browser/icon18_safari@2x.png"
 render "#00000080" 18 "$OUT/browser/icon18_safari_locked.png"
 render "#00000080" 36 "$OUT/browser/icon18_safari_locked@2x.png"
 
-# The desktop agent's tray icon. The macOS menu bar wants a template image
+# The desktop agent's tray icon (the agent is in passbundle-apps, which copies these). The macOS menu bar wants a template image
 # (black on transparent, 18 points); Windows shows the mark in color.
 render "#000000" 36 "$OUT/agent/tray-macos.png"
 render "$COLOR" 32 "$OUT/agent/tray-windows.png"
