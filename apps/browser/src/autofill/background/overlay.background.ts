@@ -46,7 +46,7 @@ import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { VaultSettingsService } from "@bitwarden/common/vault/abstractions/vault-settings/vault-settings.service";
-import { CipherType } from "@bitwarden/common/vault/enums";
+import { CipherRepromptType, CipherType } from "@bitwarden/common/vault/enums";
 import { buildCipherIcon } from "@bitwarden/common/vault/icon/build-cipher-icon";
 import { CardView } from "@bitwarden/common/vault/models/view/card.view";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
@@ -81,6 +81,7 @@ import {
   InlineMenuFillTypes,
   MAX_SUB_FRAME_DEPTH,
 } from "../enums/autofill-overlay.enum";
+import { choicesFor, fillFieldWith } from "../keykeeper/fill-field-menu";
 import AutofillField from "../models/autofill-field";
 import { AutofillService, PageDetail } from "../services/abstractions/autofill.service";
 import { InlineMenuFieldQualificationService } from "../services/abstractions/inline-menu-field-qualifications.service";
@@ -242,6 +243,8 @@ export class OverlayBackground implements OverlayBackgroundInterface {
     autofillInlineMenuBlurred: ({ port }) => this.checkInlineMenuButtonFocused(port.sender),
     unlockVault: ({ port }) => this.unlockVault(port),
     fillAutofillInlineMenuCipher: ({ message, port }) => this.fillInlineMenuCipher(message, port),
+    // Keykeeper: "Fill this field with" in the inline menu.
+    keykeeperFillFieldWith: ({ message, port }) => this.keykeeperFillFieldWith(message, port),
     addNewVaultItem: ({ message, port }) => this.getNewVaultItemDetails(message, port),
     viewSelectedCipher: ({ message, port }) => this.viewSelectedCipher(message, port),
     redirectAutofillInlineMenuFocusOut: ({ message, port }) =>
@@ -887,6 +890,16 @@ export class OverlayBackground implements OverlayBackgroundInterface {
             ? { rpName, userName }
             : null,
       };
+      // Keykeeper: the fill picker's choices, names only. The menu shows
+      // without them if an item's fields can't be read.
+      try {
+        inlineMenuData.keykeeperFillChoices = choicesFor(cipher).map(({ key, title }) => ({
+          key,
+          title,
+        }));
+      } catch {
+        inlineMenuData.keykeeperFillChoices = undefined;
+      }
       return inlineMenuData;
     }
 
@@ -2204,6 +2217,74 @@ export class OverlayBackground implements OverlayBackgroundInterface {
    */
   private waitForNextCredential() {
     return firstValueFrom(this.credential$.pipe(skip(1), filter(Boolean), timeout(10_000)));
+  }
+
+  /**
+   * Keykeeper: "Fill this field with" in the inline menu. Fills the chosen
+   * value into the focused field and remembers it as a fill rule, as the
+   * right-click menu does (keykeeper/fill-field-menu.ts).
+   */
+  private async keykeeperFillFieldWith(
+    { inlineMenuCipherId, choiceKey }: OverlayPortMessage,
+    { sender }: chrome.runtime.Port,
+  ) {
+    if (!sender || !this.senderHasValidTab(sender) || !inlineMenuCipherId || !choiceKey) {
+      return;
+    }
+    if ((await this.getAuthStatus()) !== AuthenticationStatus.Unlocked) {
+      return;
+    }
+    const tab = sender.tab;
+    const { tabId, frameId, focusedFieldOpid } = this.focusedFieldData ?? {};
+    if (tabId !== tab.id || frameId == null || !focusedFieldOpid) {
+      return;
+    }
+    const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getOptionalUserId));
+    const listed = this.inlineMenuCiphers.get(inlineMenuCipherId);
+    if (!listed || !userId) {
+      return;
+    }
+    // The item as it is now, not as the menu cached it, so saving its rule
+    // isn't refused as an edit to an older copy.
+    const cipher =
+      (await this.cipherService.getAllDecrypted(userId)).find((c) => c.id === listed.id) ?? null;
+    const choice = cipher ? choicesFor(cipher).find((c) => c.key === choiceKey) : undefined;
+    if (!cipher || !choice) {
+      return;
+    }
+    await BrowserApi.tabSendMessage(tab, { command: "collectPageDetails" }, { frameId });
+    const pageDetail = this.pageDetailsForTab[tabId]?.get(frameId);
+    const field = pageDetail?.details?.fields.find((f) => f.opid === focusedFieldOpid);
+    const url = pageDetail?.details?.url;
+    if (!field || !url) {
+      return;
+    }
+    this.closeInlineMenu(sender, { forceCloseInlineMenu: true });
+    const filled = await fillFieldWith(
+      { tab, frameId, target: { field, url }, cipher, choice, userId },
+      {
+        cipherService: this.cipherService,
+        totpService: this.totpService,
+        // An item that asks for the master password: the rule is saved
+        // first, then upstream's prompt opens, and the fill after it uses
+        // the rule.
+        passwordRepromptRequired: async (c) => c.reprompt === CipherRepromptType.Password,
+        fillAfterReprompt: async (t, c) => {
+          await this.autofillService.isPasswordRepromptRequired(c, t);
+        },
+      },
+    );
+    if (filled) {
+      this.inlineMenuCiphers.set(inlineMenuCipherId, cipher);
+      this.updateLastUsedInlineMenuCipher(inlineMenuCipherId, cipher);
+    } else {
+      // Nothing went in: the person is back in the field.
+      await BrowserApi.tabSendMessage(
+        tab,
+        { command: "focusMostRecentlyFocusedField" },
+        { frameId },
+      );
+    }
   }
 
   /** Keykeeper: the address of the page (or frame) with the focused field. */

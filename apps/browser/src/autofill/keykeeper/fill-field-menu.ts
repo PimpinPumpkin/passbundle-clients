@@ -11,6 +11,7 @@ import { AuthenticationStatus } from "@bitwarden/common/auth/enums/authenticatio
 import { getOptionalUserId } from "@bitwarden/common/auth/services/account.service";
 import { ROOT_ID } from "@bitwarden/common/autofill/constants";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
+import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { CipherType, FieldType } from "@bitwarden/common/vault/enums";
@@ -188,10 +189,42 @@ export async function handleFillFieldMenuClick(
   if (!target) {
     return true;
   }
+  await fillFieldWith({ tab, frameId, target, cipher, choice, userId }, deps);
+  return true;
+}
+
+/** Where a choice fills: the tab, the frame, and the field there. */
+export type FillFieldTarget = {
+  tab: chrome.tabs.Tab;
+  frameId: number;
+  target: { field: AutofillField; url: string };
+  cipher: CipherView;
+  choice: FillChoice;
+  userId: UserId;
+};
+
+/**
+ * Fills one of an item's values into one field now, and remembers it as a
+ * fill rule on the item: the picker's work, from the right-click menu or the
+ * inline menu (DESIGN.md, "Choosing what fills where"). Answers whether it
+ * filled the field now.
+ */
+export async function fillFieldWith(
+  { tab, frameId, target, cipher, choice, userId }: FillFieldTarget,
+  deps: Pick<
+    FillFieldMenuDependencies,
+    "cipherService" | "totpService" | "passwordRepromptRequired" | "fillAfterReprompt"
+  >,
+): Promise<boolean> {
   const secret = isSecretSource(cipher, choice.source);
   // A secret never goes into a frame from another site, such as an ad.
   if (secret && !sameSite(target.url, tab.url)) {
-    return true;
+    return false;
+  }
+  // For someone who can't see the item's passwords, a secret goes only into
+  // a password field, as with rules (fill-rules.ts).
+  if (secret && !cipher.viewPassword && target.field.type !== "password") {
+    return false;
   }
   const rule: FillRule = {
     v: 1,
@@ -207,9 +240,10 @@ export async function handleFillFieldMenuClick(
     await deps.cipherService.updateWithServer(cipher, userId);
     void keykeeperSiteFixes.share(rule).catch(() => {});
     await deps.fillAfterReprompt(tab, cipher);
-    return true;
+    return false;
   }
 
+  let filled = false;
   if (choice.source.from !== "never") {
     const value =
       choice.source.from === "totp"
@@ -231,6 +265,7 @@ export async function handleFillFieldMenuClick(
         },
         { frameId },
       );
+      filled = true;
     }
   }
 
@@ -238,5 +273,5 @@ export async function handleFillFieldMenuClick(
   await deps.cipherService.updateWithServer(cipher, userId);
   // For people who share fixes; custom fields never leave the device.
   void keykeeperSiteFixes.share(rule).catch(() => {});
-  return true;
+  return filled;
 }

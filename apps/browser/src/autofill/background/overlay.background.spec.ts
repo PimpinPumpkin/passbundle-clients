@@ -38,9 +38,11 @@ import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { VaultSettingsService } from "@bitwarden/common/vault/abstractions/vault-settings/vault-settings.service";
-import { CipherRepromptType, CipherType } from "@bitwarden/common/vault/enums";
+import { CipherRepromptType, CipherType, FieldType } from "@bitwarden/common/vault/enums";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { Fido2CredentialView } from "@bitwarden/common/vault/models/view/fido2-credential.view";
+import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
+import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
 import { CredentialGeneratorService } from "@bitwarden/generator-core";
 import { GeneratedCredential, GeneratorHistoryService } from "@bitwarden/generator-history";
 
@@ -3607,6 +3609,143 @@ describe("OverlayBackground", () => {
         await flushPromises();
 
         expect(openUnlockPopoutSpy).toHaveBeenCalled();
+      });
+    });
+
+    // Keykeeper: "Fill this field with" in the inline menu.
+    describe("keykeeperFillFieldWith message handler", () => {
+      it("fills the focused field with the chosen value and remembers it on the item", async () => {
+        const cipher = new CipherView();
+        cipher.id = "cipher-1";
+        cipher.type = CipherType.Login;
+        cipher.name = "Bank";
+        cipher.login = new LoginView();
+        cipher.login.username = "ana";
+        const customerId = new FieldView();
+        customerId.name = "Customer ID";
+        customerId.value = "C-42";
+        customerId.type = FieldType.Text;
+        cipher.fields = [customerId];
+        // The menu's cached copy; the handler reads the item as it is now.
+        overlayBackground["inlineMenuCiphers"] = new Map([["inline-menu-cipher-1", cipher]]);
+        cipherService.getAllDecrypted.mockResolvedValue([cipher]);
+        overlayBackground["focusedFieldData"] = {
+          tabId: sender.tab.id,
+          frameId: 0,
+          focusedFieldOpid: "custno-opid",
+        } as any;
+        overlayBackground["pageDetailsForTab"][sender.tab.id] = new Map([
+          [
+            0,
+            {
+              frameId: 0,
+              tab: sender.tab,
+              details: createAutofillPageDetailsMock({
+                url: "https://example.com/login",
+                fields: [createAutofillFieldMock({ opid: "custno-opid", htmlID: "custno" })],
+              }),
+            },
+          ],
+        ]);
+
+        sendPortMessage(listMessageConnectorSpy, {
+          command: "keykeeperFillFieldWith",
+          inlineMenuCipherId: "inline-menu-cipher-1",
+          choiceKey: "f0",
+          portKey,
+        });
+        await flushPromises();
+
+        expect(tabsSendMessageSpy).toHaveBeenCalledWith(
+          sender.tab,
+          expect.objectContaining({
+            command: "fillForm",
+            fillScript: expect.objectContaining({
+              script: [
+                ["click_on_opid", "custno-opid"],
+                ["focus_by_opid", "custno-opid"],
+                ["fill_by_opid", "custno-opid", "C-42"],
+              ],
+            }),
+          }),
+          { frameId: 0 },
+        );
+        expect(cipherService.updateWithServer).toHaveBeenCalledWith(cipher, mockUserId);
+        expect(cipher.fields.map((f) => f.name)).toEqual(["Customer ID", "keykeeper.fill"]);
+      });
+
+      it("saves the rule before asking for the master password, for an item that asks", async () => {
+        const cipher = new CipherView();
+        cipher.id = "cipher-1";
+        cipher.type = CipherType.Login;
+        cipher.reprompt = CipherRepromptType.Password;
+        cipher.login = new LoginView();
+        cipher.login.password = "correct-password";
+        cipher.viewPassword = true;
+        overlayBackground["inlineMenuCiphers"] = new Map([["inline-menu-cipher-1", cipher]]);
+        cipherService.getAllDecrypted.mockResolvedValue([cipher]);
+        overlayBackground["focusedFieldData"] = {
+          tabId: sender.tab.id,
+          frameId: 0,
+          focusedFieldOpid: "pw-opid",
+        } as any;
+        overlayBackground["pageDetailsForTab"][sender.tab.id] = new Map([
+          [
+            0,
+            {
+              frameId: 0,
+              tab: sender.tab,
+              details: createAutofillPageDetailsMock({
+                url: "https://example.com/login",
+                fields: [
+                  createAutofillFieldMock({ opid: "pw-opid", htmlID: "pw", type: "password" }),
+                ],
+              }),
+            },
+          ],
+        ]);
+        const order: string[] = [];
+        cipherService.updateWithServer.mockImplementation(async () => {
+          order.push("saved");
+          return undefined;
+        });
+        autofillService.isPasswordRepromptRequired.mockImplementation(async () => {
+          order.push("asked");
+          return true;
+        });
+
+        sendPortMessage(listMessageConnectorSpy, {
+          command: "keykeeperFillFieldWith",
+          inlineMenuCipherId: "inline-menu-cipher-1",
+          choiceKey: "p",
+          portKey,
+        });
+        await flushPromises();
+
+        expect(order).toEqual(["saved", "asked"]);
+        expect(tabsSendMessageSpy).not.toHaveBeenCalledWith(
+          sender.tab,
+          expect.objectContaining({ command: "fillForm" }),
+          expect.anything(),
+        );
+      });
+
+      it("does nothing for a choice the item doesn't have, or with no focused field", async () => {
+        const cipher = new CipherView();
+        cipher.type = CipherType.Login;
+        cipher.login = new LoginView();
+        overlayBackground["inlineMenuCiphers"] = new Map([["inline-menu-cipher-1", cipher]]);
+        overlayBackground["focusedFieldData"] = null;
+
+        sendPortMessage(listMessageConnectorSpy, {
+          command: "keykeeperFillFieldWith",
+          inlineMenuCipherId: "inline-menu-cipher-1",
+          choiceKey: "f9",
+          portKey,
+        });
+        await flushPromises();
+
+        expect(cipherService.updateWithServer).not.toHaveBeenCalled();
       });
     });
 

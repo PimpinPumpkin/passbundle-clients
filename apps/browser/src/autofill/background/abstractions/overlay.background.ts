@@ -175,7 +175,8 @@ export type OverlayPortCommand =
   | "updateColorScheme"
   | "unlockVault"
   | "refreshGeneratedPassword"
-  | "fillGeneratedPassword";
+  | "fillGeneratedPassword"
+  | "keykeeperFillFieldWith";
 
 export type OverlayPortMessage = {
   command: OverlayPortCommand;
@@ -188,6 +189,8 @@ export type OverlayPortMessage = {
   viewsCipherData?: InlineMenuCipherData;
   loginUrl?: string;
   fillGeneratedPassword?: boolean;
+  /** Keykeeper: the fill picker's choice for the focused field (keykeeper/fill-field-menu.ts). */
+  choiceKey?: string;
 };
 
 export type InlineMenuCipherData = {
@@ -213,6 +216,12 @@ export type InlineMenuCipherData = {
     fullName: string;
     username?: string;
   };
+  /**
+   * Keykeeper: what the login can fill into the focused field, for the
+   * inline menu's "Fill this field with" (keykeeper/fill-field-menu.ts).
+   * Names only, never values.
+   */
+  keykeeperFillChoices?: { key: string; title: string }[];
 };
 
 export type BuildCipherDataParams = {
@@ -317,6 +326,7 @@ export type InlineMenuListPortMessageHandlers = {
   refreshGeneratedPassword: () => Promise<void>;
   fillGeneratedPassword: ({ port }: PortConnectionParam) => Promise<void>;
   refreshOverlayCiphers: () => Promise<void>;
+  keykeeperFillFieldWith: ({ message, port }: PortOnMessageHandlerParams) => void;
 };
 
 export interface OverlayBackground {

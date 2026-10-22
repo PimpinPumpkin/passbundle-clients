@@ -258,7 +258,8 @@ body * {
   }
 
   .fill-cipher-button,
-  .view-cipher-button {
+  .view-cipher-button,
+  .keykeeper-pick-button {
     padding: 0;
     margin: 0;
     line-height: 0;
@@ -276,7 +277,13 @@ body * {
     outline: none;
   }
 
-  .view-cipher-button {
+  // Keykeeper: the fill picker's button, beside the view button.
+  .keykeeper-has-picker .fill-cipher-button {
+    width: calc(100% - 8rem);
+  }
+
+  .view-cipher-button,
+  .keykeeper-pick-button {
     flex-shrink: 0;
     width: 4rem;
     height: 4rem;
@@ -618,5 +625,40 @@ body * {
   .inline-menu-list-heading--bordered,
   .inline-menu-list-actions-item {
     transition: none !important;
+  }
+}
+
+// Keykeeper: the fill picker's choices, under the login they belong to.
+.keykeeper-fill-choices {
+  display: flex;
+  flex-direction: column;
+  padding: 0 0.8rem 0.6rem 4.4rem;
+
+  &[hidden] {
+    display: none;
+  }
+
+  .keykeeper-fill-choice {
+    text-align: left;
+    padding: 0.6rem 0.8rem;
+    margin: 0;
+    border: none;
+    border-radius: 0.4rem;
+    background-color: transparent;
+    cursor: pointer;
+    font: inherit;
+
+    @include themify($themes) {
+      color: themed("textColor");
+    }
+
+    &:hover,
+    &:focus-visible {
+      outline: none;
+
+      @include themify($themes) {
+        background-color: themed("backgroundOffsetColor");
+      }
+    }
   }
 }
