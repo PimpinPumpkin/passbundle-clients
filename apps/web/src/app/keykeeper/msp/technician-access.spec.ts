@@ -30,6 +30,24 @@ describe("technician access in words", () => {
     ).toBe("Acme Dental, Baker Law · Custom role with vault items · No install commands");
   });
 
+  it("names the clients where the role differs, in order, skipping clients that are gone", () => {
+    const access = {
+      ...DEFAULT_ACCESS,
+      custom: { permissions: { ...NO_PERMISSIONS, manageUsers: true }, vaultItems: false },
+      clientRoles: [
+        { client: "gone", custom: null },
+        {
+          client: "baker",
+          custom: { permissions: { ...NO_PERMISSIONS, managePolicies: true }, vaultItems: true },
+        },
+        { client: "acme", custom: null },
+      ],
+    };
+    expect(describeAccess(access, clients)).toBe(
+      "Every client · Custom role · Install commands · Admin in Acme Dental · Custom role with vault items in Baker Law",
+    );
+  });
+
   it("says when no client is chosen, and skips clients that are gone", () => {
     const access = { ...DEFAULT_ACCESS, allClients: false, clients: ["gone"] };
     expect(describeAccess(access, clients)).toBe("No clients · Admin · Install commands");

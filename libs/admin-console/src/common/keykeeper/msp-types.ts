@@ -36,13 +36,21 @@ export type CustomPermissions = {
  * admin or a custom role inside them, and whether they see install commands.
  * MSP admins are owners of every client, so they have none.
  */
+export type TechnicianCustomRole = { permissions: CustomPermissions; vaultItems: boolean };
+
 export type TechnicianAccess = {
   allClients: boolean;
   /** With allClients false, the clients they reach. */
   clients: string[];
   /** A custom role in each client, or null for admin. vaultItems: every item there. */
-  custom: { permissions: CustomPermissions; vaultItems: boolean } | null;
+  custom: TechnicianCustomRole | null;
   installCommands: boolean;
+  /**
+   * Clients where their role differs from `custom`: a custom role there, or
+   * null for admin. Each client once, and only clients they reach. Older
+   * servers leave it out.
+   */
+  clientRoles?: { client: string; custom: TechnicianCustomRole | null }[];
 };
 
 export type MspStaffMember = {
