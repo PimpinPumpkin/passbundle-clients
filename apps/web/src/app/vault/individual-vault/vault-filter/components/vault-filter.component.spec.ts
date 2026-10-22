@@ -39,11 +39,13 @@ function cipherStub(params: {
   type: CipherListViewType | CipherType;
   organizationId?: string;
   deletedDate?: string;
+  favorite?: boolean;
 }): CipherListView {
   return {
     type: params.type,
     organizationId: params.organizationId ?? undefined,
     deletedDate: params.deletedDate ?? undefined,
+    favorite: params.favorite ?? false,
   } as unknown as CipherListView;
 }
 
@@ -132,7 +134,15 @@ describe("VaultFilterComponent", () => {
     describe("when there are no restrictions", () => {
       it("shows all type filters", async () => {
         restrictedSubject.next([]);
-        cipherService.cipherListViews$.mockReturnValue(of([]));
+        cipherService.cipherListViews$.mockReturnValue(
+          of([
+            cipherStub({ type: CipherType.Login, favorite: true }),
+            cipherStub({ type: CipherType.Card }),
+            cipherStub({ type: CipherType.Identity }),
+            cipherStub({ type: CipherType.SecureNote }),
+            cipherStub({ type: CipherType.SshKey }),
+          ]),
+        );
 
         const section = await component.addTypeFilter();
         const ids = await getTypeFilterIds(section);
@@ -143,6 +153,54 @@ describe("VaultFilterComponent", () => {
       });
     });
 
+    // Keykeeper: empty categories aren't listed.
+    describe("when some categories are empty", () => {
+      it("lists only categories with items, and Favorites only with a favorite", async () => {
+        restrictedSubject.next([]);
+        cipherService.cipherListViews$.mockReturnValue(
+          of([
+            cipherStub({ type: CipherType.Login }),
+            cipherStub({ type: { card: { brand: "Visa" } } }),
+            // In the trash: its category isn't listed for it.
+            cipherStub({ type: CipherType.SshKey, deletedDate: "2026-10-01T00:00:00Z" }),
+          ]),
+        );
+
+        const ids = await getTypeFilterIds(await component.addTypeFilter());
+
+        expect(ids).toEqual(["login", "card"]);
+      });
+
+      it("keeps the category showing now, even once it's empty", async () => {
+        restrictedSubject.next([]);
+        cipherService.cipherListViews$.mockReturnValue(
+          of([cipherStub({ type: CipherType.Login })]),
+        );
+        component.activeFilter.selectedCipherTypeNode = new TreeNode<CipherTypeFilter>(
+          { id: "identity", name: "typeIdentity", type: CipherType.Identity, icon: "bwi-id-card" },
+          null,
+        );
+
+        const ids = await getTypeFilterIds(await component.addTypeFilter());
+
+        expect(ids).toEqual(["login", "identity"]);
+      });
+
+      it("counts only the organization's items in its admin console", async () => {
+        restrictedSubject.next([]);
+        cipherService.cipherListViews$.mockReturnValue(
+          of([
+            cipherStub({ type: CipherType.Login, organizationId: ORG_ID_1 }),
+            cipherStub({ type: CipherType.Card, organizationId: "another-org" }),
+          ]),
+        );
+
+        const ids = await getTypeFilterIds(await component.addTypeFilter([], ORG_ID_1));
+
+        expect(ids).toEqual(["login"]);
+      });
+    });
+
     describe("when a type is restricted by all orgs (allowViewOrgIds is empty)", () => {
       beforeEach(() => {
         restrictedSubject.next([{ cipherType: CipherType.Card, allowViewOrgIds: [] }]);
@@ -150,7 +208,10 @@ describe("VaultFilterComponent", () => {
 
       it("hides the restricted type even with CipherListView ciphers present", async () => {
         cipherService.cipherListViews$.mockReturnValue(
-          of([cipherStub({ type: { card: { brand: "" } }, organizationId: ORG_ID_1 })]),
+          of([
+            cipherStub({ type: { card: { brand: "" } }, organizationId: ORG_ID_1 }),
+            cipherStub({ type: CipherType.Login }),
+          ]),
         );
 
         const section = await component.addTypeFilter();
