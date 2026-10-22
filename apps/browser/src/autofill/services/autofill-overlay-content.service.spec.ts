@@ -528,6 +528,31 @@ describe("AutofillOverlayContentService", () => {
           );
         });
 
+        // Keykeeper: on a passwordless sign-in, the code next to the email
+        // field is never the password the save prompt offers.
+        it("never stores a masked field the page calls a one-time code as the password", async () => {
+          const codeFieldElement = document.getElementById(
+            "password-field",
+          ) as ElementWithOpId<FormFieldElement>;
+          const codeFieldData = createAutofillFieldMock({
+            opid: "password-field",
+            form: "validFormId",
+            elementNumber: 2,
+            type: "password",
+            "label-tag": "Enter the 6-digit code we sent you",
+          });
+
+          await autofillOverlayContentService.setupOverlayListeners(
+            codeFieldElement,
+            codeFieldData,
+            pageDetailsMock,
+          );
+          codeFieldElement.dispatchEvent(new Event("input"));
+
+          expect(autofillOverlayContentService["userFilledFields"].password).toBeUndefined();
+          expect(autofillOverlayContentService["getFormFieldData"]().password).toBe("");
+        });
+
         it("Closes the inline menu list and does not re-open the inline menu if the field has a value", async () => {
           (autofillFieldElement as HTMLInputElement).value = "test";
 

@@ -29,6 +29,7 @@ import {
   MAX_SUB_FRAME_DEPTH,
   RedirectFocusDirection,
 } from "../enums/autofill-overlay.enum";
+import { isOneTimeCodeField } from "../keykeeper/one-time-code-fields";
 import AutofillField from "../models/autofill-field";
 import AutofillPageDetails from "../models/autofill-page-details";
 import { AutofillInlineMenuContentService } from "../overlay/inline-menu/abstractions/autofill-inline-menu-content.service";
@@ -107,15 +108,19 @@ export class AutofillOverlayContentService implements AutofillOverlayContentServ
       this.handleGetInlineMenuFormFieldDataMessage(message),
     generatedPasswordModifyLogin: () => this.sendGeneratedPasswordModifyLogin(),
   };
+  // Keykeeper: a field the page calls a one-time code is never the password
+  // the save or update prompt offers (keykeeper/one-time-code-fields.ts).
   private readonly loginFieldQualifiers: Record<string, CallableFunction> = {
     [AutofillFieldQualifier.username]: this.inlineMenuFieldQualificationService.isUsernameField,
-    [AutofillFieldQualifier.password]:
-      this.inlineMenuFieldQualificationService.isCurrentPasswordField,
+    [AutofillFieldQualifier.password]: (field: AutofillField) =>
+      this.inlineMenuFieldQualificationService.isCurrentPasswordField(field) &&
+      !isOneTimeCodeField(field),
   };
   private readonly accountCreationFieldQualifiers: Record<string, CallableFunction> = {
     [AutofillFieldQualifier.username]: this.inlineMenuFieldQualificationService.isUsernameField,
-    [AutofillFieldQualifier.newPassword]:
-      this.inlineMenuFieldQualificationService.isNewPasswordField,
+    [AutofillFieldQualifier.newPassword]: (field: AutofillField) =>
+      this.inlineMenuFieldQualificationService.isNewPasswordField(field) &&
+      !isOneTimeCodeField(field),
   };
   private readonly cardFieldQualifiers: Record<string, CallableFunction> = {
     [AutofillFieldQualifier.cardholderName]:
