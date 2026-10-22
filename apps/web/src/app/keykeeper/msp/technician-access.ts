@@ -51,7 +51,23 @@ export function describeAccess(
         ? "Custom role with vault items"
         : "Custom role";
   const install = access.installCommands ? "Install commands" : "No install commands";
-  return `${reach} · ${role} · ${install}`;
+  const differing = (access.clientRoles ?? [])
+    .map((r) => {
+      const name = clients.find((c) => c.id === r.client)?.name;
+      if (name == null) {
+        return null;
+      }
+      const there =
+        r.custom == null
+          ? "Admin"
+          : r.custom.vaultItems
+            ? "Custom role with vault items"
+            : "Custom role";
+      return `${there} in ${name}`;
+    })
+    .filter((words): words is string => words != null)
+    .sort((a, b) => a.localeCompare(b));
+  return [reach, role, install, ...differing].join(" · ");
 }
 
 /** Whether access reaches every client, for the toast after adding someone. */

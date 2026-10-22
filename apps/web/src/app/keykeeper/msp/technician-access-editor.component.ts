@@ -1,5 +1,6 @@
 import {
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   DestroyRef,
   OnInit,
@@ -12,14 +13,15 @@ import { FormBuilder, FormControl } from "@angular/forms";
 
 import { SharedModule } from "../../shared";
 
-import { TechnicianAccess } from "./msp-api.service";
+import { CustomPermissions, TechnicianAccess } from "./msp-api.service";
 import { DEFAULT_ACCESS, NO_PERMISSIONS, PERMISSIONS } from "./technician-access";
 
 /**
  * Keykeeper: what an MSP technician gets in the MSP's clients. Every client or
  * chosen ones, admin or a custom role inside them (with or without vault
- * items), and whether they see install commands. Emits the access on every
- * change, starting from the one it was given; the parent saves it.
+ * items), a different role in some of those clients, and whether they see
+ * install commands. Emits the access on every change, starting from the one
+ * it was given; the parent saves it.
  */
 @Component({
   selector: "app-keykeeper-technician-access",
@@ -81,6 +83,59 @@ import { DEFAULT_ACCESS, NO_PERMISSIONS, PERMISSIONS } from "./technician-access
         </div>
       }
 
+      <div formArrayName="clientRoles" class="tw-mb-2">
+        <p class="tw-mb-1 tw-font-semibold">A different role in some clients</p>
+        @for (row of form.controls.clientRoles.controls; track row; let i = $index) {
+          <div [formGroupName]="i" class="tw-mb-2 tw-ml-6" data-testid="client-role">
+            <div class="tw-flex tw-items-end tw-gap-2">
+              <bit-form-field class="tw-mb-0 tw-grow">
+                <bit-label>Client</bit-label>
+                <select bitInput formControlName="client">
+                  @for (client of optionsFor(i); track client.id) {
+                    <option [value]="client.id">{{ client.name }}</option>
+                  }
+                </select>
+              </bit-form-field>
+              <bit-form-field class="tw-mb-0">
+                <bit-label>Role there</bit-label>
+                <select bitInput formControlName="role">
+                  <option value="admin">Admin</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </bit-form-field>
+              <button
+                type="button"
+                bitIconButton="bwi-trash"
+                buttonType="danger"
+                label="Remove this client's role"
+                (click)="removeClientRole(i)"
+              ></button>
+            </div>
+            @if (row.controls.role.value === "custom") {
+              <div class="tw-ml-6 tw-mt-1">
+                <div formGroupName="permissions">
+                  @for (p of permissions; track p.key) {
+                    <bit-form-control>
+                      <input type="checkbox" bitCheckbox [formControlName]="p.key" />
+                      <bit-label>{{ p.label | i18n }}</bit-label>
+                    </bit-form-control>
+                  }
+                </div>
+                <bit-form-control>
+                  <input type="checkbox" bitCheckbox formControlName="vaultItems" />
+                  <bit-label>Sees and edits every vault item</bit-label>
+                </bit-form-control>
+              </div>
+            }
+          </div>
+        }
+        @if (canAddClientRole()) {
+          <button type="button" bitButton buttonType="secondary" (click)="addClientRole()">
+            Add a client with a different role
+          </button>
+        }
+      </div>
+
       <bit-form-control>
         <input type="checkbox" bitCheckbox formControlName="installCommands" />
         <bit-label>Sees install commands</bit-label>
@@ -101,6 +156,7 @@ export class KeykeeperTechnicianAccessEditorComponent implements OnInit {
   protected readonly permissions = PERMISSIONS;
   private readonly formBuilder = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly changes = inject(ChangeDetectorRef);
 
   protected readonly form = this.formBuilder.nonNullable.group({
     scope: ["all" as "all" | "chosen"],
@@ -109,7 +165,67 @@ export class KeykeeperTechnicianAccessEditorComponent implements OnInit {
     permissions: this.formBuilder.nonNullable.group({ ...NO_PERMISSIONS }),
     vaultItems: [false],
     installCommands: [true],
+    clientRoles: this.formBuilder.nonNullable.array([this.clientRoleGroup()]),
   });
+
+  /** One client's different role. */
+  private clientRoleGroup(
+    client = "",
+    custom: { permissions: Partial<CustomPermissions>; vaultItems: boolean } | null = null,
+  ) {
+    return this.formBuilder.nonNullable.group({
+      client: [client],
+      role: [custom == null ? "admin" : "custom"] as ["admin" | "custom"],
+      permissions: this.formBuilder.nonNullable.group({
+        ...NO_PERMISSIONS,
+        ...(custom?.permissions ?? {}),
+      }),
+      vaultItems: [custom?.vaultItems ?? false],
+    });
+  }
+
+  /** The clients they reach, which can have a different role. */
+  protected reachedClients(): { id: string; name: string }[] {
+    const v = this.form.getRawValue();
+    return v.scope === "all" ? this.clients() : this.clients().filter((c) => v.clients[c.id]);
+  }
+
+  /** A row's clients: those they reach that no other row has. */
+  protected optionsFor(index: number): { id: string; name: string }[] {
+    const rows = this.form.getRawValue().clientRoles;
+    const taken = new Set(rows.filter((_, i) => i !== index).map((r) => r.client));
+    return this.reachedClients().filter((c) => !taken.has(c.id));
+  }
+
+  protected canAddClientRole(): boolean {
+    const taken = new Set(this.form.getRawValue().clientRoles.map((r) => r.client));
+    return this.reachedClients().some((c) => !taken.has(c.id));
+  }
+
+  /** Rows for clients they no longer reach go, rather than linger blank and drop out on save. */
+  private pruneClientRoles() {
+    const reached = new Set(this.reachedClients().map((c) => c.id));
+    const rows = this.form.controls.clientRoles;
+    for (let i = rows.length - 1; i >= 0; i--) {
+      if (!reached.has(rows.at(i).getRawValue().client)) {
+        rows.removeAt(i, { emitEvent: false });
+      }
+    }
+  }
+
+  protected addClientRole() {
+    const taken = new Set(this.form.getRawValue().clientRoles.map((r) => r.client));
+    const next = this.reachedClients().find((c) => !taken.has(c.id));
+    if (next) {
+      this.form.controls.clientRoles.push(this.clientRoleGroup(next.id));
+      this.changes.markForCheck();
+    }
+  }
+
+  protected removeClientRole(index: number) {
+    this.form.controls.clientRoles.removeAt(index);
+    this.changes.markForCheck();
+  }
 
   ngOnInit() {
     const access = this.access();
@@ -119,6 +235,14 @@ export class KeykeeperTechnicianAccessEditorComponent implements OnInit {
         new FormControl(access.clients.includes(client.id), { nonNullable: true }),
       );
     }
+    this.form.controls.clientRoles.clear();
+    // Only clients that are still the MSP's.
+    const known = new Set(this.clients().map((c) => c.id));
+    for (const role of access.clientRoles ?? []) {
+      if (known.has(role.client)) {
+        this.form.controls.clientRoles.push(this.clientRoleGroup(role.client, role.custom));
+      }
+    }
     this.form.patchValue({
       scope: access.allClients ? "all" : "chosen",
       role: access.custom == null ? "admin" : "custom",
@@ -126,14 +250,19 @@ export class KeykeeperTechnicianAccessEditorComponent implements OnInit {
       vaultItems: access.custom?.vaultItems ?? false,
       installCommands: access.installCommands,
     });
-    this.form.valueChanges
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.accessChange.emit(this.value()));
+    this.pruneClientRoles();
+    this.form.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      this.pruneClientRoles();
+      this.changes.markForCheck();
+      this.accessChange.emit(this.value());
+    });
   }
 
   private value(): TechnicianAccess {
     const v = this.form.getRawValue();
     const allClients = v.scope === "all";
+    const reached = new Set(this.reachedClients().map((c) => c.id));
+    const seen = new Set<string>();
     return {
       allClients,
       clients: allClients
@@ -146,6 +275,16 @@ export class KeykeeperTechnicianAccessEditorComponent implements OnInit {
           ? { permissions: { ...NO_PERMISSIONS, ...v.permissions }, vaultItems: v.vaultItems }
           : null,
       installCommands: v.installCommands,
+      // Only clients they still reach, each once (the first row wins).
+      clientRoles: v.clientRoles
+        .filter((r) => reached.has(r.client) && !seen.has(r.client) && seen.add(r.client))
+        .map((r) => ({
+          client: r.client,
+          custom:
+            r.role === "custom"
+              ? { permissions: { ...NO_PERMISSIONS, ...r.permissions }, vaultItems: r.vaultItems }
+              : null,
+        })),
     };
   }
 }
