@@ -1,4 +1,5 @@
 import { ExtensionPageUrls } from "@bitwarden/common/vault/enums";
+import { VaultMessages } from "@bitwarden/common/vault/enums/vault-messages.enum";
 
 type ContentMessageWindowData = {
   command: string;
@@ -19,7 +20,8 @@ type ContentMessageWindowEventHandlers = {
   authResult: ({ data, referrer }: ContentMessageWindowEventParams) => void;
   webAuthnResult: ({ data, referrer }: ContentMessageWindowEventParams) => void;
   duoResult: ({ data, referrer }: ContentMessageWindowEventParams) => void;
-  checkIfBWExtensionInstalled: () => void;
+  // Keykeeper: keyed by our own name for the install check (VaultMessages).
+  [VaultMessages.checkBwInstalled]: () => void;
 };
 
 export {

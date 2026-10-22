@@ -4,6 +4,7 @@ import { ActivatedRoute } from "@angular/router";
 import { BehaviorSubject, of } from "rxjs";
 
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
+import { VaultMessages } from "@bitwarden/common/vault/enums/vault-messages.enum";
 
 import {
   BrowserExtensionPromptService,
@@ -103,7 +104,7 @@ describe("BrowserExtensionPromptComponent", () => {
       button.click();
 
       expect(openExtension).toHaveBeenCalledTimes(1);
-      expect(openExtension).toHaveBeenCalledWith("openAtRiskPasswords", true);
+      expect(openExtension).toHaveBeenCalledWith(VaultMessages.OpenAtRiskPasswords, true);
     });
   });
 
