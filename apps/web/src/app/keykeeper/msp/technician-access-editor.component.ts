@@ -91,7 +91,7 @@ import { DEFAULT_ACCESS, NO_PERMISSIONS, PERMISSIONS } from "./technician-access
               <bit-form-field class="tw-mb-0 tw-grow">
                 <bit-label>Client</bit-label>
                 <select bitInput formControlName="client">
-                  @for (client of reachedClients(); track client.id) {
+                  @for (client of optionsFor(i); track client.id) {
                     <option [value]="client.id">{{ client.name }}</option>
                   }
                 </select>
@@ -129,7 +129,7 @@ import { DEFAULT_ACCESS, NO_PERMISSIONS, PERMISSIONS } from "./technician-access
             }
           </div>
         }
-        @if (reachedClients().length > form.controls.clientRoles.length) {
+        @if (canAddClientRole()) {
           <button type="button" bitButton buttonType="secondary" (click)="addClientRole()">
             Add a client with a different role
           </button>
@@ -190,6 +190,29 @@ export class KeykeeperTechnicianAccessEditorComponent implements OnInit {
     return v.scope === "all" ? this.clients() : this.clients().filter((c) => v.clients[c.id]);
   }
 
+  /** A row's clients: those they reach that no other row has. */
+  protected optionsFor(index: number): { id: string; name: string }[] {
+    const rows = this.form.getRawValue().clientRoles;
+    const taken = new Set(rows.filter((_, i) => i !== index).map((r) => r.client));
+    return this.reachedClients().filter((c) => !taken.has(c.id));
+  }
+
+  protected canAddClientRole(): boolean {
+    const taken = new Set(this.form.getRawValue().clientRoles.map((r) => r.client));
+    return this.reachedClients().some((c) => !taken.has(c.id));
+  }
+
+  /** Rows for clients they no longer reach go, rather than linger blank and drop out on save. */
+  private pruneClientRoles() {
+    const reached = new Set(this.reachedClients().map((c) => c.id));
+    const rows = this.form.controls.clientRoles;
+    for (let i = rows.length - 1; i >= 0; i--) {
+      if (!reached.has(rows.at(i).getRawValue().client)) {
+        rows.removeAt(i, { emitEvent: false });
+      }
+    }
+  }
+
   protected addClientRole() {
     const taken = new Set(this.form.getRawValue().clientRoles.map((r) => r.client));
     const next = this.reachedClients().find((c) => !taken.has(c.id));
@@ -213,8 +236,12 @@ export class KeykeeperTechnicianAccessEditorComponent implements OnInit {
       );
     }
     this.form.controls.clientRoles.clear();
+    // Only clients that are still the MSP's.
+    const known = new Set(this.clients().map((c) => c.id));
     for (const role of access.clientRoles ?? []) {
-      this.form.controls.clientRoles.push(this.clientRoleGroup(role.client, role.custom));
+      if (known.has(role.client)) {
+        this.form.controls.clientRoles.push(this.clientRoleGroup(role.client, role.custom));
+      }
     }
     this.form.patchValue({
       scope: access.allClients ? "all" : "chosen",
@@ -223,9 +250,12 @@ export class KeykeeperTechnicianAccessEditorComponent implements OnInit {
       vaultItems: access.custom?.vaultItems ?? false,
       installCommands: access.installCommands,
     });
-    this.form.valueChanges
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.accessChange.emit(this.value()));
+    this.pruneClientRoles();
+    this.form.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      this.pruneClientRoles();
+      this.changes.markForCheck();
+      this.accessChange.emit(this.value());
+    });
   }
 
   private value(): TechnicianAccess {
