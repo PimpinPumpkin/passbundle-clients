@@ -220,6 +220,13 @@ export class RegistrationFinishComponent implements OnInit, OnDestroy {
         );
       }
 
+      // Keykeeper: just signed up, in this tab: the web vault offers to bring
+      // passwords over first (apps/web keykeeper/import/setup-import).
+      try {
+        sessionStorage.setItem("keykeeper.setupImport", "1");
+      } catch {
+        // No session storage: the vault opens as usual.
+      }
       await this.router.navigate(["/vault"]);
     } catch (e) {
       // If login errors, redirect to login page per product. Don't show error

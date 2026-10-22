@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, input, output, signal } from "@angular/core";
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  input,
+  OnInit,
+  output,
+  signal,
+} from "@angular/core";
 import { firstValueFrom } from "rxjs";
 
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
@@ -121,13 +129,15 @@ import {
     </section>
   `,
 })
-export class KeykeeperBrowserImportComponent {
+export class KeykeeperBrowserImportComponent implements OnInit {
   /**
    * Opens the browser's passwords page, where the app may (the extension can
    * open a Chromium browser's own pages; a web page can't).
    */
   readonly openPasswordsPage = input<((url: string) => void) | null>(null);
   readonly done = output<void>();
+  /** The browser to start on, where it's offered (Safari for Apple Passwords, say). */
+  readonly startWith = input<BrowserId | null>(null);
 
   private readonly userAgent = globalThis.navigator?.userAgent ?? "";
   private readonly computer = detectComputer(this.userAgent);
@@ -158,6 +168,13 @@ export class KeykeeperBrowserImportComponent {
     private readonly cipherService: CipherService,
     private readonly accountService: AccountService,
   ) {}
+
+  ngOnInit() {
+    const start = this.startWith();
+    if (start != null && this.browsers().includes(start)) {
+      this.browser.set(start);
+    }
+  }
 
   protected nameOf(id: BrowserId): string {
     return guideFor(id, this.computer).name;

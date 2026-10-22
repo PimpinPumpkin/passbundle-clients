@@ -213,6 +213,10 @@ export class ImportComponent implements OnInit, OnDestroy, AfterViewInit {
 
   protected readonly returnTo = input<string | undefined>(undefined);
 
+  /** Keykeeper: the format to start on, set once the importer is ready
+   *  (apps/web keykeeper/import/setup-import). */
+  readonly startFormat = input<ImportType | null>(null);
+
   protected organization: Organization | undefined = undefined;
   protected destroy$ = new Subject<void>();
 
@@ -397,6 +401,12 @@ export class ImportComponent implements OnInit, OnDestroy, AfterViewInit {
         this.format = value;
         this.updateKdbxControls(value);
       });
+
+    // Keykeeper: see startFormat. Only now does everything follow the format.
+    const startFormat = this.startFormat();
+    if (startFormat != null) {
+      this.formGroup.controls.format.setValue(startFormat);
+    }
 
     await this.handlePolicies();
   }
