@@ -16967,5 +16967,11 @@
         "example": "Login"
       }
     }
+  },
+  "vaultLockPolicy": {
+    "message": "Vault lock"
+  },
+  "vaultLockPolicyDesc": {
+    "message": "Choose how long members' vaults can stay unlocked, and whether they lock or sign out then."
   }
 }

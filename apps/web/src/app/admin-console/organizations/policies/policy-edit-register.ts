@@ -16,6 +16,7 @@ import {
   SingleOrgPolicy,
   TwoFactorAuthenticationPolicy,
   UriMatchDefaultPolicy,
+  VaultLockPolicy,
 } from "./policy-edit-definitions";
 
 /**
@@ -26,6 +27,7 @@ export const ossPolicyEditRegister: BasePolicyEditDefinition[] = [
   new TwoFactorAuthenticationPolicy(),
   new MasterPasswordPolicy(),
   new RemoveUnlockWithPinPolicy(),
+  new VaultLockPolicy(),
   new ResetPasswordPolicy(),
   new PasswordGeneratorPolicy(),
   new SingleOrgPolicy(),
