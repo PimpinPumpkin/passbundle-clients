@@ -92,9 +92,6 @@ import { CipherListView } from "@bitwarden/sdk-internal";
 import {
   AddEditFolderDialogComponent,
   AddEditFolderDialogResult,
-  AddItemDialogCloseResult,
-  AddItemDialogComponent,
-  AddItemDialogResult,
   All,
   ASSIGN_COLLECTIONS_DIALOG,
   AttachmentDialogResult,
@@ -109,8 +106,10 @@ import {
   DefaultCipherFormConfigService,
   DefaultVaultItemsTransferService,
   FolderFilter,
+  KeykeeperNewItemDialogComponent,
   KeykeeperTemplatePickerDialogComponent,
   newTemplateDefinitionField,
+  NewItemResult,
   templateFieldsFromItem,
   openBulkMoveDialog,
   OrganizationFilter,
@@ -1037,22 +1036,30 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
    * Opens the add-item type selection dialog and handles the result.
    */
   protected async openAddItemDialog(): Promise<void> {
-    const ref = AddItemDialogComponent.open(this.dialogService, {
+    // Keykeeper: PassBundle's New item picker, with templates in it.
+    const ref = KeykeeperNewItemDialogComponent.open(this.dialogService, {
       canCreateCipher: this.canCreateCipher,
       canCreateFolder: true,
       canCreateCollection: this.canCreateCollections,
       canCreateSshKey: true,
     });
-    const result: AddItemDialogCloseResult | undefined = await firstValueFrom(ref.closed);
-    if (!result) {
-      return;
-    }
-    if (result.result === AddItemDialogResult.Cipher) {
-      await this.addCipher(result.cipherType);
-    } else if (result.result === AddItemDialogResult.Folder) {
-      this.addFolder();
-    } else {
-      await this.addCollection();
+    const result: NewItemResult | undefined = await firstValueFrom(ref.closed);
+    switch (result?.kind) {
+      case "type":
+        await this.addCipher(result.cipherType);
+        break;
+      case "template":
+        await this.addCipher(templateCipherType(result.template), templateFields(result.template));
+        break;
+      case "createTemplate":
+        await this.addCipher(CipherType.SecureNote, [newTemplateDefinitionField(result.base)]);
+        break;
+      case "folder":
+        this.addFolder();
+        break;
+      case "collection":
+        await this.addCollection();
+        break;
     }
   }
 

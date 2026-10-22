@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { Component, inject, input, output } from "@angular/core";
+import { Component, computed, inject, input, output } from "@angular/core";
 import { toObservable, toSignal } from "@angular/core/rxjs-interop";
 import { combineLatest, map, shareReplay } from "rxjs";
 
@@ -79,9 +79,16 @@ export class NewCipherMenuComponent {
     { initialValue: false },
   );
 
-  protected readonly useNewItemDialog = toSignal(
+  /** Keykeeper: New opens PassBundle's picker (KeykeeperNewItemDialogComponent). */
+  readonly keykeeperNewItemDialog = input(false);
+
+  private readonly newItemTypesFlag = toSignal(
     this.configService.getFeatureFlag$(FeatureFlag.PM32009NewItemTypes),
     { initialValue: false },
+  );
+
+  protected readonly useNewItemDialog = computed(
+    () => this.keykeeperNewItemDialog() || this.newItemTypesFlag(),
   );
 
   constructor(
