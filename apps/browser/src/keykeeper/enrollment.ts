@@ -174,17 +174,14 @@ export const chromeEnrollmentPlatform: EnrollmentPlatform = {
       BrowserApi.addListener(chrome.storage.onChanged, onChanged);
       BrowserApi.addListener(chrome.windows.onRemoved, onRemoved);
       // A prompt left open from before shows an older question; replace it.
-      // Upstream places the window by the browser's; a place partly off the
-      // screen fails, and then the browser places it.
+      // (A place partly off the screen falls back to the browser's: openPopout.)
       const url = "popup/index.html#/keykeeper-join";
       const options = { singleActionKey: "keykeeper-join", forceCloseExistingWindows: true };
       void (async () => {
-        const opened: chrome.windows.Window | undefined =
-          (await BrowserPopupUtils.openPopout(url, options)) ??
-          (await BrowserPopupUtils.openPopout(url, {
-            ...options,
-            windowOptions: { left: undefined, top: undefined },
-          }));
+        const opened: chrome.windows.Window | undefined = await BrowserPopupUtils.openPopout(
+          url,
+          options,
+        );
         if (opened?.id == null) {
           finish(undefined);
         } else {
