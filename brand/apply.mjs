@@ -431,11 +431,8 @@ ${scale}
     const branded = source.replace(/#175ddc/gi, BRAND.color);
     if (branded !== source) write(rel, branded);
   }
-  replaceAnchored(
-    "apps/browser/src/autofill/content/components/constants/styles.ts",
-    /brandLogo: `rgba\(23, 93, 220\)`/,
-    `brandLogo: \`rgba(${palette["700"].join(", ")})\``,
-  );
+  // The save bar's palettes are PassBundle's in the source already
+  // (content/components/constants/styles.ts).
 
   // 9. The icon inside login fields, and the shield on the save-password bar.
   const markPath = /\bd="([^"]+)"/.exec(
