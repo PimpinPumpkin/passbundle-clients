@@ -51,7 +51,7 @@ const sealed = (settings: object, type: string | null = "passbundle.settings") =
 const opened = (data: string) => JSON.parse(Buffer.from(data.split("|")[1], "base64").toString());
 
 describe("KeykeeperGeneratorSettingsSync", () => {
-  let server: { data: string | null; status?: number };
+  let server: { data: string | null; status?: number; hold?: Promise<void> };
   let puts: object[];
   let lastSync: BehaviorSubject<Date | null>;
   let state: FakeStateProvider;
@@ -76,6 +76,7 @@ describe("KeykeeperGeneratorSettingsSync", () => {
       state,
       mock<LogService>(),
       saveAfterMs,
+      1,
     );
   }
 
@@ -98,6 +99,11 @@ describe("KeykeeperGeneratorSettingsSync", () => {
       if (method === "PUT") {
         puts.push(opened(body.data));
         server.data = body.data;
+      } else if (server.hold) {
+        // The server's answer, as it was asked, arriving later.
+        const data = server.data;
+        await server.hold;
+        return { object: "keykeeperSettings", data };
       }
       return { object: "keykeeperSettings", data: server.data };
     });
@@ -288,5 +294,55 @@ describe("KeykeeperGeneratorSettingsSync", () => {
 
     expect(puts).toHaveLength(1);
     expect(puts[0]).toMatchObject({ generator: { length: 40, pin: { digits: 6 } } });
+  });
+  it("writes nothing here when the server's settings are what's here already", async () => {
+    server.data = sealed({ rev: 100, generator: { length: 24 } });
+    running = sync().start();
+    await awaitAsync(30);
+    const writes = () =>
+      (state.getUser(userId, PASSWORD) as unknown as { nextMock: jest.Mock }).nextMock.mock.calls
+        .length;
+    const before = writes();
+
+    lastSync.next(new Date(2000));
+    await awaitAsync(30);
+    lastSync.next(new Date(3000));
+    await awaitAsync(30);
+
+    expect(writes()).toBe(before);
+    expect(puts).toEqual([]);
+  });
+
+  it("keeps a change made while the server answers, and saves it", async () => {
+    server.data = sealed({ rev: 100, generator: { length: 24 } });
+    running = sync(10_000).start();
+    await awaitAsync(30);
+    let answer!: () => void;
+    server.hold = new Promise((resolve) => (answer = resolve));
+
+    lastSync.next(new Date(2000));
+    await awaitAsync(10);
+    await setPassword({ ...(await password()), length: 40 });
+    answer();
+    await awaitAsync(30);
+
+    expect((await password()).length).toBe(40);
+    expect(puts).toHaveLength(1);
+    expect(puts[0]).toMatchObject({ generator: { length: 40 } });
+  });
+
+  it("writes nothing from a read still running when the app locks", async () => {
+    let answer!: () => void;
+    server.hold = new Promise((resolve) => (answer = resolve));
+    server.data = sealed({ rev: 100, generator: { length: 64 } });
+    running = sync().start();
+    await awaitAsync(10);
+
+    running.unsubscribe();
+    answer();
+    await awaitAsync(30);
+
+    expect(await password()).toBeNull();
+    expect(puts).toEqual([]);
   });
 });

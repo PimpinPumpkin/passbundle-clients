@@ -10,6 +10,7 @@ import {
   distinctUntilChanged,
   EMPTY,
   filter,
+  finalize,
   firstValueFrom,
   map,
   merge,
@@ -59,6 +60,9 @@ const PATH = "/keykeeper/settings";
 /** How long after a change to save it, so dragging a slider saves once. */
 export const SAVE_AFTER_MS = 1000;
 
+/** How long to wait for more syncs before reading the server's settings. */
+export const READ_AFTER_MS = 250;
+
 /** Where upstream keeps a generator's settings: as they are, on the device. */
 function storage<T>(profile: unknown) {
   const core = profile as CoreProfileMetadata<T>;
@@ -105,6 +109,7 @@ export class KeykeeperGeneratorSettingsSync {
     private readonly stateProvider: StateProvider,
     private readonly logService: LogService,
     private readonly saveAfterMs = SAVE_AFTER_MS,
+    private readonly readAfterMs = READ_AFTER_MS,
   ) {}
 
   /** Follows whoever is signed in and unlocked. */
@@ -133,10 +138,20 @@ export class KeykeeperGeneratorSettingsSync {
   follow(userId: UserId): Observable<unknown> {
     const kept = this.stateProvider.getUser(userId, KNOWN);
     let reachable = true;
-    // The last sync's time, now (once there's been one) and after each sync.
+    // Work started while following, still running once it stops (the app
+    // locked, or another account): it writes nothing.
+    let following = true;
+    const live = () => {
+      if (!following) {
+        throw new Stopped();
+      }
+    };
+    // The last sync's time, now (once there's been one) and after each sync;
+    // a few syncs at once (signing in does several) read once.
     const read$ = this.syncService.lastSync$(userId).pipe(
       filter((date) => date != null),
       distinctUntilChanged((a, b) => a?.getTime() === b?.getTime()),
+      debounceTime(this.readAfterMs),
       map(() => "read" as const),
     );
     const changed$ = this.local$(userId).pipe(
@@ -151,16 +166,25 @@ export class KeykeeperGeneratorSettingsSync {
         try {
           const known = (await firstValueFrom(kept.state$)) ?? null;
           const next =
-            step === "read" ? await this.read(userId, known) : await this.save(userId, known);
+            step === "read"
+              ? await this.read(userId, known, live)
+              : await this.save(userId, known, live);
           if (next !== known) {
+            live();
             await kept.update(() => next);
           }
         } catch (e) {
+          if (e instanceof Stopped) {
+            return;
+          }
           // A server without PassBundle's settings, or not reachable now:
           // the settings stay on this device, as upstream keeps them.
           reachable = !isMissing(e);
           this.logService.warning(`Generator settings didn't sync: ${String(e)}`);
         }
+      }),
+      finalize(() => {
+        following = false;
       }),
     );
   }
@@ -194,10 +218,10 @@ export class KeykeeperGeneratorSettingsSync {
    * or it has none this account can read, or an older copy than one this app
    * has seen: then it gets this app's.
    */
-  private async read(userId: UserId, known: Known | null): Promise<Known> {
+  private async read(userId: UserId, known: Known | null, live: () => void): Promise<Known> {
     const before = await this.here(userId);
     if (known != null && before.chosen && before.text !== known.generator) {
-      return this.send(userId, before.text, known.settings);
+      return this.send(userId, before.text, known.settings, live);
     }
     const response: { data?: string | null } | null = await this.apiService.send(
       "GET",
@@ -208,29 +232,27 @@ export class KeykeeperGeneratorSettingsSync {
     );
     const remote = response?.data == null ? null : await this.open(userId, response.data);
     if (remote == null) {
-      return this.send(userId, before.text, {}, revOf(known?.settings));
+      return this.send(userId, before.text, {}, live, revOf(known?.settings));
     }
     if (known != null && revOf(remote) < revOf(known.settings)) {
       // Older than a copy this app had: a server handing back an old one.
       this.logService.warning("The server's generator settings are older than these; kept these.");
-      await this.apply(userId, known.settings);
-      return this.send(userId, (await this.here(userId)).text, known.settings);
+      await this.apply(userId, known.settings, before, live);
+      return this.send(userId, (await this.here(userId)).text, known.settings, live);
     }
-    const after = await this.here(userId);
-    if (after.chosen && after.text !== before.text) {
-      // Changed here while the server answered.
-      return this.send(userId, after.text, remote);
+    if (!(await this.apply(userId, remote, before, live))) {
+      // Changed here while the server answered: this device's go back.
+      return this.send(userId, (await this.here(userId)).text, remote, live);
     }
-    await this.apply(userId, remote);
     return { settings: remote, generator: (await this.here(userId)).text };
   }
 
-  private async save(userId: UserId, known: Known | null): Promise<Known | null> {
+  private async save(userId: UserId, known: Known | null, live: () => void): Promise<Known | null> {
     const here = await this.here(userId);
     if (known == null || !here.chosen || here.text === known.generator) {
       return known;
     }
-    return this.send(userId, here.text, known.settings);
+    return this.send(userId, here.text, known.settings, live);
   }
 
   /**
@@ -241,6 +263,7 @@ export class KeykeeperGeneratorSettingsSync {
     userId: UserId,
     here: string,
     base: SyncedSettings,
+    live: () => void,
     seen = revOf(base),
   ): Promise<Known> {
     const settings: SyncedSettings = {
@@ -254,6 +277,7 @@ export class KeykeeperGeneratorSettingsSync {
       throw new Error("locked");
     }
     const data = await this.encryptService.encryptString(settingsText(settings), key);
+    live();
     await this.apiService.send("PUT", PATH, { data: data.encryptedString }, true, true);
     return { settings, generator: here };
   }
@@ -271,25 +295,50 @@ export class KeykeeperGeneratorSettingsSync {
     }
   }
 
-  private async apply(userId: UserId, remote: SyncedSettings) {
+  /**
+   * Takes these settings here, unless something changed here since `seen`:
+   * then it writes nothing and answers false, and this device's go back
+   * instead. Writes only what differs, each only if it's still as it was.
+   */
+  private async apply(
+    userId: UserId,
+    remote: SyncedSettings,
+    seen: Here,
+    live: () => void,
+  ): Promise<boolean> {
     const local = await firstValueFrom(this.local$(userId));
+    if (local.chosen && generatorText(toSynced(local)) !== seen.text) {
+      return false;
+    }
     const next = fromSynced(remote.generator, local);
-    await this.stateProvider.getUser(userId, PASSWORD.key).update(() => next.password);
-    await this.stateProvider.getUser(userId, PASSPHRASE.key).update(() => next.passphrase);
-    await this.stateProvider
-      .getUser(userId, PREFERENCES)
-      .update((preferences: CredentialPreference | null) => ({
-        ...(preferences as CredentialPreference),
-        password: {
-          algorithm: next.algorithm,
-          updated:
-            preferences?.password?.algorithm === next.algorithm
-              ? preferences.password.updated
-              : new Date(),
-        },
-      }));
+    const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+    live();
+    if (!same(next.password, local.password)) {
+      await this.stateProvider.getUser(userId, PASSWORD.key).update(() => next.password, {
+        shouldUpdate: (current) =>
+          same({ ...PASSWORD.initial, ...(current ?? {}) }, local.password),
+      });
+    }
+    if (!same(next.passphrase, local.passphrase)) {
+      await this.stateProvider.getUser(userId, PASSPHRASE.key).update(() => next.passphrase, {
+        shouldUpdate: (current) =>
+          same({ ...PASSPHRASE.initial, ...(current ?? {}) }, local.passphrase),
+      });
+    }
+    if (next.algorithm !== local.algorithm) {
+      await this.stateProvider
+        .getUser(userId, PREFERENCES)
+        .update((preferences: CredentialPreference | null) => ({
+          ...(preferences as CredentialPreference),
+          password: { algorithm: next.algorithm, updated: new Date() },
+        }));
+    }
+    return true;
   }
 }
+
+/** Thrown in work that outlived the following it was for. */
+class Stopped extends Error {}
 
 /** The server doesn't have PassBundle's settings (an older or other server). */
 function isMissing(e: unknown): boolean {
