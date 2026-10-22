@@ -324,7 +324,19 @@ export class VaultFilterComponent implements OnInit, OnDestroy {
           .map((r) => r.cipherType);
 
         const toExclude = [...excludeTypes, ...restrictedForUser];
-        return cipherTypeFilters.filter((f) => !toExclude.includes(f.type));
+        // Keykeeper: a category with nothing in it isn't listed, Favorites
+        // included, except the one showing now. Less to read past.
+        const items = (ciphers ?? []).filter(
+          (c) => !c.deletedDate && (!organizationId || c.organizationId === organizationId),
+        );
+        const present = new Set<string | number>(items.map((c) => CipherViewLikeUtils.getType(c)));
+        if (items.some((c) => c.favorite)) {
+          present.add("favorites");
+        }
+        const showing = this.activeFilter?.selectedCipherTypeNode?.node.type;
+        return cipherTypeFilters.filter(
+          (f) => !toExclude.includes(f.type) && (present.has(f.type) || f.type === showing),
+        );
       }),
       switchMap((allowed) => this.vaultFilterService.buildTypeTree(allFilter, allowed)),
       distinctUntilChanged(),
