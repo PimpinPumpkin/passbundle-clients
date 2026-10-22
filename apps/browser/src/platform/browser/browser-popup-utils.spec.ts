@@ -194,6 +194,35 @@ describe("BrowserPopupUtils", () => {
       });
     });
 
+    // Keykeeper: a place partly off the screen makes Chrome refuse the window.
+    it("lets the browser place the window when the place it chose is refused", async () => {
+      const url = "popup/index.html";
+      jest.spyOn(BrowserPopupUtils as any, "isSingleActionPopoutOpen").mockResolvedValueOnce(false);
+      const opened = { id: 7 } as chrome.windows.Window;
+      jest
+        .spyOn(BrowserApi, "createWindow")
+        .mockResolvedValueOnce(undefined as unknown as chrome.windows.Window)
+        .mockResolvedValueOnce(opened);
+
+      await expect(BrowserPopupUtils.openPopout(url)).resolves.toBe(opened);
+
+      expect(BrowserApi.createWindow).toHaveBeenCalledTimes(2);
+      expect(BrowserApi.createWindow).toHaveBeenLastCalledWith(
+        expect.objectContaining({ left: undefined, top: undefined }),
+      );
+    });
+
+    it("places the window only once when the browser takes the place", async () => {
+      jest.spyOn(BrowserPopupUtils as any, "isSingleActionPopoutOpen").mockResolvedValueOnce(false);
+      jest
+        .spyOn(BrowserApi, "createWindow")
+        .mockResolvedValueOnce({ id: 7 } as chrome.windows.Window);
+
+      await BrowserPopupUtils.openPopout("popup/index.html");
+
+      expect(BrowserApi.createWindow).toHaveBeenCalledTimes(1);
+    });
+
     it("skips parsing the passed extension url path if the option to do that is set", () => {
       const url = "popup/index.html?uilocation=popout#/tabs/vault";
       jest.spyOn(BrowserPopupUtils as any, "isSingleActionPopoutOpen").mockResolvedValueOnce(false);

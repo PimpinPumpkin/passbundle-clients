@@ -193,7 +193,19 @@ export default class BrowserPopupUtils {
       return;
     }
 
-    return await BrowserApi.createWindow(popoutWindowOptions);
+    const created = await BrowserApi.createWindow(popoutWindowOptions);
+    // Keykeeper: a place partly off the screen (a small screen, several of
+    // them, or none, headless) fails, and no window opens at all, so the
+    // passkey prompt, the reprompt, and the rest never show. Then the browser
+    // places it.
+    if (created == null && (popoutWindowOptions.left != null || popoutWindowOptions.top != null)) {
+      return await BrowserApi.createWindow({
+        ...popoutWindowOptions,
+        left: undefined,
+        top: undefined,
+      });
+    }
+    return created;
   }
 
   /**
