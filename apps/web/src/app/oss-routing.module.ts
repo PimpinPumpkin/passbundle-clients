@@ -81,6 +81,7 @@ import { RouteDataProperties } from "./core";
 import { ReportsModule } from "./dirt/reports";
 import { DataRecoveryComponent } from "./key-management/data-recovery/data-recovery.component";
 import { ConfirmKeyConnectorDomainComponent } from "./key-management/key-connector/confirm-key-connector-domain.component";
+import { setupImportRedirectGuard } from "./keykeeper/import/setup-import-redirect.guard";
 import { KeykeeperMspComponent } from "./keykeeper/msp/msp.component";
 import { KeykeeperCreateOrganizationComponent } from "./keykeeper/organizations/create-organization.component";
 import { FrontendLayoutComponent } from "./layouts/frontend-layout.component";
@@ -638,6 +639,25 @@ const routes: Routes = [
           },
         ],
       },
+      {
+        // Keykeeper: just signed up, so an offer to bring passwords over.
+        path: "setup-import",
+        canActivate: [authGuard],
+        data: {
+          hideCardWrapper: true,
+          pageIcon: null,
+          maxWidth: "4xl",
+        } satisfies AnonLayoutWrapperData,
+        children: [
+          {
+            path: "",
+            loadComponent: () =>
+              import("./keykeeper/import/setup-import.component").then(
+                (mod) => mod.KeykeeperSetupImportComponent,
+              ),
+          },
+        ],
+      },
     ],
   },
   {
@@ -647,7 +667,11 @@ const routes: Routes = [
     children: [
       {
         path: "vault",
-        canActivate: [premiumInterestRedirectGuard, setupExtensionRedirectGuard],
+        canActivate: [
+          setupImportRedirectGuard,
+          premiumInterestRedirectGuard,
+          setupExtensionRedirectGuard,
+        ],
         loadChildren: () => VaultModule,
       },
       {
