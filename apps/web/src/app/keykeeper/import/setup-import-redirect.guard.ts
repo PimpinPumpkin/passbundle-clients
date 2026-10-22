@@ -42,7 +42,7 @@ export const setupImportRedirectGuard: CanActivateFn = async () => {
     return true;
   }
   const userId = await firstValueFrom(accountService.activeAccount$.pipe(getUserId));
-  const ciphers = await firstValueFrom(cipherService.ciphers$(userId)).catch(() => null);
+  const ciphers = await firstValueFrom(cipherService.ciphers$(userId)).catch((): null => null);
   if (ciphers == null || Object.keys(ciphers).length > 0) {
     forget();
     return true;
