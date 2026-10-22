@@ -6,12 +6,8 @@
       startIcon="bwi-bitwarden-shield"
       (dismiss)="hideOnboarding()"
     >
-      <app-onboarding-task
-        [title]="'onboardingCreateYourAccountTitle' | i18n"
-        [completed]="onboardingTasks.createAccount"
-        [isDisabled]="true"
-      ></app-onboarding-task>
-
+      <!-- Keykeeper: no "Create your account" task: it's always done by the time
+           anyone sees this, so it's only noise. -->
       <app-onboarding-task
         [title]="'onboardingImportYourPasswordsTitle' | i18n"
         [subtitle]="'onboardingImportDataSubtitle' | i18n"
