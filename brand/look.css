@@ -77,6 +77,15 @@
   --color-illustration-tertiary: 232 163 61;
   --color-illustration-logo: 31 111 92;
 }
+/* Secondary text in green-tinted gray (upstream's leans blue): 6.4:1 on
+   white; on Glass, a step darker for the colored field behind it. */
+:root,
+.theme_light {
+  --color-text-muted: 78 99 92;
+}
+.pb-glass:not(.theme_dark) {
+  --color-text-muted: 58 79 72;
+}
 :root.theme_dark,
 .theme_dark {
   --color-background: 20 32 29;
@@ -97,13 +106,14 @@
   --color-marketing-logo: 143 217 193;
 }
 
-/* Glass. */
+/* Glass. The field is calm enough, and the surfaces solid enough, that
+   secondary text on them stays at 4.5:1 or better wherever it lands. */
 .pb-glass {
   --frost-field:
-    radial-gradient(80vmax 70vmax at -5% -5%, rgb(38 150 120 / 0.78), transparent 64%),
-    radial-gradient(80vmax 70vmax at 112% 36%, rgb(86 120 214 / 0.62), transparent 64%),
-    radial-gradient(70vmax 60vmax at 22% 114%, rgb(236 176 104 / 0.62), transparent 64%), #d9e7e2;
-  --frost-surface: rgb(255 255 255 / 0.5);
+    radial-gradient(80vmax 70vmax at -5% -5%, rgb(38 150 120 / 0.45), transparent 64%),
+    radial-gradient(80vmax 70vmax at 112% 36%, rgb(86 120 214 / 0.36), transparent 64%),
+    radial-gradient(70vmax 60vmax at 22% 114%, rgb(236 176 104 / 0.4), transparent 64%), #d9e7e2;
+  --frost-surface: rgb(255 255 255 / 0.62);
   --frost-surface-strong: rgb(255 255 255 / 0.78);
   --frost-bar: rgb(255 255 255 / 0.34);
   --frost-edge: rgb(255 255 255 / 0.8);
@@ -116,7 +126,7 @@
 }
 .pb-glass.theme_dark {
   --frost-field:
-    radial-gradient(80vmax 70vmax at -5% -5%, rgb(46 156 128 / 0.46), transparent 64%),
+    radial-gradient(80vmax 70vmax at -5% -5%, rgb(46 156 128 / 0.38), transparent 64%),
     radial-gradient(80vmax 70vmax at 112% 36%, rgb(84 104 214 / 0.4), transparent 64%),
     radial-gradient(70vmax 60vmax at 22% 114%, rgb(170 110 60 / 0.3), transparent 64%), #0a1412;
   --frost-surface: rgb(24 38 35 / 0.55);
