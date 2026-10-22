@@ -99,7 +99,7 @@ describe("KeykeeperGeneratorSettingsSync", () => {
       if (method === "PUT") {
         puts.push(opened(body.data));
         server.data = body.data;
-      } else if (server.hold) {
+      } else if (server.hold != null) {
         // The server's answer, as it was asked, arriving later.
         const data = server.data;
         await server.hold;
