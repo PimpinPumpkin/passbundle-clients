@@ -342,6 +342,23 @@ describe("Keykeeper fill rules", () => {
       ]);
     });
 
+    it("treats a name a hidden field shares as secret, so its value never shows to someone who can't see passwords", async () => {
+      const cipher = loginItem([
+        customField("PIN", "4321", FieldType.Hidden),
+        customField("PIN", "shown", FieldType.Text),
+      ]);
+      cipher.viewPassword = false;
+      upsertFillRule(cipher, rule({ id: "pin" }, { from: "field", name: "PIN" }));
+
+      // A name a hidden field shares counts as secret: it goes only into a password field.
+      expect(
+        (await run(cipher, [pageField({ opid: "__2", htmlID: "pin", type: "text" })])).script,
+      ).toEqual([]);
+      expect(
+        (await run(cipher, [pageField({ opid: "__2", htmlID: "pin", type: "password" })])).script,
+      ).toEqual([["fill_by_opid", "__2", "4321"]]);
+    });
+
     it("does nothing for an item without rules", async () => {
       const cipher = loginItem([customField("Customer ID", "C-12345")]);
       const fillScript = new AutofillScript();

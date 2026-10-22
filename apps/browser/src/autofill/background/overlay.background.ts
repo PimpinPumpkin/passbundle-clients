@@ -46,7 +46,7 @@ import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { VaultSettingsService } from "@bitwarden/common/vault/abstractions/vault-settings/vault-settings.service";
-import { CipherType } from "@bitwarden/common/vault/enums";
+import { CipherRepromptType, CipherType } from "@bitwarden/common/vault/enums";
 import { buildCipherIcon } from "@bitwarden/common/vault/icon/build-cipher-icon";
 import { CardView } from "@bitwarden/common/vault/models/view/card.view";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
@@ -2231,15 +2231,25 @@ export class OverlayBackground implements OverlayBackgroundInterface {
     if (!sender || !this.senderHasValidTab(sender) || !inlineMenuCipherId || !choiceKey) {
       return;
     }
+    if ((await this.getAuthStatus()) !== AuthenticationStatus.Unlocked) {
+      return;
+    }
     const tab = sender.tab;
     const { tabId, frameId, focusedFieldOpid } = this.focusedFieldData ?? {};
     if (tabId !== tab.id || frameId == null || !focusedFieldOpid) {
       return;
     }
-    const cipher = this.inlineMenuCiphers.get(inlineMenuCipherId);
-    const choice = cipher ? choicesFor(cipher).find((c) => c.key === choiceKey) : undefined;
     const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getOptionalUserId));
-    if (!cipher || !choice || !userId) {
+    const listed = this.inlineMenuCiphers.get(inlineMenuCipherId);
+    if (!listed || !userId) {
+      return;
+    }
+    // The item as it is now, not as the menu cached it, so saving its rule
+    // isn't refused as an edit to an older copy.
+    const cipher =
+      (await this.cipherService.getAllDecrypted(userId)).find((c) => c.id === listed.id) ?? null;
+    const choice = cipher ? choicesFor(cipher).find((c) => c.key === choiceKey) : undefined;
+    if (!cipher || !choice) {
       return;
     }
     await BrowserApi.tabSendMessage(tab, { command: "collectPageDetails" }, { frameId });
@@ -2250,18 +2260,31 @@ export class OverlayBackground implements OverlayBackgroundInterface {
       return;
     }
     this.closeInlineMenu(sender, { forceCloseInlineMenu: true });
-    await fillFieldWith(
+    const filled = await fillFieldWith(
       { tab, frameId, target: { field, url }, cipher, choice, userId },
       {
         cipherService: this.cipherService,
         totpService: this.totpService,
-        // Opens upstream's prompt for an item that asks for the master
-        // password; the fill after it uses the rule saved here.
-        passwordRepromptRequired: (c) => this.autofillService.isPasswordRepromptRequired(c, tab),
-        fillAfterReprompt: async () => {},
+        // An item that asks for the master password: the rule is saved
+        // first, then upstream's prompt opens, and the fill after it uses
+        // the rule.
+        passwordRepromptRequired: async (c) => c.reprompt === CipherRepromptType.Password,
+        fillAfterReprompt: async (t, c) => {
+          await this.autofillService.isPasswordRepromptRequired(c, t);
+        },
       },
     );
-    this.updateLastUsedInlineMenuCipher(inlineMenuCipherId, cipher);
+    if (filled) {
+      this.inlineMenuCiphers.set(inlineMenuCipherId, cipher);
+      this.updateLastUsedInlineMenuCipher(inlineMenuCipherId, cipher);
+    } else {
+      // Nothing went in: the person is back in the field.
+      await BrowserApi.tabSendMessage(
+        tab,
+        { command: "focusMostRecentlyFocusedField" },
+        { frameId },
+      );
+    }
   }
 
   /** Keykeeper: the address of the page (or frame) with the focused field. */

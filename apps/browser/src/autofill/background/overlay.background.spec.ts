@@ -3626,7 +3626,9 @@ describe("OverlayBackground", () => {
         customerId.value = "C-42";
         customerId.type = FieldType.Text;
         cipher.fields = [customerId];
+        // The menu's cached copy; the handler reads the item as it is now.
         overlayBackground["inlineMenuCiphers"] = new Map([["inline-menu-cipher-1", cipher]]);
+        cipherService.getAllDecrypted.mockResolvedValue([cipher]);
         overlayBackground["focusedFieldData"] = {
           tabId: sender.tab.id,
           frameId: 0,
@@ -3670,6 +3672,62 @@ describe("OverlayBackground", () => {
         );
         expect(cipherService.updateWithServer).toHaveBeenCalledWith(cipher, mockUserId);
         expect(cipher.fields.map((f) => f.name)).toEqual(["Customer ID", "keykeeper.fill"]);
+      });
+
+      it("saves the rule before asking for the master password, for an item that asks", async () => {
+        const cipher = new CipherView();
+        cipher.id = "cipher-1";
+        cipher.type = CipherType.Login;
+        cipher.reprompt = CipherRepromptType.Password;
+        cipher.login = new LoginView();
+        cipher.login.password = "correct-password";
+        cipher.viewPassword = true;
+        overlayBackground["inlineMenuCiphers"] = new Map([["inline-menu-cipher-1", cipher]]);
+        cipherService.getAllDecrypted.mockResolvedValue([cipher]);
+        overlayBackground["focusedFieldData"] = {
+          tabId: sender.tab.id,
+          frameId: 0,
+          focusedFieldOpid: "pw-opid",
+        } as any;
+        overlayBackground["pageDetailsForTab"][sender.tab.id] = new Map([
+          [
+            0,
+            {
+              frameId: 0,
+              tab: sender.tab,
+              details: createAutofillPageDetailsMock({
+                url: "https://example.com/login",
+                fields: [
+                  createAutofillFieldMock({ opid: "pw-opid", htmlID: "pw", type: "password" }),
+                ],
+              }),
+            },
+          ],
+        ]);
+        const order: string[] = [];
+        cipherService.updateWithServer.mockImplementation(async () => {
+          order.push("saved");
+          return undefined;
+        });
+        autofillService.isPasswordRepromptRequired.mockImplementation(async () => {
+          order.push("asked");
+          return true;
+        });
+
+        sendPortMessage(listMessageConnectorSpy, {
+          command: "keykeeperFillFieldWith",
+          inlineMenuCipherId: "inline-menu-cipher-1",
+          choiceKey: "p",
+          portKey,
+        });
+        await flushPromises();
+
+        expect(order).toEqual(["saved", "asked"]);
+        expect(tabsSendMessageSpy).not.toHaveBeenCalledWith(
+          sender.tab,
+          expect.objectContaining({ command: "fillForm" }),
+          expect.anything(),
+        );
       });
 
       it("does nothing for a choice the item doesn't have, or with no focused field", async () => {

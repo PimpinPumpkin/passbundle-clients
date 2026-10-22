@@ -206,7 +206,8 @@ export type FillFieldTarget = {
 /**
  * Fills one of an item's values into one field now, and remembers it as a
  * fill rule on the item: the picker's work, from the right-click menu or the
- * inline menu (DESIGN.md, "Choosing what fills where").
+ * inline menu (DESIGN.md, "Choosing what fills where"). Answers whether it
+ * filled the field now.
  */
 export async function fillFieldWith(
   { tab, frameId, target, cipher, choice, userId }: FillFieldTarget,
@@ -214,11 +215,16 @@ export async function fillFieldWith(
     FillFieldMenuDependencies,
     "cipherService" | "totpService" | "passwordRepromptRequired" | "fillAfterReprompt"
   >,
-): Promise<void> {
+): Promise<boolean> {
   const secret = isSecretSource(cipher, choice.source);
   // A secret never goes into a frame from another site, such as an ad.
   if (secret && !sameSite(target.url, tab.url)) {
-    return;
+    return false;
+  }
+  // For someone who can't see the item's passwords, a secret goes only into
+  // a password field, as with rules (fill-rules.ts).
+  if (secret && !cipher.viewPassword && target.field.type !== "password") {
+    return false;
   }
   const rule: FillRule = {
     v: 1,
@@ -234,9 +240,10 @@ export async function fillFieldWith(
     await deps.cipherService.updateWithServer(cipher, userId);
     void keykeeperSiteFixes.share(rule).catch(() => {});
     await deps.fillAfterReprompt(tab, cipher);
-    return;
+    return false;
   }
 
+  let filled = false;
   if (choice.source.from !== "never") {
     const value =
       choice.source.from === "totp"
@@ -258,6 +265,7 @@ export async function fillFieldWith(
         },
         { frameId },
       );
+      filled = true;
     }
   }
 
@@ -265,4 +273,5 @@ export async function fillFieldWith(
   await deps.cipherService.updateWithServer(cipher, userId);
   // For people who share fixes; custom fields never leave the device.
   void keykeeperSiteFixes.share(rule).catch(() => {});
+  return filled;
 }

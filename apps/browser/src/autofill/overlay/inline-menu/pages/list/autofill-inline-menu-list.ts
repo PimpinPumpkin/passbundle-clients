@@ -1192,6 +1192,8 @@ export class AutofillInlineMenuList extends AutofillInlineMenuPageElement {
       return;
     }
     const listItem = event.target.closest(".inline-menu-list-actions-item") as HTMLElement;
+    // The row's own focus ring comes back, as the view button's handler does.
+    listItem.querySelector(".cipher-container")?.classList.remove("remove-outline");
     switch (event.code) {
       case "ArrowLeft":
         (event.target.previousElementSibling as HTMLElement | null)?.focus();
@@ -1215,21 +1217,28 @@ export class AutofillInlineMenuList extends AutofillInlineMenuPageElement {
     event.preventDefault();
   };
 
-  /** Keykeeper: arrows among the picker's choices; Escape goes back to its button. */
+  /**
+   * Keykeeper: arrows among the picker's choices: up from the first goes
+   * back to its button, down from the last to the next login.
+   */
   private keykeeperHandleChoiceKeyUp = (pickButton: HTMLElement) => (event: KeyboardEvent) => {
     if (!EventSecurity.isEventTrusted(event) || !(event.target instanceof HTMLElement)) {
       return;
     }
     switch (event.code) {
-      case "ArrowDown":
-        (event.target.nextElementSibling as HTMLElement | null)?.focus();
+      case "ArrowDown": {
+        const next = event.target.nextElementSibling as HTMLElement | null;
+        if (next) {
+          next.focus();
+        } else {
+          this.focusNextListItem(
+            event.target.closest(".inline-menu-list-actions-item") as HTMLElement,
+          );
+        }
         break;
+      }
       case "ArrowUp":
         ((event.target.previousElementSibling as HTMLElement | null) ?? pickButton).focus();
-        break;
-      case "Escape":
-        pickButton.click();
-        pickButton.focus();
         break;
       default:
         return;

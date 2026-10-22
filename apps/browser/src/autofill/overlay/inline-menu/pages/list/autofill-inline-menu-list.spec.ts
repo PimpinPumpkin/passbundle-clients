@@ -571,14 +571,18 @@ describe("AutofillInlineMenuList", () => {
           );
         });
 
-        it("moves between choices with the arrows, and Escape closes them", () => {
+        it("moves between choices with the arrows, and on to the next login after the last", () => {
           const pick = container().querySelector(".keykeeper-pick-button") as HTMLElement;
           pick.dispatchEvent(new Event("click"));
-          const [first, second] = Array.from(
+          const choices = Array.from(
             container().querySelectorAll(".keykeeper-fill-choice"),
           ) as HTMLElement[];
+          const [first, second] = choices;
+          const last = choices[choices.length - 1];
+          const nextLogin = container().querySelectorAll(".fill-cipher-button")[1] as HTMLElement;
           jest.spyOn(second, "focus");
           jest.spyOn(pick, "focus");
+          jest.spyOn(nextLogin, "focus");
 
           first.dispatchEvent(new KeyboardEvent("keyup", { code: "ArrowDown" }));
           expect(second.focus).toHaveBeenCalled();
@@ -586,10 +590,8 @@ describe("AutofillInlineMenuList", () => {
           first.dispatchEvent(new KeyboardEvent("keyup", { code: "ArrowUp" }));
           expect(pick.focus).toHaveBeenCalled();
 
-          second.dispatchEvent(new KeyboardEvent("keyup", { code: "Escape" }));
-          expect((container().querySelector(".keykeeper-fill-choices") as HTMLElement).hidden).toBe(
-            true,
-          );
+          last.dispatchEvent(new KeyboardEvent("keyup", { code: "ArrowDown" }));
+          expect(nextLogin.focus).toHaveBeenCalled();
         });
       });
 

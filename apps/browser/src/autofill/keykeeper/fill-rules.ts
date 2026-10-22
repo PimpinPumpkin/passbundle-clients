@@ -88,9 +88,10 @@ export function isSecretSource(cipher: CipherView, source: FillSource): boolean 
     case "password":
     case "totp":
       return true;
+    // A rule names a field by its name; if a hidden field shares it, it counts as one.
     case "field":
-      return (
-        visibleCustomFields(cipher).find((f) => f.name === source.name)?.type === FieldType.Hidden
+      return visibleCustomFields(cipher).some(
+        (f) => f.name === source.name && f.type === FieldType.Hidden,
       );
     default:
       return false;

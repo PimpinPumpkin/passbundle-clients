@@ -253,6 +253,24 @@ describe("Keykeeper fill picker menu", () => {
       expect(deps.cipherService.updateWithServer).not.toHaveBeenCalled();
     });
 
+    it("never shows a hidden value in a plain field to someone who can't see passwords, even through a field of the same name", async () => {
+      const pin = new FieldView();
+      pin.name = "Customer ID";
+      pin.value = "hidden-pin";
+      pin.type = FieldType.Hidden;
+      cipher.fields = [pin, ...cipher.fields];
+      cipher.viewPassword = false;
+
+      // The visible "Customer ID" is the only one offered (f1, after the
+      // hidden one), but a rule names fields by name.
+      expect(choicesFor(cipher).map((c) => c.key)).toContain("f1");
+      expect(choicesFor(cipher).map((c) => c.key)).not.toContain("f0");
+      await click("f1");
+
+      expect(filled()).toBe(false);
+      expect(readFillRules(cipher)).toEqual([]);
+    });
+
     it("fills a frame on another part of the same site", async () => {
       frameUrl = "https://login.example.test/frame";
 
