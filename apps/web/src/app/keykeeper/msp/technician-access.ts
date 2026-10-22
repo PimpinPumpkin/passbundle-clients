@@ -1,6 +1,8 @@
 // Keykeeper: what an MSP technician gets in the MSP's clients, in words, and
 // the choices the console offers. See DESIGN.md, "Roles and permissions".
 
+import { ClientMspStaff } from "@bitwarden/admin-console/common";
+
 import { CustomPermissions, TechnicianAccess } from "./msp-api.service";
 
 /** Every client, as admin, with install commands: what a technician gets unless limited. */
@@ -55,4 +57,33 @@ export function describeAccess(
 /** Whether access reaches every client, for the toast after adding someone. */
 export function reachesEveryClient(access: TechnicianAccess | undefined): boolean {
   return access == null || access.allClients;
+}
+
+/**
+ * What one of the MSP's people can do in a client, for the client's own
+ * owners and admins: their role, a custom role's permissions (upstream's
+ * labels, through `t`), and whether they see vault items. Null when the
+ * server didn't say.
+ */
+export function describeStaffRole(
+  staff: ClientMspStaff,
+  t: (key: string) => string,
+): string | null {
+  switch (staff.role) {
+    case "owner":
+      return "Owner, with every vault item";
+    case "admin":
+      return "Admin, with every vault item";
+    case "custom": {
+      const permissions = PERMISSIONS.filter((p) => staff.permissions?.includes(p.key))
+        .map((p) => t(p.label))
+        .join(", ");
+      const items = staff.vaultItems ? "with every vault item" : "no vault items";
+      return `Custom role (${permissions || "no permissions"}), ${items}`;
+    }
+    case "member":
+      return staff.vaultItems ? "Member, with every vault item" : "Member, no vault items";
+    default:
+      return null;
+  }
 }

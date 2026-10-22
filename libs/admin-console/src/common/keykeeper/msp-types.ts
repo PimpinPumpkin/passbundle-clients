@@ -105,9 +105,22 @@ export type ClientEnrollment = {
   secret?: string | null;
 };
 
+/** One of the MSP's people in a client, and what they can do there. */
+export type ClientMspStaff = {
+  memberId: string;
+  email: string;
+  name: string | null;
+  /** Older servers leave out the role, its permissions, and vault items. */
+  role?: "owner" | "admin" | "custom" | "member";
+  /** A custom role's permissions, by upstream's names (manageUsers and the rest). */
+  permissions?: string[];
+  /** Whether they see every vault item in the organization. */
+  vaultItems?: boolean;
+};
+
 export type ClientMsp = {
   msp: { id: string; name: string } | null;
-  staff: { memberId: string; email: string; name: string | null }[];
+  staff: ClientMspStaff[];
   /** Policies where the organization has its own setting rather than the MSP's default. Older servers leave it out. */
   ownPolicies?: { type: number; name: string }[];
 };

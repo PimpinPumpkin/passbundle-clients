@@ -10,14 +10,17 @@ import {
 
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
+import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { ButtonModule, CalloutModule, DialogService, ToastService } from "@bitwarden/components";
 
 import { ClientMsp, KeykeeperMspApiService } from "./msp-api.service";
+import { describeStaffRole } from "./technician-access";
 
 /**
- * Keykeeper: on a client organization's Members page, which MSP manages it and
- * who its staff are. The client's own owners can remove the MSP, which takes
- * all of its staff out of the organization at once.
+ * Keykeeper: on a client organization's Members page, which MSP manages it,
+ * who its staff are, and what each can do there (their role, a custom role's
+ * permissions, and whether they see vault items). The client's own owners can
+ * remove the MSP, which takes all of its staff out of the organization at once.
  */
 @Component({
   selector: "app-keykeeper-client-msp-banner",
@@ -26,9 +29,12 @@ import { ClientMsp, KeykeeperMspApiService } from "./msp-api.service";
   template: `
     @if (info()?.msp; as msp) {
       <bit-callout type="info" [title]="null" data-testid="client-msp">
-        <p class="tw-mb-2">
-          {{ msp.name }} manages this organization. Its staff here: {{ staffNames() }}.
-        </p>
+        <p class="tw-mb-2">{{ msp.name }} manages this organization. Its staff here:</p>
+        <ul class="tw-mb-2 tw-ps-5 tw-list-disc">
+          @for (person of staff(); track person.memberId) {
+            <li data-testid="client-msp-staff">{{ person.line }}</li>
+          }
+        </ul>
         @if (canRemove()) {
           <button bitButton buttonType="danger" type="button" (click)="remove(msp.name)">
             Remove {{ msp.name }}
@@ -45,8 +51,13 @@ export class KeykeeperClientMspBannerComponent {
 
   protected readonly info = signal<ClientMsp | null>(null);
 
-  protected readonly staffNames = computed(() =>
-    (this.info()?.staff ?? []).map((s) => s.name || s.email).join(", "),
+  /** Each of the MSP's people, with their role here and whether they see vault items. */
+  protected readonly staff = computed(() =>
+    (this.info()?.staff ?? []).map((s) => {
+      const who = s.name ? `${s.name} (${s.email})` : s.email;
+      const role = describeStaffRole(s, (key) => this.i18nService.t(key));
+      return { memberId: s.memberId, line: role == null ? who : `${who}: ${role}` };
+    }),
   );
 
   /** The client's own owners, never the MSP's staff. */
@@ -60,6 +71,7 @@ export class KeykeeperClientMspBannerComponent {
     private readonly mspApi: KeykeeperMspApiService,
     private readonly dialogService: DialogService,
     private readonly toastService: ToastService,
+    private readonly i18nService: I18nService,
   ) {
     effect(() => {
       const org = this.organization();
