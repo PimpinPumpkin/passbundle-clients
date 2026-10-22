@@ -31,6 +31,12 @@ import {
 } from "../../abstractions/autofill-inline-menu-list";
 import { AutofillInlineMenuPageElement } from "../shared/autofill-inline-menu-page-element";
 
+// Keykeeper: the fill picker's words (English until Keykeeper's own strings
+// are translated, as in keykeeper/fill-field-menu.ts) and its button's icon.
+const KEYKEEPER_FILL_THIS_FIELD_WITH = "Fill this field with";
+const KEYKEEPER_PICK_ICON =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 16 16" aria-hidden="true"><path fill="#175DDC" d="M2 5h12v1.5H2zm0 3.5h12V10H2zm0 3.5h8v1.5H2z"/></svg>';
+
 export class AutofillInlineMenuList extends AutofillInlineMenuPageElement {
   /** Non-null asserted. Set in initAutofillInlineMenuList before any read. */
   private inlineMenuListContainer!: HTMLDivElement;
@@ -898,6 +904,15 @@ export class AutofillInlineMenuList extends AutofillInlineMenuPageElement {
     inlineMenuListActionsItem.classList.add("inline-menu-list-actions-item");
     inlineMenuListActionsItem.appendChild(cipherContainerElement);
 
+    // Keykeeper: "Fill this field with", between filling and viewing.
+    if (cipher.keykeeperFillChoices?.length) {
+      cipherContainerElement.classList.add("keykeeper-has-picker");
+      cipherContainerElement.insertBefore(
+        this.keykeeperBuildPickButton(cipher, inlineMenuListActionsItem),
+        viewCipherElement,
+      );
+    }
+
     if (this.showPasskeysLabels && cipher.login?.passkey) {
       this.lastPasskeysListItem = inlineMenuListActionsItem;
     }
@@ -1115,6 +1130,111 @@ export class AutofillInlineMenuList extends AutofillInlineMenuPageElement {
       ".fill-cipher-button",
     ) as HTMLButtonElement;
     lastFillButton?.focus();
+  };
+
+  /**
+   * Keykeeper: the fill picker's button on a login: it shows the login's
+   * values (names only) under it, and picking one fills the focused field
+   * with it and remembers that, as the right-click menu does
+   * (keykeeper/fill-field-menu.ts).
+   */
+  private keykeeperBuildPickButton(cipher: InlineMenuCipherData, listItem: HTMLElement) {
+    const pickButton = globalThis.document.createElement("button");
+    pickButton.tabIndex = -1;
+    pickButton.classList.add("keykeeper-pick-button");
+    pickButton.setAttribute("aria-label", `${KEYKEEPER_FILL_THIS_FIELD_WITH} ${cipher.name}`);
+    pickButton.setAttribute("aria-expanded", "false");
+    pickButton.append(buildSvgDomElement(KEYKEEPER_PICK_ICON));
+
+    const choices = globalThis.document.createElement("div");
+    choices.classList.add("keykeeper-fill-choices");
+    choices.setAttribute("role", "group");
+    choices.setAttribute("aria-label", `${KEYKEEPER_FILL_THIS_FIELD_WITH} ${cipher.name}`);
+    choices.hidden = true;
+    for (const choice of cipher.keykeeperFillChoices ?? []) {
+      const choiceButton = globalThis.document.createElement("button");
+      choiceButton.tabIndex = -1;
+      choiceButton.classList.add("keykeeper-fill-choice");
+      choiceButton.textContent = choice.title;
+      choiceButton.addEventListener(EVENTS.CLICK, (event: Event) => {
+        if (!EventSecurity.isEventTrusted(event)) {
+          return;
+        }
+        this.postMessageToParent({
+          command: "keykeeperFillFieldWith",
+          inlineMenuCipherId: cipher.id,
+          choiceKey: choice.key,
+        });
+      });
+      choiceButton.addEventListener(EVENTS.KEYUP, this.keykeeperHandleChoiceKeyUp(pickButton));
+      choices.appendChild(choiceButton);
+    }
+    listItem.appendChild(choices);
+
+    pickButton.addEventListener(EVENTS.CLICK, (event: Event) => {
+      if (!EventSecurity.isEventTrusted(event)) {
+        return;
+      }
+      const opening = choices.hidden;
+      choices.hidden = !opening;
+      pickButton.setAttribute("aria-expanded", String(opening));
+      if (opening) {
+        (choices.firstElementChild as HTMLElement | null)?.focus();
+      }
+    });
+    pickButton.addEventListener(EVENTS.KEYUP, this.keykeeperHandlePickKeyUp(choices));
+    return pickButton;
+  }
+
+  /** Keykeeper: arrows from the picker's button, like the row's other buttons. */
+  private keykeeperHandlePickKeyUp = (choices: HTMLElement) => (event: KeyboardEvent) => {
+    if (!EventSecurity.isEventTrusted(event) || !(event.target instanceof HTMLElement)) {
+      return;
+    }
+    const listItem = event.target.closest(".inline-menu-list-actions-item") as HTMLElement;
+    switch (event.code) {
+      case "ArrowLeft":
+        (event.target.previousElementSibling as HTMLElement | null)?.focus();
+        break;
+      case "ArrowRight":
+        (event.target.nextElementSibling as HTMLElement | null)?.focus();
+        break;
+      case "ArrowDown":
+        if (!choices.hidden) {
+          (choices.firstElementChild as HTMLElement | null)?.focus();
+        } else {
+          this.focusNextListItem(listItem);
+        }
+        break;
+      case "ArrowUp":
+        this.focusPreviousListItem(listItem);
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+  };
+
+  /** Keykeeper: arrows among the picker's choices; Escape goes back to its button. */
+  private keykeeperHandleChoiceKeyUp = (pickButton: HTMLElement) => (event: KeyboardEvent) => {
+    if (!EventSecurity.isEventTrusted(event) || !(event.target instanceof HTMLElement)) {
+      return;
+    }
+    switch (event.code) {
+      case "ArrowDown":
+        (event.target.nextElementSibling as HTMLElement | null)?.focus();
+        break;
+      case "ArrowUp":
+        ((event.target.previousElementSibling as HTMLElement | null) ?? pickButton).focus();
+        break;
+      case "Escape":
+        pickButton.click();
+        pickButton.focus();
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
   };
 
   /**

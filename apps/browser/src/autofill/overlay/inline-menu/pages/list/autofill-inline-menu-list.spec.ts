@@ -509,6 +509,90 @@ describe("AutofillInlineMenuList", () => {
         });
       });
 
+      // Keykeeper: "Fill this field with" in the inline menu.
+      describe("fill picker", () => {
+        beforeEach(() => {
+          postWindowMessage(
+            createInitAutofillInlineMenuListMessageMock({
+              portKey,
+              ciphers: [
+                createAutofillOverlayCipherDataMock(1, {
+                  keykeeperFillChoices: [
+                    { key: "u", title: "Username" },
+                    { key: "f0", title: "Customer ID" },
+                    { key: "n", title: "Never fill this field" },
+                  ],
+                }),
+                createAutofillOverlayCipherDataMock(2),
+              ],
+            }),
+          );
+        });
+
+        const container = () => autofillInlineMenuList["inlineMenuListContainer"];
+
+        it("shows a picker button only on a login with choices, and its choices only once it's opened", () => {
+          expect(container().querySelectorAll(".keykeeper-pick-button")).toHaveLength(1);
+          const pick = container().querySelector(".keykeeper-pick-button") as HTMLElement;
+          const choices = container().querySelector(".keykeeper-fill-choices") as HTMLElement;
+          expect(pick.getAttribute("aria-label")).toBe("Fill this field with website login 1");
+          expect(choices.hidden).toBe(true);
+          expect(Array.from(choices.querySelectorAll("button")).map((b) => b.textContent)).toEqual([
+            "Username",
+            "Customer ID",
+            "Never fill this field",
+          ]);
+
+          pick.dispatchEvent(new Event("click"));
+
+          expect(choices.hidden).toBe(false);
+          expect(pick.getAttribute("aria-expanded")).toBe("true");
+          pick.dispatchEvent(new Event("click"));
+          expect(choices.hidden).toBe(true);
+        });
+
+        it("asks the background to fill the focused field with the chosen value", () => {
+          container().querySelector(".keykeeper-pick-button").dispatchEvent(new Event("click"));
+          const customerId = Array.from(
+            container().querySelectorAll(".keykeeper-fill-choice"),
+          ).find((b) => b.textContent === "Customer ID");
+
+          customerId.dispatchEvent(new Event("click"));
+
+          expect(globalThis.parent.postMessage).toHaveBeenCalledWith(
+            {
+              command: "keykeeperFillFieldWith",
+              inlineMenuCipherId: "1",
+              choiceKey: "f0",
+              portKey,
+              token: "test-token",
+            },
+            expectedOrigin,
+          );
+        });
+
+        it("moves between choices with the arrows, and Escape closes them", () => {
+          const pick = container().querySelector(".keykeeper-pick-button") as HTMLElement;
+          pick.dispatchEvent(new Event("click"));
+          const [first, second] = Array.from(
+            container().querySelectorAll(".keykeeper-fill-choice"),
+          ) as HTMLElement[];
+          jest.spyOn(second, "focus");
+          jest.spyOn(pick, "focus");
+
+          first.dispatchEvent(new KeyboardEvent("keyup", { code: "ArrowDown" }));
+          expect(second.focus).toHaveBeenCalled();
+
+          first.dispatchEvent(new KeyboardEvent("keyup", { code: "ArrowUp" }));
+          expect(pick.focus).toHaveBeenCalled();
+
+          second.dispatchEvent(new KeyboardEvent("keyup", { code: "Escape" }));
+          expect((container().querySelector(".keykeeper-fill-choices") as HTMLElement).hidden).toBe(
+            true,
+          );
+        });
+      });
+
       describe("view cipher button event listeners", () => {
         beforeEach(() => {
           postWindowMessage(createInitAutofillInlineMenuListMessageMock({ portKey }));
