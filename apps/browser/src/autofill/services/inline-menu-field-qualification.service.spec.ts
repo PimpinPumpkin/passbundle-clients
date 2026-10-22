@@ -21,6 +21,99 @@ describe("InlineMenuFieldQualificationService", () => {
   });
 
   describe("isFieldForLoginForm", () => {
+    // Keykeeper: a text field just before a sign-in password field is its
+    // username, whatever the site calls it.
+    describe("a text field the menu has no word for, just before a password field", () => {
+      const textField = (custom: Partial<AutofillField> = {}) =>
+        mock<AutofillField>({
+          type: "text",
+          viewable: true,
+          form: "f",
+          elementNumber: 1,
+          autoCompleteType: "",
+          htmlID: "i_17",
+          htmlName: "",
+          placeholder: "",
+          "label-aria": "Account name",
+          ...custom,
+        });
+      const passwordField = (custom: Partial<AutofillField> = {}) =>
+        mock<AutofillField>({
+          type: "password",
+          viewable: true,
+          form: "f",
+          elementNumber: 2,
+          autoCompleteType: "",
+          htmlID: "i_18",
+          htmlName: "",
+          placeholder: "",
+          "label-aria": "Passcode",
+          ...custom,
+        });
+      const page = (fields: AutofillField[]) =>
+        mock<AutofillPageDetails>({
+          forms: { f: mock<AutofillForm>({ opid: "f", htmlAction: "", htmlMethod: "post" }) },
+          fields,
+        });
+
+      it("is the username of a sign-in form", () => {
+        const user = textField();
+        expect(
+          inlineMenuFieldQualificationService.isFieldForLoginForm(
+            user,
+            page([user, passwordField()]),
+          ),
+        ).toBe(true);
+      });
+
+      it("isn't when the password is a new one, or one of two", () => {
+        const user = textField();
+        const fresh = passwordField({ autoCompleteType: "new-password" });
+        expect(
+          inlineMenuFieldQualificationService.isFieldForLoginForm(user, page([user, fresh])),
+        ).toBe(false);
+        const confirm = passwordField({ elementNumber: 3, htmlID: "i_19" });
+        expect(
+          inlineMenuFieldQualificationService.isFieldForLoginForm(
+            user,
+            page([user, passwordField(), confirm]),
+          ),
+        ).toBe(false);
+      });
+
+      it("isn't when its autocomplete hint says it's something else", () => {
+        const name = textField({ autoCompleteType: "given-name" });
+        expect(
+          inlineMenuFieldQualificationService.isFieldForLoginForm(
+            name,
+            page([name, passwordField()]),
+          ),
+        ).toBe(false);
+      });
+
+      it("isn't when another field comes between it and the password", () => {
+        const user = textField();
+        const other = textField({ elementNumber: 2, htmlID: "i_20" });
+        const password = passwordField({ elementNumber: 3 });
+        expect(
+          inlineMenuFieldQualificationService.isFieldForLoginForm(
+            user,
+            page([user, other, password]),
+          ),
+        ).toBe(false);
+      });
+
+      it("isn't when the password is in another form", () => {
+        const user = textField({ form: "g" });
+        expect(
+          inlineMenuFieldQualificationService.isFieldForLoginForm(
+            user,
+            page([user, passwordField()]),
+          ),
+        ).toBe(false);
+      });
+    });
+
     it("does not disqualify totp fields for premium users", () => {
       inlineMenuFieldQualificationService["premiumEnabled"] = true;
       const field = mock<AutofillField>({

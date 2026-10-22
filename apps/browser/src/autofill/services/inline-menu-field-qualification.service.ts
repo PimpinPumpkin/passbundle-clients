@@ -183,10 +183,58 @@ export class InlineMenuFieldQualificationService implements InlineMenuFieldQuali
 
     const isUsernameField = this.isUsernameField(field);
     if (!isUsernameField) {
-      return false;
+      // Keykeeper: see isUnnamedUsernameBeforePassword.
+      return (
+        this.isUnnamedUsernameBeforePassword(field, pageDetails) &&
+        this.isUsernameFieldForLoginForm(field, pageDetails)
+      );
     }
 
     return this.isUsernameFieldForLoginForm(field, pageDetails);
+  }
+
+  /**
+   * Keykeeper: a text field just before a sign-in password field, in the same
+   * form, is its username, whatever the site calls it ("Account name",
+   * "Member number"); filling already puts the username there. Not a field
+   * whose autocomplete hint says it's something else, and only when the
+   * password field is one for signing in (not a new password, or one of two).
+   * See DESIGN.md, "How it keeps getting better".
+   */
+  private isUnnamedUsernameBeforePassword(
+    field: AutofillField,
+    pageDetails: AutofillPageDetails,
+  ): boolean {
+    if (
+      field.viewable !== true ||
+      typeof field.type !== "string" ||
+      !["text", "email", "tel"].includes(field.type) ||
+      this.isExcludedFieldType(field, this.excludedAutofillFieldTypesSet) ||
+      this.fieldHasDisqualifyingAttributeValue(field) ||
+      this.isTotpField(field)
+    ) {
+      return false;
+    }
+    const hint =
+      typeof field.autoCompleteType === "string" ? field.autoCompleteType.trim().toLowerCase() : "";
+    if (hint !== "" && hint !== "on" && hint !== "off") {
+      return false;
+    }
+    const typedInto = new Set(["text", "email", "tel", "number", "password", "search", "url"]);
+    const next = pageDetails.fields
+      .filter(
+        (other) =>
+          other.viewable === true &&
+          other.form === field.form &&
+          other.elementNumber > field.elementNumber &&
+          typedInto.has(typeof other.type === "string" ? other.type : ""),
+      )
+      .sort((a, b) => a.elementNumber - b.elementNumber)[0];
+    return (
+      next != null &&
+      this.isCurrentPasswordField(next) &&
+      this.isPasswordFieldForLoginForm(next, pageDetails)
+    );
   }
 
   /**
