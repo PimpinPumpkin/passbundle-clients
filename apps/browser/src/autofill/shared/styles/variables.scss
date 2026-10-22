@@ -4,33 +4,34 @@ $font-family-sans-serif: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
 $font-family-source-code-pro: "Source Code Pro", monospace;
 $font-size-base: 14px;
 
-$text-color-light: #212529;
-$muted-text-color-light: #6c747c;
+// Keykeeper: PassBundle's palette, as in content/components/constants/styles.ts.
+$text-color-light: #18221f;
+$muted-text-color-light: #4e635c;
 $background-color-light: #ffffff;
-$background-offset-color-light: #f0f0f0;
-$brand-primary-light: #175ddc;
+$background-offset-color-light: #e9efed;
+$brand-primary-light: #1f6f5c;
 $password-special-color-light: #b80017;
-$password-number-color-light: #1452c1;
+$password-number-color-light: #185748;
 $success-color-light: #017e45;
 $error-color-light: #c83522;
 
 $text-color-dark: #ffffff;
-$muted-text-color-dark: #bac0ce;
-$background-color-dark: #2f343d;
-$background-offset-color-dark: darken(#2f343d, 2.75%);
+$muted-text-color-dark: #a0b6ae;
+$background-color-dark: #14201d;
+$background-offset-color-dark: #0c1513;
 $border-color-dark: #ddd;
-$brand-primary-dark: #6f9df1;
+$brand-primary-dark: #79a99d;
 $password-special-color-dark: #ff8d85;
-$password-number-color-dark: #6f9df1;
+$password-number-color-dark: #8fd9c1;
 $success-color-dark: #8db89b;
 $error-color-dark: #ee9792;
 
-$muted-blue: #5a6d91;
-$muted-grey: #bac0ce;
-$border-color: #ced4dc;
+$muted-blue: #4e635c;
+$muted-grey: #a0b6ae;
+$border-color: #bbcdc7;
 
 $border-radius: 3px;
-$focus-outline-color: #1252a3;
+$focus-outline-color: #124035;
 
 $themes: (
   light: (
@@ -59,9 +60,9 @@ $themes: (
     buttonPrimaryColor: $brand-primary-dark,
     primaryColor: $brand-primary-dark,
     textContrast: $background-color-dark,
-    inputBorderColor: #4c525f,
+    inputBorderColor: #3a4f48,
     inputBackgroundColor: $background-color-dark,
-    borderColor: #4c525f,
+    borderColor: #3a4f48,
     focusOutlineColor: lighten($focus-outline-color, 25%),
     successColor: $success-color-dark,
     errorColor: $error-color-dark,
