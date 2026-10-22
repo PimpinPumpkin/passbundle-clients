@@ -3,7 +3,9 @@ import { firstValueFrom } from "rxjs";
 
 import { AbstractThemingService } from "@bitwarden/angular/platform/services/theming/theming.service.abstraction";
 import { WINDOW } from "@bitwarden/angular/services/injection-tokens";
+import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import { AuthService } from "@bitwarden/common/auth/abstractions/auth.service";
 import { TokenService } from "@bitwarden/common/auth/abstractions/token.service";
 import { TwoFactorService } from "@bitwarden/common/auth/two-factor";
 import { EventUploadService as EventUploadServiceAbstraction } from "@bitwarden/common/dirt/event-logs";
@@ -14,14 +16,18 @@ import { SharedUnlockFollowerService } from "@bitwarden/common/key-management/sh
 import { DefaultVaultTimeoutService } from "@bitwarden/common/key-management/vault-timeout";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { I18nService as I18nServiceAbstraction } from "@bitwarden/common/platform/abstractions/i18n.service";
+import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { SdkLoadService } from "@bitwarden/common/platform/abstractions/sdk/sdk-load.service";
 import { IpcService } from "@bitwarden/common/platform/ipc";
 import { ServerNotificationsService } from "@bitwarden/common/platform/server-notifications";
 import { ContainerService } from "@bitwarden/common/platform/services/container.service";
 import { MigrationRunner } from "@bitwarden/common/platform/services/migration-runner";
 import { UserAutoUnlockKeyService } from "@bitwarden/common/platform/services/user-auto-unlock-key.service";
+import { StateProvider } from "@bitwarden/common/platform/state";
+import { SyncService } from "@bitwarden/common/platform/sync";
 import { UserId } from "@bitwarden/common/types/guid";
 import { TaskService } from "@bitwarden/common/vault/tasks";
+import { KeykeeperGeneratorSettingsSync } from "@bitwarden/generator-core";
 import { KeyService as KeyServiceAbstraction } from "@bitwarden/key-management";
 
 import { KeykeeperMspWorkService } from "../keykeeper/msp/msp-work.service";
@@ -31,6 +37,17 @@ import { VersionService } from "../platform/version.service";
 export class InitService {
   // Keykeeper: an MSP's background work (confirming members, keeping templates current).
   private readonly keykeeperMspWork = inject(KeykeeperMspWorkService);
+  // Keykeeper: the generator's settings follow someone to each device.
+  private readonly keykeeperGeneratorSettings = new KeykeeperGeneratorSettingsSync(
+    inject(ApiService),
+    inject(AccountService),
+    inject(AuthService),
+    inject(SyncService),
+    inject(KeyServiceAbstraction),
+    inject(EncryptService),
+    inject(StateProvider),
+    inject(LogService),
+  );
 
   constructor(
     @Inject(WINDOW) private win: Window,
@@ -86,6 +103,7 @@ export class InitService {
       this.taskService.listenForTaskNotifications();
       // Keykeeper: see KeykeeperMspWork.
       this.keykeeperMspWork.start();
+      this.keykeeperGeneratorSettings.start();
 
       const containerService = new ContainerService(this.keyService, this.encryptService);
       containerService.attachToGlobal(this.win);

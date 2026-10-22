@@ -275,6 +275,7 @@ import { TotpService } from "@bitwarden/common/vault/services/totp.service";
 import { VaultSettingsService } from "@bitwarden/common/vault/services/vault-settings/vault-settings.service";
 import { DefaultTaskService, TaskService } from "@bitwarden/common/vault/tasks";
 import {
+  KeykeeperGeneratorSettingsSync,
   createCredentialGeneratorService,
   createRandomizer,
   CredentialGeneratorService,
@@ -1922,6 +1923,17 @@ export default class MainBackground {
       ),
     );
     startMspWork(this.keykeeperMspWork);
+    // Keykeeper: the generator's settings follow someone to each device.
+    new KeykeeperGeneratorSettingsSync(
+      this.apiService,
+      this.accountService,
+      this.authService,
+      this.syncService,
+      this.keyService,
+      this.encryptService,
+      this.stateProvider,
+      this.logService,
+    ).start();
     this.commandsBackground.init();
     this.contextMenusBackground?.init();
     // Disable the side panel globally on startup so Bitwarden does not appear in

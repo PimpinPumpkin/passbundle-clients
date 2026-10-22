@@ -376,7 +376,8 @@ describe("Password generation strategy", () => {
         uppercase: 0,
         lowercase: 0,
         digits: 0,
-        special: undefined,
+        // Keykeeper: PassBundle's default has symbols.
+        special: 0,
         ambiguous: true,
       });
     });
@@ -480,7 +481,8 @@ describe("Password generation strategy", () => {
         uppercase: 0,
         lowercase: 0,
         digits: 0,
-        special: 0,
+        // Keykeeper: PassBundle's default is at least one symbol.
+        special: 1,
         ambiguous: true,
       });
     });

@@ -53,17 +53,20 @@ const password: GeneratorMetadata<PasswordGeneratorSettings> = deepFreeze({
           "minSpecial",
         ]),
         state: GENERATOR_DISK,
+        // Keykeeper: PassBundle's defaults, the same in every app: 20
+        // characters of every kind, leaving out ones that look alike (upstream:
+        // 14, no symbols). See DESIGN.md, "Generator settings".
         initial: {
-          length: 14,
-          ambiguous: true,
+          length: 20,
+          ambiguous: false,
           uppercase: true,
           minUppercase: 1,
           lowercase: true,
           minLowercase: 1,
           number: true,
           minNumber: 1,
-          special: false,
-          minSpecial: 0,
+          special: true,
+          minSpecial: 1,
         },
         options: {
           deserializer(value) {
@@ -78,7 +81,7 @@ const password: GeneratorMetadata<PasswordGeneratorSettings> = deepFreeze({
           length: {
             min: 5,
             max: 128,
-            recommendation: 14,
+            recommendation: 20,
           },
           minNumber: {
             min: 0,
