@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, effect, signal, viewChild } from "@angular/core";
+import { ChangeDetectionStrategy, Component, signal } from "@angular/core";
 import { Router } from "@angular/router";
 
 import {
@@ -126,11 +126,15 @@ const SOURCES: Source[] = [
             </ol>
             <h2 bitTypography="h5">2. Choose the file</h2>
           }
-          <tools-import
-            (formDisabled)="disabled.set($event)"
-            (formLoading)="loading.set($event)"
-            (onSuccessfulImport)="imported.set(true)"
-          ></tools-import>
+          <!-- A new importer for each source, started on its format. -->
+          @for (id of [s.id]; track id) {
+            <tools-import
+              [startFormat]="s.format ?? null"
+              (formDisabled)="disabled.set($event)"
+              (formLoading)="loading.set($event)"
+              (onSuccessfulImport)="imported.set(true)"
+            ></tools-import>
+          }
           @if (imported()) {
             <bit-callout type="warning" title="Delete the export now">
               It has every password in plain text. Delete the file, and empty the trash if it goes
@@ -184,18 +188,7 @@ export class KeykeeperSetupImportComponent {
   protected readonly loading = signal(false);
   protected readonly disabled = signal(false);
   protected readonly imported = signal(false);
-  private readonly importer = viewChild(ImportComponent);
-
-  constructor(private readonly router: Router) {
-    // Upstream's importer, set to the chosen password manager's export.
-    effect(() => {
-      const format = this.source()?.format;
-      const importer = this.importer();
-      if (format != null && importer != null) {
-        importer.formGroup.controls.format.setValue(format);
-      }
-    });
-  }
+  constructor(private readonly router: Router) {}
 
   /** Done here, or skipped: not offered again, and on to the vault. */
   protected async finish() {
