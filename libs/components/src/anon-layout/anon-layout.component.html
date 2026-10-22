@@ -40,7 +40,18 @@
       </div>
 
       @if (!hideYearAndVersion) {
-        <div bitTypography="body2">&copy; {{ year }} Bitwarden Inc.</div>
+        <!-- Keykeeper: the product's name here, and the legal notices (GPLv3 5(d):
+             upstream's copyright, no warranty, the license) a link away, in LEGAL.md. -->
+        <div bitTypography="body2">
+          &copy; {{ year }} Bitwarden &middot;
+          <a
+            class="tw-text-primary-600 hover:tw-underline"
+            href="https://github.com/PimpinPumpkin/passbundle-clients/blob/keykeeper/LEGAL.md"
+            target="_blank"
+            rel="noreferrer"
+            >Legal</a
+          >
+        </div>
         <div bitTypography="body2">{{ version }}</div>
       }
     </bit-landing-footer>
