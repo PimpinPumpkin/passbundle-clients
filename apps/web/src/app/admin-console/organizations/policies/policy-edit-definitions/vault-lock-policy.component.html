@@ -1,0 +1,50 @@
+<bit-form-control>
+  <input type="checkbox" bitCheckbox [formControl]="enabled" id="enabled" />
+  <bit-label>{{ "turnOn" | i18n }}</bit-label>
+</bit-form-control>
+
+<ng-container [formGroup]="data">
+  <bit-radio-group formControlName="when" [block]="true" class="tw-mt-2 tw-block">
+    <bit-label>Vaults lock</bit-label>
+    <bit-radio-button value="custom" id="vaultLockCustom">
+      <bit-label>After a time</bit-label>
+      <bit-hint>Members can choose a shorter time.</bit-hint>
+    </bit-radio-button>
+    <bit-radio-button value="immediately" id="vaultLockImmediately">
+      <bit-label>Immediately</bit-label>
+      <bit-hint>
+        Phones lock when the app leaves the screen, computers when the app's window is closed or
+        minimized.
+      </bit-hint>
+    </bit-radio-button>
+    <bit-radio-button value="onSystemLock" id="vaultLockOnSystemLock">
+      <bit-label>When the computer locks</bit-label>
+      <bit-hint>Or sleeps. Members choose how long otherwise.</bit-hint>
+    </bit-radio-button>
+  </bit-radio-group>
+
+  @if (data.controls.when.value === "custom") {
+    <bit-form-field>
+      <bit-label>At most</bit-label>
+      <bit-select formControlName="minutes" id="vaultLockMinutes">
+        @for (minutes of waits(); track minutes) {
+          <bit-option [value]="minutes" [label]="waitLabel(minutes)"></bit-option>
+        }
+      </bit-select>
+    </bit-form-field>
+  }
+
+  <bit-radio-group formControlName="action" [block]="true" class="tw-block">
+    <bit-label>Then</bit-label>
+    <bit-radio-button value="lock" id="vaultLockLock">
+      <bit-label>Lock the vault</bit-label>
+      <bit-hint
+        >Members unlock it with their master password, or their fingerprint or face.</bit-hint
+      >
+    </bit-radio-button>
+    <bit-radio-button value="logOut" id="vaultLockLogOut">
+      <bit-label>Sign out</bit-label>
+      <bit-hint>The vault is removed from the device, and members sign in again.</bit-hint>
+    </bit-radio-button>
+  </bit-radio-group>
+</ng-container>
