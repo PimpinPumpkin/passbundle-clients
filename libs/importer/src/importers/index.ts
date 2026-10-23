@@ -35,6 +35,7 @@ export { NordPassCsvImporter } from "./nordpass-csv-importer";
 export {
   OnePassword1PifImporter,
   OnePassword1PuxImporter,
+  OnePassword8CsvImporter,
   OnePasswordMacCsvImporter,
   OnePasswordWinCsvImporter,
 } from "./onepassword";

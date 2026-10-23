@@ -68,6 +68,7 @@ import {
   NordPassCsvImporter,
   OnePassword1PifImporter,
   OnePassword1PuxImporter,
+  OnePassword8CsvImporter,
   OnePasswordMacCsvImporter,
   OnePasswordWinCsvImporter,
   PadlockCsvImporter,
@@ -375,6 +376,9 @@ export class ImportService implements ImportServiceAbstraction {
         return new OnePassword1PifImporter();
       case "1password1pux":
         return new OnePassword1PuxImporter();
+      // Keykeeper: 1Password 8's CSV, which quotes the standard way.
+      case "1password8csv":
+        return new OnePassword8CsvImporter();
       case "1passwordwincsv":
         return new OnePasswordWinCsvImporter();
       case "1passwordmaccsv":

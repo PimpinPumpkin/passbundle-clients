@@ -258,6 +258,13 @@
             https://bitwarden.com/help/import-from-1password/</a
           >.
         </ng-container>
+        <!-- Keykeeper: 1Password 8's CSV export. -->
+        <ng-container *ngIf="format === '1password8csv'">
+          In the 1Password app on your computer, choose File, then Export, then your account. Choose
+          CSV as the format, then Export Data, and save the file. A CSV has only logins and
+          passwords; to bring cards, identities, secure notes, and custom fields too, export 1PUX
+          instead and choose "1Password (1pux/json)" here.
+        </ng-container>
         <ng-container *ngIf="format === 'passworddragonxml'">
           Using the Password Dragon desktop application, navigate to "File" &rarr; "Export" &rarr;
           "To XML". In the dialog that pops up select "All Rows" and check all fields. Click the
