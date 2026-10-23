@@ -62,12 +62,31 @@ function selfHostedEnvSettingsFormValidator(): ValidatorFn {
   };
 }
 
+/**
+ * Keykeeper: an address as someone typed it, with https:// added when they
+ * left the scheme off ("vault.example.com"), and the scheme lowercased. An
+ * address that names another scheme, such as http://, stays as typed so the
+ * form can say why it won't use it.
+ */
+export function selfHostedAddress(url: string | null | undefined): string {
+  const address = (url ?? "").trim();
+  if (address === "") {
+    return "";
+  }
+  const scheme = /^([a-z][a-z0-9+.-]*):\/\//i.exec(address);
+  if (scheme == null) {
+    return `https://${address}`;
+  }
+  return scheme[1].toLowerCase() + address.slice(scheme[1].length);
+}
+
 function onlyHttpsValidator(): ValidatorFn {
   const i18nService = inject(I18nService);
   const platformUtilsService = inject(PlatformUtilsService);
 
   return (control: AbstractControl): ValidationErrors | null => {
-    const url = control.value as string;
+    // Keykeeper: no scheme means https:// (selfHostedAddress), so only another scheme is refused.
+    const url = selfHostedAddress(control.value as string);
 
     if (url && !url.startsWith("https://") && !platformUtilsService.isDev()) {
       return {
@@ -206,14 +225,15 @@ export class SelfHostedEnvConfigDialogComponent implements OnInit, OnDestroy {
       return;
     }
 
+    // Keykeeper: addresses typed without https:// get it (selfHostedAddress).
     await this.environmentService.setEnvironment(Region.SelfHosted, {
-      base: this.baseUrl.value,
-      api: this.apiUrl.value,
-      identity: this.identityUrl.value,
-      webVault: this.webVaultUrl.value,
-      icons: this.iconsUrl.value,
-      notifications: this.notificationsUrl.value,
-      send: this.sendUrl.value,
+      base: selfHostedAddress(this.baseUrl.value),
+      api: selfHostedAddress(this.apiUrl.value),
+      identity: selfHostedAddress(this.identityUrl.value),
+      webVault: selfHostedAddress(this.webVaultUrl.value),
+      icons: selfHostedAddress(this.iconsUrl.value),
+      notifications: selfHostedAddress(this.notificationsUrl.value),
+      send: selfHostedAddress(this.sendUrl.value),
     });
 
     await this.dialogRef.close(true);
