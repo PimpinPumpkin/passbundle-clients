@@ -52,5 +52,8 @@
   },
   "keykeeperMenu": {
     "message": "Menu"
+  },
+  "keykeeperSelfHostedAddressHint": {
+    "message": "Your server's address, such as vault.example.com."
   }
 }
