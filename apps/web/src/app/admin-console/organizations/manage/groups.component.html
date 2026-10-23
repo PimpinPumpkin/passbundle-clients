@@ -54,7 +54,13 @@
         </tr>
       </ng-container>
       <ng-template body let-rows$>
-        <tr bitRow *cdkVirtualFor="let g of rows$" [ngClass]="rowHeightClass">
+        <!-- Keykeeper: a row keeps its group when the list reloads and is never
+        reused for another, so an open Options menu acts on the group it was opened for. -->
+        <tr
+          bitRow
+          *cdkVirtualFor="let g of rows$; trackBy: trackGroup; templateCacheSize: 0"
+          [ngClass]="rowHeightClass"
+        >
           <td bitCell (click)="check(g)" class="tw-cursor-pointer">
             <input type="checkbox" bitCheckbox [(ngModel)]="g.checked" />
           </td>

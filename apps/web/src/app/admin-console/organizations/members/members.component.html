@@ -223,9 +223,12 @@
             </tr>
           </ng-container>
           <ng-template body let-rows$>
+            <!-- Keykeeper: a row keeps its member when the list reloads, and is never
+            reused for someone else, so an open Options menu acts on whoever it was
+            opened for (it closes if they leave the list). -->
             <tr
               bitRow
-              *cdkVirtualFor="let u of rows$"
+              *cdkVirtualFor="let u of rows$; trackBy: trackMember; templateCacheSize: 0"
               alignContent="middle"
               [ngClass]="rowHeightClass"
             >

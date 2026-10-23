@@ -1,4 +1,4 @@
-import { NO_ERRORS_SCHEMA } from "@angular/core";
+import { IterableChanges, IterableDiffers, NO_ERRORS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ActivatedRoute } from "@angular/router";
 import { mock, MockProxy } from "jest-mock-extended";
@@ -460,6 +460,47 @@ describe("MembersComponent", () => {
       await component.revoke(mockUser, mockOrg);
 
       expect(mockKeykeeperOffboarding.showPasswords).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Keykeeper: rows keep their member when the list reloads", () => {
+    const member = (email: string) =>
+      ({ ...mockUser, id: newGuid(), email }) as OrganizationUserView;
+
+    /** What the table would do to its rows: add, remove, or move one. */
+    const rowOperations = (changes: IterableChanges<OrganizationUserView> | null) => {
+      const operations: string[] = [];
+      changes?.forEachOperation((record, previousIndex, currentIndex) => {
+        const verb = previousIndex == null ? "add" : currentIndex == null ? "remove" : "move";
+        operations.push(`${verb} ${record.item.email}`);
+      });
+      return operations;
+    };
+
+    const rowDiffer = () =>
+      TestBed.inject(IterableDiffers).find([]).create(component["trackMember"]);
+
+    it("keeps every row when a reload brings fresh copies of the same people", () => {
+      const ana = member("ana@example.com");
+      const ben = member("ben@example.com");
+      const differ = rowDiffer();
+      differ.diff([ana, ben]);
+
+      const reloaded = differ.diff([{ ...ana }, { ...ben }] as OrganizationUserView[]);
+
+      expect(rowOperations(reloaded)).toEqual([]);
+    });
+
+    it("adds a row for someone who joins and leaves the others in place", () => {
+      const ben = member("ben@example.com");
+      const cy = member("cy@example.com");
+      const ada = member("ada@example.com");
+      const differ = rowDiffer();
+      differ.diff([ben, cy]);
+
+      const reloaded = differ.diff([ada, { ...ben }, { ...cy }] as OrganizationUserView[]);
+
+      expect(rowOperations(reloaded)).toEqual(["add ada@example.com"]);
     });
   });
 

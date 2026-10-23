@@ -97,6 +97,13 @@ export class GroupsComponent {
   protected rowHeight = 50;
   protected rowHeightClass = `tw-h-[50px]`;
 
+  /**
+   * Keykeeper: rows are keyed by group, and the template turns off the row
+   * cache, so a reload never shows a row (or its open menu) for another group.
+   * See the Members page.
+   */
+  protected readonly trackGroup = (_index: number, row: GroupDetailsRow) => row.details.id;
+
   protected ModalTabType = GroupAddEditTabType;
   private refreshGroups$ = new BehaviorSubject<void>(null);
 
