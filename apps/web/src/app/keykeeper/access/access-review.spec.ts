@@ -1,3 +1,7 @@
+import {
+  FOLDER_PRESETS,
+  GRID_NONE,
+} from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { CipherType } from "@bitwarden/common/vault/enums";
 
 import {
@@ -9,6 +13,7 @@ import {
   folderMatches,
   howText,
   levelOf,
+  levelText,
   memberMatches,
   mergeFlags,
   passwordListText,
@@ -70,12 +75,33 @@ function input(extra: Partial<AccessReviewInput> = {}): AccessReviewInput {
 const t = (key: string, ...args: string[]) => (args.length ? `${key}(${args.join("|")})` : key);
 
 describe("levelOf", () => {
-  it("names upstream's five permissions", () => {
+  it("names the presets, and any other grid Custom", () => {
     expect(levelOf(CAN_VIEW)).toBe("view");
     expect(levelOf(CAN_VIEW_HIDDEN)).toBe("viewHidden");
     expect(levelOf(CAN_EDIT)).toBe("edit");
-    expect(levelOf(CAN_EDIT_HIDDEN)).toBe("editHidden");
+    // Upstream's "Can edit except passwords" isn't one of ours.
+    expect(levelOf(CAN_EDIT_HIDDEN)).toBe("custom");
     expect(levelOf(CAN_MANAGE)).toBe("manage");
+    // The grid decides when there is one.
+    expect(levelOf({ ...CAN_VIEW, keykeeper: { ...FOLDER_PRESETS.view, export: true } })).toBe(
+      "custom",
+    );
+    expect(levelOf({ ...CAN_EDIT, keykeeper: FOLDER_PRESETS.edit })).toBe("edit");
+  });
+});
+
+describe("levelText", () => {
+  it("says a preset's name, or Custom with each capability", () => {
+    expect(levelText(CAN_EDIT, t)).toBe("keykeeperCanEdit");
+    expect(
+      levelText(
+        { ...CAN_VIEW_HIDDEN, keykeeper: { ...GRID_NONE, create: true, viewHistory: true } },
+        t,
+      ),
+    ).toBe("keykeeperCustomPermissions: keykeeperCapCreate, keykeeperCapViewHistory");
+    expect(levelText({ ...CAN_VIEW_HIDDEN, keykeeper: { ...GRID_NONE } }, t)).toBe(
+      "keykeeperCustomPermissions: keykeeperCapSeeItems",
+    );
   });
 });
 
@@ -86,13 +112,35 @@ describe("mergeFlags", () => {
 
   it("hides passwords only if every way hides them", () => {
     expect(levelOf(mergeFlags([CAN_VIEW_HIDDEN, CAN_VIEW]))).toBe("view");
-    expect(levelOf(mergeFlags([CAN_VIEW_HIDDEN, CAN_EDIT_HIDDEN]))).toBe("editHidden");
-    // Edit from one way and passwords from the other: both, as the server decides.
-    expect(levelOf(mergeFlags([CAN_EDIT_HIDDEN, CAN_VIEW]))).toBe("edit");
+    expect(mergeFlags([CAN_VIEW_HIDDEN, CAN_EDIT_HIDDEN]).hidePasswords).toBe(true);
+    // Edit from one way and passwords from the other: both, as the server
+    // decides. Share comes from neither (it needs see passwords where it's
+    // given), so it's a Custom grid rather than Can edit.
+    const both = mergeFlags([CAN_EDIT_HIDDEN, CAN_VIEW]);
+    expect(both.keykeeper).toMatchObject({ seePasswords: true, edit: true, share: false });
+    expect(levelOf(both)).toBe("custom");
   });
 
   it("lets someone manage if any way does", () => {
     expect(levelOf(mergeFlags([CAN_VIEW_HIDDEN, CAN_MANAGE]))).toBe("manage");
+  });
+
+  it("merges grids capability by capability: the most open way for each", () => {
+    const dropBox = { ...CAN_VIEW_HIDDEN, keykeeper: { ...GRID_NONE, create: true } };
+    const exporter = {
+      ...CAN_VIEW,
+      keykeeper: { ...GRID_NONE, seePasswords: true, export: true },
+    };
+    const merged = mergeFlags([dropBox, exporter]);
+    expect(merged.keykeeper).toEqual({
+      ...GRID_NONE,
+      seePasswords: true,
+      create: true,
+      export: true,
+    });
+    expect(merged.hidePasswords).toBe(false);
+    expect(merged.readOnly).toBe(true);
+    expect(levelOf(merged)).toBe("custom");
   });
 });
 
@@ -108,7 +156,12 @@ describe("reviewAccess", () => {
     expect(alex.folders[0].folder.name).toBe("Front desk");
     expect(alex.folders[0].level).toBe("edit");
     expect(alex.folders[0].paths).toEqual([
-      { groupId: null, groupName: null, flags: CAN_EDIT, level: "edit" },
+      {
+        groupId: null,
+        groupName: null,
+        flags: { ...CAN_EDIT, keykeeper: FOLDER_PRESETS.edit },
+        level: "edit",
+      },
     ]);
   });
 
@@ -124,7 +177,12 @@ describe("reviewAccess", () => {
     expect(folder.folder.name).toBe("Payroll");
     expect(folder.level).toBe("view");
     expect(folder.paths).toEqual([
-      { groupId: "office", groupName: "Front office", flags: CAN_VIEW, level: "view" },
+      {
+        groupId: "office",
+        groupName: "Front office",
+        flags: { ...CAN_VIEW, keykeeper: FOLDER_PRESETS.view },
+        level: "view",
+      },
     ]);
   });
 
@@ -141,7 +199,8 @@ describe("reviewAccess", () => {
     );
 
     const [folder] = review.members[0].folders;
-    expect(folder.level).toBe("editHidden");
+    expect(folder.level).toBe("custom");
+    expect(folder.flags.readOnly).toBe(false);
     expect(folder.flags.hidePasswords).toBe(true);
     expect(folder.paths.map((p) => p.groupId)).toEqual([null, "office"]);
   });
@@ -435,7 +494,7 @@ describe("howText", () => {
     );
 
     expect(howText(review.members[0].folders[0].paths, t)).toBe(
-      "keykeeperAccessDirectly (keykeeperCanEdit), keykeeperAccessThroughGroup(Office) (keykeeperCanViewHidden)",
+      "keykeeperAccessDirectly (keykeeperCanEdit); keykeeperAccessThroughGroup(Office) (keykeeperCanViewHidden)",
     );
     expect(howText(review.members[0].folders[0].paths.slice(0, 1), t)).toBe(
       "keykeeperAccessDirectly",

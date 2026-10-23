@@ -4,6 +4,14 @@
 // the organization's items. Nothing here talks to the server. See DESIGN.md,
 // "Access and offboarding".
 
+import {
+  FOLDER_CAPABILITIES,
+  FolderGrid,
+  gridOf,
+  mergeGrids,
+  presetOf,
+  upstreamOf,
+} from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { CipherType } from "@bitwarden/common/vault/enums";
 
@@ -17,18 +25,23 @@ export function canReviewAccess(org: Organization): boolean {
   return org.canManageUsers;
 }
 
-/** How someone reaches a shared folder, as upstream stores it for each grant. */
+/**
+ * How someone reaches a shared folder: upstream's three fields, and the
+ * grant's grid of capabilities, which decides (DESIGN.md, "Folders and
+ * permissions"). Without a grid, upstream's fields name its preset.
+ */
 export type AccessFlags = {
   readOnly: boolean;
   hidePasswords: boolean;
   manage: boolean;
+  keykeeper?: FolderGrid;
 };
 
 /** A grant to one shared folder (its id), directly or to a group. */
 export type AccessGrant = AccessFlags & { id: string };
 
-/** The permission in plain words, upstream's five. */
-export type AccessLevel = "manage" | "edit" | "editHidden" | "view" | "viewHidden";
+/** The permission in plain words: a preset, or Custom with its capabilities. */
+export type AccessLevel = "manage" | "edit" | "view" | "viewHidden" | "custom";
 
 export type AccessRole = "owner" | "admin" | "user" | "custom";
 
@@ -137,35 +150,30 @@ export type AccessReview = {
   itemsByFolder: Map<string, Set<string>>;
 };
 
-/** Upstream's permission for one grant. */
+/** The preset a grant's grid is, or Custom. */
 export function levelOf(flags: AccessFlags): AccessLevel {
-  if (flags.manage) {
-    return "manage";
-  }
-  if (flags.readOnly) {
-    return flags.hidePasswords ? "viewHidden" : "view";
-  }
-  return flags.hidePasswords ? "editHidden" : "edit";
+  return presetOf(gridOf(flags));
 }
 
 /**
- * Someone who reaches a folder more than one way gets the most open of them,
- * as the server decides: they can edit if any way lets them, manage if any
- * way does, and passwords stay hidden only if every way hides them.
+ * Someone who reaches a folder more than one way gets, for each capability,
+ * the most open of them, as the server decides: so passwords stay hidden only
+ * if every way hides them.
  */
 export function mergeFlags(paths: AccessFlags[]): AccessFlags {
-  return {
-    readOnly: paths.every((p) => p.readOnly),
-    hidePasswords: paths.every((p) => p.hidePasswords),
-    manage: paths.some((p) => p.manage),
-  };
+  const grid = mergeGrids(paths.map(gridOf))!;
+  return { ...upstreamOf(grid), keykeeper: grid };
 }
 
-const flagsOf = (g: AccessFlags): AccessFlags => ({
-  readOnly: !!g.readOnly,
-  hidePasswords: !!g.hidePasswords,
-  manage: !!g.manage,
-});
+const flagsOf = (g: AccessFlags): AccessFlags => {
+  const grid = gridOf({
+    readOnly: !!g.readOnly,
+    hidePasswords: !!g.hidePasswords,
+    manage: !!g.manage,
+    keykeeper: g.keykeeper,
+  });
+  return { ...upstreamOf(grid), keykeeper: grid };
+};
 
 const byName = (a: string, b: string) =>
   a.localeCompare(b, undefined, { sensitivity: "base", numeric: true });
@@ -369,10 +377,33 @@ type Translate = (key: string, ...args: string[]) => string;
 export const LEVEL_KEYS: Record<AccessLevel, string> = {
   manage: "keykeeperCanManage",
   edit: "keykeeperCanEdit",
-  editHidden: "keykeeperCanEditHidden",
   view: "keykeeperCanView",
   viewHidden: "keykeeperCanViewHidden",
+  custom: "keykeeperCustomPermissions",
 };
+
+/**
+ * A Custom grant's capabilities in plain words, such as "See passwords,
+ * Create items" (every one it has besides seeing the items), or undefined for
+ * a preset, whose name says it all.
+ */
+export function capabilitiesText(flags: AccessFlags, t: Translate): string | undefined {
+  if (levelOf(flags) !== "custom") {
+    return undefined;
+  }
+  const grid = gridOf(flags);
+  const caps = FOLDER_CAPABILITIES.filter(({ key }) => grid[key]).map(({ label }) => t(label));
+  return caps.length === 0 ? t("keykeeperCapSeeItems") : caps.join(", ");
+}
+
+/**
+ * A grant in plain words: the preset's name, or "Custom: See passwords,
+ * Create items" with every capability it has besides seeing the items.
+ */
+export function levelText(flags: AccessFlags, t: Translate): string {
+  const caps = capabilitiesText(flags, t);
+  return caps == null ? t(LEVEL_KEYS[levelOf(flags)]) : `${t(LEVEL_KEYS.custom)}: ${caps}`;
+}
 
 /** "Directly", "Through Front office", or for a group the viewer can't list, "Through a group". */
 export function pathText(path: AccessPath, t: Translate): string {
@@ -393,7 +424,7 @@ export function howText(paths: AccessPath[], t: Translate): string {
   if (paths.length === 1) {
     return pathText(paths[0], t);
   }
-  return paths.map((p) => `${pathText(p, t)} (${t(LEVEL_KEYS[p.level])})`).join(", ");
+  return paths.map((p) => `${pathText(p, t)} (${levelText(p.flags, t)})`).join("; ");
 }
 
 /** "3 shared folders", "1 shared folder". */

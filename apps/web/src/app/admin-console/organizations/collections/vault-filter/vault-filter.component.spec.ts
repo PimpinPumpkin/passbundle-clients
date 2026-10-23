@@ -293,7 +293,9 @@ describe("OrganizationVaultFilterComponent", () => {
       const section = await (component as any).addCollectionFilter();
       const tree = await firstValueFrom(section.data$);
       expect(tree.node.name).toBe("collections");
-      expect(tree.children[0].node.name).toBe("Collections");
+      // Keykeeper: the translated word (shared folders, in our wording), not
+      // upstream's hard-coded English.
+      expect(tree.children[0].node.name).toBe("collections");
     });
 
     it("names the filter node 'sharedFolders' when the VFO1 flag is on", async () => {

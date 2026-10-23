@@ -39,6 +39,8 @@ import {
   AccessItemValue,
   AccessItemView,
   AccessSelectorModule,
+  CollectionPermission,
+  convertToGrid,
   convertToPermission,
   convertToSelectionView,
   mapGroupToAccessItemView,
@@ -208,11 +210,15 @@ function mapToAccessSelections(collection: CollectionAdminView): AccessItemValue
       id: selection.id,
       type: AccessItemType.Group,
       permission: convertToPermission(selection),
+      // Keykeeper: the grant's grid, so Custom keeps it.
+      grid: convertToGrid(selection),
     })),
     collection.users.map<AccessItemValue>((selection) => ({
       id: selection.id,
       type: AccessItemType.Member,
       permission: convertToPermission(selection),
+      // Keykeeper: the grant's grid, so Custom keeps it.
+      grid: convertToGrid(selection),
     })),
   );
 }
@@ -222,7 +228,11 @@ function accessEquals(a: AccessItemValue[], b: AccessItemValue[]): boolean {
     return false;
   }
 
-  const key = (value: AccessItemValue) => `${value.type}:${value.id}:${value.permission}`;
+  // Keykeeper: Custom grants are the same only with the same grid.
+  const key = (value: AccessItemValue) =>
+    `${value.type}:${value.id}:${value.permission}:${
+      value.permission === CollectionPermission.Custom ? JSON.stringify(value.grid) : ""
+    }`;
   const bKeys = new Set(b.map(key));
   return a.every((value) => bKeys.has(key(value)));
 }

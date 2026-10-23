@@ -239,7 +239,7 @@ describe("KeykeeperVaultMenuComponent", () => {
     button.click();
   }
 
-  it("lists search, everything, Health, then categories, vaults, and folders, with counts", () => {
+  it("lists search, everything, Health, then categories, and the folders: Personal's, then each organization's", () => {
     expect(el().querySelector("bit-search")).not.toBeNull();
     expect(rows()).toEqual([
       "allItems 3",
@@ -248,13 +248,12 @@ describe("KeykeeperVaultMenuComponent", () => {
       "# keykeeperCategories",
       "Login 2",
       "Card 1",
-      "# vaults",
+      "# keykeeperFolders",
       "My vault 2",
+      "Banking 1",
+      "No folder 1",
       "Contoso 1",
       "Office 1",
-      "# folders",
-      "Banking 1",
-      "No folder 2",
       "archiveNoun 0",
       "trash 0",
     ]);
@@ -309,9 +308,10 @@ describe("KeykeeperVaultMenuComponent", () => {
       expect.objectContaining({ id: ORG }),
     );
 
+    // A personal folder shows what's filed there, out of the organization.
     click("Banking");
     await settle();
-    expect(router.url).toBe(`/vault?organizationId=${ORG}&folderId=f-bank`);
+    expect(router.url).toBe("/vault?folderId=f-bank");
 
     click("allItems");
     await settle();
@@ -374,12 +374,20 @@ describe("KeykeeperVaultMenuComponent", () => {
     expect(sideNav.open()).toBe(false);
   });
 
-  it("makes a folder from the button beside Folders", () => {
+  it("makes a folder from the button beside Folders, asking where it goes", async () => {
     const newFolder = el().querySelector<HTMLButtonElement>(
       ".keykeeper-menu-heading button[aria-label=newFolder]",
     );
     newFolder!.click();
+    await settle();
 
+    const where = Array.from(document.querySelectorAll<HTMLButtonElement>("[bitmenuitem]"));
+    expect(where.map((b) => b.textContent!.trim())).toEqual([
+      "myVault",
+      "Contoso",
+      "newOrganization",
+    ]);
+    where[0].click();
     expect(dialogService.open).toHaveBeenCalled();
   });
 

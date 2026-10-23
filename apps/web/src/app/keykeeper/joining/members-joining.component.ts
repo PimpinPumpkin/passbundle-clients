@@ -39,7 +39,8 @@ import { KeykeeperMspWorkService } from "../msp/msp-work.service";
         data-testid="members-two-step-waiting"
       >
         This organization requires two-step login, so {{ names() }} can't be confirmed until they
-        turn it on. Their vault tells them, and they're confirmed as usual once it's on.
+        turn it on. Their web app and extension tell them, and they're confirmed as usual once it's
+        on.
       </bit-callout>
     }
   `,

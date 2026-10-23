@@ -67,6 +67,7 @@ import {
   AccessItemValue,
   AccessItemView,
   CollectionPermission,
+  convertToGrid,
   convertToPermission,
   convertToSelectionView,
 } from "../access-selector/access-selector.models";
@@ -631,11 +632,15 @@ function mapToAccessSelections(
       id: selection.id,
       type: AccessItemType.Group,
       permission: convertToPermission(selection),
+      // Keykeeper: the grant's grid, so Custom keeps it.
+      grid: convertToGrid(selection),
     })),
     collectionDetails.users.map<AccessItemValue>((selection) => ({
       id: selection.id,
       type: AccessItemType.Member,
       permission: convertToPermission(selection),
+      // Keykeeper: the grant's grid, so Custom keeps it.
+      grid: convertToGrid(selection),
     })),
   );
 }

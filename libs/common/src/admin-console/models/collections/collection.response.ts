@@ -1,5 +1,6 @@
 import { BaseResponse } from "../../../models/response/base.response";
 import { CollectionId, OrganizationId } from "../../../types/guid";
+import { FolderGrid } from "../../keykeeper/folder-permissions";
 import { SelectionReadOnlyResponse } from "../response/selection-read-only.response";
 
 import { CollectionType, CollectionTypes } from ".";
@@ -27,6 +28,8 @@ export class CollectionDetailsResponse extends CollectionResponse {
   readOnly: boolean;
   manage: boolean;
   hidePasswords: boolean;
+  /** Keykeeper: the person's own capabilities in the folder, from our server. */
+  keykeeper?: FolderGrid;
 
   /**
    * Flag indicating the user has been explicitly assigned to this Collection
@@ -38,6 +41,7 @@ export class CollectionDetailsResponse extends CollectionResponse {
     this.readOnly = this.getResponseProperty("ReadOnly") || false;
     this.manage = this.getResponseProperty("Manage") || false;
     this.hidePasswords = this.getResponseProperty("HidePasswords") || false;
+    this.keykeeper = this.getResponseProperty("Keykeeper") ?? undefined;
 
     // Temporary until the API is updated to return this property in AC-2084
     // For now, we can assume that if the object is 'collectionDetails' then the user is assigned

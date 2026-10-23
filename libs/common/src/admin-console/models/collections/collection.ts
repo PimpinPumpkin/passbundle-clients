@@ -6,6 +6,7 @@ import { asUuid, uuidAsString } from "../../../platform/abstractions/sdk/sdk.ser
 import Domain from "../../../platform/models/domain/domain-base";
 import { CollectionId, OrganizationId } from "../../../types/guid";
 import { OrgKey } from "../../../types/key";
+import { FolderGrid } from "../../keykeeper/folder-permissions";
 
 import { CollectionData } from "./collection.data";
 
@@ -28,6 +29,8 @@ export class Collection extends Domain {
   manage: boolean = false;
   type: CollectionType = CollectionTypes.SharedCollection;
   defaultUserCollectionEmail: string | undefined;
+  /** Keykeeper: the person's own capabilities in the folder. */
+  keykeeper?: FolderGrid;
 
   constructor(c: { id: CollectionId; name: EncString; organizationId: OrganizationId }) {
     super();
@@ -52,6 +55,9 @@ export class Collection extends Domain {
     collection.manage = obj.manage;
     collection.type = obj.type;
     collection.defaultUserCollectionEmail = obj.defaultUserCollectionEmail;
+    if (obj.keykeeper != null) {
+      collection.keykeeper = obj.keykeeper;
+    }
 
     return collection;
   }
@@ -72,6 +78,9 @@ export class Collection extends Domain {
     collection.hidePasswords = view.hidePasswords;
     collection.manage = view.manage;
     collection.type = view.type;
+    if (view.keykeeper != null) {
+      collection.keykeeper = view.keykeeper;
+    }
 
     return collection;
   }

@@ -9,6 +9,7 @@ import { asUuid, uuidAsString } from "../../../platform/abstractions/sdk/sdk.ser
 import { CollectionId, OrganizationId } from "../../../types/guid";
 import { OrgKey } from "../../../types/key";
 import { ITreeNodeObject } from "../../../vault/models/domain/tree-node";
+import { FolderGrid, gridOf } from "../../keykeeper/folder-permissions";
 import { Organization } from "../domain/organization";
 
 import { Collection, CollectionType, CollectionTypes } from "./collection";
@@ -27,6 +28,12 @@ export class CollectionView implements View, ITreeNodeObject {
   assigned: boolean = false;
   type: CollectionType = CollectionTypes.SharedCollection;
   defaultUserCollectionEmail: string | undefined;
+  /**
+   * Keykeeper: the person's own capabilities in the folder, from our server.
+   * Upstream's readOnly, hidePasswords, and manage are its closest preset.
+   * See DESIGN.md, "Folders and permissions".
+   */
+  keykeeper?: FolderGrid;
 
   private _name: string;
 
@@ -51,7 +58,9 @@ export class CollectionView implements View, ITreeNodeObject {
       );
     }
 
-    return org?.canEditAllCiphers || this.manage || (this.assigned && !this.readOnly);
+    // Keykeeper: adding items to a folder is its create capability (DESIGN.md,
+    // "Folders and permissions"); upstream's fields name it when there's no grid.
+    return org?.canEditAllCiphers || this.manage || (this.assigned && gridOf(this).create);
   }
 
   /**
@@ -144,6 +153,9 @@ export class CollectionView implements View, ITreeNodeObject {
     view.manage = collection.manage;
     view.type = collection.type;
     view.defaultUserCollectionEmail = collection.defaultUserCollectionEmail;
+    if (collection.keykeeper != null) {
+      view.keykeeper = collection.keykeeper;
+    }
     return view;
   }
 
@@ -167,6 +179,9 @@ export class CollectionView implements View, ITreeNodeObject {
     view.type = collection.type;
     view.assigned = collection.assigned;
     view.defaultUserCollectionEmail = collection.defaultUserCollectionEmail;
+    if (collection.keykeeper != null) {
+      view.keykeeper = collection.keykeeper;
+    }
     return view;
   }
 
@@ -200,6 +215,10 @@ export class CollectionView implements View, ITreeNodeObject {
     view.assigned = true;
     view.defaultUserCollectionEmail = sourceCollection.defaultUserCollectionEmail;
     view.type = sdkView.type;
+    // Keykeeper: the SDK doesn't carry the grid either.
+    if (sourceCollection.keykeeper != null) {
+      view.keykeeper = sourceCollection.keykeeper;
+    }
 
     return view;
   }

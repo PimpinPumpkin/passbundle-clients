@@ -1,0 +1,746 @@
+{
+  "about": "Upstream's English strings in PassBundle's words, by message key, applied by brand/apply.mjs after branding; {brand} is the product's name from brand.json. One word, folder, for every place an item lives: Personal and its folders, and each organization's shared folders (upstream's collections); the word vault stays only where it means the whole encrypted store, listed in kept with why. See DESIGN.md, 'Folders and permissions'. 'all' applies to every app's English strings that have the key; 'web' and 'browser' only to that app's. A key no app has fails the brand step, so upstream renames are noticed.",
+  "kept": {
+    "yourVaultIsLockedV2": "Locking: the whole encrypted store is locked.",
+    "unlockVaultMenu": "Unlocking the store, in the extension's in-page menu.",
+    "unlockVault": "Unlocking the store.",
+    "unlockVaultDesc": "Unlock and timeout settings for the store.",
+    "notificationUnlockDesc": "Unlocking the store to finish autofill.",
+    "vaultTimeout": "The lock timeout: how long the store stays unlocked.",
+    "vaultTimeoutAction": "What happens to the store at the timeout.",
+    "vaultTimeoutLogOutConfirmation": "Signing out removes access to the store.",
+    "vaultTimeoutTooLarge": "The lock timeout policy.",
+    "vaultLockPolicy": "Our policy name for the lock timeout.",
+    "vaultLockPolicyDesc": "Our policy description for the lock timeout.",
+    "neverLockWarning": "The store's encryption key on the device.",
+    "useForVaultEncryption": "Encryption of the whole store.",
+    "encryptionKeySettingsHowShouldWeEncryptYourData": "Encryption of the whole store.",
+    "encryptionKeySettingsIncreaseImproveSecurity": "Unlocking the whole store.",
+    "rotateAccountEncryptionDialogDescription": "Re-encrypting the whole store.",
+    "rotateAccountEncryptionKeyDescription": "Re-encrypting the whole store.",
+    "tdeDisabledMasterPasswordRequired": "The master password unlocks the store.",
+    "oldAttachmentsNeedFixDesc": "Key rotation over the whole store.",
+    "kdfSettingsChangeLogoutWarning": "Encryption settings of the whole store.",
+    "sharedUnlockDesktopPermissionWarning": "Locking the store when the extension reloads."
+  },
+  "all": {
+    "accessedClientVault": {
+      "message": "Accessed the items of organization $ID$."
+    },
+    "accessedClientVaultWithName": {
+      "message": "Accessed $ID$ in $ORGNAME$."
+    },
+    "addCollection": {
+      "message": "Add shared folder"
+    },
+    "addNewCardItemAria": {
+      "message": "Add a new card, opens in a new window"
+    },
+    "addNewIdentityItemAria": {
+      "message": "Add a new identity, opens in a new window"
+    },
+    "addNewLoginItemAria": {
+      "message": "Add a new login, opens in a new window"
+    },
+    "addNewVaultItem": {
+      "message": "Add a new item"
+    },
+    "addedOrganizationIdWithName": {
+      "message": "Added organization $ORGNAME$ $ID$."
+    },
+    "adminCollectionAccess": {
+      "message": "Administrators can access and manage shared folders."
+    },
+    "adminDesc": {
+      "message": "Manage organization access, all shared folders, members, reporting, and security settings"
+    },
+    "adminRoleDesc": {
+      "message": "Manage all shared folders, members, reporting, and security settings"
+    },
+    "allVaults": {
+      "message": "All items"
+    },
+    "allowAdminAccessToAllCollectionItemsDescription": {
+      "message": "Allow owners and admins to manage all shared folders and items from the Admin Console"
+    },
+    "allowAdminAccessToAllCollectionItemsDisabled": {
+      "message": "Turned off Allow owners and admins to manage all shared folders and items setting $ID$."
+    },
+    "allowAdminAccessToAllCollectionItemsEnabled": {
+      "message": "Turned on Allow owners and admins to manage all shared folders and items setting $ID$."
+    },
+    "archivePremiumRestart": {
+      "message": "To regain access to your archive, restart your Premium subscription. If you edit details for an archived item before restarting, it'll be moved back out of the archive."
+    },
+    "assignCollectionAccess": {
+      "message": "Assign shared folder access"
+    },
+    "assignToCollections": {
+      "message": "Add to shared folders"
+    },
+    "bitWebVault": {
+      "message": "{brand}"
+    },
+    "bulkCollectionAssignmentDialogDescriptionPlural": {
+      "message": "Only organization members with access to these shared folders will be able to see the items."
+    },
+    "bulkCollectionAssignmentDialogDescriptionSingular": {
+      "message": "Only organization members with access to these shared folders will be able to see the item."
+    },
+    "bulkVaultSharedFolderAssignmentDialogDescriptionPlural": {
+      "message": "Only organization members with access to these shared folders will be able to see the items."
+    },
+    "bulkVaultSharedFolderAssignmentDialogDescriptionSingular": {
+      "message": "Only organization members with access to these shared folders will be able to see the item."
+    },
+    "cannotAddYourselfToCollections": {
+      "message": "You cannot add yourself to shared folders."
+    },
+    "cannotCreateCollection": {
+      "message": "Free organizations may have up to 2 shared folders. Upgrade to a paid plan to add more shared folders."
+    },
+    "cannotRemoveViewOnlyCollections": {
+      "message": "You can't take items out of these shared folders: $COLLECTIONS$"
+    },
+    "clickedVaultBannerButton": {
+      "message": "Clicked the banner button"
+    },
+    "coachmarkAddItemDescription": {
+      "message": "Add new passwords, notes, and other info. Everything is protected with end-to-end encryption."
+    },
+    "coachmarkImportDescription": {
+      "message": "Did you have a password manager before? You can import a CSV of existing logins and other data."
+    },
+    "coachmarkMonitorSecurityDescription": {
+      "message": "Keep your items secure by checking reports for vulnerabilities."
+    },
+    "coachmarkShareWithCollectionsDescription": {
+      "message": "By moving an item into an organization's shared folder, you can securely share it with other people in your organization."
+    },
+    "coachmarkShareWithSharedFoldersDescription": {
+      "message": "By moving an item into an organization's shared folder, you can securely share it with other people in your organization."
+    },
+    "collection": {
+      "message": "Shared folder"
+    },
+    "collectionAdminConsoleManaged": {
+      "message": "This shared folder is only accessible from the admin console"
+    },
+    "collectionAriaLabel": {
+      "message": "Shared folder $NAME$"
+    },
+    "collectionDeleted": {
+      "message": "Shared folder deleted"
+    },
+    "collectionEdited": {
+      "message": "Shared folder edited"
+    },
+    "collectionInfo": {
+      "message": "Shared folder info"
+    },
+    "collectionItemSelect": {
+      "message": "Select shared folder"
+    },
+    "collectionManagement": {
+      "message": "Shared folder settings"
+    },
+    "collectionManagementDescription": {
+      "message": "Configure how shared folders behave in the organization"
+    },
+    "collections": {
+      "message": "Shared folders"
+    },
+    "collectionsDeleted": {
+      "message": "Shared folders deleted"
+    },
+    "collectionsEdited": {
+      "message": "Shared folders edited"
+    },
+    "confirmVaultExport": {
+      "message": "Confirm export"
+    },
+    "confirmVaultImport": {
+      "message": "Confirm import"
+    },
+    "couldNotDecryptVaultItemsBelow": {
+      "message": "The items listed below could not be decrypted."
+    },
+    "createFoldersToOrganize": {
+      "message": "Create folders to organize your items"
+    },
+    "createUnlimitedCollections": {
+      "message": "Create unlimited shared folders"
+    },
+    "createdCollectionId": {
+      "message": "Created shared folder $ID$."
+    },
+    "createdOrganizationIdWithName": {
+      "message": "Created organization $ORGNAME$ $ID$."
+    },
+    "defaultCollection": {
+      "message": "Default shared folder"
+    },
+    "deleteAccountDesc": {
+      "message": "Proceed below to delete your account and all of its items."
+    },
+    "deleteCollection": {
+      "message": "Delete shared folder"
+    },
+    "deleteCollectionConfirmation": {
+      "message": "Are you sure you want to delete this shared folder?"
+    },
+    "deleteCollectionDesc": {
+      "message": "This shared folder will be permanently deleted."
+    },
+    "deleteCollectionsCount": {
+      "message": "Delete $COUNT$ shared folders"
+    },
+    "deleteCollectionsDesc": {
+      "message": "These shared folders will be permanently deleted."
+    },
+    "deleteItemsAndCollectionsDesc": {
+      "message": "The selected items and shared folders will be permanently deleted."
+    },
+    "deleteManagedUserWarningDesc": {
+      "message": "This action will delete the member account including all of their personal items. This replaces the previous Remove action."
+    },
+    "deleteManyOrganizationUsersWarningDesc": {
+      "message": "This will permanently delete all personal items owned by the following members. Items in shared folders are not impacted."
+    },
+    "deleteOrganizationUserWarningDesc": {
+      "message": "This will permanently delete all personal items owned by $NAME$. Items in shared folders are not impacted."
+    },
+    "deleteSelectedCollectionsDesc": {
+      "message": "$COUNT$ shared folder(s) will be permanently deleted."
+    },
+    "deletedCollectionId": {
+      "message": "Deleted shared folder $ID$."
+    },
+    "deletedCollections": {
+      "message": "Deleted shared folders"
+    },
+    "deletingOrganizationContentWarning": {
+      "message": "Enter the master password to confirm deletion of $ORGANIZATION$ and all associated data. Data in $ORGANIZATION$ includes:"
+    },
+    "editCollection": {
+      "message": "Edit shared folder"
+    },
+    "editGroupCollectionsDesc": {
+      "message": "Grant access to shared folders by adding them to this group."
+    },
+    "editGroupMembersDesc": {
+      "message": "Grant members access to the group's shared folders."
+    },
+    "editedCollectionId": {
+      "message": "Edited shared folder $ID$."
+    },
+    "editedCollectionsForItem": {
+      "message": "Edited shared folders for item $ID$."
+    },
+    "editedOrgSettingsWithName": {
+      "message": "Edited the settings of $ORGNAME$."
+    },
+    "emptyVaultDescription": {
+      "message": "{brand} protects more than just your passwords. Store logins, IDs, cards, and notes securely here."
+    },
+    "errorAssigningTargetCollection": {
+      "message": "Error assigning the target shared folder."
+    },
+    "errorImportingMyItemsMultiCollection": {
+      "message": "You cannot import items into My Items that are part of more than one shared folder"
+    },
+    "exportError": {
+      "message": "An error occurred while exporting your items"
+    },
+    "exportSuccess": {
+      "message": "Items exported"
+    },
+    "exportSuccessSkippedAttachment": {
+      "message": "1 corrupted attachment was skipped during export. All other items and attachments exported successfully."
+    },
+    "exportSuccessSkippedAttachments": {
+      "message": "$COUNT$ corrupted attachments were skipped during export. All other items and attachments exported successfully."
+    },
+    "exportUnencryptedWarningDesc": {
+      "message": "This export contains your items in an unencrypted format. You should not store or send the exported file over insecure channels (such as email). Delete it immediately after you are done using it."
+    },
+    "exportedOrganizationVault": {
+      "message": "Exported the organization's items."
+    },
+    "exportedOrganizationVaultWithName": {
+      "message": "Exported the items of $ORGNAME$."
+    },
+    "exportedVault": {
+      "message": "Exported items"
+    },
+    "exportingIndividualVaultScopeDescription": {
+      "message": "Only your personal items will export."
+    },
+    "exportingOrganizationVaultFromAdminConsoleWithDataOwnershipDesc": {
+      "message": "Only the items of $ORGANIZATION$ will be exported. My items shared folders will not be included."
+    },
+    "exportingOrganizationVaultFromPasswordManagerWithDataOwnershipDesc": {
+      "message": "Only the items of $ORGANIZATION$ will be exported."
+    },
+    "exportingOrganizationVaultScopeDescription": {
+      "message": "Only items in the shared folders of $ORGANIZATION$ that you can export will export. Personal items will not."
+    },
+    "exportingOrganizationVaultTitle": {
+      "message": "Exporting an organization's items"
+    },
+    "exportingPersonalVaultTitle": {
+      "message": "Exporting your personal items"
+    },
+    "extensionPromptHeading": {
+      "message": "Get the extension for easy access to your items"
+    },
+    "familiesUnlimitedCollections": {
+      "message": "Unlimited family shared folders"
+    },
+    "filterVault": {
+      "message": "Filter items"
+    },
+    "freeOrgMaxCollectionReachedManageBilling": {
+      "message": "Free organizations may have up to $COLLECTIONCOUNT$ shared folders. Upgrade to a paid plan to add more shared folders."
+    },
+    "freeOrgMaxCollectionReachedNoManageBilling": {
+      "message": "Free organizations may have up to $COLLECTIONCOUNT$ shared folders. Contact your organization owner to upgrade."
+    },
+    "getStartedWithYourVault": {
+      "message": "Get started with {brand}"
+    },
+    "getTheDesktopAppDesc": {
+      "message": "Open your items without a browser, then set up unlock with biometrics to unlock faster in both the desktop app and browser extension."
+    },
+    "grantCollectionAccess": {
+      "message": "Grant groups or members access to this shared folder."
+    },
+    "grantCollectionAccessMembersOnly": {
+      "message": "Grant members access to this shared folder."
+    },
+    "grantManageCollectionWarning": {
+      "message": "Give someone Can manage so the shared folder can be fully managed, including deleting it."
+    },
+    "grantManageCollectionWarningTitle": {
+      "message": "No one can manage this shared folder"
+    },
+    "groupAccessUserDesc": {
+      "message": "Grant member access to shared folders by adding them to 1 or more groups."
+    },
+    "hasItemsVaultNudgeBodyThree": {
+      "message": "Search for something else"
+    },
+    "hasItemsVaultNudgeTitle": {
+      "message": "Welcome!"
+    },
+    "howToManageMyVault": {
+      "message": "How do I manage my items?"
+    },
+    "importTargetHintCollection": {
+      "message": "Select this option if you want the imported file contents moved to a shared folder"
+    },
+    "itemMovedToCollection": {
+      "message": "Item moved to shared folder"
+    },
+    "itemMovedToCollections": {
+      "message": "Item moved to shared folders"
+    },
+    "itemsMovedToCollection": {
+      "message": "Items moved to shared folder"
+    },
+    "itemsMovedToCollections": {
+      "message": "Items moved to shared folders"
+    },
+    "languageDesc": {
+      "message": "Change the language used by the web app."
+    },
+    "learnMoreAboutCollectionManagement": {
+      "message": "Learn more about shared folders"
+    },
+    "learnMoreAboutSearchingYourVault": {
+      "message": "Learn more about searching"
+    },
+    "limitCollectionCreationDisabled": {
+      "message": "Turned off Restrict shared folder creation setting $ID$."
+    },
+    "limitCollectionCreationEnabled": {
+      "message": "Turned on Restrict shared folder creation setting $ID$."
+    },
+    "limitCollectionDeletionDisabled": {
+      "message": "Turned off Restrict shared folder deletion setting $ID$."
+    },
+    "limitCollectionDeletionEnabled": {
+      "message": "Turned on Restrict shared folder deletion setting $ID$."
+    },
+    "limitedCollections": {
+      "message": "Limited to $COUNT$ shared folders"
+    },
+    "limitedCollectionsV2": {
+      "message": "Up to $COUNT$ shared folders"
+    },
+    "loadingVault": {
+      "message": "Loading items"
+    },
+    "loginToVaultMenu": {
+      "message": "Log in"
+    },
+    "manageAllCollections": {
+      "message": "Manage all shared folders"
+    },
+    "manageCollection": {
+      "message": "Can manage"
+    },
+    "modifiedCollectionManagement": {
+      "message": "Modified shared folder settings $ID$."
+    },
+    "movedItemIdToOrgWithName": {
+      "message": "Moved item $ID$ to $ORGNAME$."
+    },
+    "myVault": {
+      "message": "Personal"
+    },
+    "nCollections": {
+      "message": "$COUNT$ shared folders"
+    },
+    "nestCollectionUnder": {
+      "message": "Nest shared folder under"
+    },
+    "newCollection": {
+      "message": "New shared folder"
+    },
+    "newOrganizationDesc": {
+      "message": "Organizations let you share items with others through shared folders, and manage the people of a family, small team, or large company."
+    },
+    "newVault": {
+      "message": "New organization"
+    },
+    "noCollection": {
+      "message": "No shared folder"
+    },
+    "noCollectionsAdded": {
+      "message": "No shared folders added"
+    },
+    "noCollectionsSelected": {
+      "message": "You have not selected any shared folders."
+    },
+    "noExposedPasswords": {
+      "message": "No items have passwords that have been exposed in known data breaches."
+    },
+    "noInactive2fa": {
+      "message": "No websites were found with a missing two-step login configuration."
+    },
+    "noItemsInVault": {
+      "message": "No items yet"
+    },
+    "noPasskeyLogin": {
+      "message": "No accounts were found that support passkeys without one configured."
+    },
+    "noReusedPasswords": {
+      "message": "No logins have passwords that are being reused."
+    },
+    "noUnsecuredWebsites": {
+      "message": "No items have unsecured URIs."
+    },
+    "noWeakPasswords": {
+      "message": "No items have weak passwords."
+    },
+    "onboardingImportDataSubtitle": {
+      "message": "Save time by importing data from another password manager. You can also add items by hand."
+    },
+    "organizationUserNotificationPolicyDesc": {
+      "message": "Create and launch a customized banner that all organization members see after they log in."
+    },
+    "organizationUserNotificationPolicyTitle": {
+      "message": "Banner"
+    },
+    "orgsReportsDescV2": {
+      "message": "Identify and close security gaps in your organization by clicking the reports below."
+    },
+    "passkeyLoginFoundReportDesc": {
+      "message": "We found $COUNT$ login(s) that support passkeys. To further secure these accounts, consider setting up a passkey where available. Sourced from passkeys.2fa.directory"
+    },
+    "passkeyLoginFoundReportDescPlural": {
+      "message": "We found $COUNT$ login(s) that support passkeys. To further secure these accounts, consider setting up a passkey where available. Sourced from passkeys.2fa.directory"
+    },
+    "passkeyLoginReportDesc": {
+      "message": "Passkeys are a secure, phishing-resistant alternative to passwords. See which of your accounts support passkeys for a simpler, passwordless sign-in experience. Learn"
+    },
+    "personalItemVaultTransferWarningSingular": {
+      "message": "1 item will be permanently moved to the organization. You will no longer own this item."
+    },
+    "personalItemsVaultTransferWarningPlural": {
+      "message": "$PERSONAL_ITEMS_COUNT$ items will be permanently moved to the organization. You will no longer own these items."
+    },
+    "personalOwnershipPolicyInEffectImports": {
+      "message": "An organization policy has blocked importing items into Personal."
+    },
+    "personalVaultExportPolicyInEffect": {
+      "message": "One or more organization policies prevent you from exporting your personal items."
+    },
+    "premiumSignUpReports": {
+      "message": "Password hygiene, account health, and data breach reports to keep your items safe."
+    },
+    "premiumSignUpTotp": {
+      "message": "TOTP verification code (2FA) generator for your logins."
+    },
+    "premiumSubscriptionEndedDesc": {
+      "message": "To regain access to your archive, restart your Premium subscription. If you edit details for an archived item before restarting, it'll be moved back out of the archive."
+    },
+    "promptUsersToMoveItems": {
+      "message": "Prompt users to move their personal items to the organization"
+    },
+    "promptUsersToMoveItemsV2": {
+      "message": "Prompt users to move their personal items to the organization"
+    },
+    "purgeOrgVaultDesc": {
+      "message": "Proceed below to delete all of the organization's items."
+    },
+    "purgeVault": {
+      "message": "Delete all items"
+    },
+    "purgeVaultDesc": {
+      "message": "Proceed below to delete all of your personal items and folders. Items that belong to an organization that you share with will not be deleted."
+    },
+    "purgeVaultWarning": {
+      "message": "Deleting all items is permanent. It cannot be undone."
+    },
+    "purgedOrganizationVault": {
+      "message": "Deleted all of the organization's items."
+    },
+    "purgedOrganizationVaultWithName": {
+      "message": "Deleted all items of $ORGNAME$."
+    },
+    "readOnlyCollectionAccess": {
+      "message": "You do not have access to manage this shared folder."
+    },
+    "recoveryDeleteCiphersDesc": {
+      "message": "Some of your items could not be recovered. Do you want to delete these unrecoverable items?"
+    },
+    "recoveryDeleteCiphersTitle": {
+      "message": "Delete unrecoverable items"
+    },
+    "recoveryDeleteFoldersDesc": {
+      "message": "Some of your folders could not be recovered. Do you want to delete these unrecoverable folders?"
+    },
+    "recoveryStepCipherTitle": {
+      "message": "Verifying item integrity"
+    },
+    "removedOrganizationIdWithName": {
+      "message": "Removed organization $ORGNAME$ $ID$."
+    },
+    "restoredUserIdWithOrgName": {
+      "message": "Restored access to $ORGNAME$ for $ID$."
+    },
+    "restrictCardTypeImportDesc": {
+      "message": "A policy set by 1 or more organizations prevents you from importing cards."
+    },
+    "restrictCollectionCreationDescription": {
+      "message": "Restrict shared folder creation to owners and admins"
+    },
+    "restrictCollectionDeletionDescription": {
+      "message": "Restrict shared folder deletion to owners and admins"
+    },
+    "restrictedCollectionAssignmentDesc": {
+      "message": "You can only assign shared folders you manage."
+    },
+    "restrictedItemTypePolicyDescV2": {
+      "message": "Do not allow members to create and store credit card items. When this policy is turned on, existing cards will be automatically hidden."
+    },
+    "revokedUserIdDeclinedTransferWithOrgName": {
+      "message": "Revoked access for $ID$ for declining to move items to $ORGNAME$."
+    },
+    "revokedUserIdSingleOrganizationNonComplianceWithOrgName": {
+      "message": "Revoked access to $ORGNAME$ for $ID$ for non-compliance with the single organization membership policy."
+    },
+    "revokedUserIdTwoFactorNonComplianceWithOrgName": {
+      "message": "Revoked access to $ORGNAME$ for $ID$ for non-compliance with the two-factor login policy."
+    },
+    "revokedUserIdWithOrgName": {
+      "message": "Revoked access to $ORGNAME$ for $ID$."
+    },
+    "searchCollection": {
+      "message": "Search shared folder"
+    },
+    "searchMyVault": {
+      "message": "Search Personal"
+    },
+    "searchVault": {
+      "message": "Search items"
+    },
+    "securityPrioritizedBody": {
+      "message": "Save logins, cards, and identities securely. Zero-knowledge, end-to-end encryption protects what's important to you."
+    },
+    "selectCollections": {
+      "message": "Select shared folders"
+    },
+    "selectCollectionsToAssign": {
+      "message": "Select shared folders to add to"
+    },
+    "selectImportCollection": {
+      "message": "Select a shared folder"
+    },
+    "settingsVaultOptions": {
+      "message": "Item options"
+    },
+    "sharedFolderManagementDescription": {
+      "message": "Configure how shared folders behave in the organization."
+    },
+    "sharedUnlockWithWeb": {
+      "message": "Share unlock with the web app"
+    },
+    "showCardsInVaultViewV2": {
+      "message": "Always show cards as Autofill suggestions on the items view"
+    },
+    "showIdentitiesInVaultViewV2": {
+      "message": "Always show identities as Autofill suggestions on the items view"
+    },
+    "showQuickCopyActionsInVault": {
+      "message": "Show quick copy actions in lists"
+    },
+    "sponsoredFamiliesSharedCollectionsForFamilyMembers": {
+      "message": "Shared folders for family members"
+    },
+    "successfullyAssignedCollections": {
+      "message": "Successfully added to shared folders"
+    },
+    "twoFactorYubikeySupportUsb": {
+      "message": "The web app, desktop application, CLI, and all browser extensions on a device with a USB port that can accept your YubiKey."
+    },
+    "unlimitedCollections": {
+      "message": "Unlimited shared folders"
+    },
+    "updateBrowserDesc": {
+      "message": "You are using an unsupported web browser. The web app may not work properly."
+    },
+    "updatedCollectionManagement": {
+      "message": "Updated shared folder settings"
+    },
+    "userAcceptedTransferWithOrgName": {
+      "message": "Accepted moving items to $ORGNAME$."
+    },
+    "userDesc": {
+      "message": "Access and add items to assigned shared folders"
+    },
+    "userLeftOrganizationWithName": {
+      "message": "User $ID$ left $ORGNAME$"
+    },
+    "userSelfRevokedOrganizationOwnershipWithName": {
+      "message": "Revoked for declining to move items to $ORGNAME$."
+    },
+    "vaultAccessedByProvider": {
+      "message": "Items accessed by Provider."
+    },
+    "vaultAriaLabel": {
+      "message": "Owner $NAME$"
+    },
+    "vaultCustomization": {
+      "message": "Customization"
+    },
+    "vaultExportDisabled": {
+      "message": "Export removed"
+    },
+    "vaultItemSelect": {
+      "message": "Select item"
+    },
+    "vaultItems": {
+      "message": "Items"
+    },
+    "vaultLoaded": {
+      "message": "Items loaded"
+    },
+    "vaultManagement": {
+      "message": "Item management"
+    },
+    "vaultPurged": {
+      "message": "All items deleted."
+    },
+    "vaultSaveOptionsTitle": {
+      "message": "Save options"
+    },
+    "vaultWelcomeDialogDescription": {
+      "message": "Store all your passwords and personal info in {brand}. We'll show you around."
+    },
+    "viewCollection": {
+      "message": "View shared folder"
+    },
+    "viewCollectionWithName": {
+      "message": "View shared folder - $NAME$"
+    },
+    "viewDesc": {
+      "message": "Can view all items you own."
+    },
+    "webVault": {
+      "message": "Web app"
+    },
+    "webVaultUrl": {
+      "message": "Web app server URL"
+    },
+    "welcomeDialogGraphicAlt": {
+      "message": "Illustration of the layout of the items page."
+    },
+    "youDoNotHavePermissions": {
+      "message": "You do not have permissions to this shared folder"
+    },
+    "yourVaultIsEmpty": {
+      "message": "You don't have any items yet"
+    }
+  },
+  "web": {
+    "emailVerificationRequiredDesc": {
+      "message": "You must verify your email to use this feature."
+    },
+    "exposedPasswordsFoundReportDesc": {
+      "message": "We found $COUNT$ items with passwords that were exposed in known data breaches. You should change them to use a new password."
+    },
+    "inactive2faFoundReportDesc": {
+      "message": "We found $COUNT$ website(s) that may not be configured with two-step login (according to 2fa.directory). To further protect these accounts, you should set up two-step login."
+    },
+    "inviteUserDescSharedFolders": {
+      "message": "Invite a new user to your organization by entering their account email address below. If they don't have an account yet, they will be prompted to create one."
+    },
+    "managePermissionRequired": {
+      "message": "At least one member or group must have Can manage."
+    },
+    "reusedPasswordsFoundReportDesc": {
+      "message": "We found $COUNT$ passwords that are being reused. You should change them to a unique value."
+    },
+    "themeDesc": {
+      "message": "Choose a theme for the web app."
+    },
+    "unsecuredWebsitesFoundReportDesc": {
+      "message": "We found $COUNT$ items with unsecured URIs. You should change their URI scheme to https:// if the website allows it."
+    },
+    "userPermissionOverrideHelperDesc": {
+      "message": "Someone in a group here gets, for each permission, the most open of their own and their groups'."
+    },
+    "vault": {
+      "message": "Items"
+    },
+    "vaults": {
+      "message": "Items"
+    },
+    "weakPasswordsFoundReportDesc": {
+      "message": "We found $COUNT$ items with passwords that are not strong. You should update them to use stronger passwords."
+    }
+  },
+  "browser": {
+    "bitwardenForBusinessPageDesc": {
+      "message": "Business organizations let you share items with others through shared folders. Learn more on the website."
+    },
+    "emailVerificationRequiredDesc": {
+      "message": "You must verify your email to use this feature. You can verify your email in the web app."
+    },
+    "premiumManageAlert": {
+      "message": "You can manage your membership in the web app. Do you want to visit the website now?"
+    },
+    "sharedUnlockWithWebDescription": {
+      "message": "When enabled, unlock state will be shared with the web app."
+    },
+    "vault": {
+      "message": "Items"
+    },
+    "vaults": {
+      "message": "Owner"
+    }
+  }
+}

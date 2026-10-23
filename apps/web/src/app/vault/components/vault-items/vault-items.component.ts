@@ -14,6 +14,11 @@ import {
 } from "rxjs";
 
 import {
+  gridOf,
+  itemGrid,
+  itemLike,
+} from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
+import {
   CollectionAdminView,
   Unassigned,
   CollectionView,
@@ -490,11 +495,14 @@ export class VaultItemsComponent<C extends CipherViewLike> {
 
   protected canAssignCollections(cipher: C) {
     const organization = this.allOrganizations.find((o) => o.id === cipher.organizationId);
-    const editableCollections = this.allCollections.filter((c) => !c.readOnly);
+    // Keykeeper: shared folders they can add items to (create).
+    const editableCollections = this.allCollections.filter((c) => gridOf(c).create);
 
     return (
       (organization?.canEditAllCiphers && this.viewingOrgVault) ||
-      (CipherViewLikeUtils.canAssignToCollections(cipher) && editableCollections.length > 0)
+      (CipherViewLikeUtils.canAssignToCollections(cipher) &&
+        editableCollections.length > 0 &&
+        this.canShare(cipher))
     );
   }
 
@@ -585,7 +593,8 @@ export class VaultItemsComponent<C extends CipherViewLike> {
     const hasPersonalItems = this.hasPersonalItems();
     const uniqueCipherOrgIds = this.getUniqueOrganizationIds();
     const hasEditableCollections = this.allCollections.some((collection) => {
-      return !collection.readOnly;
+      // Keykeeper: one they can add items to (create).
+      return gridOf(collection).create;
     });
 
     // Return false if items are from different organizations
@@ -681,6 +690,8 @@ export class VaultItemsComponent<C extends CipherViewLike> {
         [CollectionPermission.Manage]: 5,
         [CollectionPermission.Edit]: 4,
         [CollectionPermission.EditExceptPass]: 3,
+        // Keykeeper: any other grid.
+        [CollectionPermission.Custom]: 3,
         [CollectionPermission.View]: 2,
         [CollectionPermission.ViewExceptPass]: 1,
         NoAccess: 0,
@@ -736,7 +747,16 @@ export class VaultItemsComponent<C extends CipherViewLike> {
   private allCiphersHaveEditAccess(): boolean {
     return this.selection.selected
       .filter(({ cipher }) => cipher)
-      .every(({ cipher }) => cipher?.edit && cipher?.viewPassword);
+      .every(({ cipher }) => cipher?.edit && cipher?.viewPassword && this.canShare(cipher));
+  }
+
+  /**
+   * Keykeeper: an organization's item goes into more of its shared folders,
+   * or out of one, only with share on it, as the server requires (DESIGN.md,
+   * "Folders and permissions"). A personal item is the person's to share.
+   */
+  private canShare(cipher: C): boolean {
+    return itemGrid(itemLike(cipher), this.allCollections).share;
   }
 
   private getUniqueOrganizationIds(): Set<string | [] | OrganizationId> {

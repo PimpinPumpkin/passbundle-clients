@@ -98,7 +98,9 @@ export class InternalGroupApiService extends GroupApiService {
       name: group.name,
       users: group.members,
       collections: group.collections.map(
-        (c) => new SelectionReadOnlyRequest(c.id, c.readOnly, c.hidePasswords, c.manage),
+        // Keykeeper: with each grant's grid.
+        (c) =>
+          new SelectionReadOnlyRequest(c.id, c.readOnly, c.hidePasswords, c.manage, c.keykeeper),
       ),
     });
 

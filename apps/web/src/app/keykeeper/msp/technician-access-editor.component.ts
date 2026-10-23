@@ -56,7 +56,7 @@ import { DEFAULT_ACCESS, NO_PERMISSIONS, PERMISSIONS } from "./technician-access
         <bit-label>Role in those clients</bit-label>
         <bit-radio-button value="admin">
           <bit-label>Admin</bit-label>
-          <bit-hint>Manages everything in the client and sees every vault item.</bit-hint>
+          <bit-hint>Manages everything in the client and sees every item.</bit-hint>
         </bit-radio-button>
         <bit-radio-button value="custom">
           <bit-label>Custom</bit-label>
@@ -75,9 +75,10 @@ import { DEFAULT_ACCESS, NO_PERMISSIONS, PERMISSIONS } from "./technician-access
           </div>
           <bit-form-control>
             <input type="checkbox" bitCheckbox formControlName="vaultItems" />
-            <bit-label>Sees and edits every vault item</bit-label>
+            <bit-label>Sees and edits every item</bit-label>
             <bit-hint>
-              In their own vault. Otherwise they see only collections the client shares with them.
+              With their own items. Otherwise they see only the shared folders the client gives
+              them.
             </bit-hint>
           </bit-form-control>
         </div>
@@ -123,7 +124,7 @@ import { DEFAULT_ACCESS, NO_PERMISSIONS, PERMISSIONS } from "./technician-access
                 </div>
                 <bit-form-control>
                   <input type="checkbox" bitCheckbox formControlName="vaultItems" />
-                  <bit-label>Sees and edits every vault item</bit-label>
+                  <bit-label>Sees and edits every item</bit-label>
                 </bit-form-control>
               </div>
             }

@@ -159,6 +159,8 @@ export class VaultCipherRowComponent<C extends CipherViewLike> implements OnInit
   private permissionPriority = [
     CollectionPermission.Manage,
     CollectionPermission.Edit,
+    // Keykeeper: any other grid.
+    CollectionPermission.Custom,
     CollectionPermission.EditExceptPass,
     CollectionPermission.View,
     CollectionPermission.ViewExceptPass,

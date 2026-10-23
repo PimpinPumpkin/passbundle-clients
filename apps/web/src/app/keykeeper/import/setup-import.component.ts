@@ -171,7 +171,7 @@ const SOURCES: Source[] = [
               there.
             </bit-callout>
             <button bitButton buttonType="primary" type="button" (click)="finish()">
-              Go to my vault
+              Go to your items
             </button>
           } @else {
             <button

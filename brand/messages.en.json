@@ -9,7 +9,7 @@
     "message": "Items that have expired or expire in the next 30 days: API keys, certificates, licenses, cards, and anything you set an expiration date on."
   },
   "keykeeperNoExpiringItems": {
-    "message": "Nothing in your vault has expired or expires in the next 30 days."
+    "message": "No items have expired or expire in the next 30 days."
   },
   "keykeeperExpiringItemsFound": {
     "message": "Expiring items found"
@@ -165,10 +165,10 @@
     "message": "Can reset the master password of members in account recovery, and so sign in as them and see everything they can."
   },
   "keykeeperImportExportHint": {
-    "message": "Covers import. Exporting the organization's vault needs access to all items, which custom roles can't have yet."
+    "message": "Covers import. Exporting the organization's items needs access to all items, which custom roles can't have yet."
   },
   "keykeeperCustomRoleNoCollections": {
-    "message": "With these permissions, a custom role can't also manage all collections yet. Give them collections on the Collections tab."
+    "message": "With these permissions, a custom role can't also manage all shared folders yet. Give them shared folders on the Shared folders tab."
   },
   "keykeeperBiometricsNotEnrolled": {
     "message": "Unlock with biometrics is still off. It wasn't confirmed, or the desktop app isn't running."
@@ -198,7 +198,7 @@
     "message": "Access"
   },
   "keykeeperAccessIntro": {
-    "message": "Who can open each shared folder, and how. Owners and admins see every item. Everyone else opens the shared folders they're given, directly or through a group. Someone who reaches a folder two ways gets the more open permission, and passwords stay hidden only if every way hides them."
+    "message": "Who can open each shared folder, and how. Owners and admins see every item. Everyone else opens the shared folders they're given, directly or through a group. Someone who reaches a folder two ways gets, for each permission, the more open way, so passwords stay hidden only if every way hides them."
   },
   "keykeeperAccessHiddenFolder": {
     "message": "1 shared folder isn't shown, since you can't open it yourself."
@@ -308,6 +308,66 @@
   },
   "keykeeperCanManage": {
     "message": "Can manage"
+  },
+  "keykeeperCustomPermissions": {
+    "message": "Custom"
+  },
+  "keykeeperCapSeeItems": {
+    "message": "See items"
+  },
+  "keykeeperCapSeePasswords": {
+    "message": "See passwords"
+  },
+  "keykeeperCapCreate": {
+    "message": "Create items"
+  },
+  "keykeeperCapEdit": {
+    "message": "Edit items"
+  },
+  "keykeeperCapDelete": {
+    "message": "Delete items"
+  },
+  "keykeeperCapExport": {
+    "message": "Export"
+  },
+  "keykeeperCapShare": {
+    "message": "Share (move out or copy)"
+  },
+  "keykeeperCapPrint": {
+    "message": "Print"
+  },
+  "keykeeperCapViewHistory": {
+    "message": "View item history"
+  },
+  "keykeeperCapManage": {
+    "message": "Manage the folder"
+  },
+  "keykeeperGridAppsEnforce": {
+    "message": "The server enforces the rest; see passwords, export, share, and print are up to the apps, since anyone who can open an item could copy it with other tools."
+  },
+  "keykeeperGridManageIncludesAll": {
+    "message": "Managing a shared folder includes every other permission in it."
+  },
+  "keykeeperGridNeedsSeePasswords": {
+    "message": "Export, print, and share need see passwords."
+  },
+  "keykeeperFolders": {
+    "message": "Folders"
+  },
+  "keykeeperNewFolderWhere": {
+    "message": "Where does it go?"
+  },
+  "keykeeperAlsoIn": {
+    "message": "Also in $FOLDERS$",
+    "placeholders": {
+      "folders": {
+        "content": "$1",
+        "example": "Everyone, IT"
+      }
+    }
+  },
+  "keykeeperPrint": {
+    "message": "Print"
   },
   "keykeeperOneSharedFolder": {
     "message": "1 shared folder"

@@ -18,7 +18,9 @@ import {
  * Keykeeper: the vault's part of the web vault's one left menu (DESIGN.md,
  * "The left menu"). It's built from the trees the old filter panel used, and
  * picking an entry goes through the same routed filter, so the list shows
- * what the panel showed.
+ * what the panel showed. Every place an item lives is a folder: Personal with
+ * its folders, then each organization with its shared folders (DESIGN.md,
+ * "Folders and permissions").
  */
 
 /** One row of the menu. */
@@ -29,11 +31,11 @@ export interface VaultMenuEntry {
   icon?: BitwardenIcon;
   /** How many items the list shows once this is picked, as things are now. */
   count?: number;
-  /** Nesting: collections inside their vault, folders inside their parent. */
+  /** Nesting: folders inside Personal or their organization, and inside their parent. */
   depth: number;
   /** The list shows this now. */
   active: boolean;
-  /** The vault that the entry showing now is inside of, such as a category in it. */
+  /** Personal or the organization the entry showing now is inside of, such as a category in it. */
   scope: boolean;
   select: () => Promise<void>;
   /** One of the person's own folders, which they can edit. */
@@ -48,12 +50,11 @@ export interface VaultMenu {
   all: VaultMenuEntry;
   favorites?: VaultMenuEntry;
   categories: VaultMenuEntry[];
-  showVaultsHeading: boolean;
-  /** Each vault, with its collections right after it, a level in. */
-  vaults: VaultMenuEntry[];
-  /** The folders heading's message key, which follows upstream's naming. */
-  foldersHeading: string;
-  folders: VaultMenuEntry[];
+  /**
+   * Personal with the person's own folders right after it, a level in, then
+   * each organization with its shared folders.
+   */
+  places: VaultMenuEntry[];
   archive?: VaultMenuEntry;
   trash?: VaultMenuEntry;
 }
@@ -69,7 +70,6 @@ export interface VaultMenuState {
   /** All items, with the categories that have items (and the one showing). */
   typeTree?: TreeNode<CipherTypeFilter>;
   organizationTree?: TreeNode<OrganizationFilter>;
-  showVaultsHeading: boolean;
   collectionTree?: TreeNode<CollectionFilter>;
   folderTree?: TreeNode<FolderFilter>;
   archive?: TreeNode<CipherTypeFilter>;
@@ -83,8 +83,28 @@ export interface VaultMenuActions {
   type: (node: TreeNode<CipherTypeFilter>) => Promise<void>;
   organization: (node: TreeNode<OrganizationFilter>) => Promise<void>;
   collection: (node: TreeNode<CollectionFilter>) => Promise<void>;
+  /** A personal folder, whatever Personal or organization was showing (folderPick). */
   folder: (node: TreeNode<FolderFilter>) => Promise<void>;
   archive: (node: TreeNode<CipherTypeFilter>) => Promise<void>;
+}
+
+/**
+ * Where picking a personal folder goes: the folder, out of any organization
+ * showing. A personal folder holds whatever its owner filed there, so it
+ * isn't inside Personal or an organization the way a category is. "No
+ * folder" sits under Personal too, so it's Personal's items in no folder.
+ */
+export function folderPick(
+  routed: RoutedVaultFilterModel,
+  node: TreeNode<FolderFilter>,
+): RoutedVaultFilterModel {
+  const owner =
+    routed.organizationIdParamType === "path"
+      ? routed.organizationId
+      : node.node.id
+        ? undefined
+        : Unassigned;
+  return filterAfter({ ...routed, organizationId: owner }, (f) => (f.selectedFolderNode = node));
 }
 
 /**
@@ -164,21 +184,51 @@ export function buildVaultMenu(state: VaultMenuState, actions: VaultMenuActions)
     .filter((t) => t.node.type !== "favorites")
     .map((t) => typeEntry(t, actions.type));
 
+  // Keykeeper: the person's own folders, under Personal. "No folder" (its
+  // id is empty) is only worth a row next to real folders.
+  const folderTrees = state.folderTree?.children ?? [];
+  const hasFolders = folderTrees.some((f) => !!f.node.id);
+  const personalFolders = flatten(
+    folderTrees.filter((f) => hasFolders || !!f.node.id),
+    1,
+  ).map(({ tree, depth }): VaultMenuEntry => ({
+    key: `folder-${tree.node.id || "none"}`,
+    label: tree.node.name ?? "",
+    icon: tree.node.icon ?? "bwi-folder",
+    count:
+      ciphers == null
+        ? undefined
+        : ciphers.filter((c) => createFilterFunction(folderPick(routed, tree))(c)).length,
+    depth,
+    active: picked(
+      !tree.node.id
+        ? routed.folderId === Unassigned || routed.folderId === ""
+        : routed.folderId === tree.node.id,
+    ),
+    scope: false,
+    select: () => actions.folder(tree),
+    folder: tree.node.id ? tree.node : undefined,
+  }));
+
   const collections = state.collectionTree?.children ?? [];
-  const vaults = (state.organizationTree?.children ?? []).flatMap((org) => {
-    const routedId = org.node.id === "MyVault" ? Unassigned : org.node.id;
-    const isVault = routed.organizationId === routedId;
-    const vault: VaultMenuEntry = {
+  const places = (state.organizationTree?.children ?? []).flatMap((org) => {
+    const personal = org.node.id === "MyVault";
+    const routedId = personal ? Unassigned : org.node.id;
+    const isPlace = routed.organizationId === routedId;
+    const place: VaultMenuEntry = {
       key: `vault-${org.node.id}`,
       label: org.node.name ?? "",
       icon: org.node.icon,
       count: countAfter(ciphers, routed, (f) => (f.selectedOrganizationNode = org)),
       depth: 0,
-      active: picked(isVault && onlyVault),
-      scope: picked(isVault && !onlyVault),
+      active: picked(isPlace && onlyVault),
+      scope: picked(isPlace && !onlyVault && routed.folderId === undefined),
       select: () => actions.organization(org),
       organization: org.node.hideOptions ? undefined : org.node,
     };
+    if (personal) {
+      return [place, ...personalFolders];
+    }
     const inside = flatten(
       collections.filter((c) => c.node.organizationId === org.node.id),
       1,
@@ -192,39 +242,14 @@ export function buildVaultMenu(state: VaultMenuState, actions: VaultMenuActions)
       scope: false,
       select: () => actions.collection(tree),
     }));
-    return [vault, ...inside];
+    return [place, ...inside];
   });
-
-  // "No folder" (its id is empty) is only worth a row next to real folders.
-  const folderTrees = state.folderTree?.children ?? [];
-  const hasFolders = folderTrees.some((f) => !!f.node.id);
-  const folders = flatten(
-    folderTrees.filter((f) => hasFolders || !!f.node.id),
-    0,
-  ).map(({ tree, depth }): VaultMenuEntry => ({
-    key: `folder-${tree.node.id || "none"}`,
-    label: tree.node.name ?? "",
-    icon: tree.node.icon ?? "bwi-folder",
-    count: countAfter(ciphers, routed, (f) => (f.selectedFolderNode = tree)),
-    depth,
-    active: picked(
-      !tree.node.id
-        ? routed.folderId === Unassigned || routed.folderId === ""
-        : routed.folderId === tree.node.id,
-    ),
-    scope: false,
-    select: () => actions.folder(tree),
-    folder: tree.node.id ? tree.node : undefined,
-  }));
 
   return {
     all,
     favorites: favorites ? typeEntry(favorites, actions.type) : undefined,
     categories,
-    showVaultsHeading: state.showVaultsHeading,
-    vaults,
-    foldersHeading: state.folderTree?.node.name ?? "folders",
-    folders,
+    places,
     archive: state.archive
       ? { ...typeEntry(state.archive, actions.archive), premiumBadge: state.archivePremiumBadge }
       : undefined,
@@ -234,18 +259,17 @@ export function buildVaultMenu(state: VaultMenuState, actions: VaultMenuActions)
 
 /**
  * The name of the entry showing now, for the vault page's title, so the
- * title says what the menu does: All items, a category, a vault, a
- * collection, a folder, Favorites, Archive, or Trash. Undefined when nothing
- * in the menu is showing (off the vault's page, or a filter it has no entry
- * for).
+ * title says what the menu does: All items, a category, Personal, an
+ * organization, a folder, Favorites, Archive, or Trash. Undefined when
+ * nothing in the menu is showing (off the vault's page, or a filter it has no
+ * entry for).
  */
 export function pickedLabel(menu: VaultMenu): string | undefined {
   const entries = [
     menu.all,
     menu.favorites,
     ...menu.categories,
-    ...menu.vaults,
-    ...menu.folders,
+    ...menu.places,
     menu.archive,
     menu.trash,
   ];

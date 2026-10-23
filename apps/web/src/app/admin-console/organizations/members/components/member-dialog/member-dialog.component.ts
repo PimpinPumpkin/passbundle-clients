@@ -54,6 +54,7 @@ import {
   AccessItemType,
   AccessItemValue,
   AccessItemView,
+  convertToGrid,
   convertToPermission,
   convertToSelectionView,
   PermissionMode,
@@ -841,6 +842,8 @@ function mapToAccessSelections(
         id: selection.id,
         type: AccessItemType.Collection,
         permission: convertToPermission(selection),
+        // Keykeeper: the grant's grid, so Custom keeps it.
+        grid: convertToGrid(selection),
       }))
   );
 }

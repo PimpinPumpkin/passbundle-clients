@@ -33,8 +33,8 @@ import { KeykeeperMspApiService } from "./msp-api.service";
       <section class="tw-mt-8" data-testid="msp-joining">
         <h2 bitTypography="h3">Joining</h2>
         <p bitTypography="body2">
-          When someone accepts an invitation to a client, the web vault or browser extension of
-          anyone here who can confirm them gives them access in the background, usually within a few
+          When someone accepts an invitation to a client, the web app or browser extension of anyone
+          here who can confirm them gives them access in the background, usually within a few
           minutes. The default for every client: {{ describe(j.default) }}.
         </p>
         @if (isAdmin()) {

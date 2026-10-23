@@ -5,6 +5,7 @@ import { combineLatest, map, Observable, of, switchMap } from "rxjs";
 import { CollectionService } from "@bitwarden/admin-console/common";
 
 import { OrganizationService } from "../../admin-console/abstractions/organization/organization.service.abstraction";
+import { gridOf } from "../../admin-console/keykeeper/folder-permissions";
 import { AccountService } from "../../auth/abstractions/account.service";
 import { getUserId } from "../../auth/services/account.service";
 import { uuidAsString } from "../../platform/abstractions/sdk/sdk.service";
@@ -176,9 +177,13 @@ export class DefaultCipherAuthorizationService implements CipherAuthorizationSer
           return of(true);
         }
 
+        // Keykeeper: copying an organization's item somewhere else is the
+        // share capability of one of its shared folders (DESIGN.md, "Folders
+        // and permissions"). Upstream allowed it only to a folder's managers,
+        // who have share.
         return this.collectionService.decryptedCollections$(userId).pipe(
           getByIds(cipher.collectionIds.map(uuidAsString)),
-          map((allCollections) => allCollections.some((collection) => collection.manage)),
+          map((allCollections) => allCollections.some((collection) => gridOf(collection).share)),
         );
       }),
     );

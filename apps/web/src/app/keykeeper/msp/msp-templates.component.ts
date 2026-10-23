@@ -51,7 +51,7 @@ import { KeykeeperTemplateClientsDialogComponent } from "./template-clients-dial
       <h2 bitTypography="h3">Templates</h2>
       <p bitTypography="body2">
         Templates here apply to your clients automatically, including clients you add later. Each
-        client has them in its Templates collection. To change one, edit it, and your clients get
+        client has them in its Templates shared folder. To change one, edit it, and your clients get
         the change. Use Clients to change which clients get one.
       </p>
       @if (rows().length === 0) {
@@ -132,7 +132,7 @@ import { KeykeeperTemplateClientsDialogComponent } from "./template-clients-dial
           <h3 bitTypography="h5">Add a template</h3>
           @if (candidates().length === 0) {
             <p bitTypography="body2" class="tw-mb-0">
-              Make a template first: in your vault, choose New, then From template, then Create
+              Make a template first: in your items, choose New, then From template, then Create
               template.
             </p>
           } @else {

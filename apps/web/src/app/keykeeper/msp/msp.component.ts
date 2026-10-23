@@ -310,8 +310,8 @@ const CLIENT_FEATURES = {
             <section class="tw-mb-8" aria-label="Expiring soon" data-testid="msp-expiring">
               <h2 bitTypography="h3">Expiring soon</h2>
               <p bitTypography="body2">
-                Items in your clients' vaults that have expired or expire within 30 days, soonest
-                first.
+                Items in your clients' organizations that have expired or expire within 30 days,
+                soonest first.
               </p>
               <bit-table>
                 <ng-container header>

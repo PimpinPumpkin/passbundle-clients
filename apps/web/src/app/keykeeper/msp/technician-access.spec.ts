@@ -27,7 +27,7 @@ describe("technician access in words", () => {
     );
     expect(
       describeAccess({ ...custom, custom: { ...custom.custom, vaultItems: true } }, clients),
-    ).toBe("Acme Dental, Baker Law · Custom role with vault items · No install commands");
+    ).toBe("Acme Dental, Baker Law · Custom role with every item · No install commands");
   });
 
   it("names the clients where the role differs, in order, skipping clients that are gone", () => {
@@ -44,7 +44,7 @@ describe("technician access in words", () => {
       ],
     };
     expect(describeAccess(access, clients)).toBe(
-      "Every client · Custom role · Install commands · Admin in Acme Dental · Custom role with vault items in Baker Law",
+      "Every client · Custom role · Install commands · Admin in Acme Dental · Custom role with every item in Baker Law",
     );
   });
 
@@ -60,9 +60,9 @@ describe("an MSP's people in a client, in words", () => {
   const person = { memberId: "m", email: "pat@example.test", name: "Pat" };
 
   it("reads owners and admins as seeing every vault item", () => {
-    expect(describeStaffRole({ ...person, role: "owner" }, t)).toBe("Owner, with every vault item");
+    expect(describeStaffRole({ ...person, role: "owner" }, t)).toBe("Owner, with every item");
     expect(describeStaffRole({ ...person, role: "admin", vaultItems: true }, t)).toBe(
-      "Admin, with every vault item",
+      "Admin, with every item",
     );
   });
 
@@ -74,16 +74,16 @@ describe("an MSP's people in a client, in words", () => {
       vaultItems: false,
     };
     expect(describeStaffRole(helpdesk, t)).toBe(
-      "Custom role (Manage users, Manage account recovery), no vault items",
+      "Custom role (Manage users, Manage account recovery), no items",
     );
     expect(describeStaffRole({ ...helpdesk, vaultItems: true }, t)).toBe(
-      "Custom role (Manage users, Manage account recovery), with every vault item",
+      "Custom role (Manage users, Manage account recovery), with every item",
     );
   });
 
   it("reads a regular member by their vault items, and says nothing when the server didn't", () => {
     expect(describeStaffRole({ ...person, role: "member", vaultItems: true }, t)).toBe(
-      "Member, with every vault item",
+      "Member, with every item",
     );
     expect(describeStaffRole(person, t)).toBeNull();
   });

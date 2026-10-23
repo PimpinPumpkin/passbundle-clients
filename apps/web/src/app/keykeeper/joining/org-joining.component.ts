@@ -24,9 +24,9 @@ import { describeJoining, inviteChoices } from "./joining";
       <section data-testid="org-joining">
         <h1 bitTypography="h1" class="tw-mt-16 tw-pb-2.5">Joining</h1>
         <p bitTypography="body1">
-          When someone accepts an invitation, the web vault or browser extension of an owner or
-          admin gives them access in the background, usually within a few minutes. It needs one of
-          them unlocked: the server never holds this organization's key.
+          When someone accepts an invitation, the web app or browser extension of an owner or admin
+          gives them access in the background, usually within a few minutes. It needs one of them
+          unlocked: the server never holds this organization's key.
         </p>
         <p bitTypography="body2" data-testid="org-joining-source">
           @switch (j.source) {

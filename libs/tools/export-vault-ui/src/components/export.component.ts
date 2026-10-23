@@ -37,6 +37,7 @@ import { UserVerificationDialogComponent } from "@bitwarden/auth/angular";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import { PolicyType } from "@bitwarden/common/admin-console/enums";
+import { gridOf } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
@@ -460,8 +461,11 @@ export class ExportComponent implements OnInit, OnDestroy, AfterViewInit {
       )
       .pipe(
         map(({ collections, memberOrganizations }) => {
+          // Keykeeper: organizations with a shared folder the person can
+          // export (DESIGN.md, "Folders and permissions"). Upstream offered
+          // those with a folder they manage, and managing includes export.
           const managedCollectionsOrgIds = new Set(
-            collections.filter((c) => c.manage).map((c) => c.organizationId),
+            collections.filter((c) => gridOf(c).export).map((c) => c.organizationId),
           );
           const filteredOrgs = memberOrganizations.filter((org) =>
             managedCollectionsOrgIds.has(org.id),

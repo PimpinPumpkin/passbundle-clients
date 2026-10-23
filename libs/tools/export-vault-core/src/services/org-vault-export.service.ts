@@ -4,6 +4,7 @@ import * as papa from "papaparse";
 import { filter, firstValueFrom, map } from "rxjs";
 
 import { CollectionService } from "@bitwarden/admin-console/common";
+import { gridOf } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import {
   CollectionView,
   CollectionDetailsResponse,
@@ -105,6 +106,19 @@ export class OrganizationVaultExportService
 
     if (format === "zip") {
       throw new Error("Zip export not supported for organization");
+    }
+
+    // Keykeeper: an organization's whole export holds every item, so it's
+    // refused to anyone with a shared folder there they can't export
+    // (DESIGN.md, "Folders and permissions"). Owners and admins can export
+    // every folder.
+    if (!onlyManagedCollections) {
+      const collections = await firstValueFrom(
+        this.collectionService.decryptedCollections$(userId),
+      );
+      if (collections.some((c) => c.organizationId === organizationId && !gridOf(c).export)) {
+        throw new Error("You can't export some of this organization's shared folders.");
+      }
     }
 
     if (format === "encrypted_json") {
@@ -241,13 +255,13 @@ export class OrganizationVaultExportService
     await Promise.all(promises);
 
     const decCollections: CollectionView[] = await firstValueFrom(
-      this.collectionService
-        .decryptedCollections$(activeUserId)
-        .pipe(
-          map((collections) =>
-            collections.filter((c) => c.organizationId == organizationId && c.manage),
-          ),
+      this.collectionService.decryptedCollections$(activeUserId).pipe(
+        // Keykeeper: the shared folders the person can export (DESIGN.md,
+        // "Folders and permissions"); managing includes export.
+        map((collections) =>
+          collections.filter((c) => c.organizationId == organizationId && gridOf(c).export),
         ),
+      ),
     );
 
     const restrictions = await firstValueFrom(this.restrictedItemTypesService.restricted$);
@@ -285,8 +299,9 @@ export class OrganizationVaultExportService
     const encCollections: Collection[] = await firstValueFrom(
       this.collectionService.encryptedCollections$(activeUserId).pipe(
         map((collections) => collections ?? []),
+        // Keykeeper: the shared folders the person can export.
         map((collections) =>
-          collections.filter((c) => c.organizationId == organizationId && c.manage),
+          collections.filter((c) => c.organizationId == organizationId && gridOf(c).export),
         ),
       ),
     );

@@ -29,7 +29,7 @@ import { KeyService } from "@bitwarden/key-management";
 
 import { OrganizationCollectionRequest } from "../admin-console/models/request/organization-collection.request";
 import { OrganizationCollectionResponse } from "../admin-console/models/response/organization-collection.response";
-import { SelectionReadOnly } from "../admin-console/models/selection-read-only";
+import { SelectionReadOnly, selectionRequest } from "../admin-console/models/selection-read-only";
 import { Response } from "../models/response";
 import { CliUtils } from "../utils";
 
@@ -246,18 +246,11 @@ export class CreateCommand {
       );
       const currentOrgUserId = organization.organizationUserId;
 
-      const groups =
-        req.groups == null
-          ? null
-          : req.groups.map(
-              (g) => new SelectionReadOnlyRequest(g.id, g.readOnly, g.hidePasswords, g.manage),
-            );
+      const groups = req.groups == null ? null : req.groups.map((g) => selectionRequest(g));
       const users =
         req.users == null
           ? [new SelectionReadOnlyRequest(currentOrgUserId, false, false, true)]
-          : req.users.map(
-              (u) => new SelectionReadOnlyRequest(u.id, u.readOnly, u.hidePasswords, u.manage),
-            );
+          : req.users.map((u) => selectionRequest(u));
       const request = new CreateCollectionRequest({
         name: await this.encryptService.encryptString(req.name, orgKey),
         externalId: req.externalId,
@@ -267,10 +260,10 @@ export class CreateCommand {
       const response = await this.apiService.postCollection(req.organizationId, request);
       const view = CollectionExport.toView(req, response.id);
       const serverGroups = response.groups.map(
-        (g) => new SelectionReadOnly(g.id, g.readOnly, g.hidePasswords, g.manage),
+        (g) => new SelectionReadOnly(g.id, g.readOnly, g.hidePasswords, g.manage, g.keykeeper),
       );
       const serverUsers = response.users.map(
-        (u) => new SelectionReadOnly(u.id, u.readOnly, u.hidePasswords, u.manage),
+        (u) => new SelectionReadOnly(u.id, u.readOnly, u.hidePasswords, u.manage, u.keykeeper),
       );
       const res = new OrganizationCollectionResponse(view, serverGroups, serverUsers);
       return Response.success(res);

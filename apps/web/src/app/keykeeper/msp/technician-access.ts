@@ -48,7 +48,7 @@ export function describeAccess(
     access.custom == null
       ? "Admin"
       : access.custom.vaultItems
-        ? "Custom role with vault items"
+        ? "Custom role with every item"
         : "Custom role";
   const install = access.installCommands ? "Install commands" : "No install commands";
   const differing = (access.clientRoles ?? [])
@@ -61,7 +61,7 @@ export function describeAccess(
         r.custom == null
           ? "Admin"
           : r.custom.vaultItems
-            ? "Custom role with vault items"
+            ? "Custom role with every item"
             : "Custom role";
       return `${there} in ${name}`;
     })
@@ -87,18 +87,18 @@ export function describeStaffRole(
 ): string | null {
   switch (staff.role) {
     case "owner":
-      return "Owner, with every vault item";
+      return "Owner, with every item";
     case "admin":
-      return "Admin, with every vault item";
+      return "Admin, with every item";
     case "custom": {
       const permissions = PERMISSIONS.filter((p) => staff.permissions?.includes(p.key))
         .map((p) => t(p.label))
         .join(", ");
-      const items = staff.vaultItems ? "with every vault item" : "no vault items";
+      const items = staff.vaultItems ? "with every item" : "no items";
       return `Custom role (${permissions || "no permissions"}), ${items}`;
     }
     case "member":
-      return staff.vaultItems ? "Member, with every vault item" : "Member, no vault items";
+      return staff.vaultItems ? "Member, with every item" : "Member, no items";
     default:
       return null;
   }

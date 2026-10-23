@@ -4,6 +4,7 @@ import { of } from "rxjs";
 
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
+import { GRID_NONE } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions/account/billing-account-profile-state.service";
 import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
@@ -209,6 +210,21 @@ describe("CreateCommand", () => {
           users: [expect.objectContaining({ id: orgUserId })],
         }),
       );
+    });
+
+    it("sends each grant's grid with it while it agrees with upstream's fields", async () => {
+      // Keykeeper: see DESIGN.md, "Folders and permissions".
+      const custom = { ...GRID_NONE, create: true, viewHistory: true };
+      const groups = [
+        { id: "drop-box", readOnly: true, hidePasswords: true, manage: false, keykeeper: custom },
+        { id: "edited", readOnly: false, hidePasswords: true, manage: false, keykeeper: custom },
+      ];
+      await command["createOrganizationCollection"](makeRequest({ groups }), makeOptions());
+      const sent = apiService.postCollection.mock.calls[0][1] as any;
+      expect(sent.groups.map((g: any) => [g.id, g.keykeeper])).toEqual([
+        ["drop-box", custom],
+        ["edited", undefined],
+      ]);
     });
 
     it("returns error when the API call fails", async () => {

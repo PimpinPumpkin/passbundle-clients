@@ -70,6 +70,8 @@ export class OrganizationUserAdminView {
         hidePasswords: c.hidePasswords,
         readOnly: c.readOnly,
         manage: c.manage,
+        // Keykeeper: the grant's grid (DESIGN.md, "Folders and permissions").
+        keykeeper: c.keykeeper,
       })),
       groups: response.groups ?? [],
       type: response.type,
