@@ -3,6 +3,7 @@ import {
   afterNextRender,
   Component,
   computed,
+  effect,
   ElementRef,
   inject,
   Injector,
@@ -65,7 +66,8 @@ import { OrganizationOptionsComponent } from "../../vault/individual-vault/vault
 import { VaultFilterComponent } from "../../vault/individual-vault/vault-filter/components/vault-filter.component";
 import { OptionsInput } from "../../vault/individual-vault/vault-filter/shared/components/vault-filter-section.component";
 
-import { buildVaultMenu, VaultMenuActions } from "./vault-menu";
+import { KeykeeperPickedLabelService } from "./picked-label.service";
+import { buildVaultMenu, pickedLabel, VaultMenuActions } from "./vault-menu";
 
 /** The vault's own page, whatever its filters. */
 export function isVaultUrl(router: Router): boolean {
@@ -115,7 +117,8 @@ export function isVaultUrl(router: Router): boolean {
       text-align: end;
       font-size: 0.8125rem;
       font-variant-numeric: tabular-nums;
-      opacity: 0.72;
+      /* 4.5:1 or more on the nav, and on the brighter pill of the entry showing. */
+      opacity: 0.8;
       cursor: pointer;
     }
     /* A folder's edit button and an organization's options show on hover and
@@ -256,6 +259,12 @@ export class KeykeeperVaultMenuComponent extends VaultFilterComponent implements
     );
   });
 
+  // The vault page's title is the name of what's picked here.
+  private readonly pickedLabelService = inject(KeykeeperPickedLabelService);
+  private readonly publishPicked = effect(() =>
+    this.pickedLabelService.label.set(pickedLabel(this.menu())),
+  );
+
   /** What the edit button calls a folder, the way the panel did. */
   protected get folderLabelKey(): string {
     return this.terminology.enabled() ? "myFolder" : "folder";
@@ -309,6 +318,11 @@ export class KeykeeperVaultMenuComponent extends VaultFilterComponent implements
     this.searchTyped$
       .pipe(debounceTime(SearchTextDebounceInterval), takeUntil(this.destroy$))
       .subscribe((text) => void this.showSearch(text));
+  }
+
+  override ngOnDestroy() {
+    this.pickedLabelService.label.set(undefined);
+    super.ngOnDestroy();
   }
 
   /** The panel's placeholder for what's showing, and "Search all items" for everything. */

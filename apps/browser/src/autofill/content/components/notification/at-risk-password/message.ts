@@ -3,7 +3,7 @@ import { html, nothing } from "lit";
 
 import { Theme } from "@bitwarden/common/platform/enums";
 
-import { themes } from "../../constants/styles";
+import { fontFamily, themes } from "../../constants/styles";
 
 export type AtRiskNotificationMessageProps = {
   message?: string;
@@ -31,7 +31,8 @@ const baseTextStyles = css`
   text-align: left;
   text-overflow: ellipsis;
   line-height: 24px;
-  font-family: Inter, sans-serif;
+  /* Keykeeper: PassBundle's typeface. */
+  font-family: ${fontFamily};
   font-size: 16px;
 `;
 

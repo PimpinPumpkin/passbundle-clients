@@ -12,7 +12,13 @@ import {
   RoutedVaultFilterModel,
 } from "@bitwarden/vault";
 
-import { buildVaultMenu, filterAfter, VaultMenuActions, VaultMenuState } from "./vault-menu";
+import {
+  buildVaultMenu,
+  filterAfter,
+  pickedLabel,
+  VaultMenuActions,
+  VaultMenuState,
+} from "./vault-menu";
 
 const ORG = "org-1" as OrganizationId;
 const OTHER_ORG = "org-2" as OrganizationId;
@@ -350,6 +356,35 @@ describe("buildVaultMenu", () => {
     expect(act.folder.mock.calls[0][0].node.id).toBe("f-bank");
     expect(act.archive).toHaveBeenCalledWith(archive);
     expect(act.type).toHaveBeenCalledWith(trash);
+  });
+});
+
+describe("pickedLabel", () => {
+  const titleFor = (routed: RoutedVaultFilterModel, more: Partial<VaultMenuState> = {}) =>
+    pickedLabel(buildVaultMenu(state(routed, more), actions()));
+
+  it("is the name of the entry showing, for the vault page's title", () => {
+    expect(titleFor({})).toBe("All items");
+    expect(titleFor({ type: "favorites" })).toBe("Favorites");
+    expect(titleFor({ type: "card" })).toBe("Card");
+    expect(titleFor({ organizationId: ORG })).toBe("Contoso");
+    expect(titleFor({ organizationId: Unassigned })).toBe("My vault");
+    expect(titleFor({ organizationId: ORG, collectionId: "c-printers" as CollectionId })).toBe(
+      "Printers",
+    );
+    expect(titleFor({ folderId: "f-bank" })).toBe("Banking");
+    expect(titleFor({ folderId: Unassigned })).toBe("No folder");
+    expect(titleFor({ type: "archive" })).toBe("Archive");
+    expect(titleFor({ type: "trash" })).toBe("Trash");
+  });
+
+  it("is the category inside a vault, not the vault around it", () => {
+    expect(titleFor({ organizationId: ORG, type: "login" })).toBe("Login");
+  });
+
+  it("is nothing off the vault's page, or for a filter the menu has no entry for", () => {
+    expect(titleFor({ type: "login" }, { onVault: false })).toBeUndefined();
+    expect(titleFor({ collectionId: Unassigned })).toBeUndefined();
   });
 });
 

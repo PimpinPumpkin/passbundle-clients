@@ -4,7 +4,7 @@ import { html, nothing } from "lit";
 import { Theme } from "@bitwarden/common/platform/enums";
 
 import { EventSecurity } from "../../../../utils/event-security";
-import { spacing, themes, typography } from "../../constants/styles";
+import { fontFamily, spacing, themes, typography } from "../../constants/styles";
 
 export type NotificationConfirmationMessageProps = {
   buttonAria?: string;
@@ -93,7 +93,8 @@ const baseTextStyles = css`
   text-align: left;
   text-overflow: ellipsis;
   line-height: 24px;
-  font-family: Inter, sans-serif;
+  /* Keykeeper: PassBundle's typeface. */
+  font-family: ${fontFamily};
   font-size: 16px;
 `;
 

@@ -204,11 +204,13 @@ function apply() {
     /const BitwardenShield = svg`[\s\S]*?`;/,
     `const BitwardenShield = svg\`${themedMark}\`;`,
   );
+  // Every product's corner logo is the one-line wordmark: the product's name
+  // stays in the logo link's label and the product switcher.
   const svgModules = [
-    ["password-manager.ts", "const PasswordManagerLogo", "logo-password-manager.svg"],
-    ["admin-console.ts", "const AdminConsoleLogo", "logo-admin-console.svg"],
-    ["provider-portal.ts", "const ProviderPortalLogo", "logo-provider-portal.svg"],
-    ["secrets-manager.ts", "const SecretsManagerLogo", "logo-secrets-manager.svg"],
+    ["password-manager.ts", "const PasswordManagerLogo", "logo-nav.svg"],
+    ["admin-console.ts", "const AdminConsoleLogo", "logo-nav.svg"],
+    ["provider-portal.ts", "const ProviderPortalLogo", "logo-nav.svg"],
+    ["secrets-manager.ts", "const SecretsManagerLogo", "logo-nav.svg"],
     ["bitwarden-icon.ts", "export const BitwardenIcon", "icon-square.svg"],
   ];
   for (const [file, declaration, asset] of svgModules) {
@@ -409,12 +411,22 @@ ${scale}
 }
 `,
   );
-  // 8b. The look: Figtree, green-tinted darks, the brand's illustration colors,
-  //     and the translucent Glass theme (DESIGN.md, "The look").
+  // 8b. The typeface, Google Sans Flex, goes into the shared theme.css, which
+  //     tw-theme.css imports and what the extension draws inside websites
+  //     imports alone, so every surface has it. Then the look: green-tinted
+  //     darks, the brand's illustration colors, and the translucent Glass
+  //     theme (DESIGN.md, "The look").
   const fontDir = path.join(ROOT, "brand/assets/fonts");
   for (const font of fs.readdirSync(fontDir).filter((f) => f.endsWith(".woff2"))) {
     addFile(path.join(fontDir, font), `libs/components/src/webfonts/${font}`);
   }
+  const sharedThemeFile = "libs/components/src/theme.css";
+  if (!/--font-sans:/.test(read(sharedThemeFile)))
+    fail(`${sharedThemeFile} doesn't set --font-sans anymore.`);
+  write(
+    sharedThemeFile,
+    read(sharedThemeFile) + "\n" + fs.readFileSync(path.join(ROOT, "brand/fonts.css"), "utf8"),
+  );
   write(
     themeFile,
     read(themeFile) + "\n" + fs.readFileSync(path.join(ROOT, "brand/look.css"), "utf8"),

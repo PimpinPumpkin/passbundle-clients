@@ -152,20 +152,24 @@ export const border = {
   },
 };
 
+// Keykeeper: PassBundle's typeface, from the page's theme (brand/fonts.css),
+// where upstream names Inter.
+export const fontFamily = `var(--font-sans, Inter, sans-serif)`;
+
 export const typography = {
   body1: `
     line-height: 24px;
-    font-family: Inter, sans-serif;
+    font-family: ${fontFamily};
     font-size: 16px;
   `,
   body2: `
     line-height: 20px;
-    font-family: Inter, sans-serif;
+    font-family: ${fontFamily};
     font-size: 14px;
   `,
   helperMedium: `
     line-height: 16px;
-    font-family: Inter, sans-serif;
+    font-family: ${fontFamily};
     font-size: 12px;
   `,
 };

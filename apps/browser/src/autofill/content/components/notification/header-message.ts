@@ -3,7 +3,7 @@ import { html } from "lit";
 
 import { Theme } from "@bitwarden/common/platform/enums";
 
-import { themes } from "../constants/styles";
+import { fontFamily, themes } from "../constants/styles";
 
 export function NotificationHeaderMessage({ message, theme }: { message: string; theme: Theme }) {
   return html`
@@ -19,7 +19,8 @@ const notificationHeaderMessageStyles = (theme: Theme) => css`
   line-height: 28px;
   white-space: nowrap;
   color: ${themes[theme].text.main};
-  font-family: Inter, sans-serif;
+  /* Keykeeper: PassBundle's typeface. */
+  font-family: ${fontFamily};
   font-size: 18px;
   font-weight: 500;
 `;
