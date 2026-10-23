@@ -48,6 +48,10 @@ export enum EventType {
   Cipher_ClientToggledIbanVisible = 1130,
   Cipher_ClientCopiedNationalIdentificationNumber = 1131,
   Cipher_ClientToggledNationalIdentificationNumberVisible = 1132,
+  // Keykeeper: someone cleared an item's earlier versions, or deleted one
+  // (libs/vault/src/keykeeper/item-versions.ts).
+  Keykeeper_CipherHistoryCleared = 1190,
+  Keykeeper_CipherVersionDeleted = 1191,
 
   Collection_Created = 1300,
   Collection_Updated = 1301,

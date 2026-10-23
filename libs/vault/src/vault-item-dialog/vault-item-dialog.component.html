@@ -14,6 +14,14 @@
         [collections]="collections"
         [isAdminConsole]="formConfig.isAdminConsole"
       ></app-cipher-view>
+      <!-- Keykeeper: the item's earlier versions, to compare and restore -->
+      <app-keykeeper-item-versions
+        [cipher]="cipher"
+        [formConfig]="formConfig"
+        [canEdit]="canEdit"
+        [canDelete]="canDelete"
+        (restored)="onCipherSaved($event)"
+      ></app-keykeeper-item-versions>
     }
 
     @if (loadForm) {
