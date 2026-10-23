@@ -386,6 +386,7 @@ import { BrowserSessionTimeoutTypeService } from "../key-management/session-time
 import { SHARED_UNLOCK_EXTERNAL } from "../key-management/shared-unlock-messages";
 import VaultTimeoutService from "../key-management/vault-timeout/vault-timeout.service";
 import { KeykeeperAgentBiometrics } from "../keykeeper/agent-biometrics";
+import { KeykeeperDevReload } from "../keykeeper/dev-reload";
 import { KeykeeperEnrollment } from "../keykeeper/enrollment";
 import { KeykeeperExpirationReminders } from "../keykeeper/expiration-reminders";
 import { startMspWork } from "../keykeeper/msp-work";
@@ -1861,6 +1862,8 @@ export default class MainBackground {
       this.stateProvider,
     );
     this.keykeeperExpirationReminders.init();
+    // Keykeeper: an unpacked test build reloads itself when a newer one replaces its files.
+    void new KeykeeperDevReload().init();
     // Keykeeper: site fixes for autofill, and sharing the ones people make.
     this.keykeeperSiteFixes = new KeykeeperSiteFixes(
       this.apiService,
