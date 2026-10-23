@@ -45,6 +45,7 @@ import { OrganizationUserStatusType } from "@bitwarden/sdk-internal";
 import { UserId } from "@bitwarden/user-core";
 import { BillingConstraintService } from "@bitwarden/web-vault/app/billing/members/billing-constraint/billing-constraint.service";
 import { OrganizationWarningsService } from "@bitwarden/web-vault/app/billing/organizations/warnings/services";
+import { KeykeeperOffboardingService } from "@bitwarden/web-vault/app/keykeeper/access/offboarding.service";
 
 import {
   MaxCheckedCount,
@@ -101,6 +102,8 @@ export class MembersComponent {
   private organizationMetadataService = inject(OrganizationMetadataServiceAbstraction);
   private environmentService = inject(EnvironmentService);
   private memberExportService = inject(MemberExportService);
+  // Keykeeper: what someone could see, when removing or revoking them.
+  private keykeeperOffboarding = inject(KeykeeperOffboardingService);
 
   private userId$: Observable<UserId> = this.accountService.activeAccount$.pipe(getUserId);
 
@@ -265,7 +268,16 @@ export class MembersComponent {
   }
 
   async remove(user: OrganizationUserView, organization: Organization) {
-    const confirmed = await this.memberDialogManager.openRemoveUserConfirmationDialog(user);
+    // Keykeeper: what they can open, then the passwords they could see.
+    const offboarding = await this.keykeeperOffboarding.prepare(
+      organization,
+      user.id,
+      this.userNamePipe.transform(user),
+    );
+    const confirmed = await this.memberDialogManager.openRemoveUserConfirmationDialog(
+      user,
+      offboarding?.summary,
+    );
 
     if (!confirmed) {
       return false;
@@ -274,6 +286,9 @@ export class MembersComponent {
     const result = await this.memberActionsService.removeUser(organization, user.id);
     const sideEffect = () => this.dataSource().removeUser(user);
     await this.handleMemberActionResult(result, "removedUserId", user, sideEffect);
+    if (result.success) {
+      this.keykeeperOffboarding.showPasswords(offboarding);
+    }
   }
 
   async reinvite(user: OrganizationUserView, organization: Organization) {
@@ -295,7 +310,16 @@ export class MembersComponent {
   }
 
   async revoke(user: OrganizationUserView, organization: Organization) {
-    const confirmed = await this.memberDialogManager.openRevokeUserConfirmationDialog(user);
+    // Keykeeper: what they can open, then the passwords they could see.
+    const offboarding = await this.keykeeperOffboarding.prepare(
+      organization,
+      user.id,
+      this.userNamePipe.transform(user),
+    );
+    const confirmed = await this.memberDialogManager.openRevokeUserConfirmationDialog(
+      user,
+      offboarding?.summary,
+    );
 
     if (!confirmed) {
       return false;
@@ -304,6 +328,9 @@ export class MembersComponent {
     const result = await this.memberActionsService.revokeUser(organization, user.id);
     const sideEffect = async () => await this.load(organization);
     await this.handleMemberActionResult(result, "revokedUserId", user, sideEffect);
+    if (result.success) {
+      this.keykeeperOffboarding.showPasswords(offboarding);
+    }
   }
 
   async restore(user: OrganizationUserView, organization: Organization) {
