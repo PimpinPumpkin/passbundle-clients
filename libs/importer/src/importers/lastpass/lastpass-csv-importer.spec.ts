@@ -74,13 +74,8 @@ Notes:",empty,,0`,
       card: Object.assign(new CardView(), {
         expMonth: undefined,
       }),
-      fields: [
-        Object.assign(new FieldView(), {
-          name: "Start Date",
-          value: ",",
-          type: FieldType.Text,
-        }),
-      ],
+      // Keykeeper: a start date with no month or year isn't a field.
+      fields: [],
     }),
   },
   {
@@ -102,19 +97,10 @@ Notes:",noyear,,0`,
         number: "1234567887654321",
         code: "321",
         expMonth: "1",
+        // Keykeeper: the type is the brand when the number doesn't say.
+        brand: "Visa",
       }),
-      fields: [
-        Object.assign(new FieldView(), {
-          name: "Type",
-          value: "Visa",
-          type: FieldType.Text,
-        }),
-        Object.assign(new FieldView(), {
-          name: "Start Date",
-          value: ",",
-          type: FieldType.Text,
-        }),
-      ],
+      fields: [],
     }),
   },
   {
@@ -137,19 +123,9 @@ Notes:",nomonth,,0`,
         code: "987",
         expYear: "2020",
         expMonth: undefined,
+        brand: "Mastercard",
       }),
-      fields: [
-        Object.assign(new FieldView(), {
-          name: "Type",
-          value: "Mastercard",
-          type: FieldType.Text,
-        }),
-        Object.assign(new FieldView(), {
-          name: "Start Date",
-          value: ",",
-          type: FieldType.Text,
-        }),
-      ],
+      fields: [],
     }),
   },
 ];
@@ -174,6 +150,78 @@ describe("Lastpass CSV Importer", () => {
         }
       }
     });
+  });
+
+  // Keykeeper: a card's brand, and only what's the card's own as fields.
+  it("should give a card its brand from the number, without LastPass's own fields", async () => {
+    const result = await new LastPassCsvImporter()
+      .parse(`url,username,password,totp,extra,name,grouping,fav
+http://sn,,,,"NoteType:Credit Card
+Language:en-US
+Name on Card:Test Person
+Type:Visa
+Number:4111111111111111
+Security Code:123
+Start Date:,
+Expiration Date:December,2030
+Notes:Not a real card.",Test Visa,Finance,1`);
+
+    const cipher = result.ciphers[0];
+    expect(cipher.type).toBe(CipherType.Card);
+    expect(cipher.card.brand).toBe("Visa");
+    expect(cipher.card.number).toBe("4111111111111111");
+    expect(cipher.card.expMonth).toBe("12");
+    expect(cipher.card.expYear).toBe("2030");
+    expect(cipher.fields).toEqual([]);
+    expect(cipher.notes).toBe("Not a real card.");
+  });
+
+  it("should keep a card type that isn't its brand, and a real start date, as fields", async () => {
+    const result = await new LastPassCsvImporter()
+      .parse(`url,username,password,totp,extra,name,grouping,fav
+http://sn,,,,"NoteType:Credit Card
+Language:en-US
+Name on Card:Test Person
+Type:Debit
+Number:5555555555554444
+Security Code:321
+Start Date:March,2024
+Expiration Date:January,2029
+Notes:",Test Mastercard,,0`);
+
+    const cipher = result.ciphers[0];
+    expect(cipher.card.brand).toBe("Mastercard");
+    expect(cipher.fields.map((f) => [f.name, f.value])).toEqual([
+      ["Type", "Debit"],
+      ["Start Date", "March,2024"],
+    ]);
+  });
+
+  it("should give an address its phone, without LastPass's language", async () => {
+    const result = await new LastPassCsvImporter()
+      .parse(`url,username,password,totp,extra,name,grouping,fav
+http://sn,,,,"NoteType:Address
+Language:en-US
+First Name:Test
+Last Name:Person
+Address 1:1 Example Street
+City / Town:Exampleville
+Phone:{""num"":""5550100"",""ext"":""12"",""cc3l"":""USA""}
+Mobile Phone:{""num"":""5550199"",""ext"":"""",""cc3l"":""USA""}
+Fax:
+Notes:",Test Person,,0
+http://sn,,,,"NoteType:Address
+Language:en-US
+First Name:Zoë
+Phone:+1 555 0100
+Notes:",Zoë,,0`);
+
+    const [json, plain] = result.ciphers;
+    expect(json.type).toBe(CipherType.Identity);
+    expect(json.identity.phone).toBe("5550100 ext. 12");
+    expect(json.fields.map((f) => [f.name, f.value])).toEqual([["Mobile Phone", "5550199"]]);
+    expect(plain.identity.phone).toBe("+1 555 0100");
+    expect(plain.fields).toEqual([]);
   });
 
   it("should parse login with totp", async () => {

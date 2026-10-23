@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, computed, signal } from "@angular/core";
 import { Router } from "@angular/router";
 
 import {
@@ -28,6 +28,14 @@ type Source = {
   format?: ImportType;
   /** The export, step by step, ending at "choose the file below". */
   steps?: string[];
+  /** Another export the source makes, offered under the steps for the recommended one. */
+  other?: {
+    /** The link to it, and back. */
+    offer: string;
+    back: string;
+    format: ImportType;
+    steps: string[];
+  };
 };
 
 const SOURCES: Source[] = [
@@ -47,13 +55,24 @@ const SOURCES: Source[] = [
   {
     id: "onepassword",
     name: "1Password",
-    from: "A 1PUX export",
+    from: "A 1PUX or CSV export",
     format: "1password1pux",
     steps: [
       "In the 1Password app on your computer, choose File, then Export, then your account.",
       "Enter your 1Password password if it asks.",
       "Choose 1PUX as the format, then Export Data, and save the file.",
     ],
+    // 1PUX brings everything; a CSV, only logins and passwords.
+    other: {
+      offer: "Have a CSV from 1Password instead?",
+      back: "Use a 1PUX export instead (recommended)",
+      format: "1password8csv",
+      steps: [
+        "In the 1Password app on your computer, choose File, then Export, then your account.",
+        "Enter your 1Password password if it asks.",
+        "Choose CSV as the format, then Export Data, and save the file. A CSV has only logins and passwords; a 1PUX export brings cards, identities, secure notes, and custom fields too.",
+      ],
+    },
   },
   {
     id: "bitwarden",
@@ -106,7 +125,7 @@ const SOURCES: Source[] = [
           bitLink
           startIcon="bwi-angle-left"
           class="tw-mb-4"
-          (click)="source.set(null)"
+          (click)="choose(null)"
         >
           Back
         </button>
@@ -117,19 +136,30 @@ const SOURCES: Source[] = [
             (done)="finish()"
           ></tools-keykeeper-browser-import>
         } @else {
-          @if (s.steps; as steps) {
+          @if (path().steps; as steps) {
             <h2 bitTypography="h5">1. Export from {{ s.name }}</h2>
             <ol class="tw-mb-4 tw-ps-6" [style.list-style-type]="'decimal'">
               @for (step of steps; track step) {
                 <li bitTypography="body1">{{ step }}</li>
               }
             </ol>
+            @if (s.other; as other) {
+              <button
+                type="button"
+                bitLink
+                class="tw-mb-4"
+                data-testid="setup-import-other-export"
+                (click)="toggleOther()"
+              >
+                {{ useOther() ? other.back : other.offer }}
+              </button>
+            }
             <h2 bitTypography="h5">2. Choose the file</h2>
           }
-          <!-- A new importer for each source, started on its format. -->
-          @for (id of [s.id]; track id) {
+          <!-- A new importer for each source and export, started on its format. -->
+          @for (key of [s.id + ":" + (path().format ?? "")]; track key) {
             <tools-import
-              [startFormat]="s.format ?? null"
+              [startFormat]="path().format ?? null"
               (formDisabled)="disabled.set($event)"
               (formLoading)="loading.set($event)"
               (onSuccessfulImport)="imported.set(true)"
@@ -167,7 +197,7 @@ const SOURCES: Source[] = [
               type="button"
               class="tw-flex tw-flex-col tw-items-start tw-gap-1 tw-rounded-xl tw-border tw-border-solid tw-border-secondary-300 tw-bg-background tw-p-5 tw-text-start hover:tw-border-primary-600 focus-visible:tw-outline-primary-600"
               [attr.data-source]="s.id"
-              (click)="source.set(s)"
+              (click)="choose(s)"
             >
               <span bitTypography="h5" class="tw-mb-0">{{ s.name }}</span>
               <span bitTypography="body2" class="tw-text-muted">{{ s.from }}</span>
@@ -185,10 +215,29 @@ export class KeykeeperSetupImportComponent {
   protected readonly sources = SOURCES;
   protected readonly onMac = /Macintosh|Mac OS X/.test(navigator.userAgent);
   protected readonly source = signal<Source | null>(null);
+  /** The source's other export (1Password's CSV) rather than its recommended one. */
+  protected readonly useOther = signal(false);
+  /** The export being imported: its format and steps. */
+  protected readonly path = computed(() => {
+    const s = this.source();
+    const other = this.useOther() ? s?.other : null;
+    return other ?? { format: s?.format, steps: s?.steps };
+  });
   protected readonly loading = signal(false);
   protected readonly disabled = signal(false);
   protected readonly imported = signal(false);
   constructor(private readonly router: Router) {}
+
+  protected choose(source: Source | null) {
+    this.useOther.set(false);
+    this.imported.set(false);
+    this.source.set(source);
+  }
+
+  protected toggleOther() {
+    this.useOther.set(!this.useOther());
+    this.imported.set(false);
+  }
 
   /** Done here, or skipped: not offered again, and on to the vault. */
   protected async finish() {

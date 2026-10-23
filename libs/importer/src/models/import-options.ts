@@ -21,6 +21,8 @@ export const regularImportOptions = [
   { id: "keepasskdbx", name: "KeePass (kdbx)" },
   { id: "keepassxcsv", name: "KeePassX (csv)" },
   { id: "1password1pif", name: "1Password (1pif)" },
+  // Keykeeper: 1Password 8's CSV export.
+  { id: "1password8csv", name: "1Password 8 (csv)" },
   { id: "1passwordwincsv", name: "1Password 6 and 7 Windows (csv)" },
   { id: "1passwordmaccsv", name: "1Password 6 and 7 Mac (csv)" },
   { id: "dashlanejson", name: "Dashlane (json)" },

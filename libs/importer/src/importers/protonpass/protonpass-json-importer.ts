@@ -136,6 +136,13 @@ export class ProtonPassJsonImporter extends BaseImporter implements Importer {
       return Promise.resolve(result);
     }
 
+    // Keykeeper: each vault is a folder only when items come from more than one. Everything
+    // in one vault, Proton Pass's default "Personal" for most people, isn't in a folder.
+    const vaultsWithItems = Object.values(results.vaults).filter((vault) =>
+      vault.items?.some((item) => item.state != ProtonPassItemState.TRASHED),
+    );
+    const vaultsAreFolders = vaultsWithItems.length > 1;
+
     for (const [, vault] of Object.entries(results.vaults)) {
       for (const item of vault.items) {
         if (item.state == ProtonPassItemState.TRASHED) {
@@ -210,16 +217,26 @@ export class ProtonPassJsonImporter extends BaseImporter implements Importer {
 
             cipher.identity.email = this.getValueOrDefault(identityContent.email);
             cipher.identity.phone = this.getValueOrDefault(identityContent.phoneNumber);
-            cipher.identity.company = this.getValueOrDefault(identityContent.company);
+            // Keykeeper: an address's organization is the company when there's no other.
+            const company = this.getValueOrDefault(identityContent.company);
+            const organization = this.getValueOrDefault(identityContent.organization);
+            cipher.identity.company = company ?? organization;
             cipher.identity.ssn = this.getValueOrDefault(identityContent.socialSecurityNumber);
             cipher.identity.passportNumber = this.getValueOrDefault(identityContent.passportNumber);
             cipher.identity.licenseNumber = this.getValueOrDefault(identityContent.licenseNumber);
 
-            const address3 =
-              `${identityContent.floor ?? ""} ${identityContent.county ?? ""}`.trim();
-            cipher.identity.address1 = this.getValueOrDefault(identityContent.organization);
-            cipher.identity.address2 = this.getValueOrDefault(identityContent.streetAddress);
-            cipher.identity.address3 = this.getValueOrDefault(address3);
+            // Keykeeper: the street on the first address line, then the organization (when
+            // it isn't the company), then the floor and county; no empty lines between.
+            const [address1, address2, address3] = [
+              identityContent.streetAddress,
+              company != null && organization !== company ? organization : null,
+              `${identityContent.floor ?? ""} ${identityContent.county ?? ""}`,
+            ]
+              .map((line) => this.getValueOrDefault(line?.trim()))
+              .filter((line) => line != null);
+            cipher.identity.address1 = address1 ?? null;
+            cipher.identity.address2 = address2 ?? null;
+            cipher.identity.address3 = address3 ?? null;
 
             cipher.identity.city = this.getValueOrDefault(identityContent.city);
             cipher.identity.state = this.getValueOrDefault(identityContent.stateOrProvince);
@@ -260,7 +277,9 @@ export class ProtonPassJsonImporter extends BaseImporter implements Importer {
             continue;
         }
 
-        this.processFolder(result, vault.name);
+        if (vaultsAreFolders) {
+          this.processFolder(result, vault.name);
+        }
         this.cleanupCipher(cipher);
         result.ciphers.push(cipher);
       }
