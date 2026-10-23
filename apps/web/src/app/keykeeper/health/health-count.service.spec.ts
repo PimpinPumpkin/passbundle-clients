@@ -12,6 +12,7 @@ import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
 
+import { KeykeeperBreachCheckSetting } from "./breach-check-setting.service";
 import {
   HEALTH_COUNT_SETTLE_MS,
   HEALTH_COUNT_START_MS,
@@ -35,12 +36,16 @@ function login(password: string, { edit = true, org = null as string | null } = 
 describe("Health's count of items to fix", () => {
   let status$: BehaviorSubject<AuthenticationStatus>;
   let ciphers$: BehaviorSubject<CipherView[] | null>;
+  let checkAfterUnlock$: BehaviorSubject<boolean>;
   let auditService: ReturnType<typeof mock<AuditService>>;
   let service: KeykeeperHealthCountService;
 
   beforeEach(() => {
     status$ = new BehaviorSubject<AuthenticationStatus>(AuthenticationStatus.Locked);
     ciphers$ = new BehaviorSubject<CipherView[] | null>(null);
+    checkAfterUnlock$ = new BehaviorSubject<boolean>(true);
+    const breachCheck = mock<KeykeeperBreachCheckSetting>();
+    breachCheck.checksAfterUnlock$.mockReturnValue(checkAfterUnlock$);
     const authService = mock<AuthService>();
     authService.authStatusFor$.mockReturnValue(status$);
     const cipherService = mock<CipherService>();
@@ -60,6 +65,7 @@ describe("Health's count of items to fix", () => {
       cipherService,
       strength,
       auditService,
+      breachCheck,
     );
   });
 
@@ -82,6 +88,12 @@ describe("Health's count of items to fix", () => {
     auditService.passwordLeaked.mockRejectedValue(new Error("Failed to fetch"));
     const counts = await firstValueFrom(service.count(vault()).pipe(toArray()));
     expect(counts).toEqual([3, 3]);
+  });
+
+  it("counts weak and reused only, and asks nothing, when the person turned the check off", async () => {
+    const counts = await firstValueFrom(service.count(vault(), false).pipe(toArray()));
+    expect(counts).toEqual([3]);
+    expect(auditService.passwordLeaked).not.toHaveBeenCalled();
   });
 
   it("asks the breach check about each different password once", async () => {
@@ -109,6 +121,17 @@ describe("Health's count of items to fix", () => {
       expect(auditService.passwordLeaked).not.toHaveBeenCalled();
       await jest.advanceTimersByTimeAsync(HEALTH_COUNT_SETTLE_MS + 1_000);
       expect(seen).toEqual([undefined, 3, 4]);
+
+      // Turned off: counted again without asking; turned back on: asked again.
+      auditService.passwordLeaked.mockClear();
+      checkAfterUnlock$.next(false);
+      await jest.advanceTimersByTimeAsync(HEALTH_COUNT_SETTLE_MS + 1_000);
+      expect(seen.at(-1)).toBe(3);
+      expect(auditService.passwordLeaked).not.toHaveBeenCalled();
+      checkAfterUnlock$.next(true);
+      await jest.advanceTimersByTimeAsync(HEALTH_COUNT_SETTLE_MS + 1_000);
+      expect(seen.at(-1)).toBe(4);
+      expect(auditService.passwordLeaked).toHaveBeenCalled();
 
       status$.next(AuthenticationStatus.Locked);
       await jest.advanceTimersByTimeAsync(0);

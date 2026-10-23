@@ -1,5 +1,6 @@
 import { Injectable } from "@angular/core";
 import {
+  combineLatest,
   debounceTime,
   distinctUntilChanged,
   filter,
@@ -27,6 +28,8 @@ import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 
+import { KeykeeperBreachCheckSetting } from "./breach-check-setting.service";
+
 /** How long after unlocking before counting, so the vault shows first. */
 export const HEALTH_COUNT_START_MS = 3_000;
 /** How long the vault stays unchanged before counting again. */
@@ -44,8 +47,9 @@ const pause = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
  * a few passwords at a time, so it never holds anything up: weak and reused
  * first, then exposed once the k-anonymity breach check answers (only 5
  * characters of each password's SHA-1 hash leave the browser). When that
- * check can't be made, the count is weak and reused only. See DESIGN.md, "The
- * left menu".
+ * check can't be made, or the person turned off "Check my passwords against
+ * known breaches after unlocking", the count is weak and reused only, and with
+ * the setting off nothing is sent. See DESIGN.md, "The left menu".
  */
 @Injectable({ providedIn: "root" })
 export class KeykeeperHealthCountService {
@@ -61,6 +65,7 @@ export class KeykeeperHealthCountService {
     private readonly cipherService: CipherService,
     private readonly passwordStrengthService: PasswordStrengthServiceAbstraction,
     private readonly auditService: AuditService,
+    private readonly breachCheck: KeykeeperBreachCheckSetting,
   ) {
     this.count$ = accountService.activeAccount$.pipe(
       switchMap((account) =>
@@ -82,15 +87,24 @@ export class KeykeeperHealthCountService {
 
   private countFor(userId: UserId): Observable<number | undefined> {
     return timer(HEALTH_COUNT_START_MS).pipe(
-      switchMap(() => this.cipherService.cipherViews$(userId)),
-      filter((ciphers): ciphers is CipherView[] => ciphers != null),
+      switchMap(() =>
+        combineLatest([
+          this.cipherService
+            .cipherViews$(userId)
+            .pipe(filter((ciphers): ciphers is CipherView[] => ciphers != null)),
+          this.breachCheck.checksAfterUnlock$(userId),
+        ]),
+      ),
       debounceTime(HEALTH_COUNT_SETTLE_MS),
-      switchMap((ciphers) => this.count(ciphers)),
+      switchMap(([ciphers, checkExposed]) => this.count(ciphers, checkExposed)),
     );
   }
 
-  /** The items to fix among these: weak and reused first, then with exposed. Never fails. */
-  count(ciphers: CipherView[]): Observable<number> {
+  /**
+   * The items to fix among these: weak and reused first, then with exposed,
+   * unless `checkExposed` is off. Never fails.
+   */
+  count(ciphers: CipherView[], checkExposed = true): Observable<number> {
     return new Observable<number>((subscriber) => {
       let stopped = false;
       const run = async () => {
@@ -109,6 +123,10 @@ export class KeykeeperHealthCountService {
         }
         const rules = { needsEdit: true, weak: (cipher: CipherView) => weak.has(cipher) };
         subscriber.next(passwordProblems(checked, rules).filter(needsFixing).length);
+        if (!checkExposed) {
+          subscriber.complete();
+          return;
+        }
 
         const exposed = await checkPasswords(
           checked.map((cipher) => cipher.login.password),

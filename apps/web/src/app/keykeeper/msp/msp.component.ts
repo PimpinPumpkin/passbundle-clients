@@ -34,6 +34,7 @@ import {
 } from "../../admin-console/organizations/policies";
 import { HeaderModule } from "../../layouts/header/header.module";
 import { SharedModule } from "../../shared";
+import { KeykeeperBreachCheckSetting } from "../health/breach-check-setting.service";
 import { KeykeeperJoinSealer } from "../joining/join-sealer.service";
 
 import {
@@ -150,6 +151,22 @@ const CLIENT_FEATURES = {
                 <bit-icon name="bwi-spinner" class="bwi-spin tw-mr-1" />
                 Checking passwords against known breaches: {{ check.checked }} of {{ check.total }}
               </p>
+            } @else if (check.state === "off") {
+              <div class="tw-mb-3 tw-flex tw-items-center tw-gap-3" data-testid="msp-exposed-off">
+                <button
+                  bitButton
+                  buttonType="secondary"
+                  type="button"
+                  class="tw-shrink-0 tw-whitespace-nowrap"
+                  (click)="checkByHand(m)"
+                >
+                  Check exposed passwords
+                </button>
+                <span bitTypography="helper">
+                  Your settings don't check passwords against known breaches after unlocking.
+                  Checking sends only the first 5 characters of each password's SHA-1 hash.
+                </span>
+              </div>
             } @else if (check.unchecked > 0) {
               <bit-callout
                 type="warning"
@@ -418,7 +435,9 @@ const CLIENT_FEATURES = {
                 <bit-icon name="bwi-spinner" class="bwi-spin tw-text-muted" title="Loading" />
               } @else if (details.toFix.length === 0) {
                 <p bitTypography="body2" class="tw-mb-0" data-testid="msp-health-nothing">
-                  @if (details.exposed === undefined) {
+                  @if (details.exposed === undefined && exposedCheck()?.state === "off") {
+                    Nothing weak or reused. Exposed passwords aren't checked yet.
+                  } @else if (details.exposed === undefined) {
                     Nothing weak or reused so far. Still checking for exposed passwords.
                   } @else {
                     Nothing to fix.
@@ -837,8 +856,14 @@ export class KeykeeperMspComponent implements OnInit {
   protected readonly exposedCheck = signal<
     | { state: "checking"; checked: number; total: number }
     | { state: "done"; unchecked: number }
+    | { state: "off" }
     | null
   >(null);
+  /**
+   * The person asked for the breach check on this visit, with their setting
+   * for checking after unlocking off (KeykeeperBreachCheckSetting).
+   */
+  protected readonly exposedAsked = signal(false);
   /** The client whose passwords to fix are showing. */
   protected readonly detailsFor = signal<MspClient | null>(null);
   protected readonly exposedTitle =
@@ -889,6 +914,7 @@ export class KeykeeperMspComponent implements OnInit {
     private readonly cipherService: CipherService,
     private readonly passwordStrengthService: PasswordStrengthServiceAbstraction,
     private readonly auditService: AuditService,
+    private readonly breachCheck: KeykeeperBreachCheckSetting,
     private readonly syncService: SyncService,
     private readonly route: ActivatedRoute,
     private readonly router: Router,
@@ -1301,6 +1327,17 @@ export class KeykeeperMspComponent implements OnInit {
       };
       // Weak and reused first; exposed follows when the breach check is done.
       this.health.set(clientHealth(ciphers, clientIds, score));
+      // With checking after unlocking off, nothing goes to the breach service
+      // until the person asks.
+      if (
+        !this.exposedAsked() &&
+        !(await firstValueFrom(this.breachCheck.activeChecksAfterUnlock$))
+      ) {
+        if (run === this.healthRuns.latest) {
+          this.exposedCheck.set({ state: "off" });
+        }
+        return;
+      }
 
       // Each different password once, across every client, through the one
       // k-anonymity client (only 5 characters of each hash are sent).
@@ -1324,6 +1361,13 @@ export class KeykeeperMspComponent implements OnInit {
     }
   }
 
+  /** Checks for exposed passwords when the person's setting doesn't on its own. */
+  protected checkByHand(msp: MspDetails) {
+    this.exposedAsked.set(true);
+    this.exposedCheck.set(null);
+    void this.computeHealth(msp);
+  }
+
   /** Checks for exposed passwords again, after the breach service couldn't be reached. */
   protected checkAgain(msp: MspDetails) {
     this.exposedCheck.set(null);
@@ -1337,7 +1381,13 @@ export class KeykeeperMspComponent implements OnInit {
 
   /** A health count opens the client's list of what to fix when there's something in it. */
   protected opensDetails(client: MspClient, value: number | string): boolean {
-    return this.seesItems(client) && value !== 0 && value !== "..." && value !== "-";
+    return (
+      this.seesItems(client) &&
+      value !== 0 &&
+      value !== "..." &&
+      value !== "-" &&
+      value !== "Not checked"
+    );
   }
 
   protected toggleDetails(client: MspClient) {
@@ -1384,8 +1434,10 @@ export class KeykeeperMspComponent implements OnInit {
     if (health == null) {
       return { expiring: "...", weak: "...", reused: "...", exposed: "...", exposedNote: null };
     }
-    let exposed: number | string = health.exposed ?? "...";
-    let exposedNote: string | null = health.exposed === undefined ? "Checking" : null;
+    const off = this.exposedCheck()?.state === "off";
+    let exposed: number | string = health.exposed ?? (off ? "Not checked" : "...");
+    let exposedNote: string | null =
+      health.exposed !== undefined ? null : off ? "Checking after unlocking is off" : "Checking";
     if (health.unchecked > 0) {
       exposed = health.exposed ? `${health.exposed}+` : "Couldn't check";
       exposedNote = `${health.unchecked === 1 ? "1 password" : `${health.unchecked} passwords`} couldn't be checked`;

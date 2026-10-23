@@ -555,5 +555,11 @@
   },
   "keykeeperExposedCheckFailed": {
     "message": "Couldn't check this password, because this browser couldn't reach api.pwnedpasswords.com. It may be offline, or a firewall may block it."
+  },
+  "keykeeperBreachCheckAfterUnlock": {
+    "message": "Check my passwords against known breaches after unlocking"
+  },
+  "keykeeperBreachCheckAfterUnlockHint": {
+    "message": "For the count beside Health and the MSP console's Exposed column. Only the first 5 characters of each password's SHA-1 hash are sent to Have I Been Pwned. Turned off, nothing is sent unless you open the exposed passwords report or press Check."
   }
 }
