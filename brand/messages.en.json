@@ -20,6 +20,90 @@
   "keykeeperExpires": {
     "message": "Expires"
   },
+  "keykeeperVersionHistory": {
+    "message": "Version history"
+  },
+  "keykeeperSavedByYou": {
+    "message": "Saved by you"
+  },
+  "keykeeperSavedBy": {
+    "message": "Saved by $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "Ana Example"
+      }
+    }
+  },
+  "keykeeperSavedByAnotherMember": {
+    "message": "Saved by another member"
+  },
+  "keykeeperShowAllVersions": {
+    "message": "Show all $COUNT$ versions",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "12"
+      }
+    }
+  },
+  "keykeeperVersionsUnreadable": {
+    "message": "Earlier versions that can't be opened: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "keykeeperVersionFrom": {
+    "message": "Version from $DATE$",
+    "placeholders": {
+      "date": {
+        "content": "$1",
+        "example": "Oct 23, 2026, 10:04:12 AM"
+      }
+    }
+  },
+  "keykeeperField": {
+    "message": "Field"
+  },
+  "keykeeperThisVersion": {
+    "message": "This version"
+  },
+  "keykeeperNow": {
+    "message": "Now"
+  },
+  "keykeeperChanged": {
+    "message": "Changed"
+  },
+  "keykeeperShowHiddenValues": {
+    "message": "Show hidden values"
+  },
+  "keykeeperHideHiddenValues": {
+    "message": "Hide hidden values"
+  },
+  "keykeeperRestoreVersion": {
+    "message": "Restore this version"
+  },
+  "keykeeperRestoreVersionTitle": {
+    "message": "Restore this version?"
+  },
+  "keykeeperRestoreVersionDesc": {
+    "message": "The item goes back to how it was on $DATE$. How it is now stays in its version history, so you can come back to it.",
+    "placeholders": {
+      "date": {
+        "content": "$1",
+        "example": "Oct 23, 2026, 10:04:12 AM"
+      }
+    }
+  },
+  "keykeeperVersionRestored": {
+    "message": "Version restored"
+  },
+  "keykeeperVersionSameAsNow": {
+    "message": "This version looks the same as the item does now."
+  },
   "keykeeperMspConsole": {
     "message": "MSP console"
   },

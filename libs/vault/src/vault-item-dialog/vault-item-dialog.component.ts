@@ -60,6 +60,7 @@ import {
 } from "../cipher-view/attachments/attachments-v2.component";
 import { CipherViewComponent } from "../cipher-view/cipher-view.component";
 import { DecryptionFailureDialogComponent } from "../components/decryption-failure-dialog/decryption-failure-dialog.component";
+import { KeykeeperItemVersionsComponent } from "../keykeeper/item-versions.component";
 
 export type VaultItemDialogMode = "view" | "form";
 
@@ -127,6 +128,8 @@ export type VaultItemDialogResult = UnionOfValues<typeof VaultItemDialogResult>;
     IconButtonModule,
     IconModule,
     CipherViewComponent,
+    // Keykeeper: the item's earlier versions (DESIGN.md, "Item history")
+    KeykeeperItemVersionsComponent,
     DialogModule,
     CommonModule,
     CipherFormModule,
