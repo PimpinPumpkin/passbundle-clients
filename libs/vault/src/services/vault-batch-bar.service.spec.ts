@@ -632,6 +632,41 @@ describe("VaultBatchBarService", () => {
     });
   });
 
+  describe("canAssignToCollections and shared folder permissions", () => {
+    // Keykeeper: an organization's item goes into more shared folders only
+    // with share on it (DESIGN.md, "Folders and permissions").
+    const grid = {
+      seePasswords: true,
+      create: true,
+      edit: true,
+      delete: false,
+      export: false,
+      share: false,
+      print: false,
+      viewHistory: false,
+      manage: false,
+    };
+
+    function withFolder(share: boolean) {
+      const folder = makeCollection({ readOnly: false, keykeeper: { ...grid, share } } as any);
+      service.setConfig(makeConfig({ hasCiphers: true, allCollections: [folder] }));
+      organizationsSubject.next([makeOrg()]);
+      service.selection.select(
+        makeCipherItem({ organizationId: orgId, collectionIds: [folder.id] } as any),
+      );
+    }
+
+    it("is offered for an item someone can share", () => {
+      withFolder(true);
+      expect(service.canAssignToCollections()).toBe(true);
+    });
+
+    it("isn't offered for an item someone can edit but not share", () => {
+      withFolder(false);
+      expect(service.canAssignToCollections()).toBe(false);
+    });
+  });
+
   describe("filter change clears selection", () => {
     it("clears selection when a relevant filter property changes", () => {
       service.selection.select(makeCipherItem());

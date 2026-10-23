@@ -4,6 +4,7 @@ import { of } from "rxjs";
 
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
+import { GRID_NONE } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions";
 import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
@@ -384,6 +385,47 @@ describe("EditCommand", () => {
         validCollectionId,
         expect.objectContaining({ name: mockEncString.encryptedString }),
       );
+    });
+
+    it("sends each grant's grid back while it agrees with upstream's fields, and not once they were edited", async () => {
+      // Keykeeper: see DESIGN.md, "Folders and permissions".
+      const custom = { ...GRID_NONE, seePasswords: true, edit: true, viewHistory: true };
+      const users = [
+        // As `get org-collection` printed it.
+        { id: "kept", readOnly: false, hidePasswords: false, manage: false, keykeeper: custom },
+        // readOnly edited, the grid left as it was.
+        { id: "edited", readOnly: true, hidePasswords: false, manage: false, keykeeper: custom },
+        // No grid at all.
+        { id: "plain", readOnly: true, hidePasswords: true, manage: false },
+      ];
+      await command["editOrganizationCollection"](
+        validCollectionId,
+        makeRequest({ users }),
+        makeOptions(),
+      );
+      const sent = apiService.putCollection.mock.calls[0][2] as any;
+      expect(sent.users.map((u: any) => [u.id, u.keykeeper])).toEqual([
+        ["kept", custom],
+        ["edited", undefined],
+        ["plain", undefined],
+      ]);
+    });
+
+    it("prints the grids the server saved", async () => {
+      const custom = { ...GRID_NONE, create: true, viewHistory: true };
+      apiService.putCollection.mockResolvedValue({
+        id: validCollectionId,
+        groups: [],
+        users: [
+          { id: "user-1", readOnly: true, hidePasswords: true, manage: false, keykeeper: custom },
+        ],
+      } as any);
+      const result = await command["editOrganizationCollection"](
+        validCollectionId,
+        makeRequest(),
+        makeOptions(),
+      );
+      expect((result.data as any).users[0].keykeeper).toEqual(custom);
     });
 
     it("handles null groups and users", async () => {

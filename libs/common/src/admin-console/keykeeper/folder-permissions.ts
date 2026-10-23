@@ -218,6 +218,20 @@ export type ItemLike = {
 };
 
 /**
+ * An item's owner and folders as ItemLike, from any item the apps hold,
+ * including the SDK's list items, whose ids are tagged strings.
+ */
+export function itemLike(item: {
+  organizationId?: unknown;
+  collectionIds?: readonly unknown[] | null;
+}): ItemLike {
+  return {
+    organizationId: item.organizationId == null ? null : String(item.organizationId),
+    collectionIds: (item.collectionIds ?? []).map(String),
+  };
+}
+
+/**
  * What someone can do with an item: everything with their own; otherwise what
  * any shared folder holding it allows them (the server's rule). An item in no
  * folder they reach gets `fallback`, such as everything for an admin, who

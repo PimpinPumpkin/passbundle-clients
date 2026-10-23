@@ -13,7 +13,11 @@ import {
   switchMap,
 } from "rxjs";
 
-import { gridOf } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
+import {
+  gridOf,
+  itemGrid,
+  itemLike,
+} from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import {
   CollectionAdminView,
   Unassigned,
@@ -496,7 +500,9 @@ export class VaultItemsComponent<C extends CipherViewLike> {
 
     return (
       (organization?.canEditAllCiphers && this.viewingOrgVault) ||
-      (CipherViewLikeUtils.canAssignToCollections(cipher) && editableCollections.length > 0)
+      (CipherViewLikeUtils.canAssignToCollections(cipher) &&
+        editableCollections.length > 0 &&
+        this.canShare(cipher))
     );
   }
 
@@ -741,7 +747,16 @@ export class VaultItemsComponent<C extends CipherViewLike> {
   private allCiphersHaveEditAccess(): boolean {
     return this.selection.selected
       .filter(({ cipher }) => cipher)
-      .every(({ cipher }) => cipher?.edit && cipher?.viewPassword);
+      .every(({ cipher }) => cipher?.edit && cipher?.viewPassword && this.canShare(cipher));
+  }
+
+  /**
+   * Keykeeper: an organization's item goes into more of its shared folders,
+   * or out of one, only with share on it, as the server requires (DESIGN.md,
+   * "Folders and permissions"). A personal item is the person's to share.
+   */
+  private canShare(cipher: C): boolean {
+    return itemGrid(itemLike(cipher), this.allCollections).share;
   }
 
   private getUniqueOrganizationIds(): Set<string | [] | OrganizationId> {

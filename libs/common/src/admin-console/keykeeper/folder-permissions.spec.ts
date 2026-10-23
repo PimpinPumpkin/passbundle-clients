@@ -7,6 +7,7 @@ import {
   gridProblem,
   gridWithin,
   itemGrid,
+  itemLike,
   mergeGrids,
   presetGrid,
   presetOf,
@@ -81,9 +82,9 @@ describe("upstreamOf", () => {
 describe("gridOf", () => {
   it("is the server's grid when it sent one, otherwise the preset of upstream's fields", () => {
     const custom: FolderGrid = { ...GRID_NONE, create: true };
-    expect(gridOf({ readOnly: true, hidePasswords: true, manage: false, keykeeper: custom })).toEqual(
-      custom,
-    );
+    expect(
+      gridOf({ readOnly: true, hidePasswords: true, manage: false, keykeeper: custom }),
+    ).toEqual(custom);
     expect(gridOf({ readOnly: false, hidePasswords: false, manage: false })).toEqual(
       FOLDER_PRESETS.edit,
     );
@@ -182,5 +183,18 @@ describe("itemGrid", () => {
   it("falls back for an item in no folder the person reaches", () => {
     expect(itemGrid({ organizationId: "org", collectionIds: ["x"] }, [])).toEqual(GRID_NONE);
     expect(itemGrid({ organizationId: "org", collectionIds: [] }, [], GRID_ALL)).toEqual(GRID_ALL);
+  });
+});
+
+describe("itemLike", () => {
+  it("reads any item's owner and folders as plain ids, a personal item's owner as none", () => {
+    expect(itemLike({ organizationId: "org", collectionIds: ["a", "b"] })).toEqual({
+      organizationId: "org",
+      collectionIds: ["a", "b"],
+    });
+    expect(itemLike({ organizationId: undefined, collectionIds: null })).toEqual({
+      organizationId: null,
+      collectionIds: [],
+    });
   });
 });

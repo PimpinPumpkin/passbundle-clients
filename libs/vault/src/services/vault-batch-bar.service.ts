@@ -14,7 +14,11 @@ import {
 } from "rxjs";
 
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
-import { gridOf } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
+import {
+  gridOf,
+  itemGrid,
+  itemLike,
+} from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { CollectionView, Unassigned } from "@bitwarden/common/admin-console/models/collections";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
@@ -346,7 +350,11 @@ export class VaultBatchBarService<C extends CipherViewLike> {
     const org = allOrganizations.find((o) => o.id === orgId);
     const canEditOrManageAll = org?.canEditAllCiphers === true;
     const collectionNotSelected = selected.filter((i) => i.collection).length === 0;
-    const allCiphersHaveEdit = selectedCiphers.every((c) => c.edit && c.viewPassword);
+    // Keykeeper: and share on each, to add it to more shared folders or take
+    // it out of one (DESIGN.md, "Folders and permissions").
+    const allCiphersHaveEdit = selectedCiphers.every(
+      (c) => c.edit && c.viewPassword && itemGrid(itemLike(c), config.allCollections).share,
+    );
 
     return (
       (canEditOrManageAll || allCiphersHaveEdit) && collectionNotSelected && hasEditableCollections

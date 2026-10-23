@@ -7,7 +7,6 @@ import { UpdateCollectionRequest } from "@bitwarden/admin-console/common";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import { PolicyType } from "@bitwarden/common/admin-console/enums";
-import { SelectionReadOnlyRequest } from "@bitwarden/common/admin-console/models/request/selection-read-only.request";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions";
@@ -27,7 +26,7 @@ import { KeyService } from "@bitwarden/key-management";
 
 import { OrganizationCollectionRequest } from "../admin-console/models/request/organization-collection.request";
 import { OrganizationCollectionResponse } from "../admin-console/models/response/organization-collection.response";
-import { SelectionReadOnly } from "../admin-console/models/selection-read-only";
+import { SelectionReadOnly, selectionRequest } from "../admin-console/models/selection-read-only";
 import { Response } from "../models/response";
 import { CliUtils } from "../utils";
 import { CipherResponse } from "../vault/models/cipher.response";
@@ -285,18 +284,8 @@ export class EditCommand {
         throw new Error("No encryption key for this organization.");
       }
 
-      const groups =
-        req.groups == null
-          ? null
-          : req.groups.map(
-              (g) => new SelectionReadOnlyRequest(g.id, g.readOnly, g.hidePasswords, g.manage),
-            );
-      const users =
-        req.users == null
-          ? null
-          : req.users.map(
-              (u) => new SelectionReadOnlyRequest(u.id, u.readOnly, u.hidePasswords, u.manage),
-            );
+      const groups = req.groups == null ? null : req.groups.map((g) => selectionRequest(g));
+      const users = req.users == null ? null : req.users.map((u) => selectionRequest(u));
       const request = new UpdateCollectionRequest({
         name: await this.encryptService.encryptString(req.name, orgKey),
         externalId: req.externalId,
@@ -307,10 +296,10 @@ export class EditCommand {
       const response = await this.apiService.putCollection(req.organizationId, id, request);
       const view = CollectionExport.toView(req, response.id);
       const serverGroups = response.groups.map(
-        (g) => new SelectionReadOnly(g.id, g.readOnly, g.hidePasswords, g.manage),
+        (g) => new SelectionReadOnly(g.id, g.readOnly, g.hidePasswords, g.manage, g.keykeeper),
       );
       const serverUsers = response.users.map(
-        (u) => new SelectionReadOnly(u.id, u.readOnly, u.hidePasswords, u.manage),
+        (u) => new SelectionReadOnly(u.id, u.readOnly, u.hidePasswords, u.manage, u.keykeeper),
       );
       const res = new OrganizationCollectionResponse(view, serverGroups, serverUsers);
       return Response.success(res);

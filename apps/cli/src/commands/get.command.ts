@@ -518,13 +518,15 @@ export class GetCommand extends DownloadCommand {
         response.groups == null
           ? null
           : response.groups.map(
-              (g) => new SelectionReadOnly(g.id, g.readOnly, g.hidePasswords, g.manage),
+              (g) =>
+                new SelectionReadOnly(g.id, g.readOnly, g.hidePasswords, g.manage, g.keykeeper),
             );
       const users =
         response.users == null
           ? null
           : response.users.map(
-              (g) => new SelectionReadOnly(g.id, g.readOnly, g.hidePasswords, g.manage),
+              (g) =>
+                new SelectionReadOnly(g.id, g.readOnly, g.hidePasswords, g.manage, g.keykeeper),
             );
       const res = new OrganizationCollectionResponse(decCollection, groups, users);
       return Response.success(res);
