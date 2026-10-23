@@ -8,6 +8,7 @@ import {
 } from "@bitwarden/admin-console/common";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { OrganizationUserType } from "@bitwarden/common/admin-console/enums";
+import { FolderGrid } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
@@ -64,11 +65,14 @@ const grantOf = (c: {
   readOnly: boolean;
   hidePasswords: boolean;
   manage: boolean;
+  keykeeper?: FolderGrid;
 }): AccessGrant => ({
   id: c.id,
   readOnly: c.readOnly,
   hidePasswords: c.hidePasswords,
   manage: c.manage,
+  // Keykeeper: the grant's grid (DESIGN.md, "Folders and permissions").
+  keykeeper: c.keykeeper,
 });
 
 /**

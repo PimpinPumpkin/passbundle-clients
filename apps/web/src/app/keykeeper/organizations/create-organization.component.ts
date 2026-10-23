@@ -39,7 +39,7 @@ import { ClientPreset, KeykeeperMspApiService } from "../msp/msp-api.service";
             <bit-label>A business</bit-label>
             <bit-hint>
               Starts with account recovery for forgotten master passwords, strong master passwords,
-              one work account per person, and Everyone and Admins collections. You also get an
+              one work account per person, and Everyone and Admins shared folders. You also get an
               install command for rolling it out. Change any of it on the organization's Settings
               and Policies pages.
             </bit-hint>

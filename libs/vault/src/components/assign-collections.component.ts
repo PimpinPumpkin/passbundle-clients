@@ -37,6 +37,7 @@ import {
   OrganizationService,
 } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { OrganizationUserStatusType } from "@bitwarden/common/admin-console/enums";
+import { gridOf } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import {
   CollectionView,
   CollectionTypes,
@@ -599,12 +600,13 @@ export class AssignCollectionsComponent implements OnInit, OnDestroy, AfterViewI
 
         const canAccessDefaultCollection = this.canAccessDefaultCollection(collections);
 
+        // Keykeeper: the ones they can add items to (create).
         return orgCollections.filter((c) => {
           if (canAccessDefaultCollection) {
-            return !c.readOnly;
+            return gridOf(c).create;
           }
 
-          return !c.readOnly && c.type !== CollectionTypes.DefaultUserCollection;
+          return gridOf(c).create && c.type !== CollectionTypes.DefaultUserCollection;
         });
       }),
       shareReplay({ refCount: true, bufferSize: 1 }),
@@ -718,12 +720,14 @@ export class AssignCollectionsComponent implements OnInit, OnDestroy, AfterViewI
       this.organizations$.pipe(map((orgs) => orgs.find((o) => o.id === this.selectedOrgId))),
     );
 
+    // Keykeeper: an item leaves a shared folder only with share there
+    // (DESIGN.md, "Folders and permissions").
     this.readOnlyCollectionNames = availableCollections
       .filter((c) => {
         return (
-          c.readOnly &&
           ciphers.some((cipher) => cipher.collectionIds.includes(c.id)) &&
-          !c.canEditItems(organization)
+          !organization?.canEditAllCiphers &&
+          !gridOf(c).share
         );
       })
       .map((c) => c.name);

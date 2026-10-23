@@ -14,6 +14,7 @@ import {
 } from "rxjs";
 
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
+import { gridOf } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { CollectionView, Unassigned } from "@bitwarden/common/admin-console/models/collections";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
@@ -328,7 +329,8 @@ export class VaultBatchBarService<C extends CipherViewLike> {
     const uniqueOrgIds = new Set(
       selectedCiphers.flatMap((c) => c.organizationId ?? null).filter(Boolean),
     );
-    const hasEditableCollections = config.allCollections.some((c) => !c.readOnly);
+    // Keykeeper: a shared folder they can add items to (create).
+    const hasEditableCollections = config.allCollections.some((c) => gridOf(c).create);
 
     // Assigning ciphers from multiple orgs at once cannot be done.
     if (uniqueOrgIds.size > 1) {

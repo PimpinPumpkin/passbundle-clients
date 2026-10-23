@@ -12,7 +12,7 @@
           [ngModelOptions]="{ standalone: true }"
           (closed)="handleBlur()"
         >
-          @for (p of permissionList; track p) {
+          @for (p of initialPermissionList; track p) {
             <bit-option
               [value]="p.perm"
               [label]="p.labelId | vfo1I18n: p.vfo1LabelId ?? p.labelId"
@@ -168,6 +168,14 @@
             }
           </td>
         </tr>
+        <!-- Keykeeper: a Custom row's grid, under it. -->
+        @if (permissionMode() != "hidden" && isCustomRow(i)) {
+          <tr bitRow [formGroupName]="i" data-testid="keykeeper-custom-row">
+            <td bitCell [attr.colspan]="5" class="tw-pt-0">
+              <app-keykeeper-folder-grid formControlName="grid" [label]="item.labelName" />
+            </td>
+          </tr>
+        }
       }
       @if (selectedItems().length == 0) {
         <tr>

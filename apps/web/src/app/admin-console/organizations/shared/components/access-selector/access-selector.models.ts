@@ -5,6 +5,13 @@ import {
   OrganizationUserStatusType,
   OrganizationUserType,
 } from "@bitwarden/common/admin-console/enums";
+import {
+  FOLDER_PRESETS,
+  FolderGrid,
+  gridOf,
+  presetOf,
+  upstreamOf,
+} from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { CollectionAccessSelectionView } from "@bitwarden/common/admin-console/models/collections";
 import { SelectItemView } from "@bitwarden/components";
 
@@ -21,6 +28,8 @@ export enum CollectionPermission {
   Edit = "edit",
   EditExceptPass = "editExceptPass",
   Manage = "manage",
+  /** Keykeeper: any other grid of capabilities (DESIGN.md, "Folders and permissions"). */
+  Custom = "custom",
 }
 
 // FIXME: update to use a const object instead of a typescript enum
@@ -76,6 +85,11 @@ export type AccessItemValue = {
   id: string;
   permission?: CollectionPermission;
   type: AccessItemType;
+  /**
+   * Keykeeper: the grant's grid of capabilities. A preset's grid for the
+   * presets; any grid for Custom. Missing means the permission's preset.
+   */
+  grid?: FolderGrid;
 };
 
 export type Permission = {
@@ -103,19 +117,54 @@ export const permissionLabelId = (
   return vfo1Enabled ? (permission.vfo1LabelId ?? permission.labelId) : permission.labelId;
 };
 
+/**
+ * Keykeeper: the access selector's choices: four presets and Custom, which
+ * opens the grid. Upstream's "Can edit except passwords" is a Custom grid
+ * now. See DESIGN.md, "Folders and permissions".
+ */
 export const getPermissionList = (): Permission[] => {
   const permissions = [
-    { perm: CollectionPermission.ViewExceptPass, labelId: "viewItemsHidePass" },
-    { perm: CollectionPermission.View, labelId: "viewItems" },
-    { perm: CollectionPermission.EditExceptPass, labelId: "editItemsHidePass" },
-    { perm: CollectionPermission.Edit, labelId: "editItems" },
-    // "manageCollection" is shortened to "manage" rather than following the usual
-    // collection -> shared folder renaming pattern.
-    { perm: CollectionPermission.Manage, labelId: "manageCollection", vfo1LabelId: "manage" },
+    { perm: CollectionPermission.View, labelId: "keykeeperCanView" },
+    { perm: CollectionPermission.ViewExceptPass, labelId: "keykeeperCanViewHidden" },
+    { perm: CollectionPermission.Edit, labelId: "keykeeperCanEdit" },
+    { perm: CollectionPermission.Manage, labelId: "keykeeperCanManage" },
+    { perm: CollectionPermission.Custom, labelId: "keykeeperCustomPermissions" },
   ];
 
   return permissions;
 };
+
+/** Keykeeper: each preset's permission, by the grid's preset name. */
+const PRESET_PERMISSIONS = {
+  view: CollectionPermission.View,
+  viewHidden: CollectionPermission.ViewExceptPass,
+  edit: CollectionPermission.Edit,
+  manage: CollectionPermission.Manage,
+  custom: CollectionPermission.Custom,
+} as const;
+
+/** Keykeeper: the grid a permission's preset gives, or undefined for Custom. */
+export const presetGridFor = (perm: CollectionPermission | undefined): FolderGrid | undefined => {
+  switch (perm) {
+    case CollectionPermission.View:
+      return { ...FOLDER_PRESETS.view };
+    case CollectionPermission.ViewExceptPass:
+      return { ...FOLDER_PRESETS.viewHidden };
+    case CollectionPermission.Edit:
+      return { ...FOLDER_PRESETS.edit };
+    case CollectionPermission.Manage:
+      return { ...FOLDER_PRESETS.manage };
+    case CollectionPermission.EditExceptPass:
+      return gridOf({ readOnly: false, hidePasswords: true, manage: false });
+    default:
+      return undefined;
+  }
+};
+
+/** Keykeeper: a grant's grid, from what the server sent. */
+export const convertToGrid = (
+  value: CollectionAccessSelectionView | undefined,
+): FolderGrid | undefined => (value == null ? undefined : gridOf(value));
 
 /**
  * Converts the CollectionAccessSelectionView interface to one of the new CollectionPermission values
@@ -128,13 +177,8 @@ export const convertToPermission = (
   if (value == null) {
     return undefined;
   }
-  if (value.manage) {
-    return CollectionPermission.Manage;
-  } else if (value.readOnly) {
-    return value.hidePasswords ? CollectionPermission.ViewExceptPass : CollectionPermission.View;
-  } else {
-    return value.hidePasswords ? CollectionPermission.EditExceptPass : CollectionPermission.Edit;
-  }
+  // Keykeeper: the preset the grant's grid is, or Custom.
+  return PRESET_PERMISSIONS[presetOf(gridOf(value))];
 };
 
 /**
@@ -143,19 +187,16 @@ export const convertToPermission = (
  * @param value
  */
 export const convertToSelectionView = (value: AccessItemValue) => {
+  // Keykeeper: the grid decides; upstream's fields carry its closest preset.
+  const grid = (value.permission === CollectionPermission.Custom ? value.grid : undefined) ??
+    presetGridFor(value.permission) ??
+    value.grid ?? { ...FOLDER_PRESETS.view };
   return new CollectionAccessSelectionView({
     id: value.id,
-    readOnly: readOnly(value.permission),
-    hidePasswords: hidePassword(value.permission),
-    manage: value.permission === CollectionPermission.Manage,
+    ...upstreamOf(grid),
+    keykeeper: grid,
   });
 };
-
-const readOnly = (perm: CollectionPermission) =>
-  [CollectionPermission.View, CollectionPermission.ViewExceptPass].includes(perm);
-
-const hidePassword = (perm: CollectionPermission) =>
-  [CollectionPermission.ViewExceptPass, CollectionPermission.EditExceptPass].includes(perm);
 
 export function mapGroupToAccessItemView(group: GroupView): AccessItemView {
   return {

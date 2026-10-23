@@ -35,11 +35,13 @@ import {
 import { PremiumBadgeComponent } from "@bitwarden/angular/billing/components/premium-badge";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
+import { OrganizationId } from "@bitwarden/common/types/guid";
 import { TreeNode } from "@bitwarden/common/vault/models/domain/tree-node";
 import { SearchTextDebounceInterval } from "@bitwarden/common/vault/services/search.service";
 import {
   IconButtonModule,
   IconModule,
+  MenuModule,
   NavigationModule,
   PopoverModule,
   SearchModule,
@@ -61,13 +63,14 @@ import {
   Vfo1TerminologyService,
 } from "@bitwarden/vault";
 
+import { openCollectionDialog } from "../../admin-console/organizations/shared/components/collection-dialog";
 import { CoachmarkComponent, CoachmarkService } from "../../vault/components/coachmark";
 import { OrganizationOptionsComponent } from "../../vault/individual-vault/vault-filter/components/organization-options.component";
 import { VaultFilterComponent } from "../../vault/individual-vault/vault-filter/components/vault-filter.component";
 import { OptionsInput } from "../../vault/individual-vault/vault-filter/shared/components/vault-filter-section.component";
 
 import { KeykeeperPickedLabelService } from "./picked-label.service";
-import { buildVaultMenu, pickedLabel, VaultMenuActions } from "./vault-menu";
+import { buildVaultMenu, folderPick, pickedLabel, VaultMenuActions } from "./vault-menu";
 
 /** The vault's own page, whatever its filters. */
 export function isVaultUrl(router: Router): boolean {
@@ -78,7 +81,8 @@ export function isVaultUrl(router: Router): boolean {
 /**
  * Keykeeper: the vault's part of the web vault's one left menu, like
  * 1Password's: search, All items, Favorites, Health, the categories, the
- * vaults with their collections, the folders, Archive, and Trash. The user
+ * folders (Personal with its own, each organization with its shared ones),
+ * Archive, and Trash. The user
  * layout puts the tools after it. It replaces the vault page's filter panel,
  * and is that panel underneath: the same sections and the same actions, on
  * the same routed filter, so picking an entry shows what picking it there
@@ -147,6 +151,7 @@ export function isVaultUrl(router: Router): boolean {
     I18nPipe,
     IconButtonModule,
     IconModule,
+    MenuModule,
     NavigationModule,
     NgComponentOutlet,
     NgTemplateOutlet,
@@ -227,7 +232,9 @@ export class KeykeeperVaultMenuComponent extends VaultFilterComponent implements
     type: (node) => this.pick(() => this.applyTypeFilter(node)),
     organization: (node) => this.pick(() => this.applyOrganizationFilter(node)),
     collection: (node) => this.pick(() => this.applyCollectionFilter(node)),
-    folder: (node) => this.pick(() => this.applyFolderFilter(node)),
+    // A personal folder shows what its owner filed there, out of any
+    // organization that was showing (vault-menu.ts, folderPick).
+    folder: (node) => this.pick(() => this.bridgeService.navigate(folderPick(this.routed(), node))),
     archive: async (node) => {
       const blocked = this.sections()?.archiveFilter?.premiumOptions?.blockFilterAction;
       if (blocked) {
@@ -248,7 +255,6 @@ export class KeykeeperVaultMenuComponent extends VaultFilterComponent implements
         allItemsLabel: this.i18nService.t("allItems"),
         typeTree: this.typeTree(),
         organizationTree: this.organizationTree(),
-        showVaultsHeading: this.organizationSection()?.header.showHeader ?? true,
         collectionTree: this.collectionTree(),
         folderTree: this.folderTree(),
         archive: this.archiveTree()?.children[0],
@@ -272,6 +278,13 @@ export class KeykeeperVaultMenuComponent extends VaultFilterComponent implements
 
   /** "New organization", unless a policy keeps the person in one. */
   protected readonly newOrganization = computed(() => this.organizationSection()?.add);
+
+  /** Organizations the person can make shared folders in, for New folder. */
+  protected readonly sharedFolderOwners = computed(() =>
+    (this.organizationTree()?.children ?? [])
+      .map((o) => o.node)
+      .filter((o) => o.id !== "MyVault" && o.canCreateNewCollections && !o.isProviderUser),
+  );
 
   // Search, kept in the address the way the vault page kept it, so the list
   // reads it as before. Typing elsewhere opens the vault with it.
@@ -379,8 +392,21 @@ export class KeykeeperVaultMenuComponent extends VaultFilterComponent implements
     }
   }
 
+  /** A folder in Personal. */
   protected addFolder() {
     AddEditFolderDialogComponent.open(this.dialogService);
+  }
+
+  /** A shared folder in an organization, with upstream's dialog for its name and people. */
+  protected async addSharedFolder(organizationId: OrganizationId) {
+    const dialog = openCollectionDialog(this.dialogService, {
+      data: {
+        organizationId,
+        showOrgSelector: false,
+        limitNestedCollections: true,
+      },
+    });
+    await lastValueFrom(dialog.closed);
   }
 
   protected async editFolderEntry(folder: FolderFilter) {

@@ -9,6 +9,10 @@ import { BehaviorSubject, of } from "rxjs";
 import { ClientType } from "@bitwarden/client-type";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import {
+  FOLDER_PRESETS,
+  GRID_NONE,
+} from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
+import {
   CollectionView,
   CollectionType,
   CollectionTypes,
@@ -930,6 +934,75 @@ describe("ItemDetailsSectionComponent", () => {
       const firstItem = select.componentInstance.items()[0];
 
       expect(firstItem.icon).toBe("bwi-user");
+    });
+  });
+  // Keykeeper: the web vault's one Folder picker, grouped by owner
+  // (DESIGN.md, "Folders and permissions").
+  describe("Folder picker (web vault)", () => {
+    const acme = Object.assign(new Organization(), { id: "org1", name: "Acme" });
+
+    beforeEach(() => {
+      getInitialCipherView.mockReturnValue(null);
+      mockPlatformUtilsService.getClientType.mockReturnValue(ClientType.Web);
+      i18nService.t.mockImplementation((key: string) => key);
+      const dropBox = createMockCollection(
+        "c1",
+        "Drop box",
+        "org1",
+        true,
+        true,
+        CollectionTypes.SharedCollection,
+      );
+      dropBox.keykeeper = { ...GRID_NONE, create: true };
+      const reference = createMockCollection(
+        "c2",
+        "Reference",
+        "org1",
+        true,
+        false,
+        CollectionTypes.SharedCollection,
+      );
+      reference.keykeeper = FOLDER_PRESETS.view;
+      component.config.organizationDataOwnershipDisabled = true;
+      component.config.organizations = [acme as Organization];
+      component.config.collections = [dropBox, reference];
+      component.config.folders = [
+        { id: null, name: "No folder" },
+        { id: "f1", name: "Bank" },
+      ] as any;
+    });
+
+    it("lists Personal's folders, then each organization's shared folders the person can add to", async () => {
+      await component.ngOnInit();
+      const options = (component as any).placeOptions;
+      expect(options.map((o: any) => [o.value, o.label, !!o.heading])).toEqual([
+        ["heading:personal", "myVault", true],
+        ["personal:", "No folder", false],
+        ["personal:f1", "Bank", false],
+        ["heading:org1", "Acme", true],
+        ["org:org1:c1", "Drop box", false],
+      ]);
+    });
+
+    it("puts the item where the picker says", async () => {
+      await component.ngOnInit();
+      expect((component as any).place).toBe("personal:");
+
+      await (component as any).pickPlace("org:org1:c1");
+      expect(component.itemDetailsForm.controls.organizationId.value).toBe("org1");
+      expect(component.itemDetailsForm.controls.collectionIds.value.map((c: any) => c.id)).toEqual([
+        "c1",
+      ]);
+      expect((component as any).place).toBe("org:org1:c1");
+
+      await (component as any).pickPlace("personal:f1");
+      expect(component.itemDetailsForm.controls.organizationId.value).toBeNull();
+      expect(component.itemDetailsForm.controls.folderId.value).toBe("f1");
+    });
+
+    it("keeps the extension on upstream's fields", async () => {
+      mockPlatformUtilsService.getClientType.mockReturnValue(ClientType.Browser);
+      expect((component as any).folderPicker).toBe(false);
     });
   });
 });

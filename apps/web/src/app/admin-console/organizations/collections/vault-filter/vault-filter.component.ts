@@ -170,7 +170,8 @@ export class VaultFilterComponent {
         [
           {
             id: "AllCollections",
-            name: vfo1Enabled ? "Shared folders" : "Collections",
+            // Keykeeper: shared folders, in our words (brand/wording.en.json).
+            name: vfo1Enabled ? "Shared folders" : this.i18nService.t("collections"),
             type: "all",
             icon: this.vfo1TerminologyService.iconClass("bwi-collection-shared"),
           },

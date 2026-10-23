@@ -49,59 +49,61 @@
   </div>
 }
 
-@if (m.vaults.length > 0) {
-  <div
-    role="group"
-    [attr.aria-labelledby]="open && m.showVaultsHeading ? 'keykeeper-menu-vaults' : null"
-    data-testid="keykeeper-menu-vaults"
-  >
-    @if (open && m.showVaultsHeading) {
-      <div
-        class="keykeeper-menu-heading"
-        [bitPopoverAnchorFor]="collectionsCoachmark.popover()"
-        [popoverOpen]="collectionsCoachmarkOpen()"
-        [position]="coachmarkService.getStepPosition('shareWithCollections')"
-        [closeOnBackdropClick]="false"
-        [spotlight]="true"
-      >
-        <h2 id="keykeeper-menu-vaults">{{ "vaults" | i18n }}</h2>
-        @if (newOrganization(); as add) {
-          <button
-            type="button"
-            bitIconButton="bwi-plus"
-            buttonType="side-nav"
-            size="small"
-            [label]="add.text | i18n"
-            (click)="newOrganizationClicked(add.route ?? '/create-organization')"
-          ></button>
-        }
-      </div>
-    }
-    @for (e of m.vaults; track e.key) {
-      <ng-container *ngTemplateOutlet="entry; context: { $implicit: e, rail: false }" />
-    }
-  </div>
-}
-
+<!-- Keykeeper: every place an item lives is a folder: Personal with its
+     folders, then each organization with its shared folders (DESIGN.md,
+     "Folders and permissions"). New folder asks where it goes. -->
 <div
   role="group"
   [attr.aria-labelledby]="open ? 'keykeeper-menu-folders' : null"
   data-testid="keykeeper-menu-folders"
 >
   @if (open) {
-    <div class="keykeeper-menu-heading">
-      <h2 id="keykeeper-menu-folders">{{ m.foldersHeading | i18n }}</h2>
+    <div
+      class="keykeeper-menu-heading"
+      [bitPopoverAnchorFor]="collectionsCoachmark.popover()"
+      [popoverOpen]="collectionsCoachmarkOpen()"
+      [position]="coachmarkService.getStepPosition('shareWithCollections')"
+      [closeOnBackdropClick]="false"
+      [spotlight]="true"
+    >
+      <h2 id="keykeeper-menu-folders">{{ "keykeeperFolders" | i18n }}</h2>
       <button
         type="button"
         bitIconButton="bwi-plus"
         buttonType="side-nav"
         size="small"
         [label]="'newFolder' | i18n"
-        (click)="addFolder()"
+        [bitMenuTriggerFor]="newFolderMenu"
       ></button>
     </div>
+    <bit-menu #newFolderMenu>
+      <span class="tw-block tw-px-4 tw-pb-1 tw-pt-2 tw-text-xs tw-font-bold tw-text-muted">
+        {{ "keykeeperNewFolderWhere" | i18n }}
+      </span>
+      <button type="button" bitMenuItem (click)="addFolder()">
+        <bit-icon name="bwi-user" class="tw-mr-1" />
+        {{ "myVault" | i18n }}
+      </button>
+      @for (org of sharedFolderOwners(); track org.id) {
+        <button type="button" bitMenuItem (click)="addSharedFolder(org.id)">
+          <bit-icon name="bwi-business" class="tw-mr-1" />
+          {{ org.name }}
+        </button>
+      }
+      @if (newOrganization(); as add) {
+        <bit-menu-divider />
+        <button
+          type="button"
+          bitMenuItem
+          (click)="newOrganizationClicked(add.route ?? '/create-organization')"
+        >
+          <bit-icon name="bwi-plus" class="tw-mr-1" />
+          {{ add.text | i18n }}
+        </button>
+      }
+    </bit-menu>
   }
-  @for (e of m.folders; track e.key) {
+  @for (e of m.places; track e.key) {
     <ng-container *ngTemplateOutlet="entry; context: { $implicit: e, rail: false }" />
   }
   @if (m.archive; as archive) {

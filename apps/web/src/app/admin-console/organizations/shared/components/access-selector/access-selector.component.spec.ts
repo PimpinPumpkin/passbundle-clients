@@ -6,6 +6,10 @@ import {
   OrganizationUserStatusType,
   OrganizationUserType,
 } from "@bitwarden/common/admin-console/enums";
+import {
+  FOLDER_PRESETS,
+  GRID_NONE,
+} from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 // FIXME: remove `src` and fix import
 // eslint-disable-next-line no-restricted-imports
 import { SelectItemView } from "@bitwarden/components/src/multi-select/models/select-item-view";
@@ -14,7 +18,14 @@ import { Vfo1TerminologyService } from "@bitwarden/vault";
 import { PreloadedEnglishI18nModule } from "../../../../../core/tests";
 
 import { AccessSelectorComponent, PermissionMode } from "./access-selector.component";
-import { AccessItemType, CollectionPermission } from "./access-selector.models";
+import {
+  AccessItemType,
+  AccessItemValue,
+  CollectionPermission,
+  convertToPermission,
+  convertToSelectionView,
+  getPermissionList,
+} from "./access-selector.models";
 
 /**
  * Helper class that makes it easier to test the AccessSelectorComponent by
@@ -246,6 +257,110 @@ describe("AccessSelectorComponent", () => {
       expect(mockChange.mock.calls.length).toEqual(1);
       expect(mockChange.mock.lastCall[0]).toHaveProperty("[0].id", "123");
       expect(mockChange.mock.lastCall[0]).not.toHaveProperty("[0].permission");
+    });
+  });
+
+  // Keykeeper: presets and a Custom grid (DESIGN.md, "Folders and permissions").
+  describe("presets and the Custom grid", () => {
+    beforeEach(() => {
+      fixture.componentRef.setInput("items", [
+        { id: "123", type: AccessItemType.Group, labelName: "Group 1", listName: "Group 1" },
+      ]);
+      fixture.componentRef.setInput("permissionMode", PermissionMode.Edit);
+      fixture.detectChanges();
+    });
+
+    it("offers four presets and Custom", () => {
+      expect(getPermissionList().map((p) => p.perm)).toEqual([
+        CollectionPermission.View,
+        CollectionPermission.ViewExceptPass,
+        CollectionPermission.Edit,
+        CollectionPermission.Manage,
+        CollectionPermission.Custom,
+      ]);
+    });
+
+    it("gives a preset its grid, and Custom starts from the last preset's", () => {
+      const mockChange = jest.fn();
+      component.selectItems([{ id: "123" } as any]);
+      component.registerOnChange(mockChange);
+
+      component.changeSelectedItemPerm(0, CollectionPermission.Edit);
+      expect(mockChange.mock.lastCall[0][0].grid).toEqual(FOLDER_PRESETS.edit);
+
+      component.changeSelectedItemPerm(0, CollectionPermission.Custom);
+      expect(mockChange.mock.lastCall[0][0].permission).toBe(CollectionPermission.Custom);
+      expect(mockChange.mock.lastCall[0][0].grid).toEqual(FOLDER_PRESETS.edit);
+      expect(mockChange.mock.calls).toHaveLength(2);
+    });
+
+    it("shows the grid under a Custom row, and saves what it's set to", () => {
+      component.writeValue([
+        {
+          id: "123",
+          type: AccessItemType.Group,
+          permission: CollectionPermission.Custom,
+          grid: { ...GRID_NONE, create: true },
+        },
+      ]);
+      fixture.detectChanges();
+
+      const grid = fixture.nativeElement.querySelector("[data-testid=keykeeper-folder-grid]");
+      expect(grid).not.toBeNull();
+      const create = grid.querySelector("input[data-capability=create]") as HTMLInputElement;
+      expect(create.checked).toBe(true);
+
+      const mockChange = jest.fn();
+      component.registerOnChange(mockChange);
+      const exportBox = grid.querySelector("input[data-capability=export]") as HTMLInputElement;
+      exportBox.click();
+      fixture.detectChanges();
+
+      // Export needs see passwords, so the grid turns it on too.
+      expect(mockChange.mock.lastCall[0][0].grid).toEqual({
+        ...GRID_NONE,
+        create: true,
+        export: true,
+        seePasswords: true,
+      });
+      expect(
+        convertToSelectionView(mockChange.mock.lastCall[0][0] as AccessItemValue),
+      ).toMatchObject({
+        readOnly: true,
+        hidePasswords: false,
+        manage: false,
+        keykeeper: { create: true, export: true, seePasswords: true },
+      });
+    });
+
+    it("names a grant from the server as its preset, or Custom", () => {
+      expect(
+        convertToPermission({
+          id: "1",
+          readOnly: true,
+          hidePasswords: false,
+          manage: false,
+          keykeeper: FOLDER_PRESETS.view,
+        } as any),
+      ).toBe(CollectionPermission.View);
+      expect(
+        convertToPermission({
+          id: "1",
+          readOnly: true,
+          hidePasswords: true,
+          manage: false,
+          keykeeper: { ...GRID_NONE, create: true },
+        } as any),
+      ).toBe(CollectionPermission.Custom);
+      // Without a grid, upstream's fields name the preset.
+      expect(
+        convertToPermission({
+          id: "1",
+          readOnly: false,
+          hidePasswords: false,
+          manage: false,
+        } as any),
+      ).toBe(CollectionPermission.Edit);
     });
   });
 

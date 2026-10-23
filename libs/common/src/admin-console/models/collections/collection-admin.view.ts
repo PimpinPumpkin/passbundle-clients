@@ -134,6 +134,9 @@ export class CollectionAdminView extends CollectionView {
     view.readOnly = collection.readOnly;
     view.hidePasswords = collection.hidePasswords;
     view.manage = collection.manage;
+    if (collection.keykeeper != null) {
+      view.keykeeper = collection.keykeeper;
+    }
     view.unmanaged = collection.unmanaged;
     view.type = collection.type;
     view.externalId = collection.externalId;

@@ -3,13 +3,20 @@
 import { CommonModule } from "@angular/common";
 import { Component, computed, DestroyRef, inject, input, Input, OnInit } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
-import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from "@angular/forms";
+import {
+  FormBuilder,
+  FormControl,
+  FormsModule,
+  ReactiveFormsModule,
+  Validators,
+} from "@angular/forms";
 import { concatMap, distinctUntilChanged, firstValueFrom, map } from "rxjs";
 
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { ClientType } from "@bitwarden/client-type";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import { OrganizationUserType, PolicyType } from "@bitwarden/common/admin-console/enums";
+import { gridOf } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import {
   CollectionView,
   CollectionTypes,
@@ -43,6 +50,18 @@ import {
 } from "../../abstractions/cipher-form-config.service";
 import { CipherFormContainer } from "../../cipher-form-container";
 
+/**
+ * Keykeeper: one choice in the web vault's Folder picker: a folder in
+ * Personal (or none), or one of an organization's shared folders, under a
+ * heading row for each owner.
+ */
+export type FolderPlaceOption = {
+  value: string;
+  label: string;
+  icon?: BitwardenIcon;
+  heading?: boolean;
+};
+
 // FIXME(https://bitwarden.atlassian.net/browse/CL-764): Migrate to OnPush
 // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
 @Component({
@@ -51,6 +70,7 @@ import { CipherFormContainer } from "../../cipher-form-container";
   imports: [
     CardComponent,
     ChipActionComponent,
+    FormsModule,
     TypographyModule,
     FormFieldModule,
     ReactiveFormsModule,
@@ -185,6 +205,148 @@ export class ItemDetailsSectionComponent implements OnInit {
 
   getOrgIcon(org: Organization): BitwardenIcon {
     return getOrgIconForTier(org.productTierType);
+  }
+
+  /**
+   * Keykeeper: the web vault shows one Folder picker, grouped by owner, in
+   * place of Owner, Collections, and Folder: Personal with its folders, then
+   * each organization with the shared folders the person can add items to
+   * (DESIGN.md, "Folders and permissions"). The extension keeps upstream's
+   * fields while its own screens are redone.
+   */
+  protected get folderPicker(): boolean {
+    return (
+      this.platformUtilsService.getClientType() === ClientType.Web &&
+      !this.config.hideIndividualVaultFields
+    );
+  }
+
+  /** The picker's value: "personal:<folder id or empty>" or "org:<org id>:<collection id>". */
+  protected get place(): string {
+    const value = this.itemDetailsForm.getRawValue();
+    if (value.organizationId == null) {
+      return `personal:${value.folderId ?? ""}`;
+    }
+    const first = (value.collectionIds ?? [])[0] as { id?: string } | undefined;
+    return `org:${value.organizationId}:${first?.id ?? ""}`;
+  }
+
+  /**
+   * The picker can't change anything: partial edits, an item whose folders
+   * this person can't change, or an organization's item in a shared folder
+   * they can't move it out of (share; the server refuses it too).
+   */
+  protected get placeLocked(): boolean {
+    if (this.partialEdit) {
+      return true;
+    }
+    if (this.itemDetailsForm.controls.organizationId.value == null) {
+      return false;
+    }
+    if (this.itemDetailsForm.controls.collectionIds.disabled) {
+      return true;
+    }
+    const original = this.originalCipherView();
+    if (original?.id == null || original.organizationId == null) {
+      return false;
+    }
+    const org = this.organizations.find((o) => o.id === original.organizationId);
+    if (org?.canEditAllCiphers) {
+      return false;
+    }
+    return this.collections
+      .filter((c) => original.collectionIds?.includes(c.id))
+      .some((c) => !gridOf(c).share);
+  }
+
+  /** The other shared folders the item is in, which the picker leaves as they are. */
+  protected get alsoIn(): string[] {
+    const ids = (this.itemDetailsForm.getRawValue().collectionIds ?? [])
+      .slice(1)
+      .map((c) => (c as { id: string }).id);
+    return [...ids, ...this.readOnlyCollections.map((c) => c.id)]
+      .map((id) => this.collections.find((c) => c.id === id)?.name)
+      .filter((name): name is string => !!name);
+  }
+
+  protected get placeOptions(): FolderPlaceOption[] {
+    const options: FolderPlaceOption[] = [];
+    const orgId = this.itemDetailsForm.controls.organizationId.value as OrganizationId | null;
+    const ownerLocked = this.itemDetailsForm.controls.organizationId.disabled;
+    const held = new Set(this.originalCipherView()?.collectionIds ?? []);
+    if (this.showPersonalOwnershipOption && (!ownerLocked || orgId == null)) {
+      options.push({
+        value: "heading:personal",
+        label: this.i18nService.t("myVault"),
+        icon: "bwi-user",
+        heading: true,
+      });
+      for (const folder of this.config.folders ?? []) {
+        options.push({
+          value: `personal:${folder.id ?? ""}`,
+          label: folder.name,
+          icon: "bwi-folder",
+        });
+      }
+    }
+    for (const org of this.organizations) {
+      if (ownerLocked && org.id !== orgId) {
+        continue;
+      }
+      const shared = this.collections.filter(
+        (c) =>
+          c.organizationId === org.id &&
+          c.type !== CollectionTypes.DefaultUserCollection &&
+          (held.has(c.id) ||
+            this.config.admin ||
+            (c.assigned && gridOf({ ...c, keykeeper: c.keykeeper }).create)),
+      );
+      if (shared.length === 0) {
+        continue;
+      }
+      options.push({
+        value: `heading:${org.id}`,
+        label: org.name,
+        icon: "bwi-business",
+        heading: true,
+      });
+      for (const c of shared.sort(Utils.getSortFunction(this.i18nService, "name"))) {
+        options.push({
+          value: `org:${org.id}:${c.id}`,
+          label: c.name,
+          icon: "bwi-collection-shared",
+        });
+      }
+    }
+    return options;
+  }
+
+  /** Puts the item where the picker says: an owner, and a folder or shared folder there. */
+  protected async pickPlace(value: string) {
+    const [kind, first, second] = value.split(":");
+    if (kind === "personal") {
+      if (this.itemDetailsForm.controls.organizationId.value != null) {
+        this.itemDetailsForm.controls.organizationId.setValue(null, { emitEvent: false });
+        await this.updateCollectionOptions();
+        this.setFormState();
+      }
+      this.itemDetailsForm.controls.folderId.setValue(first || null);
+      return;
+    }
+    if (kind !== "org") {
+      return;
+    }
+    const orgId = first as OrganizationId;
+    const collectionId = second as CollectionId;
+    if (this.itemDetailsForm.controls.organizationId.value !== orgId) {
+      this.itemDetailsForm.controls.organizationId.setValue(orgId, { emitEvent: false });
+      await this.updateCollectionOptions([collectionId]);
+      this.setFormState();
+    } else {
+      this.itemDetailsForm.controls.collectionIds.setValue(
+        this.collectionOptions.filter((c) => c.id === collectionId),
+      );
+    }
   }
 
   get favoriteIcon() {
@@ -463,7 +625,8 @@ export class ItemDetailsSectionComponent implements OnInit {
         }
 
         // Non-admins can only select assigned collections that are not read only. (Non-AC)
-        return c.assigned && !c.readOnly;
+        // Keykeeper: the ones they can add items to (create).
+        return c.assigned && gridOf(c).create;
       })
       .sort((a, b) => {
         // Show default collection first

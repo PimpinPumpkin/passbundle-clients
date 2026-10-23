@@ -14,14 +14,17 @@
         [collections]="collections"
         [isAdminConsole]="formConfig.isAdminConsole"
       ></app-cipher-view>
-      <!-- Keykeeper: the item's earlier versions, to compare and restore -->
-      <app-keykeeper-item-versions
-        [cipher]="cipher"
-        [formConfig]="formConfig"
-        [canEdit]="canEdit"
-        [canDelete]="canDelete"
-        (restored)="onCipherSaved($event)"
-      ></app-keykeeper-item-versions>
+      <!-- Keykeeper: the item's earlier versions, to compare and restore, for
+           people whose shared folders let them view its history -->
+      @if (itemCaps.viewHistory) {
+        <app-keykeeper-item-versions
+          [cipher]="cipher"
+          [formConfig]="formConfig"
+          [canEdit]="canEdit"
+          [canDelete]="canDelete"
+          (restored)="onCipherSaved($event)"
+        ></app-keykeeper-item-versions>
+      }
     }
 
     @if (loadForm) {
@@ -113,6 +116,17 @@
               [label]="'archiveVerb' | i18n"
             ></button>
           }
+        }
+        <!-- Keykeeper: Print, where the item's shared folders allow it -->
+        @if (cipher && showCipherView && itemCaps.print) {
+          <button
+            type="button"
+            class="tw-mr-1"
+            bitIconButton="bwi-file-text"
+            [label]="'keykeeperPrint' | i18n"
+            data-testid="keykeeper-print-item"
+            (click)="print()"
+          ></button>
         }
         @if (cipher) {
           <button

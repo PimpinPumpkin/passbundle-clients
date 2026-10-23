@@ -180,6 +180,48 @@ function apply() {
     write(rel, JSON.stringify(data, null, 2) + "\n");
   }
 
+  // 1c. Upstream's English strings in our words (brand/wording.en.json): one
+  //     word, folder, for every place an item lives, and no "vault" except
+  //     where it means the whole encrypted store. Only the message changes;
+  //     placeholders stay upstream's. A key no app has fails, so an upstream
+  //     rename is noticed. See DESIGN.md, "Folders and permissions".
+  const wording = JSON.parse(fs.readFileSync(path.join(ROOT, "brand/wording.en.json"), "utf8"));
+  const wordingApps = {
+    web: "apps/web/src/locales/en/messages.json",
+    browser: "apps/browser/src/_locales/en/messages.json",
+  };
+  const wordingFiles = Object.fromEntries(
+    Object.entries(wordingApps).map(([app, rel]) => [app, JSON.parse(read(rel).replace(/^﻿/, ""))]),
+  );
+  const reworded = new Set();
+  // "{brand}" in a message is the product's name from brand.json.
+  const reword = (app, key, value) => {
+    if (typeof value?.message !== "string" || /Bitwarden/.test(value.message)) {
+      fail(`brand/wording.en.json: "${key}" needs a message, without upstream's name.`);
+    }
+    const entry = wordingFiles[app][key];
+    if (entry) {
+      entry.message = value.message.replaceAll("{brand}", BRAND.name);
+      reworded.add(key);
+    }
+  };
+  for (const [key, value] of Object.entries(wording.all ?? {})) {
+    for (const app of Object.keys(wordingApps)) reword(app, key, value);
+  }
+  for (const app of Object.keys(wordingApps)) {
+    for (const [key, value] of Object.entries(wording[app] ?? {})) reword(app, key, value);
+  }
+  const unknown = [
+    ...Object.keys(wording.all ?? {}),
+    ...Object.keys(wordingApps).flatMap((app) => Object.keys(wording[app] ?? {})),
+  ].filter((key) => !reworded.has(key));
+  if (unknown.length) {
+    fail(`brand/wording.en.json: no app has ${unknown.join(", ")}. Upstream renamed them?`);
+  }
+  for (const [app, rel] of Object.entries(wordingApps)) {
+    write(rel, JSON.stringify(wordingFiles[app], null, 2) + "\n");
+  }
+
   // 2. Hard-coded text in HTML templates.
   let templates = 0;
   for (const rel of trackedFiles("apps/**/*.html", "apps/**/*.ejs", "libs/**/*.html")) {

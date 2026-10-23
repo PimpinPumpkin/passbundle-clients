@@ -2,6 +2,7 @@ import { NgClass } from "@angular/common";
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   effect,
   forwardRef,
   inject,
@@ -20,8 +21,8 @@ import {
   ReactiveFormsModule,
 } from "@angular/forms";
 
-import { ControlsOf } from "@bitwarden/angular/types/controls-of";
 import { FormSelectionList } from "@bitwarden/angular/utils/form-selection-list";
+import { FolderGrid } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import {
   A11yTitleDirective,
@@ -45,8 +46,18 @@ import {
   getPermissionList,
   Permission,
   permissionLabelId,
+  presetGridFor,
 } from "./access-selector.models";
+import { FolderGridComponent } from "./folder-grid.component";
 import { UserTypePipe } from "./user-type.pipe";
+
+/** Keykeeper: one row's controls, with the grant's grid as one value. */
+type AccessRow = FormGroup<{
+  id: FormControl<string>;
+  type: FormControl<AccessItemType>;
+  permission: FormControl<CollectionPermission>;
+  grid: FormControl<FolderGrid | undefined>;
+}>;
 
 // FIXME: update to use a const object instead of a typescript enum
 // eslint-disable-next-line @bitwarden/platform/no-enums
@@ -81,6 +92,7 @@ export enum PermissionMode {
   imports: [
     A11yTitleDirective,
     BadgeComponent,
+    FolderGridComponent,
     FormFieldModule,
     FormsModule,
     I18nPipe,
@@ -95,6 +107,7 @@ export enum PermissionMode {
 })
 export class AccessSelectorComponent implements ControlValueAccessor {
   private readonly formBuilder = inject(FormBuilder);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly i18nService = inject(I18nService);
   private readonly vfo1TerminologyService = inject(Vfo1TerminologyService);
 
@@ -109,10 +122,7 @@ export class AccessSelectorComponent implements ControlValueAccessor {
    * @param controlRow - The form group for the row to update
    * @param item - The access item that is represented by the row
    */
-  private readonly updateRowControlDisableState = (
-    controlRow: FormGroup<ControlsOf<AccessItemValue>>,
-    item: AccessItemView,
-  ) => {
+  private readonly updateRowControlDisableState = (controlRow: AccessRow, item: AccessItemView) => {
     // Disable entire row form group if readonly
     if (item.readonly) {
       controlRow.disable();
@@ -123,6 +133,7 @@ export class AccessSelectorComponent implements ControlValueAccessor {
       // Disable permission control if not in Edit mode
       if (this.permissionMode() != PermissionMode.Edit) {
         controlRow.controls.permission?.disable();
+        controlRow.controls.grid?.disable();
       }
     }
   };
@@ -132,7 +143,7 @@ export class AccessSelectorComponent implements ControlValueAccessor {
    */
   private readonly updateAllRowControlDisableStates = () => {
     this.selectionList.forEachControlItem((controlRow, item) => {
-      this.updateRowControlDisableState(controlRow as FormGroup<ControlsOf<AccessItemValue>>, item);
+      this.updateRowControlDisableState(controlRow as unknown as AccessRow, item);
     });
   };
 
@@ -147,10 +158,27 @@ export class AccessSelectorComponent implements ControlValueAccessor {
         nonNullable: true,
       });
 
-      const fg = this.formBuilder.group<ControlsOf<AccessItemValue>>({
+      // Keykeeper: the grant's grid. A preset sets it; Custom starts from the
+      // last preset's and opens the grid (DESIGN.md, "Folders and permissions").
+      // Set without its own event: the permission's change carries it up.
+      const gridControl = new FormControl<FolderGrid | undefined>(undefined);
+      let lastPreset = presetGridFor(permissionControl.value);
+      permissionControl.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((perm) => {
+        if (perm === CollectionPermission.Custom) {
+          if (gridControl.value == null && lastPreset != null) {
+            gridControl.setValue({ ...lastPreset }, { emitEvent: false });
+          }
+        } else {
+          lastPreset = presetGridFor(perm);
+          gridControl.setValue(lastPreset, { emitEvent: false });
+        }
+      });
+
+      const fg: AccessRow = new FormGroup({
         id: new FormControl(item.id, { nonNullable: true }),
         type: new FormControl(item.type, { nonNullable: true }),
         permission: permissionControl,
+        grid: gridControl,
       });
 
       this.updateRowControlDisableState(fg, item);
@@ -170,6 +198,8 @@ export class AccessSelectorComponent implements ControlValueAccessor {
 
   protected readonly itemType = AccessItemType;
   protected readonly permissionList: Permission[];
+  /** Keykeeper: what a newly added row starts with: a preset, never Custom. */
+  protected readonly initialPermissionList: Permission[];
 
   /**
    * When disabled, the access selector will make the assumption that a readonly state is desired.
@@ -252,6 +282,9 @@ export class AccessSelectorComponent implements ControlValueAccessor {
 
   constructor() {
     this.permissionList = getPermissionList();
+    this.initialPermissionList = this.permissionList.filter(
+      (p) => p.perm !== CollectionPermission.Custom,
+    );
 
     effect(() => {
       const val = this.items();
@@ -414,6 +447,14 @@ export class AccessSelectorComponent implements ControlValueAccessor {
     const permission = this.permissionList.find((p) => p.perm == perm);
     const labelId = permissionLabelId(permission, this.vfo1TerminologyService.enabled());
     return labelId == null ? "" : this.i18nService.t(labelId);
+  }
+
+  /** Keykeeper: whether row `index` is Custom, so its grid shows under it. */
+  protected isCustomRow(index: number): boolean {
+    return (
+      this.selectionList.formArray.at(index)?.get("permission")?.value ===
+      CollectionPermission.Custom
+    );
   }
 
   protected canEditItemPermission(item: AccessItemView) {

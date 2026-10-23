@@ -23,58 +23,86 @@
       <bit-label>{{ "itemName" | i18n }}</bit-label>
       <input bitInput formControlName="name" />
     </bit-form-field>
-    @if (showOwnership) {
-      <bit-form-field>
-        <bit-label>{{ "owner" | vfo1I18n: "vault" }}</bit-label>
-        <bit-select formControlName="organizationId">
-          @if (showPersonalOwnershipOption) {
-            @if (vfo1Enabled()) {
-              <bit-option
-                icon="bwi-user"
-                [value]="null"
-                [label]="'myVault' | i18n"
-                [description]="userEmail$ | async"
-              ></bit-option>
-            } @else {
-              <bit-option [value]="null" [label]="userEmail$ | async"></bit-option>
-            }
-          }
-          @for (org of organizations; track org.id) {
+    @if (folderPicker) {
+      <!-- Keykeeper: one Folder picker, grouped by owner (see the component). -->
+      <bit-form-field disableMargin>
+        <bit-label>{{ "folder" | i18n }}</bit-label>
+        <bit-select
+          data-testid="keykeeper-folder-picker"
+          [ngModel]="place"
+          (ngModelChange)="pickPlace($event)"
+          [ngModelOptions]="{ standalone: true }"
+          [disabled]="placeLocked"
+        >
+          @for (option of placeOptions; track option.value) {
             <bit-option
-              [value]="org.id"
-              [label]="org.name"
-              [icon]="vfo1Enabled() ? getOrgIcon(org) : undefined"
+              [value]="option.value"
+              [label]="option.label"
+              [icon]="option.icon"
+              [disabled]="option.heading"
             ></bit-option>
           }
         </bit-select>
+        @if (alsoIn.length > 0) {
+          <bit-hint data-testid="keykeeper-also-in">
+            {{ "keykeeperAlsoIn" | i18n: alsoIn.join(", ") }}
+          </bit-hint>
+        }
       </bit-form-field>
-    }
-    @if (showCollectionsControl) {
-      <ng-container>
-        <bit-form-field class="tw-w-full" [disableMargin]="config.hideIndividualVaultFields">
-          <bit-label>{{ "collections" | vfo1I18n: "sharedFolders" }}</bit-label>
-          <bit-multi-select
-            class="tw-w-full"
-            formControlName="collectionIds"
-            [baseItems]="collectionOptions"
-          ></bit-multi-select>
-          @if (readOnlyCollectionsNames.length > 0) {
-            <bit-hint data-testid="view-only-hint">
-              {{ "cannotRemoveViewOnlyCollections" | i18n: readOnlyCollectionsNames.join(", ") }}
-            </bit-hint>
-          }
+    } @else {
+      @if (showOwnership) {
+        <bit-form-field>
+          <bit-label>{{ "owner" | vfo1I18n: "vault" }}</bit-label>
+          <bit-select formControlName="organizationId">
+            @if (showPersonalOwnershipOption) {
+              @if (vfo1Enabled()) {
+                <bit-option
+                  icon="bwi-user"
+                  [value]="null"
+                  [label]="'myVault' | i18n"
+                  [description]="userEmail$ | async"
+                ></bit-option>
+              } @else {
+                <bit-option [value]="null" [label]="userEmail$ | async"></bit-option>
+              }
+            }
+            @for (org of organizations; track org.id) {
+              <bit-option
+                [value]="org.id"
+                [label]="org.name"
+                [icon]="vfo1Enabled() ? getOrgIcon(org) : undefined"
+              ></bit-option>
+            }
+          </bit-select>
         </bit-form-field>
-      </ng-container>
-    }
-    @if (!config.hideIndividualVaultFields) {
-      <bit-form-field disableMargin>
-        <bit-label>{{ "folder" | vfo1I18n: "myFolders" }}</bit-label>
-        <bit-select formControlName="folderId">
-          @for (folder of config.folders; track folder.id) {
-            <bit-option [value]="folder.id" [label]="folder.name"></bit-option>
-          }
-        </bit-select>
-      </bit-form-field>
+      }
+      @if (showCollectionsControl) {
+        <ng-container>
+          <bit-form-field class="tw-w-full" [disableMargin]="config.hideIndividualVaultFields">
+            <bit-label>{{ "collections" | vfo1I18n: "sharedFolders" }}</bit-label>
+            <bit-multi-select
+              class="tw-w-full"
+              formControlName="collectionIds"
+              [baseItems]="collectionOptions"
+            ></bit-multi-select>
+            @if (readOnlyCollectionsNames.length > 0) {
+              <bit-hint data-testid="view-only-hint">
+                {{ "cannotRemoveViewOnlyCollections" | i18n: readOnlyCollectionsNames.join(", ") }}
+              </bit-hint>
+            }
+          </bit-form-field>
+        </ng-container>
+      }
+      @if (!config.hideIndividualVaultFields) {
+        <bit-form-field disableMargin>
+          <bit-label>{{ "folder" | vfo1I18n: "myFolders" }}</bit-label>
+          <bit-select formControlName="folderId">
+            @for (folder of config.folders; track folder.id) {
+              <bit-option [value]="folder.id" [label]="folder.name"></bit-option>
+            }
+          </bit-select>
+        </bit-form-field>
+      }
     }
   </bit-card>
 </section>

@@ -10,6 +10,12 @@ import { map } from "rxjs/operators";
 import { PremiumBadgeComponent } from "@bitwarden/angular/billing/components/premium-badge";
 import { VaultViewPasswordHistoryService } from "@bitwarden/angular/services/view-password-history.service";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
+import {
+  FolderGrid,
+  GRID_ALL,
+  GRID_NONE,
+  itemGrid,
+} from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { CollectionView } from "@bitwarden/common/admin-console/models/collections";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
@@ -61,6 +67,7 @@ import {
 import { CipherViewComponent } from "../cipher-view/cipher-view.component";
 import { DecryptionFailureDialogComponent } from "../components/decryption-failure-dialog/decryption-failure-dialog.component";
 import { KeykeeperItemVersionsComponent } from "../keykeeper/item-versions.component";
+import { printItem } from "../keykeeper/print-item";
 
 export type VaultItemDialogMode = "view" | "form";
 
@@ -311,6 +318,13 @@ export class VaultItemDialogComponent implements OnInit, OnDestroy {
 
   protected canDelete = false;
 
+  /**
+   * Keykeeper: what the person can do with this item, from its shared
+   * folders: viewing its history and printing it are theirs to have
+   * (DESIGN.md, "Folders and permissions").
+   */
+  protected itemCaps: FolderGrid = { ...GRID_NONE };
+
   protected canEdit = false;
 
   protected attachmentsButtonDisabled = false;
@@ -382,6 +396,7 @@ export class VaultItemDialogComponent implements OnInit, OnDestroy {
           this.params.isAdminConsoleAction,
         ),
       );
+      this.itemCaps = this.capabilitiesOf(this.cipher);
 
       // If user cannot edit and dialog opened in form mode, force to view mode
       if (!this.canEdit && this.formConfig.mode !== "partial-edit" && this.params.mode === "form") {
@@ -464,8 +479,30 @@ export class VaultItemDialogComponent implements OnInit, OnDestroy {
         this.params.isAdminConsoleAction,
       ),
     );
+    this.itemCaps = this.capabilitiesOf(this.cipher);
 
     await this.changeMode("view");
+  }
+
+  /**
+   * Keykeeper: the item's capabilities: everything for an item of one's own,
+   * otherwise what any of its shared folders allows (the server's rule), and
+   * everything for an admin, who reaches every item.
+   */
+  private capabilitiesOf(cipher: CipherView): FolderGrid {
+    const org = this.formConfig.organizations.find((o) => o.id === cipher.organizationId);
+    return itemGrid(
+      cipher,
+      this.formConfig.collections,
+      org?.canEditAllCiphers ? GRID_ALL : GRID_NONE,
+    );
+  }
+
+  /** Keykeeper: prints the item, where its shared folders allow it. */
+  protected print() {
+    if (this.cipher && this.itemCaps.print) {
+      printItem(this.cipher, (key) => this.i18nService.t(key));
+    }
   }
 
   /**

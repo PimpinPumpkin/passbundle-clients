@@ -108,9 +108,12 @@
                       <div class="tw-flex tw-flex-wrap tw-items-center tw-gap-x-2 tw-gap-y-1">
                         <span class="tw-font-medium">{{ f.folder.name }}</span>
                         <span bitBadge variant="subtle" data-testid="access-level">{{
-                          levelLabel(f.level)
+                          levelBadge(f.flags)
                         }}</span>
                       </div>
+                      @if (capabilities(f.flags); as caps) {
+                        <div class="tw-text-sm" data-testid="access-capabilities">{{ caps }}</div>
+                      }
                       <div class="tw-text-sm tw-text-muted">
                         <span data-testid="access-how">{{ how(f.paths) }}</span>
                         @if (open) {
@@ -170,7 +173,7 @@
                     <div class="tw-text-sm tw-text-muted">{{ person.member.email }}</div>
                   }
                 </td>
-                <td bitCell data-testid="access-level">{{ levelLabel(person.level) }}</td>
+                <td bitCell data-testid="access-level">{{ levelLabel(person.flags) }}</td>
                 <td bitCell class="tw-text-muted" data-testid="access-how">
                   {{ how(person.paths) }}
                 </td>

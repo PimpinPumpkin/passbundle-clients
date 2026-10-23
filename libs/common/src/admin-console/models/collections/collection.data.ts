@@ -1,6 +1,7 @@
 import { Jsonify } from "type-fest";
 
 import { CollectionId, OrganizationId } from "../../../types/guid";
+import { FolderGrid } from "../../keykeeper/folder-permissions";
 
 import { CollectionDetailsResponse, CollectionType, CollectionTypes } from ".";
 
@@ -14,6 +15,8 @@ export class CollectionData {
   manage: boolean = false;
   hidePasswords: boolean = false;
   type: CollectionType = CollectionTypes.SharedCollection;
+  /** Keykeeper: the person's own capabilities in the folder. */
+  keykeeper?: FolderGrid;
 
   constructor(response: CollectionDetailsResponse) {
     this.id = response.id;
@@ -25,6 +28,9 @@ export class CollectionData {
     this.hidePasswords = response.hidePasswords;
     this.type = response.type;
     this.defaultUserCollectionEmail = response.defaultUserCollectionEmail;
+    if (response.keykeeper != null) {
+      this.keykeeper = response.keykeeper;
+    }
   }
 
   static fromJSON(obj: Jsonify<CollectionData | null>): CollectionData | null {

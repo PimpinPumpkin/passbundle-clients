@@ -15,6 +15,7 @@ import {
 import {
   buildVaultMenu,
   filterAfter,
+  folderPick,
   pickedLabel,
   VaultMenuActions,
   VaultMenuState,
@@ -161,7 +162,6 @@ function state(
     allItemsLabel: "All items",
     typeTree: typeTree(favorites, login, card),
     organizationTree: organizations(),
-    showVaultsHeading: true,
     collectionTree: collections(),
     folderTree: folders(["f-bank", "Banking"], ["", "No folder"]),
     archive,
@@ -239,14 +239,14 @@ describe("buildVaultMenu", () => {
     );
 
     expect(menu.all.active).toBe(false);
-    expect([...menu.categories, ...menu.vaults].some((e) => e.active || e.scope)).toBe(false);
+    expect([...menu.categories, ...menu.places].some((e) => e.active || e.scope)).toBe(false);
     // And counts as if nothing were picked.
     expect(menu.categories.find((c) => c.key === "type-login")?.count).toBe(2);
   });
 
   it("shows the category picked, and the vault it's in as the scope", () => {
     const menu = buildVaultMenu(state({ organizationId: ORG, type: "login" }), actions());
-    const contoso = menu.vaults.find((v) => v.key === `vault-${ORG}`)!;
+    const contoso = menu.places.find((v) => v.key === `vault-${ORG}`)!;
 
     expect(menu.all.active).toBe(false);
     expect(menu.categories.find((c) => c.key === "type-login")?.active).toBe(true);
@@ -256,51 +256,76 @@ describe("buildVaultMenu", () => {
 
   it("shows a vault as showing when only it is picked", () => {
     const menu = buildVaultMenu(state({ organizationId: Unassigned }), actions());
-    const myVault = menu.vaults.find((v) => v.key === "vault-MyVault")!;
+    const myVault = menu.places.find((v) => v.key === "vault-MyVault")!;
 
     expect(myVault.active).toBe(true);
     expect(myVault.scope).toBe(false);
     expect(myVault.count).toBe(2);
   });
 
-  it("lists each vault with its collections right after it, a level in", () => {
+  it("lists Personal with its folders, then each organization with its shared folders, a level in", () => {
     const menu = buildVaultMenu(state(), actions());
 
-    expect(menu.vaults.map((v) => [v.label, v.depth])).toEqual([
+    expect(menu.places.map((v) => [v.label, v.depth])).toEqual([
       ["My vault", 0],
+      ["Banking", 1],
+      ["No folder", 1],
       ["Contoso", 0],
       ["Office", 1],
       ["Printers", 2],
       ["Fabrikam", 0],
       ["Shared", 1],
     ]);
-    expect(menu.vaults.find((v) => v.key === "collection-c-office")?.count).toBe(1);
+    expect(menu.places.find((v) => v.key === "collection-c-office")?.count).toBe(1);
   });
 
   it("offers an organization's options, and not My vault's", () => {
     const menu = buildVaultMenu(state(), actions());
 
-    expect(menu.vaults.find((v) => v.key === "vault-MyVault")?.organization).toBeUndefined();
-    expect(menu.vaults.find((v) => v.key === `vault-${ORG}`)?.organization?.id).toBe(ORG);
-    expect(menu.vaults.find((v) => v.key === `vault-${OTHER_ORG}`)?.organization?.enabled).toBe(
+    expect(menu.places.find((v) => v.key === "vault-MyVault")?.organization).toBeUndefined();
+    expect(menu.places.find((v) => v.key === `vault-${ORG}`)?.organization?.id).toBe(ORG);
+    expect(menu.places.find((v) => v.key === `vault-${OTHER_ORG}`)?.organization?.enabled).toBe(
       false,
     );
   });
 
-  it("lists folders with No folder, which only shows next to a real folder", () => {
+  const personalFolders = (menu: ReturnType<typeof buildVaultMenu>) =>
+    menu.places.filter((p) => p.key.startsWith("folder-"));
+
+  it("lists personal folders with No folder, which only shows next to a real folder", () => {
     const withFolders = buildVaultMenu(state({ folderId: "f-bank" }), actions());
-    expect(withFolders.folders.map((f) => [f.label, f.count, f.active])).toEqual([
+    expect(personalFolders(withFolders).map((f) => [f.label, f.count, f.active])).toEqual([
       ["Banking", 1, true],
-      ["No folder", 2, false],
+      ["No folder", 1, false],
     ]);
-    expect(withFolders.folders[0].folder?.id).toBe("f-bank");
-    expect(withFolders.folders[1].folder).toBeUndefined();
+    expect(personalFolders(withFolders)[0].folder?.id).toBe("f-bank");
+    expect(personalFolders(withFolders)[1].folder).toBeUndefined();
 
     const without = buildVaultMenu(
       state({}, { folderTree: folders(["", "No folder"]) }),
       actions(),
     );
-    expect(without.folders).toEqual([]);
+    expect(personalFolders(without)).toEqual([]);
+  });
+
+  it("counts a personal folder whatever organization is showing: it holds what its owner filed there", () => {
+    const filed = [
+      item(CipherType.Login, { folderId: "f-bank" }),
+      item(CipherType.Login, {
+        folderId: "f-bank",
+        organizationId: ORG,
+        collectionIds: ["c-office"],
+      }),
+    ];
+    const menu = buildVaultMenu(state({ organizationId: ORG }, { ciphers: filed }), actions());
+
+    expect(personalFolders(menu)[0].count).toBe(2);
+  });
+
+  it("counts No folder as Personal's items in no folder, not an organization's", () => {
+    const menu = buildVaultMenu(state({ organizationId: ORG }), actions());
+
+    expect(personalFolders(menu).find((f) => f.key === "folder-none")?.count).toBe(1);
   });
 
   it("nests folders inside folders", () => {
@@ -313,19 +338,10 @@ describe("buildVaultMenu", () => {
 
     const menu = buildVaultMenu(state({}, { folderTree: tree }), actions());
 
-    expect(menu.folders.map((f) => [f.label, f.depth])).toEqual([
-      ["Work", 0],
-      ["Clients", 1],
+    expect(personalFolders(menu).map((f) => [f.label, f.depth])).toEqual([
+      ["Work", 1],
+      ["Clients", 2],
     ]);
-  });
-
-  it("follows the folders heading upstream names", () => {
-    const tree = folders(["f-bank", "Banking"]);
-    tree.node.name = "myFolders";
-
-    expect(buildVaultMenu(state({}, { folderTree: tree }), actions()).foldersHeading).toBe(
-      "myFolders",
-    );
   });
 
   it("shows Archive and Trash as picked, with the premium badge when asked", () => {
@@ -343,9 +359,9 @@ describe("buildVaultMenu", () => {
 
     await menu.all.select();
     await menu.categories[1].select();
-    await menu.vaults[1].select();
-    await menu.vaults[2].select();
-    await menu.folders[0].select();
+    await menu.places[3].select();
+    await menu.places[4].select();
+    await menu.places[1].select();
     await menu.archive!.select();
     await menu.trash!.select();
 
@@ -374,6 +390,7 @@ describe("pickedLabel", () => {
     );
     expect(titleFor({ folderId: "f-bank" })).toBe("Banking");
     expect(titleFor({ folderId: Unassigned })).toBe("No folder");
+    expect(titleFor({ organizationId: Unassigned, folderId: Unassigned })).toBe("No folder");
     expect(titleFor({ type: "archive" })).toBe("Archive");
     expect(titleFor({ type: "trash" })).toBe("Trash");
   });
@@ -405,6 +422,29 @@ describe("filterAfter", () => {
       folderId: undefined,
       collectionId: undefined,
     });
+  });
+
+  it("takes a personal folder out of any organization showing", () => {
+    const node = new TreeNode<FolderFilter>(
+      { id: "f-bank", name: "Banking" } as FolderFilter,
+      null!,
+    );
+
+    expect(folderPick(routed, node)).toEqual({
+      organizationIdParamType: "query",
+      organizationId: undefined,
+      folderId: "f-bank",
+      collectionId: undefined,
+      type: undefined,
+    });
+  });
+
+  it("takes No folder to Personal's items in no folder", () => {
+    const node = new TreeNode<FolderFilter>({ id: "", name: "No folder" } as FolderFilter, null!);
+
+    expect(folderPick(routed, node)).toEqual(
+      expect.objectContaining({ organizationId: Unassigned, folderId: Unassigned }),
+    );
   });
 
   it("clears everything for All items", () => {

@@ -198,9 +198,7 @@ export class KeykeeperBrowserImportComponent implements OnInit {
     const logins = (n: number) => (n === 1 ? "1 login" : `${n} logins`);
     const parts = [`Imported ${logins(s.added + s.toCheck)}.`];
     if (s.alreadyThere > 0) {
-      parts.push(
-        `${s.alreadyThere === 1 ? "1 was" : `${s.alreadyThere} were`} already in your vault.`,
-      );
+      parts.push(`${s.alreadyThere === 1 ? "1 was" : `${s.alreadyThere} were`} already here.`);
     }
     if (s.toCheck > 0) {
       parts.push(

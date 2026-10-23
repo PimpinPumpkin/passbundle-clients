@@ -17,7 +17,7 @@ import { HeaderModule } from "../../layouts/header/header.module";
 import { SharedModule } from "../../shared";
 
 import {
-  AccessLevel,
+  AccessFlags,
   AccessMemberInput,
   AccessPath,
   AccessRole,
@@ -25,7 +25,10 @@ import {
   folderMatches,
   howText,
   itemCount,
+  capabilitiesText,
   LEVEL_KEYS,
+  levelOf,
+  levelText,
   MemberAccess,
   memberMatches,
   reachOf,
@@ -130,8 +133,19 @@ export class KeykeeperAccessComponent {
     return this.t(ROLE_KEYS[member.role]);
   }
 
-  protected levelLabel(level: AccessLevel): string {
-    return this.t(LEVEL_KEYS[level]);
+  /** The preset's name, or Custom with its capabilities. */
+  protected levelLabel(flags: AccessFlags): string {
+    return levelText(flags, this.t);
+  }
+
+  /** The preset's name, or Custom, for a badge. */
+  protected levelBadge(flags: AccessFlags): string {
+    return this.t(LEVEL_KEYS[levelOf(flags)]);
+  }
+
+  /** A Custom grant's capabilities, for the line under its badge. */
+  protected capabilities(flags: AccessFlags): string | undefined {
+    return capabilitiesText(flags, this.t);
   }
 
   protected how(paths: AccessPath[]): string {

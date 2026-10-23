@@ -7,6 +7,7 @@ import { CollectionService } from "@bitwarden/admin-console/common";
 
 import { FakeAccountService, mockAccountServiceWith } from "../../../spec";
 import { OrganizationService } from "../../admin-console/abstractions/organization/organization.service.abstraction";
+import { FOLDER_PRESETS, FolderGrid } from "../../admin-console/keykeeper/folder-permissions";
 import { CollectionView } from "../../admin-console/models/collections";
 import { Organization } from "../../admin-console/models/domain/organization";
 import { Utils } from "../../platform/misc/utils";
@@ -40,9 +41,13 @@ describe("CipherAuthorizationService", () => {
     permissions,
   });
 
-  const createMockCollection = (id: string, manage: boolean) => ({
+  // Keykeeper: a "Can view" grant unless it manages, or the grid it has.
+  const createMockCollection = (id: string, manage: boolean, keykeeper?: FolderGrid) => ({
     id,
     manage,
+    readOnly: !manage,
+    hidePasswords: false,
+    keykeeper,
   });
 
   const createMockOrganization = ({
@@ -342,6 +347,38 @@ describe("CipherAuthorizationService", () => {
 
         const result = await firstValueFrom(cipherAuthorizationService.canCloneCipher$(cipher));
         expect(result).toBe(false);
+      });
+
+      it("follows the share capability of the item's shared folders (Keykeeper)", async () => {
+        const cipher = createMockCipher("org1", ["col1", "col2"]) as CipherView;
+        mockOrganizationService.organizations$.mockReturnValue(
+          of([createMockOrganization()] as Organization[]),
+        );
+        const share = { ...FOLDER_PRESETS.view, share: true };
+        mockCollectionService.decryptedCollections$.mockReturnValue(
+          of([
+            createMockCollection("col1", false, FOLDER_PRESETS.view),
+            createMockCollection("col2", false, share),
+          ] as CollectionView[]),
+        );
+        expect(await firstValueFrom(cipherAuthorizationService.canCloneCipher$(cipher))).toBe(true);
+
+        mockCollectionService.decryptedCollections$.mockReturnValue(
+          of([
+            createMockCollection("col1", false, FOLDER_PRESETS.edit),
+            createMockCollection("col2", false, { ...FOLDER_PRESETS.edit, share: false }),
+          ] as CollectionView[]),
+        );
+        expect(await firstValueFrom(cipherAuthorizationService.canCloneCipher$(cipher))).toBe(true);
+
+        mockCollectionService.decryptedCollections$.mockReturnValue(
+          of([
+            createMockCollection("col1", false, { ...FOLDER_PRESETS.edit, share: false }),
+          ] as CollectionView[]),
+        );
+        expect(await firstValueFrom(cipherAuthorizationService.canCloneCipher$(cipher))).toBe(
+          false,
+        );
       });
     });
   });

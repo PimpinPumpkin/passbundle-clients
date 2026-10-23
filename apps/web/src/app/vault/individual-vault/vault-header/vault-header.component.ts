@@ -226,7 +226,8 @@ export class VaultHeaderComponent {
 
     const activeOrganization = this.activeOrganization;
     if (activeOrganization) {
-      return `${activeOrganization.name} ${this.i18nService.t("vault").toLowerCase()}`;
+      // Keykeeper: the organization, which holds its shared folders.
+      return activeOrganization.name;
     }
 
     return this.i18nService.t("allVaults");
