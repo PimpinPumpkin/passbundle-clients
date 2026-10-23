@@ -38,29 +38,35 @@ export class SelectionReadOnly {
 }
 
 /**
- * Keykeeper: a grant from a CLI request, for the server. Its grid goes back
- * with it while the grid still agrees with readOnly, hidePasswords, and
- * manage, so saving a folder keeps everyone's permissions. A grant whose
- * fields were edited without its grid goes without it, and the server gives
- * the preset those fields name.
+ * Keykeeper: a grant from a CLI request, for the server, with its grid when it
+ * has one, so saving a folder keeps everyone's permissions. A grid that
+ * disagrees with readOnly, hidePasswords, or manage is refused: sent without
+ * it, the server would keep the stored grid while those fields are unchanged,
+ * so an edited grid would be dropped without a word. A grant without a grid
+ * gets the preset its fields name.
  */
 export function selectionRequest(selection: SelectionReadOnly): SelectionReadOnlyRequest {
-  const grid = selection.keykeeper;
-  const agrees =
-    grid != null &&
-    (() => {
-      const upstream = upstreamOf(grid);
-      return (
-        upstream.readOnly === !!selection.readOnly &&
-        upstream.hidePasswords === !!selection.hidePasswords &&
-        upstream.manage === !!selection.manage
+  const grid = selection.keykeeper ?? undefined;
+  if (grid != null) {
+    const upstream = upstreamOf(grid);
+    if (
+      upstream.readOnly !== !!selection.readOnly ||
+      upstream.hidePasswords !== !!selection.hidePasswords ||
+      upstream.manage !== !!selection.manage
+    ) {
+      throw new Error(
+        `The grant for ${selection.id} has a keykeeper grid that doesn't match its readOnly, ` +
+          `hidePasswords, and manage: make readOnly/hidePasswords/manage match the grid ` +
+          `(readOnly ${upstream.readOnly}, hidePasswords ${upstream.hidePasswords}, ` +
+          `manage ${upstream.manage}), or remove keykeeper to use the preset.`,
       );
-    })();
+    }
+  }
   return new SelectionReadOnlyRequest(
     selection.id,
     selection.readOnly,
     selection.hidePasswords,
     selection.manage,
-    agrees ? grid : undefined,
+    grid,
   );
 }

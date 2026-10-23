@@ -387,28 +387,54 @@ describe("EditCommand", () => {
       );
     });
 
-    it("sends each grant's grid back while it agrees with upstream's fields, and not once they were edited", async () => {
+    it("sends each grant's grid back while it agrees with upstream's fields", async () => {
       // Keykeeper: see DESIGN.md, "Folders and permissions".
       const custom = { ...GRID_NONE, seePasswords: true, edit: true, viewHistory: true };
       const users = [
         // As `get org-collection` printed it.
         { id: "kept", readOnly: false, hidePasswords: false, manage: false, keykeeper: custom },
-        // readOnly edited, the grid left as it was.
-        { id: "edited", readOnly: true, hidePasswords: false, manage: false, keykeeper: custom },
-        // No grid at all.
+        // No grid at all: the preset its fields name.
         { id: "plain", readOnly: true, hidePasswords: true, manage: false },
       ];
-      await command["editOrganizationCollection"](
+      const result = await command["editOrganizationCollection"](
         validCollectionId,
         makeRequest({ users }),
         makeOptions(),
       );
+      expect(result.success).toBe(true);
       const sent = apiService.putCollection.mock.calls[0][2] as any;
       expect(sent.users.map((u: any) => [u.id, u.keykeeper])).toEqual([
         ["kept", custom],
-        ["edited", undefined],
         ["plain", undefined],
       ]);
+    });
+
+    it("refuses a grant whose grid disagrees with upstream's fields, and saves nothing", async () => {
+      // Without the grid the server would keep the stored one while the fields
+      // are unchanged, so a narrowed grid would be dropped without a word.
+      const narrowed = { ...GRID_NONE, seePasswords: true, print: true, viewHistory: true };
+      const users = [
+        { id: "kept", readOnly: true, hidePasswords: false, manage: false, keykeeper: narrowed },
+        // Can edit's fields, as printed before the grid was narrowed to Can view.
+        {
+          id: "narrowed",
+          readOnly: false,
+          hidePasswords: false,
+          manage: false,
+          keykeeper: narrowed,
+        },
+      ];
+      const result = await command["editOrganizationCollection"](
+        validCollectionId,
+        makeRequest({ users }),
+        makeOptions(),
+      );
+      expect(result.success).toBe(false);
+      expect(result.message).toContain("narrowed");
+      expect(result.message).toContain(
+        "make readOnly/hidePasswords/manage match the grid (readOnly true, hidePasswords false, manage false), or remove keykeeper to use the preset",
+      );
+      expect(apiService.putCollection).not.toHaveBeenCalled();
     });
 
     it("prints the grids the server saved", async () => {
