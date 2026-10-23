@@ -154,6 +154,10 @@ describe("VaultComponent", () => {
             organizationTree$: of(emptyTreeNode("organizations")),
             cipherTypeTree$: of(emptyTreeNode("cipherTypes")),
             filteredCollections$: of([]),
+            // Keykeeper: the page uses this one now, not one of its own with
+            // the filter panel's module, which is the left menu.
+            clearOrganizationFilter: jest.fn(),
+            setOrganizationFilter: jest.fn(),
           },
         },
         { provide: PasswordRepromptService, useValue: mock<PasswordRepromptService>() },

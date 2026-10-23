@@ -1,0 +1,162 @@
+<!-- eslint-disable tailwindcss/no-custom-classname -->
+<!-- Keykeeper: the vault's part of the one left menu. See vault-menu.component.ts. -->
+@let open = sideNavService.open();
+@let m = menu();
+
+@if (open) {
+  <div #searchBox class="tw-px-3 tw-pb-3 tw-text-main">
+    <bit-search
+      [placeholder]="menuSearchPlaceholder | i18n"
+      [ngModel]="searchText"
+      (ngModelChange)="onSearch($event)"
+      autocomplete="off"
+    />
+  </div>
+} @else {
+  <bit-nav-item icon="bwi-search" [text]="'search' | i18n" (mainContentClicked)="openSearch()" />
+}
+
+<ng-container *ngTemplateOutlet="entry; context: { $implicit: m.all, rail: true }" />
+@if (m.favorites; as favorites) {
+  <ng-container *ngTemplateOutlet="entry; context: { $implicit: favorites, rail: true }" />
+}
+<bit-nav-item
+  icon="bwi-dashboard"
+  [text]="'keykeeperHealth' | i18n"
+  route="/reports"
+  [bitPopoverAnchorFor]="reportsCoachmark.popover()"
+  [popoverOpen]="reportsCoachmarkOpen()"
+  [position]="coachmarkService.getStepPosition('monitorSecurity')"
+  [closeOnBackdropClick]="false"
+  [spotlight]="true"
+></bit-nav-item>
+<app-coachmark #reportsCoachmark stepId="monitorSecurity" />
+
+@if (m.categories.length > 0) {
+  <div
+    role="group"
+    [attr.aria-labelledby]="open ? 'keykeeper-menu-categories' : null"
+    data-testid="keykeeper-menu-categories"
+  >
+    @if (open) {
+      <div class="keykeeper-menu-heading">
+        <h2 id="keykeeper-menu-categories">{{ "keykeeperCategories" | i18n }}</h2>
+      </div>
+    }
+    @for (e of m.categories; track e.key) {
+      <ng-container *ngTemplateOutlet="entry; context: { $implicit: e, rail: true }" />
+    }
+  </div>
+}
+
+@if (m.vaults.length > 0) {
+  <div
+    role="group"
+    [attr.aria-labelledby]="open && m.showVaultsHeading ? 'keykeeper-menu-vaults' : null"
+    data-testid="keykeeper-menu-vaults"
+  >
+    @if (open && m.showVaultsHeading) {
+      <div
+        class="keykeeper-menu-heading"
+        [bitPopoverAnchorFor]="collectionsCoachmark.popover()"
+        [popoverOpen]="collectionsCoachmarkOpen()"
+        [position]="coachmarkService.getStepPosition('shareWithCollections')"
+        [closeOnBackdropClick]="false"
+        [spotlight]="true"
+      >
+        <h2 id="keykeeper-menu-vaults">{{ "vaults" | i18n }}</h2>
+        @if (newOrganization(); as add) {
+          <button
+            type="button"
+            bitIconButton="bwi-plus"
+            buttonType="side-nav"
+            size="small"
+            [label]="add.text | i18n"
+            (click)="newOrganizationClicked(add.route ?? '/create-organization')"
+          ></button>
+        }
+      </div>
+    }
+    @for (e of m.vaults; track e.key) {
+      <ng-container *ngTemplateOutlet="entry; context: { $implicit: e, rail: false }" />
+    }
+  </div>
+}
+
+<div
+  role="group"
+  [attr.aria-labelledby]="open ? 'keykeeper-menu-folders' : null"
+  data-testid="keykeeper-menu-folders"
+>
+  @if (open) {
+    <div class="keykeeper-menu-heading">
+      <h2 id="keykeeper-menu-folders">{{ m.foldersHeading | i18n }}</h2>
+      <button
+        type="button"
+        bitIconButton="bwi-plus"
+        buttonType="side-nav"
+        size="small"
+        [label]="'newFolder' | i18n"
+        (click)="addFolder()"
+      ></button>
+    </div>
+  }
+  @for (e of m.folders; track e.key) {
+    <ng-container *ngTemplateOutlet="entry; context: { $implicit: e, rail: false }" />
+  }
+  @if (m.archive; as archive) {
+    <ng-container *ngTemplateOutlet="entry; context: { $implicit: archive, rail: true }" />
+  }
+  @if (m.trash; as trash) {
+    <ng-container *ngTemplateOutlet="entry; context: { $implicit: trash, rail: true }" />
+  }
+</div>
+<app-coachmark #collectionsCoachmark stepId="shareWithCollections" />
+
+<!-- One entry: its name, then what it holds, right-aligned. With the menu
+     closed to icons, only the entries marked for the rail stay. -->
+<ng-template #entry let-e let-rail="rail">
+  <bit-nav-item
+    [class.keykeeper-menu-scope]="e.scope"
+    [text]="e.label"
+    [icon]="open || rail ? e.icon : undefined"
+    [treeDepth]="e.depth"
+    [forceActiveStyles]="e.active"
+    (mainContentClicked)="e.select()"
+  >
+    <span slot="end" class="tw-flex tw-items-center tw-gap-1">
+      @if (e.organization; as organization) {
+        @if (!organization.enabled) {
+          <bit-icon
+            name="bwi-exclamation-triangle"
+            class="tw-text-danger"
+            [ariaLabel]="'organizationIsDisabled' | i18n"
+            [title]="'organizationIsDisabled' | i18n"
+          />
+        }
+        <span class="keykeeper-menu-reveal">
+          <ng-container
+            *ngComponentOutlet="organizationOptions; injector: optionsInjector(organization)"
+          />
+        </span>
+      }
+      @if (e.folder; as folder) {
+        <button
+          type="button"
+          class="keykeeper-menu-reveal"
+          bitIconButton="bwi-pencil"
+          buttonType="side-nav"
+          size="small"
+          [label]="'editWithName' | i18n: (folderLabelKey | i18n) : folder.name"
+          (click)="editFolderEntry(folder)"
+        ></button>
+      }
+      @if (e.premiumBadge) {
+        <app-premium-badge [iconOnly]="true" />
+      }
+      @if (e.count !== undefined) {
+        <span class="keykeeper-menu-count" (click)="e.select()">{{ e.count }}</span>
+      }
+    </span>
+  </bit-nav-item>
+</ng-template>

@@ -2,9 +2,18 @@
 // @ts-strict-ignore
 import { CommonModule } from "@angular/common";
 import { Component, computed, inject, OnInit, Signal } from "@angular/core";
-import { toSignal } from "@angular/core/rxjs-interop";
-import { RouterModule } from "@angular/router";
-import { catchError, from, map, Observable, of, switchMap } from "rxjs";
+import { takeUntilDestroyed, toSignal } from "@angular/core/rxjs-interop";
+import { NavigationEnd, Router, RouterModule } from "@angular/router";
+import {
+  catchError,
+  distinctUntilChanged,
+  filter,
+  from,
+  map,
+  Observable,
+  of,
+  switchMap,
+} from "rxjs";
 
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { PasswordManagerLogo } from "@bitwarden/assets/svg";
@@ -19,6 +28,8 @@ import { PremiumSubscriptionRoutingService } from "@bitwarden/web-vault/app/bill
 
 import { BillingFreeFamiliesNavItemComponent } from "../billing/shared/billing-free-families-nav-item.component";
 import { KeykeeperMspApiService } from "../keykeeper/msp/msp-api.service";
+import { KEYKEEPER_MENU_BUTTON } from "../keykeeper/vault-menu/menu-button";
+import { KeykeeperVaultMenuComponent } from "../keykeeper/vault-menu/vault-menu.component";
 import { CoachmarkComponent, CoachmarkService } from "../vault/components/coachmark";
 
 import { WebLayoutModule } from "./web-layout.module";
@@ -37,7 +48,10 @@ import { WebLayoutModule } from "./web-layout.module";
     BillingFreeFamiliesNavItemComponent,
     PopoverModule,
     CoachmarkComponent,
+    KeykeeperVaultMenuComponent,
   ],
+  // Keykeeper: pages here show a button that opens the menu where it's hidden (a phone).
+  providers: [{ provide: KEYKEEPER_MENU_BUTTON, useValue: true }],
 })
 export class UserLayoutComponent implements OnInit {
   protected readonly logo = PasswordManagerLogo;
@@ -54,10 +68,6 @@ export class UserLayoutComponent implements OnInit {
     () => this.coachmarkService.activeStepId() === "importData",
   );
 
-  protected readonly reportsCoachmarkOpen = computed(
-    () => this.coachmarkService.activeStepId() === "monitorSecurity",
-  );
-
   /** Keykeeper: the MSP console shows in the nav for MSP staff. */
   protected readonly showMspConsole = toSignal(
     from(inject(KeykeeperMspApiService).list()).pipe(
@@ -67,7 +77,7 @@ export class UserLayoutComponent implements OnInit {
     { initialValue: false },
   );
 
-  /** Expand tools nav group when import coachmark is active */
+  /** Expand the import and export nav group when import coachmark is active */
   protected readonly toolsNavGroupOpen = computed(
     () => this.coachmarkService.activeStepId() === "importData",
   );
@@ -87,6 +97,23 @@ export class UserLayoutComponent implements OnInit {
     );
 
     this.subscriptionRoute$ = this.premiumSubscriptionRoutingService.getSubscriptionRoute$();
+
+    // Keykeeper: where the menu covers the page (a phone), going to another
+    // page closes it. Picking a filter closes it too (the menu does that);
+    // typing a search doesn't.
+    const router = inject(Router);
+    router.events
+      .pipe(
+        filter((event) => event instanceof NavigationEnd),
+        map(() => router.url.split(/[?#]/)[0]),
+        distinctUntilChanged(),
+        takeUntilDestroyed(),
+      )
+      .subscribe(() => {
+        if (this.sideNavService.isOverlay()) {
+          this.sideNavService.open.set(false);
+        }
+      });
   }
 
   async ngOnInit() {

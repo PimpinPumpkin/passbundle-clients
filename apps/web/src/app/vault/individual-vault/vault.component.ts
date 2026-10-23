@@ -151,8 +151,6 @@ import { openBulkDeleteDialog } from "./bulk-action-dialogs/bulk-delete-dialog/b
 import { BulkDeleteDialogWebAdapter } from "./bulk-action-dialogs/bulk-delete-dialog-web.adapter";
 import { openDeleteSharedFolderDialog } from "./bulk-action-dialogs/delete-shared-folder-dialog/delete-shared-folder-dialog.component";
 import { VaultBannersComponent } from "./vault-banners/vault-banners.component";
-import { VaultFilterComponent } from "./vault-filter/components/vault-filter.component";
-import { VaultFilterModule } from "./vault-filter/vault-filter.module";
 import { VaultHeaderComponent } from "./vault-header/vault-header.component";
 import { VaultOnboardingComponent } from "./vault-onboarding/vault-onboarding.component";
 
@@ -179,7 +177,8 @@ type EmptyStateMap = Record<EmptyStateType, EmptyStateItem>;
     VaultHeaderComponent,
     VaultOnboardingComponent,
     VaultBannersComponent,
-    VaultFilterModule,
+    // Keykeeper: no filter panel here; it's the left menu, which shares the
+    // app's vault filter service with this page.
     VaultItemsModule,
     SharedModule,
     VaultBatchActionComponent,
@@ -198,7 +197,6 @@ type EmptyStateMap = Record<EmptyStateType, EmptyStateItem>;
 export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestroy {
   private readonly vfo1TerminologyService = inject(Vfo1TerminologyService);
 
-  readonly filterComponent = viewChild(VaultFilterComponent);
   readonly vaultItemsComponent = viewChild(VaultItemsComponent);
 
   trashCleanupWarning: string = "";
@@ -878,13 +876,11 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
     if (orgId == null) {
       orgId = "MyVault";
     }
-    const data = this.filterComponent()?.filters?.organizationFilter?.data$;
-    if (data == undefined) {
-      return;
-    }
-    const orgs = await firstValueFrom(data);
+    // Keykeeper: the filter panel this went through is the left menu now; do what it did.
+    const orgs = await firstValueFrom(this.vaultFilterService.organizationTree$);
     const orgNode = ServiceUtils.getTreeNodeObject(orgs, orgId) as TreeNode<OrganizationFilter>;
-    await this.filterComponent()?.filters?.organizationFilter?.action(orgNode);
+    this.activeFilter.selectedOrganizationNode = orgNode;
+    this.vaultFilterService.setOrganizationFilter(orgNode?.node);
   }
 
   addFolder = (): void => {
