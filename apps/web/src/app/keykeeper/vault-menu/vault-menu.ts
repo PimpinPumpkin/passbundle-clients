@@ -231,3 +231,23 @@ export function buildVaultMenu(state: VaultMenuState, actions: VaultMenuActions)
     trash: state.trash ? typeEntry(state.trash, actions.type) : undefined,
   };
 }
+
+/**
+ * The name of the entry showing now, for the vault page's title, so the
+ * title says what the menu does: All items, a category, a vault, a
+ * collection, a folder, Favorites, Archive, or Trash. Undefined when nothing
+ * in the menu is showing (off the vault's page, or a filter it has no entry
+ * for).
+ */
+export function pickedLabel(menu: VaultMenu): string | undefined {
+  const entries = [
+    menu.all,
+    menu.favorites,
+    ...menu.categories,
+    ...menu.vaults,
+    ...menu.folders,
+    menu.archive,
+    menu.trash,
+  ];
+  return entries.find((entry) => entry?.active)?.label || undefined;
+}

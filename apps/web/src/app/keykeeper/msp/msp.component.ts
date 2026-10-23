@@ -292,7 +292,8 @@ const CLIENT_FEATURES = {
                 <bit-label>New client's name</bit-label>
                 <input bitInput formControlName="name" />
               </bit-form-field>
-              <bit-form-field disableMargin class="tw-min-w-48">
+              <!-- Wide enough for "Default policies (recommended)" beside its arrow. -->
+              <bit-form-field disableMargin class="tw-min-w-64">
                 <bit-label>Policies</bit-label>
                 <select bitInput formControlName="preset">
                   <option value="business">Default policies (recommended)</option>

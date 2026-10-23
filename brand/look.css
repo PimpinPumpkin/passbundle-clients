@@ -1,62 +1,19 @@
 /* PassBundle's look, appended to the component library's theme by
    brand/apply.mjs. See DESIGN.md, "The look".
 
-   Every theme gets the identity: Figtree, green-tinted darks, and the brand's
-   illustration colors. The Glass theme (upstream's System setting, so light or
-   dark like the device) adds translucent surfaces over a soft color field;
-   html.pb-glass turns it on. Light and Dark stay solid, for legibility.
+   Every theme gets the identity: Google Sans Flex (brand/fonts.css),
+   green-tinted darks, and the brand's illustration colors. The Glass theme
+   (upstream's System setting, so light or dark like the device) adds
+   translucent surfaces over a soft color field; html.pb-glass turns it on.
+   Light and Dark stay solid, for legibility.
 
    Rules target upstream's components (bit-*, popup-*) rather than its utility
    classes, so changes to the markup inside them don't break the look. */
 
-@font-face {
-  font-family: "Figtree";
-  font-style: normal;
-  font-weight: 300 900;
-  font-display: swap;
-  src: url("~@bitwarden/components/src/webfonts/figtree-latin-normal.woff2") format("woff2");
-  unicode-range:
-    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
-    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: "Figtree";
-  font-style: normal;
-  font-weight: 300 900;
-  font-display: swap;
-  src: url("~@bitwarden/components/src/webfonts/figtree-latin-ext-normal.woff2") format("woff2");
-  unicode-range:
-    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
-    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F,
-    U+A720-A7FF;
-}
-@font-face {
-  font-family: "Figtree";
-  font-style: italic;
-  font-weight: 300 900;
-  font-display: swap;
-  src: url("~@bitwarden/components/src/webfonts/figtree-latin-italic.woff2") format("woff2");
-  unicode-range:
-    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
-    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: "Figtree";
-  font-style: italic;
-  font-weight: 300 900;
-  font-display: swap;
-  src: url("~@bitwarden/components/src/webfonts/figtree-latin-ext-italic.woff2") format("woff2");
-  unicode-range:
-    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
-    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F,
-    U+A720-A7FF;
-}
-
-/* Identity, in every theme. Figtree covers Latin scripts; Inter, upstream's
-   font, still draws Cyrillic and Greek. */
+/* Identity, in every theme. The typeface, Google Sans Flex, is in
+   brand/fonts.css. */
 :root,
 .theme_light {
-  --font-sans: "Figtree", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
   /* Upstream's grays lean blue; ours lean toward the brand's green, at the same
      lightness, so every surface built from them follows. */
   --color-gray-050: #f8f9f9;
@@ -78,13 +35,25 @@
   --color-illustration-logo: 31 111 92;
 }
 /* Secondary text in green-tinted gray (upstream's leans blue): 6.4:1 on
-   white; on Glass, a step darker for the colored field behind it. */
+   white; on Glass, a step darker for the colored field behind it. Subtle
+   text (placeholders, hints) is the same gray: upstream's lighter one is
+   under 4.5:1 on white once tinted green. */
 :root,
 .theme_light {
   --color-text-muted: 78 99 92;
+  --color-fg-body-subtle: var(--color-gray-600);
 }
 .pb-glass:not(.theme_dark) {
   --color-text-muted: 58 79 72;
+  /* Links and code on the colored field: a step darker, so they stay at
+     4.5:1 where the field is lightest behind them. */
+  --color-fg-brand: var(--color-brand-800);
+  --color-primary-600: 24 87 72;
+  --color-text-code: 163 15 100;
+  /* Body text and the required-field asterisk, where they sit on the field
+     itself (a breadcrumb, a form outside a card): a step darker too. */
+  --color-fg-body: var(--color-gray-700);
+  --color-fg-danger: var(--color-red-800);
 }
 :root.theme_dark,
 .theme_dark {
@@ -92,6 +61,7 @@
   --color-background-alt: 12 21 19;
   --color-text-main: 232 242 238;
   --color-text-muted: 160 182 174;
+  --color-fg-body-subtle: var(--color-gray-300);
   --color-nav-bg-primary: #0e211d;
   --color-nav-bg-secondary: #0e211d;
   --color-nav-bg-primary-strong: #1d4a3f;
@@ -119,8 +89,14 @@
   --frost-edge: rgb(255 255 255 / 0.8);
   --frost-line: rgb(18 52 44 / 0.08);
   --frost-shadow: 0 1px 0 rgb(255 255 255 / 0.6) inset, 0 10px 30px rgb(18 52 44 / 0.1);
-  --frost-nav: rgb(14 52 44 / 0.74);
+  /* The side nav: deep enough that the field barely shifts it from top to
+     bottom, so its white text reads the same everywhere. */
+  --frost-nav: rgb(14 52 44 / 0.9);
   --frost-nav-sticky: rgb(14 52 44 / 0.55);
+  /* Dialogs: nearly solid, so they don't go gray over the dimmed page, with
+     their cards in white on them, as in the solid themes. */
+  --frost-dialog: rgb(239 244 242 / 0.96);
+  --frost-dialog-card: rgb(255 255 255 / 0.94);
   --frost-blur: blur(22px) saturate(170%);
   --frost-radius: 16px;
 }
@@ -135,8 +111,10 @@
   --frost-edge: rgb(255 255 255 / 0.09);
   --frost-line: rgb(255 255 255 / 0.07);
   --frost-shadow: 0 1px 0 rgb(255 255 255 / 0.05) inset, 0 12px 32px rgb(0 0 0 / 0.35);
-  --frost-nav: rgb(8 22 19 / 0.62);
+  --frost-nav: rgb(8 22 19 / 0.78);
   --frost-nav-sticky: rgb(8 22 19 / 0.5);
+  --frost-dialog: rgb(17 29 26 / 0.96);
+  --frost-dialog-card: rgb(255 255 255 / 0.045);
 }
 
 .pb-glass,
@@ -200,9 +178,16 @@
 .pb-glass bit-table td {
   border-color: var(--frost-line) !important;
 }
-.pb-glass bit-card input,
-.pb-glass bit-card textarea {
+.pb-glass bit-card input {
   background-color: rgb(var(--color-background) / 0.35) !important;
+}
+
+/* Segmented choices (Password, Passphrase, Username; All, Text, File) sit on
+   a glass strip like the cards around them, not straight on the field. */
+.pb-glass bit-toggle-group.tw-grid-flow-col {
+  background: var(--frost-surface);
+  -webkit-backdrop-filter: var(--frost-blur);
+  backdrop-filter: var(--frost-blur);
 }
 
 /* Fields, search, and filter menus: lighter glass. */
@@ -216,14 +201,33 @@
   border-radius: 13px !important;
 }
 
-/* Primary buttons: a pill with a soft glow, in every theme. */
+/* Primary buttons: a pill with a soft glow, in every theme. A solid primary
+   button is the one with the brand fill and contrast text, however its type
+   was set. */
 button[bitbutton][buttontype="primary"],
-a[bitbutton][buttontype="primary"] {
+a[bitbutton][buttontype="primary"],
+[bitbutton].tw-bg-bg-brand.tw-text-fg-contrast {
   border-radius: 999px !important;
 }
 .pb-glass button[bitbutton][buttontype="primary"],
-.pb-glass a[bitbutton][buttontype="primary"] {
+.pb-glass a[bitbutton][buttontype="primary"],
+.pb-glass [bitbutton].tw-bg-bg-brand.tw-text-fg-contrast {
   box-shadow: 0 6px 16px rgb(var(--color-primary-600) / 0.28);
+}
+/* In dark themes, upstream fills them pale (the brand's 400) with dark text,
+   which reads as washed out on a dark page. Ours: the brand's green, deep
+   enough for white text (4.8:1) and light enough to stand out from the page
+   (3.2:1 or more). Hover goes a step deeper, so white text only gets
+   stronger. */
+.theme_dark .tw-bg-bg-brand.tw-text-fg-contrast {
+  --color-bg-brand: #24806a;
+  --color-bg-brand-strong: #1c6d59;
+  --color-border-brand: #24806a;
+  --color-border-brand-strong: #1c6d59;
+  --color-fg-contrast: var(--color-white);
+}
+.pb-glass.theme_dark [bitbutton].tw-bg-bg-brand.tw-text-fg-contrast {
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.35);
 }
 
 /* Banners and callouts: tinted glass instead of solid color. */
@@ -247,17 +251,57 @@ a[bitbutton][buttontype="primary"] {
   border-radius: 18px !important;
   box-shadow: 0 24px 60px rgb(0 0 0 / 0.18);
 }
+/* A dialog is one surface: its header, body, and footer share its color
+   (upstream paints the footer and some bodies solid, which on glass made two
+   shades in one dialog), and the cards in it are white, as in the solid
+   themes. Over the dimmed page, near-solid reads cleaner than see-through. */
+.pb-glass bit-dialog > section,
+.pb-glass bit-simple-dialog > section {
+  background: var(--frost-dialog) !important;
+}
+.pb-glass bit-dialog > section > header,
+.pb-glass bit-dialog > section > footer,
+.pb-glass bit-dialog > section > div[class*="tw-bg-background"],
+.pb-glass bit-simple-dialog > section [class*="tw-bg-background"] {
+  background-color: transparent !important;
+}
+.pb-glass bit-dialog bit-card,
+.pb-glass bit-dialog bit-item-group {
+  background: var(--frost-dialog-card) !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-color: var(--frost-line) !important;
+  box-shadow: none;
+}
 
 /* The web vault's side nav: smoked glass, so its white text reads in both
-   modes. Its sticky parts sit over scrolled items, so they keep a tint. */
+   modes. Its sticky parts sit over scrolled items, so they keep a tint; the
+   footer with the collapse button never does, so it has none of its own and
+   the nav is one even color down to the bottom. */
 .pb-glass bit-side-nav > div > nav {
   background: var(--frost-nav) !important;
   -webkit-backdrop-filter: var(--frost-blur);
   backdrop-filter: var(--frost-blur);
 }
-.pb-glass bit-side-nav > div > nav > div > div > [class*="tw-bg-bg-nav"],
-.pb-glass bit-side-nav > div > nav > [class*="tw-bg-bg-nav"] {
+.pb-glass bit-side-nav > div > nav > div > div > [class*="tw-bg-bg-nav"] {
   background: var(--frost-nav-sticky) !important;
+}
+.pb-glass bit-side-nav > div > nav > [class*="tw-bg-bg-nav"],
+.pb-glass .keykeeper-menu bit-side-nav > div > nav > div > div > [class*="tw-bg-bg-nav"] {
+  background: transparent !important;
+}
+/* The admin console's nav is upstream's light variant (dark text). On glass
+   every nav is the same smoked green, so it takes the white text too. */
+.pb-glass:not(.theme_dark) bit-side-nav {
+  --color-nav-fg-secondary: var(--color-nav-fg-primary);
+  --color-nav-bg-secondary-hover: var(--color-nav-bg-primary-hover);
+  --color-nav-bg-secondary-hover-strong: var(--color-nav-bg-primary-hover-strong);
+  --color-nav-border-secondary: var(--color-nav-border-primary);
+  --color-nav-border-secondary-focus: var(--color-nav-border-primary-focus);
+}
+/* Lines in the nav: the same faint white everywhere, not the brand green. */
+.pb-glass bit-side-nav bit-nav-divider > div {
+  background: rgb(255 255 255 / 0.14) !important;
 }
 .pb-glass bit-side-nav bit-nav-item [class*="tw-bg-bg-nav"],
 .pb-glass bit-side-nav bit-nav-group [class*="tw-bg-bg-nav"],
@@ -268,14 +312,14 @@ a[bitbutton][buttontype="primary"] {
   border-right: 1px solid var(--frost-line);
 }
 
-/* The user pages' one left menu (DESIGN.md, "The left menu"): a soft pill
-   under the pointer and a brighter one for the entry showing, like 1Password's
-   sidebar. Upstream marks the entry showing with its strong nav colors, which
-   the glass above clears. The admin console's menu stays as it is. */
-.pb-glass .keykeeper-menu bit-nav-item [class*="tw-bg-bg-nav"]:hover {
+/* A soft pill under the pointer and a brighter one for the entry showing,
+   like 1Password's sidebar, in every nav (the user pages' one left menu,
+   DESIGN.md "The left menu", and the admin console's). Upstream marks the
+   entry showing with its strong nav colors, which the glass above clears. */
+.pb-glass bit-side-nav bit-nav-item [class*="tw-bg-bg-nav"]:hover {
   background: rgb(255 255 255 / 0.08) !important;
 }
-.pb-glass .keykeeper-menu bit-nav-item [class*="tw-bg-bg-nav"][style*="-strong"] {
+.pb-glass bit-side-nav bit-nav-item [class*="tw-bg-bg-nav"][style*="-strong"] {
   background: rgb(255 255 255 / 0.16) !important;
 }
 /* It's one list that scrolls: the logo and "More from" scroll with it, rather
@@ -284,13 +328,111 @@ a[bitbutton][buttontype="primary"] {
 .keykeeper-menu #bit-side-nav--scroll [class*="tw-sticky"] {
   position: static !important;
 }
-/* The line between the vault's entries and the tools, inset like the pills. */
-.keykeeper-menu app-keykeeper-vault-menu + bit-nav-divider > div {
+/* An entry inside a group (Import and export's, Settings') lines its text up
+   with its group's, past the group's icon. Upstream indents it by a fixed
+   amount that stops 5px short. */
+bit-side-nav bit-nav-group > div[role="group"] > bit-nav-item [data-testid="nav-item-container"] {
+  padding-inline-start: calc(2.75rem + 1.28571429em) !important;
+}
+/* Its lines are inset like the pills: between the vault's entries and the
+   tools, above "More from", and above the collapse button. */
+.keykeeper-menu bit-nav-divider > div {
   width: auto;
-  margin: 0.75rem;
+  margin: 0.5rem 0.75rem;
   background: rgb(255 255 255 / 0.16);
+}
+/* The list fades out at its bottom edge rather than cutting an entry in
+   half, so a long menu (a phone, or many collections) reads as one that
+   scrolls. The space at its end keeps the last entry clear of the fade. */
+.keykeeper-menu #bit-side-nav--scroll {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 1.5rem), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 1.5rem), transparent);
+}
+.keykeeper-menu #bit-side-nav--scroll > div {
+  padding-bottom: 1.5rem;
+}
+/* "More from PassBundle" is a heading like the menu's others (Categories,
+   Vaults, Folders), and its links line up with the entries above them. */
+.keykeeper-menu navigation-product-switcher section > span {
+  display: block;
+  padding: 0.75rem 1.25rem 0 3rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+.keykeeper-menu navigation-product-switcher section > div {
+  padding-inline: 0.75rem;
+}
+.keykeeper-menu navigation-product-switcher section a {
+  padding-inline-start: 2rem;
 }
 /* Its search field is one white field, not a field in a field. */
 .pb-glass .keykeeper-menu bit-search input {
   background-color: transparent !important;
+}
+
+/* Item cards and checklists keep the glass they're on: no solid header band
+   over a see-through body. */
+.pb-glass bit-accordion [data-accordion-trigger]:not(:hover) {
+  background-color: transparent !important;
+}
+/* The vault's checklist shows all of itself, on a phone too, rather than
+   scrolling inside its card with "Dismiss" cut off at the bottom. */
+app-vault-onboarding [data-accordion-content] > div {
+  max-height: none;
+}
+
+/* Sign-in and sign-up: the form is on a glass card at every width, so its
+   labels and links don't sit straight on the colored field on a phone. */
+.pb-glass bit-landing-card > bit-base-card {
+  background: var(--frost-surface-strong) !important;
+  -webkit-backdrop-filter: var(--frost-blur);
+  backdrop-filter: var(--frost-blur);
+  border: 1px solid var(--frost-edge) !important;
+  box-shadow: var(--frost-shadow) !important;
+}
+@media (max-width: 639px) {
+  .pb-glass bit-landing-card > bit-base-card {
+    padding: 1.25rem;
+  }
+}
+
+/* An avatar's initials, in the typeface (upstream names Inter in the SVG). */
+bit-avatar text {
+  font-family: var(--font-sans);
+}
+
+/* A long item name in the vault list ends in an ellipsis where its column is
+   narrow (a phone) instead of being cut off mid-letter. The name is a link
+   button whose text sits in a flex row that doesn't shrink on its own. */
+[id^="cipher-btn-"],
+[id^="cipher-btn-"] > div > span {
+  min-width: 0;
+}
+[id^="cipher-btn-"] > div > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The logo (brand/wordmark.py): the jewel tile and "passbundle", two-tone.
+   The shared logo (sign-in pages, the extension's) is drawn for light
+   backgrounds; on dark ones the name lightens and the tile's shadow goes. The
+   navigation's is drawn for its dark background; upstream's light nav (the
+   admin console in the solid Light theme) takes the light colors. */
+.theme_dark .pb-wm-pass {
+  fill: #e7efec;
+}
+.theme_dark .pb-wm-bundle {
+  fill: #6fd4b4;
+}
+.theme_dark .pb-wm-tile {
+  filter: none;
+}
+.theme_light:not(.pb-glass) bit-side-nav nav[style*="nav-fg-secondary"] .pb-wm-pass {
+  fill: #1b3a33;
+}
+.theme_light:not(.pb-glass) bit-side-nav nav[style*="nav-fg-secondary"] .pb-wm-bundle {
+  fill: #0e7a5a;
 }

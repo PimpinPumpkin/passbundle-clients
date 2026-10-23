@@ -34,6 +34,7 @@ import { OrganizationWarningsService } from "@bitwarden/web-vault/app/billing/or
 
 import { CoachmarkService } from "../../vault/components/coachmark";
 
+import { KeykeeperPickedLabelService } from "./picked-label.service";
 import { KeykeeperVaultMenuComponent } from "./vault-menu.component";
 
 @Component({ template: "", changeDetection: ChangeDetectionStrategy.OnPush })
@@ -278,6 +279,22 @@ describe("KeykeeperVaultMenuComponent", () => {
     expect(el().querySelector("bit-nav-item.keykeeper-menu-scope")?.textContent).toContain(
       "Contoso",
     );
+  });
+
+  it("gives the vault page what's showing, by name, for its title", async () => {
+    const picked = TestBed.inject(KeykeeperPickedLabelService);
+    expect(picked.label()).toBe("allItems");
+
+    click("Contoso");
+    await settle();
+    expect(picked.label()).toBe("Contoso");
+
+    click("Banking");
+    await settle();
+    expect(picked.label()).toBe("Banking");
+
+    fixture.destroy();
+    expect(picked.label()).toBeUndefined();
   });
 
   it("filters the vault through the routed filter, as the panel did", async () => {

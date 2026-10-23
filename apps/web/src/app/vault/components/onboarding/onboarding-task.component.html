@@ -1,9 +1,11 @@
-<!-- Keykeeper: the button goes under the text where both don't fit (a phone). -->
+<!-- Keykeeper: the button goes under the text where both don't fit (a phone).
+     A finished task's title is muted text (4.5:1 or more), not upstream's
+     inactive gray, which is too faint to read. -->
 <div class="tw-flex tw-flex-wrap tw-items-start tw-gap-x-4 tw-gap-y-2">
   <div class="tw-flex-1 tw-min-w-48">
     <div
       class="tw-text-base tw-font-medium"
-      [ngClass]="completed() ? 'tw-text-fg-inactive' : 'tw-text-fg-heading'"
+      [ngClass]="completed() ? 'tw-text-muted' : 'tw-text-fg-heading'"
     >
       {{ title() }}
     </div>

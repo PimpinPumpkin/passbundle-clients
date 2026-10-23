@@ -44,6 +44,7 @@ import {
 } from "@bitwarden/vault";
 
 import { CollectionDialogTabType } from "../../../admin-console/organizations/shared/components/collection-dialog";
+import { KeykeeperPickedLabelService } from "../../../keykeeper/vault-menu/picked-label.service";
 import { HeaderModule } from "../../../layouts/header/header.module";
 import { SharedModule } from "../../../shared";
 import { CoachmarkComponent, CoachmarkService } from "../../components/coachmark";
@@ -70,6 +71,7 @@ import { PipesModule } from "../pipes/pipes.module";
 })
 export class VaultHeaderComponent {
   private readonly vfo1TerminologyService = inject(Vfo1TerminologyService);
+  private readonly keykeeperPickedLabel = inject(KeykeeperPickedLabelService);
 
   protected readonly Unassigned = Unassigned;
   protected readonly All = All;
@@ -196,6 +198,14 @@ export class VaultHeaderComponent {
   protected get title() {
     if (this.filter === undefined) {
       return "";
+    }
+
+    // Keykeeper: the title is the name of what's picked in the left menu (All
+    // items, a category, a vault, a collection, a folder, Favorites, Archive,
+    // or Trash), so the two agree. Upstream's titles stay for anything else.
+    const picked = this.keykeeperPickedLabel.label();
+    if (picked) {
+      return picked;
     }
 
     if (this.filter.collectionId === Unassigned) {
