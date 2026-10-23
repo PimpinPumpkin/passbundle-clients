@@ -1,0 +1,194 @@
+<app-header>
+  <bit-search
+    [placeholder]="'keykeeperAccessSearch' | i18n"
+    [formControl]="searchControl"
+    class="tw-w-96"
+  ></bit-search>
+</app-header>
+
+<p bitTypography="body1" class="tw-max-w-4xl">{{ "keykeeperAccessIntro" | i18n }}</p>
+
+@if (hiddenFolders(); as note) {
+  <bit-callout type="info" [title]="null" data-testid="access-hidden-folders">{{
+    note
+  }}</bit-callout>
+}
+
+<div class="tw-mb-4">
+  <bit-toggle-group
+    [selected]="view()"
+    (selectedChange)="view.set($event)"
+    [label]="'keykeeperAccessView' | i18n"
+  >
+    <bit-toggle value="people">{{ "keykeeperAccessByPerson" | i18n }}</bit-toggle>
+    <bit-toggle value="folders">{{ "keykeeperAccessBySharedFolder" | i18n }}</bit-toggle>
+  </bit-toggle-group>
+</div>
+
+@if (failed()) {
+  <bit-callout type="danger" [title]="null">{{ "keykeeperAccessLoadFailed" | i18n }}</bit-callout>
+} @else if (!loaded()) {
+  <bit-icon name="bwi-spinner" class="bwi-spin tw-text-muted" [title]="'loading' | i18n"></bit-icon>
+  <span class="tw-sr-only">{{ "loading" | i18n }}</span>
+} @else if (view() === "people") {
+  @if (people().length === 0) {
+    <p class="tw-text-muted">{{ "keykeeperAccessNothingFound" | i18n }}</p>
+  } @else {
+    <bit-table data-testid="access-people">
+      <ng-container header>
+        <tr>
+          <th bitCell class="tw-w-12"></th>
+          <th bitCell class="tw-w-1/4">{{ "keykeeperAccessPerson" | i18n }}</th>
+          <th bitCell class="tw-w-40">{{ "role" | i18n }}</th>
+          <th bitCell>{{ "keykeeperAccessSharedFoldersTheyCanOpen" | i18n }}</th>
+        </tr>
+      </ng-container>
+      <ng-template body>
+        @for (access of people(); track access.member.id) {
+          @let member = access.member;
+          @let open = isExpanded(member.id);
+          <tr
+            bitRow
+            alignContent="top"
+            data-testid="access-person"
+            [attr.data-email]="member.email"
+          >
+            <td bitCell>
+              <button
+                type="button"
+                bitIconButton="{{ open ? 'bwi-angle-down' : 'bwi-angle-right' }}"
+                size="small"
+                [attr.aria-expanded]="open"
+                [label]="'keykeeperAccessShowItemCounts' | i18n: displayName(member)"
+                (click)="toggle(member.id)"
+              ></button>
+            </td>
+            <td bitCell>
+              <div class="tw-font-medium">{{ displayName(member) }}</div>
+              @if (member.name) {
+                <div class="tw-text-sm tw-text-muted">{{ member.email }}</div>
+              }
+            </td>
+            <td bitCell>
+              <div class="tw-flex tw-flex-wrap tw-gap-1">
+                <span bitBadge variant="subtle">{{ roleLabel(member) }}</span>
+                @if (member.mspStaff) {
+                  <span bitBadge variant="primary" data-testid="access-msp-staff">{{
+                    "keykeeperAccessMspStaff" | i18n
+                  }}</span>
+                }
+                @if (member.status === "pending") {
+                  <span bitBadge variant="warning">{{ "keykeeperAccessNotConfirmed" | i18n }}</span>
+                }
+                @if (member.status === "revoked") {
+                  <span bitBadge variant="subtle">{{ "revoked" | i18n }}</span>
+                }
+              </div>
+            </td>
+            <td bitCell>
+              @if (access.everyItem) {
+                <span bitBadge variant="primary" data-testid="access-every-item">{{
+                  "keykeeperAccessEveryItem" | i18n
+                }}</span>
+                @if (open) {
+                  <span class="tw-ml-2 tw-text-sm tw-text-muted" data-testid="access-total">{{
+                    total(access)
+                  }}</span>
+                }
+              } @else if (access.folders.length === 0) {
+                <span class="tw-text-muted">{{ "keykeeperAccessNoSharedFolders" | i18n }}</span>
+              } @else {
+                <ul class="tw-m-0 tw-list-none tw-p-0">
+                  @for (f of access.folders; track f.folder.id) {
+                    <li
+                      class="tw-mb-2 last:tw-mb-0"
+                      data-testid="access-folder"
+                      [attr.data-folder]="f.folder.name"
+                    >
+                      <div class="tw-flex tw-flex-wrap tw-items-center tw-gap-x-2 tw-gap-y-1">
+                        <span class="tw-font-medium">{{ f.folder.name }}</span>
+                        <span bitBadge variant="subtle" data-testid="access-level">{{
+                          levelLabel(f.level)
+                        }}</span>
+                      </div>
+                      <div class="tw-text-sm tw-text-muted">
+                        <span data-testid="access-how">{{ how(f.paths) }}</span>
+                        @if (open) {
+                          <span aria-hidden="true"> · </span>
+                          <span data-testid="access-items">{{ items(f.itemCount) }}</span>
+                        }
+                      </div>
+                    </li>
+                  }
+                </ul>
+                @if (open) {
+                  <div class="tw-mt-2 tw-text-sm tw-font-medium" data-testid="access-total">
+                    {{ total(access) }}
+                  </div>
+                }
+              }
+            </td>
+          </tr>
+        }
+      </ng-template>
+    </bit-table>
+  }
+} @else {
+  @if (loaded()!.review.folders.length === 0) {
+    <p class="tw-text-muted">{{ "keykeeperAccessNoFoldersYet" | i18n }}</p>
+  } @else if (folders().length === 0) {
+    <p class="tw-text-muted">{{ "keykeeperAccessNothingFound" | i18n }}</p>
+  }
+  @for (folder of folders(); track folder.folder.id) {
+    <section
+      class="tw-mb-8"
+      data-testid="access-shared-folder"
+      [attr.data-folder]="folder.folder.name"
+      [attr.aria-label]="folder.folder.name"
+    >
+      <h2 bitTypography="h4" class="tw-mb-2">
+        {{ folder.folder.name }}
+        <span class="tw-ml-2 tw-text-base tw-font-normal tw-text-muted">{{
+          items(folder.itemCount)
+        }}</span>
+      </h2>
+      @if (folder.people.length > 0) {
+        <bit-table>
+          <ng-container header>
+            <tr>
+              <th bitCell class="tw-w-1/3">{{ "keykeeperAccessPerson" | i18n }}</th>
+              <th bitCell class="tw-w-1/4">{{ "keykeeperAccessPermission" | i18n }}</th>
+              <th bitCell>{{ "keykeeperAccessHow" | i18n }}</th>
+            </tr>
+          </ng-container>
+          <ng-template body>
+            @for (person of folder.people; track person.member.id) {
+              <tr bitRow data-testid="access-folder-person" [attr.data-email]="person.member.email">
+                <td bitCell>
+                  <div class="tw-font-medium">{{ displayName(person.member) }}</div>
+                  @if (person.member.name) {
+                    <div class="tw-text-sm tw-text-muted">{{ person.member.email }}</div>
+                  }
+                </td>
+                <td bitCell data-testid="access-level">{{ levelLabel(person.level) }}</td>
+                <td bitCell class="tw-text-muted" data-testid="access-how">
+                  {{ how(person.paths) }}
+                </td>
+              </tr>
+            }
+          </ng-template>
+        </bit-table>
+      }
+      @if (folder.everyItemPeople.length > 0) {
+        <p class="tw-mt-2 tw-text-sm tw-text-muted" data-testid="access-every-item-people">
+          {{
+            (folder.people.length === 0
+              ? "keykeeperAccessOnlyEveryItemPeople"
+              : "keykeeperAccessEveryItemPeople"
+            ) | i18n: everyItemPeople(folder.everyItemPeople)
+          }}
+        </p>
+      }
+    </section>
+  }
+}

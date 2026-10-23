@@ -31,6 +31,10 @@ import { newGuid } from "@bitwarden/guid";
 import { KeyService } from "@bitwarden/key-management";
 import { BillingConstraintService } from "@bitwarden/web-vault/app/billing/members/billing-constraint/billing-constraint.service";
 import { OrganizationWarningsService } from "@bitwarden/web-vault/app/billing/organizations/warnings/services";
+import {
+  KeykeeperOffboarding,
+  KeykeeperOffboardingService,
+} from "@bitwarden/web-vault/app/keykeeper/access/offboarding.service";
 
 import { OrganizationUserView } from "../core/views/organization-user.view";
 
@@ -77,6 +81,7 @@ describe("MembersComponent", () => {
   let mockEnvironmentService: MockProxy<EnvironmentService>;
   let mockMemberExportService: MockProxy<MemberExportService>;
   let mockFileDownloadService: MockProxy<FileDownloadService>;
+  let mockKeykeeperOffboarding: MockProxy<KeykeeperOffboardingService>;
 
   let routeParamsSubject: BehaviorSubject<any>;
   let queryParamsSubject: BehaviorSubject<any>;
@@ -170,6 +175,8 @@ describe("MembersComponent", () => {
 
     mockMemberExportService = mock<MemberExportService>();
     mockFileDownloadService = mock<FileDownloadService>();
+    mockKeykeeperOffboarding = mock<KeykeeperOffboardingService>();
+    mockKeykeeperOffboarding.prepare.mockResolvedValue(null);
 
     await TestBed.configureTestingModule({
       declarations: [MembersComponent],
@@ -208,6 +215,7 @@ describe("MembersComponent", () => {
         { provide: EnvironmentService, useValue: mockEnvironmentService },
         { provide: MemberExportService, useValue: mockMemberExportService },
         { provide: FileDownloadService, useValue: mockFileDownloadService },
+        { provide: KeykeeperOffboardingService, useValue: mockKeykeeperOffboarding },
       ],
       schemas: [NO_ERRORS_SCHEMA],
     })
@@ -259,8 +267,10 @@ describe("MembersComponent", () => {
 
       await component.remove(mockUser, mockOrg);
 
+      // Keykeeper: and what they can open, when that's known (it isn't here).
       expect(mockMemberDialogManager.openRemoveUserConfirmationDialog).toHaveBeenCalledWith(
         mockUser,
+        undefined,
       );
       expect(mockMemberActionsService.removeUser).toHaveBeenCalledWith(mockOrg, mockUser.id);
       expect(removeSpy).toHaveBeenCalledWith(mockUser);
@@ -373,8 +383,10 @@ describe("MembersComponent", () => {
 
       await component.revoke(mockUser, mockOrg);
 
+      // Keykeeper: and what they can open, when that's known (it isn't here).
       expect(mockMemberDialogManager.openRevokeUserConfirmationDialog).toHaveBeenCalledWith(
         mockUser,
+        undefined,
       );
       expect(mockMemberActionsService.revokeUser).toHaveBeenCalledWith(mockOrg, mockUser.id);
       expect(mockToastService.showToast).toHaveBeenCalled();
@@ -387,6 +399,67 @@ describe("MembersComponent", () => {
 
       expect(result).toBe(false);
       expect(mockMemberActionsService.revokeUser).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Keykeeper: what a member could see", () => {
+    const offboarding = {
+      summary: "Test User can open 2 shared folders with 3 items.",
+    } as KeykeeperOffboarding;
+
+    beforeEach(() => {
+      mockKeykeeperOffboarding.prepare.mockResolvedValue(offboarding);
+    });
+
+    it("says what they can open when removing them, then lists the passwords they could see", async () => {
+      mockMemberDialogManager.openRemoveUserConfirmationDialog.mockResolvedValue(true);
+      mockMemberActionsService.removeUser.mockResolvedValue({ success: true });
+
+      await component.remove(mockUser, mockOrg);
+
+      expect(mockKeykeeperOffboarding.prepare).toHaveBeenCalledWith(
+        mockOrg,
+        mockUser.id,
+        "Test User",
+      );
+      expect(mockMemberDialogManager.openRemoveUserConfirmationDialog).toHaveBeenCalledWith(
+        mockUser,
+        offboarding.summary,
+      );
+      expect(mockKeykeeperOffboarding.showPasswords).toHaveBeenCalledWith(offboarding);
+    });
+
+    it("says what they can open when revoking them, then lists the passwords they could see", async () => {
+      mockMemberDialogManager.openRevokeUserConfirmationDialog.mockResolvedValue(true);
+      mockMemberActionsService.revokeUser.mockResolvedValue({ success: true });
+
+      await component.revoke(mockUser, mockOrg);
+
+      expect(mockMemberDialogManager.openRevokeUserConfirmationDialog).toHaveBeenCalledWith(
+        mockUser,
+        offboarding.summary,
+      );
+      expect(mockKeykeeperOffboarding.showPasswords).toHaveBeenCalledWith(offboarding);
+    });
+
+    it("lists nothing when the removal is canceled", async () => {
+      mockMemberDialogManager.openRemoveUserConfirmationDialog.mockResolvedValue(false);
+
+      await component.remove(mockUser, mockOrg);
+
+      expect(mockKeykeeperOffboarding.showPasswords).not.toHaveBeenCalled();
+    });
+
+    it("lists nothing when removing or revoking fails", async () => {
+      mockMemberDialogManager.openRemoveUserConfirmationDialog.mockResolvedValue(true);
+      mockMemberDialogManager.openRevokeUserConfirmationDialog.mockResolvedValue(true);
+      mockMemberActionsService.removeUser.mockResolvedValue({ success: false, error: "No" });
+      mockMemberActionsService.revokeUser.mockResolvedValue({ success: false, error: "No" });
+
+      await component.remove(mockUser, mockOrg);
+      await component.revoke(mockUser, mockOrg);
+
+      expect(mockKeykeeperOffboarding.showPasswords).not.toHaveBeenCalled();
     });
   });
 

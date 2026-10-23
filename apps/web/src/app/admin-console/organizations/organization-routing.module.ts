@@ -15,6 +15,7 @@ import {
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 
 import { deepLinkGuard } from "../../auth/guards/deep-link/deep-link.guard";
+import { canReviewAccess } from "../../keykeeper/access/access-review";
 
 import { VaultModule } from "./collections/vault.module";
 import { organizationPermissionsGuard } from "./guards/org-permissions.guard";
@@ -48,6 +49,16 @@ const routes: Routes = [
       {
         path: "members",
         loadChildren: () => import("./members").then((m) => m.MembersModule),
+      },
+      // Keykeeper: who can see what (DESIGN.md, "Access and offboarding").
+      {
+        path: "access",
+        loadComponent: () =>
+          import("../../keykeeper/access/access.component").then((m) => m.KeykeeperAccessComponent),
+        canActivate: [organizationPermissionsGuard(canReviewAccess)],
+        data: {
+          titleId: "keykeeperAccess",
+        },
       },
       {
         component: GroupsComponent,

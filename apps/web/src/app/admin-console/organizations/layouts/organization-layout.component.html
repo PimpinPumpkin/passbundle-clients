@@ -37,6 +37,13 @@
         <bit-nav-item icon="bwi-user" [text]="'members' | i18n" route="members"></bit-nav-item>
       </ng-template>
     </ng-container>
+    <!-- Keykeeper: who can see what, for whoever manages members. -->
+    <bit-nav-item
+      icon="bwi-eye"
+      [text]="'keykeeperAccess' | i18n"
+      route="access"
+      *ngIf="organization.canManageUsers"
+    ></bit-nav-item>
 
     <bit-nav-item
       icon="bwi-users"

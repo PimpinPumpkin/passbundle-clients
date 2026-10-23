@@ -482,6 +482,22 @@ describe("MemberDialogManagerService", () => {
   });
 
   describe("openRemoveUserConfirmationDialog", () => {
+    it("Keykeeper: adds what the member can open to the warning", async () => {
+      i18nService.t.mockImplementation((key) => key);
+      dialogService.openSimpleDialog.mockResolvedValue(true);
+
+      await service.openRemoveUserConfirmationDialog(
+        mockUser,
+        "Test User can open 1 shared folder with 1 item.",
+      );
+
+      expect(dialogService.openSimpleDialog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: "removeOrgUserConfirmation Test User can open 1 shared folder with 1 item.",
+        }),
+      );
+    });
+
     it("should return true when user confirms removal", async () => {
       dialogService.openSimpleDialog.mockResolvedValue(true);
 
@@ -561,6 +577,23 @@ describe("MemberDialogManagerService", () => {
   });
 
   describe("openRevokeUserConfirmationDialog", () => {
+    it("Keykeeper: adds what the member can open to the warning", async () => {
+      i18nService.t.mockReturnValue("Revoke user confirmation");
+      dialogService.openSimpleDialog.mockResolvedValue(true);
+
+      await service.openRevokeUserConfirmationDialog(
+        mockUser,
+        "Test User can see every item in this organization: 3 items.",
+      );
+
+      expect(dialogService.openSimpleDialog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content:
+            "Revoke user confirmation Test User can see every item in this organization: 3 items.",
+        }),
+      );
+    });
+
     it("should return true when user confirms revocation", async () => {
       i18nService.t.mockReturnValue("Revoke user confirmation");
       dialogService.openSimpleDialog.mockResolvedValue(true);

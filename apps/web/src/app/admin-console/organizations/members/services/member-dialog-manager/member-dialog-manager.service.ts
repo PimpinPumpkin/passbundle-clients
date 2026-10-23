@@ -264,7 +264,11 @@ export class MemberDialogManagerService {
     });
   }
 
-  async openRemoveUserConfirmationDialog(user: OrganizationUserView): Promise<boolean> {
+  /** Keykeeper: `keykeeperReach` says what they can open (see KeykeeperOffboardingService). */
+  async openRemoveUserConfirmationDialog(
+    user: OrganizationUserView,
+    keykeeperReach?: string,
+  ): Promise<boolean> {
     const content = user.usesKeyConnector
       ? "removeUserConfirmationKeyConnector"
       : "removeOrgUserConfirmation";
@@ -274,7 +278,9 @@ export class MemberDialogManagerService {
         key: "removeUserIdAccess",
         placeholders: [this.userNamePipe.transform(user)],
       },
-      content: { key: content },
+      content: keykeeperReach
+        ? `${this.i18nService.t(content)} ${keykeeperReach}`
+        : { key: content },
       type: "warning",
     });
 
@@ -294,10 +300,16 @@ export class MemberDialogManagerService {
     return true;
   }
 
-  async openRevokeUserConfirmationDialog(user: OrganizationUserView): Promise<boolean> {
+  /** Keykeeper: `keykeeperReach` says what they can open (see KeykeeperOffboardingService). */
+  async openRevokeUserConfirmationDialog(
+    user: OrganizationUserView,
+    keykeeperReach?: string,
+  ): Promise<boolean> {
     const confirmed = await this.dialogService.openSimpleDialog({
       title: { key: "revokeAccess", placeholders: [this.userNamePipe.transform(user)] },
-      content: this.i18nService.t("revokeUserConfirmation"),
+      content: keykeeperReach
+        ? `${this.i18nService.t("revokeUserConfirmation")} ${keykeeperReach}`
+        : this.i18nService.t("revokeUserConfirmation"),
       acceptButtonText: { key: "revokeAccess" },
       type: "warning",
     });

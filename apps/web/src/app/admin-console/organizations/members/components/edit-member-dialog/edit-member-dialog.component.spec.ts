@@ -35,6 +35,10 @@ import { ValidationService } from "@bitwarden/common/platform/abstractions/valid
 import { DIALOG_DATA, DialogRef, DialogService, ToastService } from "@bitwarden/components";
 import { Vfo1TerminologyService } from "@bitwarden/vault";
 import { BillingConstraintService } from "@bitwarden/web-vault/app/billing/members/billing-constraint/billing-constraint.service";
+import {
+  KeykeeperOffboarding,
+  KeykeeperOffboardingService,
+} from "@bitwarden/web-vault/app/keykeeper/access/offboarding.service";
 
 import { GroupApiService, OrganizationUserAdminView, UserAdminService } from "../../../core";
 import { DeleteManagedMemberWarningService } from "../../services/delete-managed-member/delete-managed-member-warning.service";
@@ -136,6 +140,7 @@ async function createComponent(
     configService: MockProxy<ConfigService>;
     validationService: MockProxy<ValidationService>;
     logService: MockProxy<LogService>;
+    keykeeperOffboarding: MockProxy<KeykeeperOffboardingService>;
   };
 }> {
   const accountService = mock<AccountService>();
@@ -154,6 +159,8 @@ async function createComponent(
   const configService = mock<ConfigService>();
   const validationService = mock<ValidationService>();
   const logService = mock<LogService>();
+  const keykeeperOffboarding = mock<KeykeeperOffboardingService>();
+  keykeeperOffboarding.prepare.mockResolvedValue(null);
 
   accountService.activeAccount$ = of({ id: ACCOUNT_ID } as any);
   organizationService.organizations$ = jest
@@ -194,6 +201,7 @@ async function createComponent(
       { provide: ConfigService, useValue: configService },
       { provide: ValidationService, useValue: validationService },
       { provide: LogService, useValue: logService },
+      { provide: KeykeeperOffboardingService, useValue: keykeeperOffboarding },
       {
         provide: Vfo1TerminologyService,
         useValue: buildVfo1TerminologyService(overrides.vfo1FoundationEnabled),
@@ -231,6 +239,7 @@ async function createComponent(
       configService,
       validationService,
       logService,
+      keykeeperOffboarding,
     },
   };
 }
@@ -391,6 +400,56 @@ describe("EditMemberDialogComponent", () => {
         expect.objectContaining({ variant: "success" }),
       );
       expect(mocks.dialogRef.close).not.toHaveBeenCalledWith(MemberDialogResult.Restored);
+    });
+  });
+
+  describe("Keykeeper: what a member could see", () => {
+    const offboarding = {
+      summary: "Test User can open 1 shared folder with 2 items.",
+    } as KeykeeperOffboarding;
+
+    it("says what they can open when removing them, then lists the passwords they could see", async () => {
+      const { fixture, component, mocks } = await createComponent(defaultParams());
+      mocks.keykeeperOffboarding.prepare.mockResolvedValue(offboarding);
+      mocks.dialogService.openSimpleDialog.mockResolvedValue(true);
+      mocks.memberActionsService.removeUser.mockResolvedValue({ success: true });
+
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      await component.remove();
+
+      expect(mocks.keykeeperOffboarding.prepare).toHaveBeenCalledWith(
+        expect.objectContaining({ id: ORG_ID }),
+        USER_ID,
+        "Test User",
+      );
+      expect(mocks.dialogService.openSimpleDialog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: `translated ${offboarding.summary}`,
+        }),
+      );
+      expect(mocks.dialogRef.close).toHaveBeenCalledWith(MemberDialogResult.Deleted);
+      expect(mocks.keykeeperOffboarding.showPasswords).toHaveBeenCalledWith(offboarding);
+    });
+
+    it("says what they can open when revoking them, and lists nothing if they stay", async () => {
+      const { fixture, component, mocks } = await createComponent(defaultParams());
+      mocks.keykeeperOffboarding.prepare.mockResolvedValue(offboarding);
+      mocks.dialogService.openSimpleDialog.mockResolvedValue(false);
+
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      await component.revoke();
+
+      expect(mocks.dialogService.openSimpleDialog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: `translated ${offboarding.summary}`,
+        }),
+      );
+      expect(mocks.memberActionsService.revokeUser).not.toHaveBeenCalled();
+      expect(mocks.keykeeperOffboarding.showPasswords).not.toHaveBeenCalled();
     });
   });
 

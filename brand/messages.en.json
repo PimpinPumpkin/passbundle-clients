@@ -55,5 +55,280 @@
   },
   "keykeeperSelfHostedAddressHint": {
     "message": "Your server's address, such as vault.example.com."
+  },
+  "keykeeperAccess": {
+    "message": "Access"
+  },
+  "keykeeperAccessIntro": {
+    "message": "Who can open each shared folder, and how. Owners and admins see every item. Everyone else opens the shared folders they're given, directly or through a group. Someone who reaches a folder two ways gets the more open permission, and passwords stay hidden only if every way hides them."
+  },
+  "keykeeperAccessHiddenFolder": {
+    "message": "1 shared folder isn't shown, since you can't open it yourself."
+  },
+  "keykeeperAccessHiddenFolders": {
+    "message": "$COUNT$ shared folders aren't shown, since you can't open them yourself.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "keykeeperAccessSearch": {
+    "message": "Search people, groups, and shared folders"
+  },
+  "keykeeperAccessView": {
+    "message": "Show access"
+  },
+  "keykeeperAccessByPerson": {
+    "message": "By person"
+  },
+  "keykeeperAccessBySharedFolder": {
+    "message": "By shared folder"
+  },
+  "keykeeperAccessPerson": {
+    "message": "Person"
+  },
+  "keykeeperAccessSharedFoldersTheyCanOpen": {
+    "message": "Shared folders they can open"
+  },
+  "keykeeperAccessEveryItem": {
+    "message": "Every item"
+  },
+  "keykeeperAccessNoSharedFolders": {
+    "message": "No shared folders"
+  },
+  "keykeeperAccessShowItemCounts": {
+    "message": "Show item counts for $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "keykeeperAccessMspStaff": {
+    "message": "MSP staff"
+  },
+  "keykeeperAccessNotConfirmed": {
+    "message": "Not confirmed yet"
+  },
+  "keykeeperAccessPermission": {
+    "message": "Permission"
+  },
+  "keykeeperAccessHow": {
+    "message": "How"
+  },
+  "keykeeperAccessDirectly": {
+    "message": "Directly"
+  },
+  "keykeeperAccessThroughGroup": {
+    "message": "Through $GROUP$",
+    "placeholders": {
+      "group": {
+        "content": "$1"
+      }
+    }
+  },
+  "keykeeperAccessThroughAGroup": {
+    "message": "Through a group"
+  },
+  "keykeeperAccessEveryItemPeople": {
+    "message": "Also open to everyone who sees every item: $NAMES$.",
+    "placeholders": {
+      "names": {
+        "content": "$1"
+      }
+    }
+  },
+  "keykeeperAccessOnlyEveryItemPeople": {
+    "message": "Only people who see every item can open it: $NAMES$.",
+    "placeholders": {
+      "names": {
+        "content": "$1"
+      }
+    }
+  },
+  "keykeeperAccessNoFoldersYet": {
+    "message": "This organization has no shared folders yet."
+  },
+  "keykeeperAccessNothingFound": {
+    "message": "Nothing matches your search."
+  },
+  "keykeeperAccessLoadFailed": {
+    "message": "Couldn't load who can see what. Reload the page to try again."
+  },
+  "keykeeperCanView": {
+    "message": "Can view"
+  },
+  "keykeeperCanViewHidden": {
+    "message": "Can view but not see passwords"
+  },
+  "keykeeperCanEdit": {
+    "message": "Can edit"
+  },
+  "keykeeperCanEditHidden": {
+    "message": "Can edit but not see passwords"
+  },
+  "keykeeperCanManage": {
+    "message": "Can manage"
+  },
+  "keykeeperOneSharedFolder": {
+    "message": "1 shared folder"
+  },
+  "keykeeperSharedFolderCount": {
+    "message": "$COUNT$ shared folders",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "keykeeperOneItem": {
+    "message": "1 item"
+  },
+  "keykeeperItemCount": {
+    "message": "$COUNT$ items",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "keykeeperReachFolders": {
+    "message": "$NAME$ can open $FOLDERS$ with $ITEMS$.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "folders": {
+        "content": "$2"
+      },
+      "items": {
+        "content": "$3"
+      }
+    }
+  },
+  "keykeeperReachFoldersRevoked": {
+    "message": "Before they were revoked, $NAME$ could open $FOLDERS$ with $ITEMS$.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "folders": {
+        "content": "$2"
+      },
+      "items": {
+        "content": "$3"
+      }
+    }
+  },
+  "keykeeperReachEveryItem": {
+    "message": "$NAME$ can see every item in this organization: $ITEMS$.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "items": {
+        "content": "$2"
+      }
+    }
+  },
+  "keykeeperReachEveryItemRevoked": {
+    "message": "Before they were revoked, $NAME$ could see every item in this organization: $ITEMS$.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "items": {
+        "content": "$2"
+      }
+    }
+  },
+  "keykeeperReachNoFolders": {
+    "message": "$NAME$ can't open any shared folders.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "keykeeperReachNoFoldersRevoked": {
+    "message": "Before they were revoked, $NAME$ couldn't open any shared folders.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "keykeeperReachNeverConfirmed": {
+    "message": "$NAME$ was never confirmed, so they never had the key to this organization's items.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "keykeeperSeenPasswordsTitle": {
+    "message": "Passwords $NAME$ could see",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "keykeeperSeenPasswordsIntro": {
+    "message": "$NAME$ could see these logins' passwords in the shared folders they could open. They may still know them, so change them.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "keykeeperSeenPasswordsEveryItem": {
+    "message": "$NAME$ could see every item in this organization, so they may know any of its passwords.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "keykeeperSeenPasswordsShowAll": {
+    "message": "Show all $COUNT$ logins",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "keykeeperSeenPasswordsShowOne": {
+    "message": "Show the login"
+  },
+  "keykeeperSeenPasswordsOtherItems": {
+    "message": "Other items they could see, such as notes and cards, aren't listed."
+  },
+  "keykeeperSeenPasswordsNotAgain": {
+    "message": "This list won't be shown again, so copy it if you'll need it later."
+  },
+  "keykeeperSeenPasswordsAccessLink": {
+    "message": "See who can open each shared folder"
+  },
+  "keykeeperSeenPasswordsFolders": {
+    "message": "Shared folders"
+  },
+  "keykeeperSeenPasswordsNoFolder": {
+    "message": "No shared folder"
+  },
+  "keykeeperSeenPasswordsCopy": {
+    "message": "Copy list"
+  },
+  "keykeeperSeenPasswordsCopied": {
+    "message": "Copied the list"
+  },
+  "keykeeperSeenPasswordsOpen": {
+    "message": "Open $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
   }
 }

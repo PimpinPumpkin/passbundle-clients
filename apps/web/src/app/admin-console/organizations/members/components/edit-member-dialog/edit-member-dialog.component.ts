@@ -59,6 +59,7 @@ import { OrganizationUserType, OrganizationUserStatusType } from "@bitwarden/sdk
 import { I18nPipe } from "@bitwarden/ui-common";
 import { Vfo1I18nPipe, Vfo1TerminologyService } from "@bitwarden/vault";
 import { BillingConstraintService } from "@bitwarden/web-vault/app/billing/members/billing-constraint/billing-constraint.service";
+import { KeykeeperOffboardingService } from "@bitwarden/web-vault/app/keykeeper/access/offboarding.service";
 
 import {
   GroupApiService,
@@ -137,6 +138,8 @@ export class EditMemberDialogComponent {
   private readonly problemDetailsService = inject(ProblemDetailsService);
   private readonly logService = inject(LogService);
   private readonly vfo1TerminologyService = inject(Vfo1TerminologyService);
+  // Keykeeper: what someone could see, when removing or revoking them.
+  private readonly keykeeperOffboarding = inject(KeykeeperOffboardingService);
 
   protected readonly organizationUserType = OrganizationUserType;
   protected readonly PermissionMode = PermissionMode;
@@ -549,9 +552,17 @@ export class EditMemberDialogComponent {
   };
 
   readonly revoke = async () => {
+    // Keykeeper: what they can open, then the passwords they could see.
+    const offboarding = await this.keykeeperOffboarding.prepare(
+      await firstValueFrom(this.organization$),
+      this.params.organizationUserId,
+      this.params.name,
+    );
     let confirmed = await this.dialogService.openSimpleDialog({
       title: { key: "revokeUserId", placeholders: [this.params.name] },
-      content: { key: "revokeUserConfirmation" },
+      content: offboarding
+        ? `${this.i18nService.t("revokeUserConfirmation")} ${offboarding.summary}`
+        : { key: "revokeUserConfirmation" },
       acceptButtonText: { key: "revokeAccess" },
       type: "warning",
     });
@@ -583,6 +594,7 @@ export class EditMemberDialogComponent {
     });
     this.isRevoked.set(true);
     this.close(MemberDialogResult.Revoked);
+    this.keykeeperOffboarding.showPasswords(offboarding);
   };
 
   readonly restore = async () => {
@@ -617,9 +629,17 @@ export class EditMemberDialogComponent {
       ? "removeUserConfirmationKeyConnector"
       : "removeOrgUserConfirmation";
 
+    // Keykeeper: what they can open, then the passwords they could see.
+    const offboarding = await this.keykeeperOffboarding.prepare(
+      await firstValueFrom(this.organization$),
+      this.params.organizationUserId,
+      this.params.name,
+    );
     let confirmed = await this.dialogService.openSimpleDialog({
       title: { key: "removeUserIdAccess", placeholders: [this.params.name] },
-      content: { key: message },
+      content: offboarding
+        ? `${this.i18nService.t(message)} ${offboarding.summary}`
+        : { key: message },
       type: "warning",
     });
 
@@ -649,6 +669,7 @@ export class EditMemberDialogComponent {
       message: this.i18nService.t("removedUserId", this.params.name),
     });
     this.close(MemberDialogResult.Deleted);
+    this.keykeeperOffboarding.showPasswords(offboarding);
   };
 
   readonly delete = async () => {
