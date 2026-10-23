@@ -234,7 +234,8 @@ export class MembersComponent {
 
           if (qParams.viewEvents != null) {
             const user = this.dataSource().data.filter((u) => u.id === qParams.viewEvents);
-            if (user.length > 0 && user[0].status === OrganizationUserStatusType.Confirmed) {
+            // Keykeeper: the same check as the Options menu (canViewEventsOf).
+            if (user.length > 0 && this.canViewEventsOf(user[0], organization!)) {
               this.openEventsDialog(user[0], organization!);
             }
           }
@@ -513,6 +514,16 @@ export class MembersComponent {
 
     this.dataSource().uncheckAllUsers();
     await this.load(organization);
+  }
+
+  /**
+   * Keykeeper: whether a member's Options menu offers their event log. Only
+   * to roles that can view event logs (owners, admins, and custom roles with
+   * that permission): a custom role that manages members but can't view event
+   * logs would be refused the member's events, and the refusal signs them out.
+   */
+  canViewEventsOf(user: OrganizationUserView, organization: Organization): boolean {
+    return organization.canAccessEventLogs && user.status === OrganizationUserStatusType.Confirmed;
   }
 
   openEventsDialog(user: OrganizationUserView, organization: Organization) {
