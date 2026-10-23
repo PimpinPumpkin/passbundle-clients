@@ -271,6 +271,33 @@ export abstract class BaseImporter {
     return true;
   }
 
+  /**
+   * Keykeeper: a card brand as the vault names it, from the name another password manager
+   * gives it ("American Express", "MasterCard", "visa"), or undefined when it isn't one.
+   */
+  protected cardBrandFromName(name: string): string | undefined {
+    if (this.isNullOrWhitespace(name)) {
+      return undefined;
+    }
+    const brands: Record<string, string> = {
+      visa: "Visa",
+      visaelectron: "Visa",
+      mastercard: "Mastercard",
+      mc: "Mastercard",
+      amex: "Amex",
+      americanexpress: "Amex",
+      discover: "Discover",
+      diners: "Diners Club",
+      dinersclub: "Diners Club",
+      jcb: "JCB",
+      maestro: "Maestro",
+      unionpay: "UnionPay",
+      chinaunionpay: "UnionPay",
+      rupay: "RuPay",
+    };
+    return brands[name.toLowerCase().replace(/[^a-z]/g, "")];
+  }
+
   protected moveFoldersToCollections(result: ImportResult) {
     result.folderRelationships.forEach((r) => result.collectionRelationships.push(r));
     result.collections = result.folders.map((f) => {

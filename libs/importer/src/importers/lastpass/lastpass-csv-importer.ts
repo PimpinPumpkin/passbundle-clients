@@ -176,14 +176,23 @@ export class LastPassCsvImporter extends BaseImporter implements Importer {
         (typeParts[1] === "Credit Card" || typeParts[1] === "Address")
       ) {
         if (typeParts[1] === "Credit Card") {
-          const mappedData = this.parseSecureNoteMapping<CardView>(cipher, extraParts, {
+          const mappedData = this.parseSecureNoteMapping<
+            CardView & { lastPassType?: string; startDate?: string }
+          >(cipher, extraParts, {
             Number: "number",
             "Name on Card": "cardholderName",
             "Security Code": "code",
             // LP provides date in a format like 'June,2020'
             // Store in expMonth, then parse and modify
             "Expiration Date": "expMonth",
+            // Keykeeper: the card's type is its brand, and a start date with no month or
+            // year (",") is nothing.
+            Type: "lastPassType",
+            "Start Date": "startDate",
           });
+          const { lastPassType, startDate } = mappedData;
+          delete mappedData.lastPassType;
+          delete mappedData.startDate;
 
           if (this.isNullOrWhitespace(mappedData.expMonth) || mappedData.expMonth === ",") {
             // No expiration data
@@ -209,6 +218,17 @@ export class LastPassCsvImporter extends BaseImporter implements Importer {
           cipher.type = CipherType.Card;
           cipher.card = new CardView();
           Object.assign(cipher.card, mappedData);
+
+          // Keykeeper: the brand from the number, or else from the card's type. A type
+          // that isn't the brand, and a start date, are kept as fields.
+          const typeBrand = this.cardBrandFromName(lastPassType);
+          cipher.card.brand = CardView.getCardBrandByPatterns(cipher.card.number) ?? typeBrand;
+          if (!this.isNullOrWhitespace(lastPassType) && typeBrand !== cipher.card.brand) {
+            this.processKvp(cipher, "Type", lastPassType);
+          }
+          if (!this.isNullOrWhitespace(startDate?.replace(/,/g, ""))) {
+            this.processKvp(cipher, "Start Date", startDate);
+          }
         } else if (typeParts[1] === "Address") {
           const mappedData = this.parseSecureNoteMapping<IdentityView>(cipher, extraParts, {
             Title: "title",
@@ -225,6 +245,8 @@ export class LastPassCsvImporter extends BaseImporter implements Importer {
             Country: "country",
             "Email Address": "email",
             Username: "username",
+            // Keykeeper: the phone is the identity's phone.
+            Phone: "phone",
           });
           cipher.type = CipherType.Identity;
           cipher.identity = new IdentityView();
@@ -261,8 +283,17 @@ export class LastPassCsvImporter extends BaseImporter implements Importer {
             val = extraPart.substring(colonIndex + 1);
           }
         }
-        if (this.isNullOrWhitespace(key) || this.isNullOrWhitespace(val) || key === "NoteType") {
+        // Keykeeper: Language is LastPass's own, not part of the card or address.
+        if (
+          this.isNullOrWhitespace(key) ||
+          this.isNullOrWhitespace(val) ||
+          key === "NoteType" ||
+          key === "Language"
+        ) {
           return;
+        }
+        if (/phone|fax/i.test(key)) {
+          val = this.phoneNumber(val);
         }
       }
 
@@ -284,5 +315,25 @@ export class LastPassCsvImporter extends BaseImporter implements Importer {
     });
 
     return dataObj;
+  }
+
+  /**
+   * Keykeeper: LastPass keeps an address's phone numbers as {"num":"...","ext":"...","cc3l":"USA"};
+   * the number, with its extension. Anything else as it is.
+   */
+  private phoneNumber(value: string): string {
+    if (!/^\s*\{.*"num".*\}\s*$/.test(value)) {
+      return value;
+    }
+    try {
+      const phone = JSON.parse(value);
+      if (phone == null || typeof phone.num !== "string") {
+        return value;
+      }
+      const ext = typeof phone.ext === "string" ? phone.ext.trim() : "";
+      return ext === "" ? phone.num.trim() : `${phone.num.trim()} ext. ${ext}`;
+    } catch {
+      return value;
+    }
   }
 }
