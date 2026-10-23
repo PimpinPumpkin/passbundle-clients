@@ -1,10 +1,26 @@
-<bit-accordion [title]="title()" [subtitle]="subtitle()" [startIcon]="startIcon()" [(open)]="open">
+<!-- Keykeeper: on a phone, the icon goes and the progress moves under the
+     title, so the title isn't squeezed into a narrow column. -->
+<bit-accordion
+  [title]="title()"
+  [subtitle]="subtitle()"
+  [startIcon]="startIcon()"
+  [(open)]="open"
+  class="max-sm:[&_bit-icon-tile]:tw-hidden"
+>
   @if (tasks().length > 0) {
-    <bit-badge variant="primary" startIcon="bwi-clock" slot="end">
+    <bit-badge variant="primary" startIcon="bwi-clock" slot="end" class="max-sm:tw-hidden">
       {{ "onboardingTasksComplete" | i18n: amountCompleted() : tasks().length }}
     </bit-badge>
   } @else {
     <bit-icon name="bwi-spinner" class="bwi-spin" slot="end"></bit-icon>
+  }
+
+  @if (tasks().length > 0) {
+    <div class="tw-pb-2 sm:tw-hidden">
+      <bit-badge variant="primary" startIcon="bwi-clock">
+        {{ "onboardingTasksComplete" | i18n: amountCompleted() : tasks().length }}
+      </bit-badge>
+    </div>
   }
 
   <div class="tw-flex tw-flex-col" role="list">

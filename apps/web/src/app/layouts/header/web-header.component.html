@@ -1,12 +1,28 @@
+<!-- eslint-disable tailwindcss/no-custom-classname -->
 @let routeData = routeData$ | async;
 @if (routeData) {
   <bit-header [title]="title() || (routeData.titleId | i18n)" [icon]="icon()">
+    <!-- Keykeeper: opens the menu where it has no room to show at all (a phone). -->
+    @if (menuNav; as nav) {
+      <button
+        slot="start"
+        type="button"
+        class="keykeeper-menu-button tw-me-2 tw-mb-1 tw-self-end"
+        bitIconButton="bwi-list"
+        buttonType="subtleGhost"
+        [label]="'keykeeperMenu' | i18n"
+        aria-controls="bit-side-nav"
+        [attr.aria-expanded]="nav.open()"
+        (click)="nav.toggle()"
+      ></button>
+    }
     <ng-container slot="breadcrumbs">
       <ng-content select="[slot=breadcrumbs]"></ng-content>
     </ng-container>
 
     <ng-content></ng-content>
-    <product-switcher></product-switcher>
+    <!-- Keykeeper: on a phone the menu has the products, and the title needs the room. -->
+    <product-switcher [class.keykeeper-phone-hidden]="menuNav != null"></product-switcher>
     <app-account-menu></app-account-menu>
 
     <ng-container slot="title-suffix">

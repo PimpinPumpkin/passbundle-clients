@@ -37,5 +37,20 @@
   },
   "keykeeperThemeGlass": {
     "message": "Glass (default)"
+  },
+  "keykeeperSearchAllItems": {
+    "message": "Search all items"
+  },
+  "keykeeperHealth": {
+    "message": "Health"
+  },
+  "keykeeperCategories": {
+    "message": "Categories"
+  },
+  "keykeeperImportAndExport": {
+    "message": "Import and export"
+  },
+  "keykeeperMenu": {
+    "message": "Menu"
   }
 }

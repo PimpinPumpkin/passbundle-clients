@@ -267,3 +267,30 @@ a[bitbutton][buttontype="primary"] {
 .pb-glass.theme_dark bit-side-nav > div > nav {
   border-right: 1px solid var(--frost-line);
 }
+
+/* The user pages' one left menu (DESIGN.md, "The left menu"): a soft pill
+   under the pointer and a brighter one for the entry showing, like 1Password's
+   sidebar. Upstream marks the entry showing with its strong nav colors, which
+   the glass above clears. The admin console's menu stays as it is. */
+.pb-glass .keykeeper-menu bit-nav-item [class*="tw-bg-bg-nav"]:hover {
+  background: rgb(255 255 255 / 0.08) !important;
+}
+.pb-glass .keykeeper-menu bit-nav-item [class*="tw-bg-bg-nav"][style*="-strong"] {
+  background: rgb(255 255 255 / 0.16) !important;
+}
+/* It's one list that scrolls: the logo and "More from" scroll with it, rather
+   than staying put over the entries (see-through on glass). */
+.keykeeper-menu bit-nav-logo > div,
+.keykeeper-menu #bit-side-nav--scroll [class*="tw-sticky"] {
+  position: static !important;
+}
+/* The line between the vault's entries and the tools, inset like the pills. */
+.keykeeper-menu app-keykeeper-vault-menu + bit-nav-divider > div {
+  width: auto;
+  margin: 0.75rem;
+  background: rgb(255 255 255 / 0.16);
+}
+/* Its search field is one white field, not a field in a field. */
+.pb-glass .keykeeper-menu bit-search input {
+  background-color: transparent !important;
+}

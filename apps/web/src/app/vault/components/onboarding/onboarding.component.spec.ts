@@ -80,4 +80,17 @@ describe("OnboardingComponent", () => {
       expect((onboarding as any).open()).toBe(false);
     });
   });
+
+  // Keykeeper: on a phone, the progress leaves the header so the title has room.
+  it("shows the progress in the header, and above the tasks instead on a phone", () => {
+    setupWithCompletion(true, false, false);
+    const badges: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll("bit-badge"));
+
+    expect(badges.map((b) => b.textContent!.trim())).toEqual([
+      "1 of 3 complete",
+      "1 of 3 complete",
+    ]);
+    expect(badges[0].classList).toContain("max-sm:tw-hidden");
+    expect(badges[1].parentElement!.classList).toContain("sm:tw-hidden");
+  });
 });
