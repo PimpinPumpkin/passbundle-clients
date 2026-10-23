@@ -217,14 +217,34 @@ describe("CreateCommand", () => {
       const custom = { ...GRID_NONE, create: true, viewHistory: true };
       const groups = [
         { id: "drop-box", readOnly: true, hidePasswords: true, manage: false, keykeeper: custom },
-        { id: "edited", readOnly: false, hidePasswords: true, manage: false, keykeeper: custom },
+        { id: "plain", readOnly: false, hidePasswords: true, manage: false },
       ];
-      await command["createOrganizationCollection"](makeRequest({ groups }), makeOptions());
+      const result = await command["createOrganizationCollection"](
+        makeRequest({ groups }),
+        makeOptions(),
+      );
+      expect(result.success).toBe(true);
       const sent = apiService.postCollection.mock.calls[0][1] as any;
       expect(sent.groups.map((g: any) => [g.id, g.keykeeper])).toEqual([
         ["drop-box", custom],
-        ["edited", undefined],
+        ["plain", undefined],
       ]);
+    });
+
+    it("refuses a grant whose grid disagrees with upstream's fields, and creates nothing", async () => {
+      const custom = { ...GRID_NONE, create: true, viewHistory: true };
+      const groups = [
+        { id: "edited", readOnly: false, hidePasswords: true, manage: false, keykeeper: custom },
+      ];
+      const result = await command["createOrganizationCollection"](
+        makeRequest({ groups }),
+        makeOptions(),
+      );
+      expect(result.success).toBe(false);
+      expect(result.message).toContain(
+        "make readOnly/hidePasswords/manage match the grid (readOnly true, hidePasswords true, manage false), or remove keykeeper to use the preset",
+      );
+      expect(apiService.postCollection).not.toHaveBeenCalled();
     });
 
     it("returns error when the API call fails", async () => {

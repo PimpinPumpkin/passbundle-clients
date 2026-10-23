@@ -31,11 +31,16 @@ import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.servi
 import { templateDefinition } from "@bitwarden/common/vault/keykeeper/templates";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 
+import { CollectionService } from "../collections";
 import { OrganizationUserService } from "../organization-user";
 
 import { KeykeeperJoinChecks } from "./join-checks";
 import { KeykeeperMspRequests } from "./msp-requests";
-import { KeykeeperTemplateSender, templateSourceProblem } from "./msp-template-sender";
+import {
+  KeykeeperTemplateSender,
+  templateShareProblem,
+  templateSourceProblem,
+} from "./msp-template-sender";
 import { knownItems, templateRows } from "./msp-template-status";
 import { MspDetails, MspTemplates, PendingMember } from "./msp-types";
 import { KeykeeperScriptRefresher } from "./script-refresh";
@@ -77,6 +82,8 @@ export class KeykeeperMspWork {
     private readonly authService: AuthService,
     private readonly cipherService: CipherService,
     private readonly organizationService: OrganizationService,
+    /** The person's shared folders, for whether they can share a template's item. */
+    private readonly collectionService: CollectionService,
     private readonly organizationUserService: OrganizationUserService,
     private readonly syncService: SyncService,
     private readonly joinChecks: KeykeeperJoinChecks,
@@ -224,9 +231,10 @@ export class KeykeeperMspWork {
   }
 
   /**
-   * Writes the current version of each template the person can see into
-   * every client that's behind, and moves duplicate copies (from two devices
-   * writing at once) to the client's trash.
+   * Writes the current version of each template the person can see and share
+   * into every client that's behind, and moves duplicate copies (from two
+   * devices writing at once) to the client's trash. A template whose item
+   * they can't share is skipped and reported.
    */
   private async updateTemplates(mspId: string): Promise<{ wrote: boolean; failures: string[] }> {
     const [msp, state] = await Promise.all([
@@ -238,7 +246,11 @@ export class KeykeeperMspWork {
       return outcome;
     }
     const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
-    const items = await this.cipherService.getAllDecrypted(userId);
+    const [items, folders, organizations] = await Promise.all([
+      this.cipherService.getAllDecrypted(userId),
+      firstValueFrom(this.collectionService.decryptedCollections$(userId)),
+      firstValueFrom(this.organizationService.organizations$(userId)),
+    ]);
     const rows = templateRows(
       state,
       msp.clients.map(({ id, name }) => ({ id, name })),
@@ -249,10 +261,11 @@ export class KeykeeperMspWork {
       if (!row.sourceVisible || source == null) {
         continue;
       }
-      const problem = templateSourceProblem(
-        source,
-        msp.clients.map((c) => c.id),
-      );
+      const problem =
+        templateSourceProblem(
+          source,
+          msp.clients.map((c) => c.id),
+        ) ?? templateShareProblem(source, folders, organizations);
       if (problem != null) {
         // Said once a session, like a failed copy.
         if (!this.failed.has(`${row.templateId}:source`)) {
