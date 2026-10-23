@@ -60,21 +60,22 @@ export class DashlaneCsvImporter extends BaseImporter implements Importer {
     }
 
     if (results[0].type != null && results[0].title != null) {
-      const personalRecords = results as PersonalInformationRecord[];
-
-      // If personalRecords has only one "name" then create an Identity-Cipher
-      if (personalRecords.filter((x) => x.type === "name").length === 1) {
+      // Keykeeper: an identity for each person, however many there are.
+      this.peopleOf(results as PersonalInformationRecord[]).forEach((rows) => {
         const cipher = this.initLoginCipher();
         cipher.type = CipherType.Identity;
         cipher.identity = new IdentityView();
-        results.forEach((row) => {
+        rows.forEach((row) => {
           this.parsePersonalInformationRecordAsIdentity(cipher, row);
         });
+        if (this.isNullOrWhitespace(cipher.name)) {
+          cipher.name = rows.find((r) => !this.isNullOrWhitespace(r.item_name))?.item_name;
+        }
         this.cleanupCipher(cipher);
         result.ciphers.push(cipher);
-        result.success = true;
-        return Promise.resolve(result);
-      }
+      });
+      result.success = true;
+      return Promise.resolve(result);
     }
 
     results.forEach((row) => {
@@ -136,23 +137,45 @@ export class DashlaneCsvImporter extends BaseImporter implements Importer {
     cipher.name = row.account_name;
     let mappedValues: string[] = [];
     switch (row.type) {
-      case "credit_card":
-        cipher.card.cardholderName = row.account_name;
+      case "credit_card": {
+        // Keykeeper: a card is named by its brand and last four digits ("Visa ending
+        // 1111"), not its holder, unless the export has a name for it: a title column, or
+        // an account name that isn't the holder's.
+        const row_ = row as PaymentsRecord & Record<string, string>;
+        const titleColumn = ["title", "name", "item_name", "card_name", "nickname"].find(
+          (column) => !this.isNullOrWhitespace(row_[column]),
+        );
+        const accountNameIsTitle =
+          !this.isNullOrWhitespace(row.account_holder) &&
+          !this.isNullOrWhitespace(row.account_name) &&
+          row.account_name.trim() !== row.account_holder.trim();
+        cipher.card.cardholderName = this.getValueOrDefault(
+          accountNameIsTitle ? row.account_holder : row.account_name,
+        );
         cipher.card.number = row.cc_number;
         cipher.card.brand = CardView.getCardBrandByPatterns(cipher.card.number);
         cipher.card.code = row.code;
         this.setCardExpiration(cipher, `${row.expiration_month}/${row.expiration_year}`);
+        cipher.name =
+          titleColumn != null
+            ? row_[titleColumn]
+            : accountNameIsTitle
+              ? row.account_name
+              : (this.cardName(cipher.card) ?? row.account_name);
 
         // If you add more mapped fields please extend this
         mappedValues = [
+          "type",
           "account_name",
           "account_holder",
           "cc_number",
           "code",
           "expiration_month",
           "expiration_year",
+          ...(titleColumn != null ? [titleColumn] : []),
         ];
         break;
+      }
       case "bank":
         cipher.card.cardholderName = row.account_holder;
         cipher.card.number = row.account_number;
@@ -227,26 +250,56 @@ export class DashlaneCsvImporter extends BaseImporter implements Importer {
   }
 
   parsePersonalInformationRecordAsIdentity(cipher: CipherView, row: PersonalInformationRecord) {
+    // Keykeeper: a person's second email, number, or address is kept as a field, not
+    // written over the first.
+    const label = (fallback: string) => this.getValueOrDefault(row.item_name, fallback);
     switch (row.type) {
       case "name":
-        this.processFullName(cipher, `${row.first_name} ${row.middle_name} ${row.last_name}`);
-        cipher.identity.title = row.title;
+        // Keykeeper: Dashlane has a column for each part of the name.
+        cipher.identity.title = this.getValueOrDefault(row.title);
+        cipher.identity.firstName = this.getValueOrDefault(row.first_name);
+        cipher.identity.middleName = this.getValueOrDefault(row.middle_name);
+        cipher.identity.lastName = this.getValueOrDefault(row.last_name);
         cipher.name = cipher.identity.fullName;
 
-        cipher.identity.username = row.login;
+        cipher.identity.username = this.getValueOrDefault(row.login);
         break;
       case "email":
-        cipher.identity.email = row.email;
+        if (this.isNullOrWhitespace(cipher.identity.email)) {
+          cipher.identity.email = row.email;
+        } else {
+          this.processKvp(cipher, label("email"), row.email);
+        }
         break;
       case "number":
-        cipher.identity.phone = row.phone_number;
+        if (this.isNullOrWhitespace(cipher.identity.phone)) {
+          cipher.identity.phone = row.phone_number;
+        } else {
+          this.processKvp(cipher, label("phone_number"), row.phone_number);
+        }
         break;
       case "address":
-        cipher.identity.address1 = row.address;
-        cipher.identity.city = row.city;
-        cipher.identity.postalCode = row.zip;
-        cipher.identity.state = row.state;
-        cipher.identity.country = row.country;
+        if (
+          this.isNullOrWhitespace(cipher.identity.address1) &&
+          this.isNullOrWhitespace(cipher.identity.city)
+        ) {
+          cipher.identity.address1 = this.getValueOrDefault(row.address);
+          cipher.identity.city = this.getValueOrDefault(row.city);
+          cipher.identity.postalCode = this.getValueOrDefault(row.zip);
+          cipher.identity.state = this.getValueOrDefault(row.state);
+          cipher.identity.country = this.getValueOrDefault(row.country);
+        } else {
+          const address = [
+            row.address,
+            row.city,
+            `${row.state ?? ""} ${row.zip ?? ""}`,
+            row.country,
+          ]
+            .map((part) => (part ?? "").trim())
+            .filter((part) => part !== "")
+            .join(", ");
+          this.processKvp(cipher, label("address"), address);
+        }
         break;
       default:
         break;
@@ -262,6 +315,64 @@ export class DashlaneCsvImporter extends BaseImporter implements Importer {
     cipher.notes = row.note;
 
     this.importUnmappedFields(cipher, row, _mappedSecureNoteColumns);
+  }
+
+  /**
+   * Keykeeper: personalInfo.csv's rows, person by person. A "name" row starts a person, and
+   * the rows after it are theirs, unless a row's label or recipient names exactly one
+   * other person ("Jane's email"). Rows before the first name are the first person's.
+   */
+  private peopleOf(rows: PersonalInformationRecord[]): PersonalInformationRecord[][] {
+    const people: { names: string[]; rows: PersonalInformationRecord[] }[] = [];
+    const before: PersonalInformationRecord[] = [];
+    const letters = (s: string) => (s ?? "").trim().toLocaleLowerCase();
+    // A letter or digit next to the name means it's part of another word, except the "s"
+    // of "Johns email".
+    const inWord = (c: string | undefined) =>
+      c != null && (c.toLowerCase() !== c.toUpperCase() || /[0-9]/.test(c));
+    const mentions = (text: string, name: string) => {
+      for (let i = text.indexOf(name); name !== "" && i !== -1; i = text.indexOf(name, i + 1)) {
+        const after = text.substring(i + name.length);
+        if (
+          !inWord(text[i - 1]) &&
+          (!inWord(after[0]) || (after[0] === "s" && !inWord(after[1])))
+        ) {
+          return true;
+        }
+      }
+      return false;
+    };
+    for (const row of rows) {
+      if (row.type === "name") {
+        const first = letters(row.first_name);
+        const full = [first, letters(row.last_name)].filter((n) => n !== "").join(" ");
+        people.push({ names: [full, first].filter((n) => n !== ""), rows: [] });
+        continue;
+      }
+      if (people.length === 0) {
+        before.push(row);
+        continue;
+      }
+      const text = letters(`${row.item_name ?? ""} ${row.address_recipient ?? ""}`);
+      const named = people.filter((p) => p.names.some((n) => mentions(text, n)));
+      const current = people[people.length - 1];
+      (named.length === 1 ? named[0] : current).rows.push(row);
+    }
+    if (people.length === 0) {
+      return before.length > 0 ? [before] : [];
+    }
+    // Each person's name row first, then their other rows.
+    const nameRows = rows.filter((r) => r.type === "name");
+    return people.map((p, i) => [nameRows[i], ...(i === 0 ? before : []), ...p.rows]);
+  }
+
+  /** Keykeeper: "Visa ending 1111", or "Card ending 1111" with no brand. */
+  private cardName(card: CardView): string | null {
+    const digits = (card.number ?? "").replace(/\D/g, "");
+    if (digits.length < 4) {
+      return null;
+    }
+    return `${card.brand ?? "Card"} ending ${digits.slice(-4)}`;
   }
 
   importUnmappedFields(cipher: CipherView, row: any, mappedValues: Set<string>) {
