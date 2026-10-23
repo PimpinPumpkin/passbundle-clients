@@ -156,6 +156,16 @@ export class MembersComponent {
   protected rowHeight = 66;
   protected rowHeightClass = `tw-h-[66px]`;
 
+  /**
+   * Keykeeper: the list reloads while the page is open (the background work
+   * lets someone in, or a sync changes the organization), and every reload
+   * brings fresh copies of the members. Rows are keyed by member, so a row
+   * stays with its member and an open Options menu keeps acting on them. The
+   * template also turns off the row cache, which would otherwise hand a
+   * departed member's row (and its open menu) to someone else.
+   */
+  protected readonly trackMember = (_index: number, member: OrganizationUserView) => member.id;
+
   constructor() {
     combineLatest([
       this.searchControl.valueChanges.pipe(startWith(this.searchControl.value), debounceTime(200)),
