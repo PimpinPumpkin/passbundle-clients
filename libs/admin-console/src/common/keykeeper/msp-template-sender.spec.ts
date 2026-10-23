@@ -1,6 +1,10 @@
 import { mock } from "jest-mock-extended";
 import { BehaviorSubject, of } from "rxjs";
 
+import {
+  FOLDER_PRESETS,
+  FolderLike,
+} from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { UserId } from "@bitwarden/common/types/guid";
@@ -13,7 +17,11 @@ import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
 import { CollectionAdminService } from "../collections";
 
 import { KeykeeperMspRequests } from "./msp-requests";
-import { KeykeeperTemplateSender, templateSourceProblem } from "./msp-template-sender";
+import {
+  KeykeeperTemplateSender,
+  templateShareProblem,
+  templateSourceProblem,
+} from "./msp-template-sender";
 import { MspTemplates } from "./msp-types";
 
 const USER = "user-1" as UserId;
@@ -82,6 +90,49 @@ describe("MSP template sources", () => {
     ).rejects.toThrow(/clients' own/);
     expect(cipherService.createWithServer).not.toHaveBeenCalled();
     expect(cipherService.updateWithServer).not.toHaveBeenCalled();
+  });
+});
+
+describe("Sharing a template's item", () => {
+  // Keykeeper: copying an item into clients shares it (DESIGN.md, "Folders and permissions").
+  const folder = (id: string, grid: (typeof FOLDER_PRESETS)[keyof typeof FOLDER_PRESETS]) =>
+    ({
+      id,
+      organizationId: "msp-shared",
+      readOnly: !grid.edit,
+      hidePasswords: !grid.seePasswords,
+      manage: grid.manage,
+      keykeeper: { ...grid },
+    }) as FolderLike;
+  const inFolders = (...ids: string[]) => {
+    const source = template("src", "msp-shared", "fw");
+    source.collectionIds = ids as any;
+    return source;
+  };
+  const member = [{ id: "msp-shared", canEditAllCiphers: false }];
+
+  it("is always the person's with their own item", () => {
+    expect(templateShareProblem(template("a", null, "fw"), [], [])).toBeNull();
+  });
+
+  it("needs share in one of the folders the item is in", () => {
+    const view = folder("viewing", FOLDER_PRESETS.view);
+    const edit = folder("editing", FOLDER_PRESETS.edit);
+    expect(templateShareProblem(inFolders("viewing"), [view], member)).toMatch(
+      /can't share that template's item/,
+    );
+    expect(templateShareProblem(inFolders("viewing", "editing"), [view, edit], member)).toBeNull();
+    // A folder the item isn't in doesn't count.
+    expect(templateShareProblem(inFolders("viewing"), [view, edit], member)).not.toBeNull();
+  });
+
+  it("is an owner's or admin's for an item in no folder they reach, and nobody else's", () => {
+    const admin = [{ id: "msp-shared", canEditAllCiphers: true }];
+    expect(templateShareProblem(inFolders(), [], admin)).toBeNull();
+    expect(templateShareProblem(inFolders(), [], member)).not.toBeNull();
+    expect(
+      templateShareProblem(inFolders(), [], [{ id: "elsewhere", canEditAllCiphers: true }]),
+    ).not.toBeNull();
   });
 });
 

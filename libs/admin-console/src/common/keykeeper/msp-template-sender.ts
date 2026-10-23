@@ -7,6 +7,13 @@
 
 import { firstValueFrom } from "rxjs";
 
+import {
+  FolderLike,
+  GRID_ALL,
+  GRID_NONE,
+  itemGrid,
+  itemLike,
+} from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { CollectionAdminView } from "@bitwarden/common/admin-console/models/collections";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
@@ -53,6 +60,29 @@ export function templateSourceProblem(
     return "That template is one of your clients' own, so it can't go to the others.";
   }
   return null;
+}
+
+/**
+ * Why the person can't copy this source into the clients, or null when they
+ * can. A copy in another organization shares the item, so they need share on
+ * it, as the server requires (DESIGN.md, "Folders and permissions"): on their
+ * own item, always; on an organization's item, share in one of its folders
+ * they reach, or, for an item in none of them, reaching every item there as
+ * owners and admins do. Checked on every run, so copies stop when share is
+ * taken away, however long ago the template was added.
+ */
+export function templateShareProblem(
+  source: CipherView,
+  folders: FolderLike[],
+  organizations: { id: string; canEditAllCiphers: boolean }[],
+): string | null {
+  const everyItem = organizations.some(
+    (o) => o.id === source.organizationId && o.canEditAllCiphers,
+  );
+  const grid = itemGrid(itemLike(source), folders, everyItem ? GRID_ALL : GRID_NONE);
+  return grid.share
+    ? null
+    : "You can't share that template's item, so it isn't copied to your clients.";
 }
 
 /** Whether an item is a copy of this template in this client, which an update may replace. */

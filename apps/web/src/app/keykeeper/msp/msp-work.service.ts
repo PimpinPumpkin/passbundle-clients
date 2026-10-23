@@ -2,6 +2,7 @@ import { Injectable } from "@angular/core";
 
 import {
   CollectionAdminService,
+  CollectionService,
   KeykeeperJoinChecks,
   KeykeeperMspWork,
   KeykeeperScriptCopies,
@@ -61,6 +62,7 @@ export class KeykeeperMspWorkService extends KeykeeperMspWork {
     authService: AuthService,
     cipherService: CipherService,
     organizationService: OrganizationService,
+    collectionService: CollectionService,
     organizationUserService: OrganizationUserService,
     syncService: SyncService,
     joinChecks: KeykeeperJoinChecksService,
@@ -75,6 +77,7 @@ export class KeykeeperMspWorkService extends KeykeeperMspWork {
       authService,
       cipherService,
       organizationService,
+      collectionService,
       organizationUserService,
       syncService,
       joinChecks,

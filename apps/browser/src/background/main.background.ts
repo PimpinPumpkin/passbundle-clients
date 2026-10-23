@@ -1914,6 +1914,7 @@ export default class MainBackground {
       this.authService,
       this.cipherService,
       this.organizationService,
+      this.collectionService,
       this.organizationUserService,
       this.syncService,
       new KeykeeperJoinChecks(this.keyService, this.encryptService, this.stateProvider),

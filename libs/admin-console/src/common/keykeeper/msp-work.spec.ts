@@ -2,6 +2,10 @@ import { mock } from "jest-mock-extended";
 import { BehaviorSubject, of, throwError } from "rxjs";
 
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
+import {
+  FOLDER_PRESETS,
+  FolderGrid,
+} from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { AuthService } from "@bitwarden/common/auth/abstractions/auth.service";
@@ -12,6 +16,7 @@ import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.servi
 import { newTemplateDefinitionField } from "@bitwarden/common/vault/keykeeper/templates";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 
+import { CollectionService } from "../collections";
 import { OrganizationUserService } from "../organization-user";
 
 import { KeykeeperJoinChecks } from "./join-checks";
@@ -40,6 +45,8 @@ function setup() {
     isAdmin: true,
   } as Organization;
   organizationService.organizations$.mockReturnValue(of([dental]));
+  const collectionService = mock<CollectionService>();
+  collectionService.decryptedCollections$.mockReturnValue(of([]));
   const organizationUserService = mock<OrganizationUserService>();
   organizationUserService.confirmUser.mockReturnValue(of(undefined));
   const syncService = mock<SyncService>();
@@ -55,11 +62,22 @@ function setup() {
     authService,
     cipherService,
     organizationService,
+    collectionService,
     organizationUserService,
     syncService,
     joinChecks,
   );
-  return { work, requests, authService, organizationService, organizationUserService, joinChecks };
+  return {
+    work,
+    requests,
+    sender,
+    authService,
+    cipherService,
+    organizationService,
+    collectionService,
+    organizationUserService,
+    joinChecks,
+  };
 }
 
 const member = (organizationId: string, memberId: string, autoConfirm = true): PendingMember => ({
@@ -169,6 +187,73 @@ describe("MSP background work", () => {
     requests.list.mockResolvedValue([{ id: "msp-1", name: "Northwind IT", role: "technician" }]);
     await work.run();
     expect(requests.getTemplates).not.toHaveBeenCalled();
+  });
+});
+
+describe("Keeping clients' templates current", () => {
+  // An MSP admin whose template's item is in a shared folder of the MSP's own
+  // organization, and one client that hasn't had it yet.
+  function withTemplate(grid: FolderGrid) {
+    const setUp = setup();
+    const { requests, sender, cipherService, organizationService, collectionService } = setUp;
+    requests.list.mockResolvedValue([{ id: "msp-1", name: "Northwind IT", role: "admin" }]);
+    requests.get.mockResolvedValue({
+      id: "msp-1",
+      name: "Northwind IT",
+      role: "admin",
+      staff: [],
+      invites: [],
+      clients: [{ id: "dental", name: "Acme Dental", you: { status: 2 } }],
+    } as any);
+    requests.getTemplates.mockResolvedValue({
+      templates: [{ templateId: "fw", sourceCipherId: "src", allClients: true, clients: [] }],
+      copies: [],
+      collections: {},
+    } as any);
+    const source = new CipherView();
+    source.id = "src";
+    source.name = "Firewall";
+    source.organizationId = "msp-shared" as any;
+    source.collectionIds = ["shared-folder"] as any;
+    source.revisionDate = new Date("2026-10-01T00:00:00Z");
+    source.fields = [newTemplateDefinitionField("note", "fw")];
+    cipherService.getAllDecrypted.mockResolvedValue([source]);
+    organizationService.organizations$.mockReturnValue(
+      of([{ id: "msp-shared", name: "Northwind IT", canEditAllCiphers: false } as Organization]),
+    );
+    collectionService.decryptedCollections$.mockReturnValue(
+      of([
+        {
+          id: "shared-folder",
+          organizationId: "msp-shared",
+          readOnly: !grid.edit,
+          hidePasswords: !grid.seePasswords,
+          manage: grid.manage,
+          keykeeper: grid,
+        } as any,
+      ]),
+    );
+    sender.send.mockResolvedValue({ sent: [{ id: "dental", name: "Acme Dental" }], failed: [] });
+    return setUp;
+  }
+
+  it("copies a template whose item the person can share", async () => {
+    const { work, sender } = withTemplate({ ...FOLDER_PRESETS.edit });
+    expect(await work.run()).toEqual([]);
+    expect(sender.send).toHaveBeenCalledTimes(1);
+    expect(sender.send.mock.calls[0][2]).toEqual([{ id: "dental", name: "Acme Dental" }]);
+  });
+
+  it("skips and reports, once a session, a template whose item the person can't share", async () => {
+    const { work, sender } = withTemplate({ ...FOLDER_PRESETS.view });
+    expect(await work.run()).toEqual([
+      "Firewall: You can't share that template's item, so it isn't copied to your clients.",
+    ]);
+    expect(await work.run()).toEqual([]);
+    expect(sender.send).not.toHaveBeenCalled();
+    // Asking again says it again, and still copies nothing.
+    expect(await work.run(true)).toHaveLength(1);
+    expect(sender.send).not.toHaveBeenCalled();
   });
 });
 
