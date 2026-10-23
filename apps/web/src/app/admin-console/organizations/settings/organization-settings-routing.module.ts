@@ -47,6 +47,15 @@ const routes: Routes = [
           titleId: "policies",
         },
       },
+      // Keykeeper: provisioning from Microsoft Entra ID (DESIGN.md, "Provisioning from Entra ID").
+      {
+        path: "provisioning",
+        loadComponent: () =>
+          import("../../../keykeeper/organizations/provisioning.component").then(
+            (mod) => mod.KeykeeperProvisioningComponent,
+          ),
+        canActivate: [organizationPermissionsGuard((org) => org.isAdmin)],
+      },
       {
         path: "tools",
         children: [

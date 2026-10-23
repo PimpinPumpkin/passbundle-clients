@@ -99,6 +99,15 @@ export function describeEvent(
       return `${actor} revoked the script token "${detail}" for ${org}`;
     case "script_token_new_address":
       return `The script token "${detail}" for ${org} was used from a new address, ${e.ip ?? "unknown"}`;
+    // Provisioning from Microsoft Entra ID (DESIGN.md, "Provisioning from Entra ID").
+    case "provisioning_token_created":
+      return `${actor} made a provisioning token for ${org}`;
+    case "provisioning_token_replaced":
+      return `${actor} replaced ${org}'s provisioning token`;
+    case "provisioning_token_revoked":
+      return `${actor} revoked ${org}'s provisioning token`;
+    case "provisioning_let_in":
+      return `${actor} let in ${detail} Microsoft Entra ID added to ${org}`;
     default:
       return `${e.event} by ${actor}`;
   }

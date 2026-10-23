@@ -151,7 +151,19 @@ const CLIENT_FEATURES = {
               <ng-template body>
                 @for (client of m.clients; track client.id) {
                   <tr bitRow [attr.data-testid]="'msp-client-' + client.name">
-                    <td bitCell>{{ client.name }}</td>
+                    <td bitCell>
+                      {{ client.name }}
+                      @if (client.provisioning; as p) {
+                        <div class="tw-text-xs tw-text-muted" data-testid="msp-client-provisioning">
+                          Microsoft Entra ID:
+                          {{
+                            p.lastUsedAt
+                              ? "synced " + (p.lastUsedAt | date: "short")
+                              : "not synced yet"
+                          }}
+                        </div>
+                      }
+                    </td>
                     <td bitCell data-testid="msp-client-policies">{{ policySummary(client) }}</td>
                     <td bitCell data-testid="msp-client-members">{{ client.members.confirmed }}</td>
                     <td bitCell data-testid="msp-client-waiting">{{ client.members.accepted }}</td>
@@ -171,6 +183,16 @@ const CLIENT_FEATURES = {
                         >
                           Install command
                         </button>
+                      }
+                      @if (client.you?.status === CONFIRMED && m.role === "admin") {
+                        <a
+                          bitLink
+                          class="tw-mr-4"
+                          [routerLink]="['/organizations', client.id, 'settings', 'provisioning']"
+                          [attr.aria-label]="'Provisioning for ' + client.name"
+                        >
+                          Provisioning
+                        </a>
                       }
                       @if (client.you?.status === CONFIRMED) {
                         <a bitLink [routerLink]="openLink(client)">Open</a>
