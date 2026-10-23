@@ -307,7 +307,7 @@
       "message": "Free organizations may have up to $COLLECTIONCOUNT$ shared folders. Contact your organization owner to upgrade."
     },
     "getStartedWithYourVault": {
-      "message": "Get started"
+      "message": "Get started with {brand}"
     },
     "getTheDesktopAppDesc": {
       "message": "Open your items without a browser, then set up unlock with biometrics to unlock faster in both the desktop app and browser extension."
