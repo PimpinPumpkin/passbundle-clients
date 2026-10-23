@@ -343,7 +343,7 @@
     "message": "Manage the folder"
   },
   "keykeeperGridAppsEnforce": {
-    "message": "The apps keep to see passwords, export, share, and print. Someone who can open an item could still copy it with other tools."
+    "message": "The server enforces the rest; see passwords, export, share, and print are up to the apps, since anyone who can open an item could copy it with other tools."
   },
   "keykeeperGridManageIncludesAll": {
     "message": "Managing a shared folder includes every other permission in it."
