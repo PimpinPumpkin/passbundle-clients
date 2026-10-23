@@ -16,6 +16,13 @@ import { EventRequest } from "../models/request/event.request";
 
 import { EVENT_COLLECTION } from "./key-definitions";
 
+/**
+ * Keykeeper: the most events one upload carries. The server refuses a
+ * request with more (passbundle-server, src/api/core/events.rs), so a long
+ * backlog goes in batches of this size.
+ */
+export const MAX_EVENTS_PER_UPLOAD = 500;
+
 export class EventUploadService implements EventUploadServiceAbstraction {
   private inited = false;
   constructor(
@@ -78,12 +85,23 @@ export class EventUploadService implements EventUploadServiceAbstraction {
       req.organizationId = e.organizationId;
       return req;
     });
-    try {
-      await this.apiService.postEventsCollect(request, userId);
-    } catch (e) {
-      this.logService.error(e);
-      // Add the events back to state if there was an error and they were not uploaded.
-      await this.stateProvider.setUserState(EVENT_COLLECTION, eventCollection, userId);
+    // Keykeeper: in batches the server takes. When one fails, it and the
+    // ones after it go back in state, ahead of anything collected meanwhile.
+    for (let start = 0; start < request.length; start += MAX_EVENTS_PER_UPLOAD) {
+      try {
+        await this.apiService.postEventsCollect(
+          request.slice(start, start + MAX_EVENTS_PER_UPLOAD),
+          userId,
+        );
+      } catch (e) {
+        this.logService.error(e);
+        // Add the events back to state if there was an error and they were not uploaded.
+        const notUploaded = eventCollection.slice(start);
+        await this.stateProvider
+          .getUser(userId, EVENT_COLLECTION)
+          .update((current) => [...notUploaded, ...(current ?? [])]);
+        return;
+      }
     }
   }
 

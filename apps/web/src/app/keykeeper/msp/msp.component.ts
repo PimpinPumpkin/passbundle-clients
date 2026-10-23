@@ -41,6 +41,7 @@ import {
 } from "../../admin-console/organizations/policies";
 import { HeaderModule } from "../../layouts/header/header.module";
 import { SharedModule } from "../../shared";
+import { KeykeeperEventStreamingComponent } from "../event-streaming/event-streaming.component";
 import { KeykeeperBreachCheckSetting } from "../health/breach-check-setting.service";
 import { KeykeeperExposureChecks } from "../health/exposure-checks.service";
 import { KeykeeperJoinSealer } from "../joining/join-sealer.service";
@@ -106,6 +107,7 @@ const CLIENT_FEATURES = {
     HeaderModule,
     KeykeeperDefaultPoliciesComponent,
     KeykeeperMspJoiningComponent,
+    KeykeeperEventStreamingComponent,
     KeykeeperMspSiteFixesComponent,
     KeykeeperMspTemplatesComponent,
     KeykeeperTechnicianAccessEditorComponent,
@@ -583,6 +585,13 @@ const CLIENT_FEATURES = {
 
         @if (m.role === "admin") {
           <app-keykeeper-msp-site-fixes [mspId]="m.id" />
+          <div class="tw-mt-8">
+            <app-keykeeper-event-streaming
+              [scope]="{ kind: 'msp', id: m.id }"
+              [heading]="true"
+              (changed)="reload(m.id)"
+            />
+          </div>
         }
 
         <section aria-label="Staff">

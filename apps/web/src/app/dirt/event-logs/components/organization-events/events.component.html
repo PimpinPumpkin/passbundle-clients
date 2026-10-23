@@ -61,6 +61,20 @@
         {{ "exportVerb" | i18n }}
       </button>
     </form>
+    <!-- Keykeeper: the same export as JSON. -->
+    <form>
+      <button
+        type="button"
+        class="tw-ml-3 tw-mt-1"
+        bitButton
+        bitFormButton
+        [bitAction]="exportEventsJson"
+        [disabled]="dirtyDates || usePlaceHolderEvents"
+        endIcon="bwi-sign-in"
+      >
+        {{ "keykeeperExportJson" | i18n }}
+      </button>
+    </form>
   </div>
 </div>
 @if (loaded() && usePlaceHolderEvents) {

@@ -108,6 +108,14 @@ export function describeEvent(
       return `${actor} revoked ${org}'s provisioning token`;
     case "provisioning_let_in":
       return `${actor} let in ${detail} Microsoft Entra ID added to ${org}`;
+    case "event_stream_added":
+      return `${actor} started sending the MSP's events to ${detail || "a destination"}`;
+    case "event_stream_changed":
+      return `${actor} changed where the MSP's events go: ${detail || "a destination"}`;
+    case "event_stream_removed":
+      return `${actor} stopped sending the MSP's events to ${detail || "a destination"}`;
+    case "event_stream_paused":
+      return `The server stopped sending the MSP's events to ${detail || "a destination"}`;
     default:
       return `${e.event} by ${actor}`;
   }
