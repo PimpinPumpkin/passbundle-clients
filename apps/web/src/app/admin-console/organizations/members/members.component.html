@@ -485,7 +485,8 @@
                       </button>
                       <bit-menu-divider></bit-menu-divider>
                     }
-                    @if (organization.useEvents && u.status === userStatusType.Confirmed) {
+                    <!-- Keykeeper: only for roles that can view event logs (canViewEventsOf). -->
+                    @if (canViewEventsOf(u, organization)) {
                       <button
                         type="button"
                         bitMenuItem

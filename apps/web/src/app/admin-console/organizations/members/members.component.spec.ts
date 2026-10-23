@@ -145,6 +145,10 @@ describe("MembersComponent", () => {
     mockToastService = mock<ToastService>();
     mockDeleteManagedMemberWarningService = mock<DeleteManagedMemberWarningService>();
     mockOrganizationWarningsService = mock<OrganizationWarningsService>();
+    // Keykeeper: no warning dialogs. Left unset, the page's subscription to
+    // them fails a moment later, inside whichever test is waiting then.
+    mockOrganizationWarningsService.showInactiveSubscriptionDialog$.mockReturnValue(of());
+    mockOrganizationWarningsService.showSubscribeBeforeFreeTrialEndsDialog$.mockReturnValue(of());
     mockMemberActionsService = mock<MemberActionsService>();
     mockMemberDialogManager = mock<MemberDialogManagerService>();
     mockBillingConstraint = mock<BillingConstraintService>();
@@ -501,6 +505,44 @@ describe("MembersComponent", () => {
       const reloaded = differ.diff([ada, { ...ben }, { ...cy }] as OrganizationUserView[]);
 
       expect(rowOperations(reloaded)).toEqual(["add ada@example.com"]);
+    });
+  });
+
+  describe("Keykeeper: a member's event log", () => {
+    const org = (canAccessEventLogs: boolean) =>
+      ({ ...mockOrg, canAccessEventLogs }) as unknown as Organization;
+    const invited = {
+      ...mockUser,
+      status: OrganizationUserStatusType.Invited,
+    } as OrganizationUserView;
+
+    it("is offered only to roles that can view event logs, for confirmed members", () => {
+      expect(component.canViewEventsOf(mockUser, org(true))).toBe(true);
+      // A custom role that manages members but can't view event logs.
+      expect(component.canViewEventsOf(mockUser, org(false))).toBe(false);
+      expect(component.canViewEventsOf(invited, org(true))).toBe(false);
+    });
+
+    /** Opens the page again, for this organization, with ?viewEvents=<member>. */
+    async function openWithViewEvents(organization: Organization) {
+      fixture.destroy();
+      mockOrganizationService.organizations$.mockReturnValue(of([organization]));
+      queryParamsSubject.next({ viewEvents: mockUser.id });
+      fixture = TestBed.createComponent(MembersComponent);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+      await fixture.whenStable();
+    }
+
+    it("opens from a link only for roles that can view event logs", async () => {
+      await openWithViewEvents(org(false));
+      expect(mockMemberDialogManager.openEventsDialog).not.toHaveBeenCalled();
+
+      await openWithViewEvents(org(true));
+      expect(mockMemberDialogManager.openEventsDialog).toHaveBeenCalledWith(
+        mockUser,
+        expect.objectContaining({ id: mockOrgId }),
+      );
     });
   });
 
