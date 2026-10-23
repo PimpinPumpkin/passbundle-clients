@@ -46,6 +46,8 @@ import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
 import { Cipher } from "@bitwarden/common/vault/models/domain/cipher";
 import { TreeNode } from "@bitwarden/common/vault/models/domain/tree-node";
+import { CipherResponse } from "@bitwarden/common/vault/models/response/cipher.response";
+import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { CipherAuthorizationService } from "@bitwarden/common/vault/services/cipher-authorization.service";
 import { RestrictedItemTypesService } from "@bitwarden/common/vault/services/restricted-item-types.service";
 import { CipherViewLike } from "@bitwarden/common/vault/utils/cipher-view-like-utils";
@@ -515,6 +517,38 @@ describe("VaultComponent", () => {
 
       const config = dialogOpen.mock.lastCall[1];
       expect(config.data.organizationId).toBe("org-1");
+    });
+  });
+
+  // Keykeeper: a favorite isn't an edit of the item (DESIGN.md, "Item history").
+  describe("toggling a favorite", () => {
+    it("saves only the favorite, through the partial update, and keeps it locally", async () => {
+      const view = new CipherView();
+      view.id = TEST_CIPHER_ID;
+      view.folderId = "folder-1";
+      view.collectionIds = ["collection-1"];
+      view.favorite = false;
+      const cipherService = TestBed.inject(CipherService) as jest.Mocked<CipherService>;
+      cipherService.getFullCipherView.mockResolvedValue(view);
+      const apiService = TestBed.inject(ApiService) as jest.Mocked<ApiService>;
+      apiService.putPartialCipher.mockResolvedValue(
+        new CipherResponse({ id: TEST_CIPHER_ID, type: CipherType.Login, favorite: true }),
+      );
+
+      await component.handleFavoriteEvent(view);
+
+      expect(apiService.putPartialCipher).toHaveBeenCalledWith(TEST_CIPHER_ID, {
+        folderId: "folder-1",
+        favorite: true,
+      });
+      expect(cipherService.updateWithServer).not.toHaveBeenCalled();
+      const [saved, userId] = cipherService.upsert.mock.calls[0];
+      expect(userId).toBe(TEST_USER_ID);
+      expect(saved).toMatchObject({
+        id: TEST_CIPHER_ID,
+        favorite: true,
+        collectionIds: ["collection-1"],
+      });
     });
   });
 

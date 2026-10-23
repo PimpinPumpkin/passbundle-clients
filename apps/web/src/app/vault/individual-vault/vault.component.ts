@@ -76,6 +76,7 @@ import { SearchService } from "@bitwarden/common/vault/abstractions/search.servi
 import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherRepromptType } from "@bitwarden/common/vault/enums/cipher-reprompt-type";
+import { CipherData } from "@bitwarden/common/vault/models/data/cipher.data";
 import { TreeNode } from "@bitwarden/common/vault/models/domain/tree-node";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
@@ -1699,8 +1700,19 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
   async handleFavoriteEvent(cipher: C) {
     const activeUserId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
     const cipherFullView = await this.cipherService.getFullCipherView(cipher);
-    cipherFullView.favorite = !cipherFullView.favorite;
-    await this.cipherService.updateWithServer(cipherFullView, activeUserId);
+    // Keykeeper: only the favorite changes, through the partial update, so
+    // the item isn't encrypted and saved again, and its history keeps no copy
+    // of it (DESIGN.md, "Item history").
+    const favorite = !cipherFullView.favorite;
+    const response = await this.apiService.putPartialCipher(cipherFullView.id, {
+      folderId: cipherFullView.folderId,
+      favorite,
+    });
+    await this.cipherService.upsert(
+      new CipherData(response, cipherFullView.collectionIds),
+      activeUserId,
+    );
+    cipherFullView.favorite = favorite;
 
     this.toastService.showToast({
       variant: "success",

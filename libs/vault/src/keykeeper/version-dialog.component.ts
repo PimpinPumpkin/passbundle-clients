@@ -13,6 +13,7 @@ import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
   AsyncActionsModule,
   BadgeComponent,
+  BitIconButtonComponent,
   ButtonModule,
   DIALOG_DATA,
   DialogModule,
@@ -35,21 +36,26 @@ export type VersionDialogData = {
   revisionDate: Date;
   /** "Saved by …", when known. */
   savedBy: string | null;
-  /** Saves the version as the item's newest; absent when the person can't edit it. */
+  /**
+   * Saves the version as the item's newest; absent when the person can't edit
+   * the item or can't see its passwords.
+   */
   restore?: () => Promise<CipherView>;
+  /** Deletes the version; absent when the person can't delete the item. */
+  delete?: () => Promise<void>;
 };
 
-/** Closes with the item as saved when a version was restored. */
-export type VersionDialogResult = CipherView | undefined;
+/** The item as saved when a version was restored, or "deleted" when it was deleted. */
+export type VersionDialogResult = CipherView | "deleted" | undefined;
 
 const MASK = "••••••••";
 
 /**
  * Keykeeper: one earlier version of an item next to the item now, field by
- * field, with what changed marked, and "Restore this version" for people who
- * can edit the item. Hidden values (passwords and the like) stay masked until
- * shown, and always for someone who can't see the item's passwords: that's
- * the app's rule, as for the item itself (DESIGN.md, "Item history").
+ * field, with what changed marked; "Restore this version" for people who can
+ * edit the item and see its passwords, and "Delete this version" for people
+ * who can delete it. Hidden values (passwords and the like) stay masked until
+ * shown (DESIGN.md, "Item history").
  */
 @Component({
   selector: "app-keykeeper-version-dialog",
@@ -57,6 +63,7 @@ const MASK = "••••••••";
   imports: [
     AsyncActionsModule,
     BadgeComponent,
+    BitIconButtonComponent,
     ButtonModule,
     DialogModule,
     I18nPipe,
@@ -139,6 +146,16 @@ const MASK = "••••••••";
         <button bitButton buttonType="secondary" type="button" bitDialogClose>
           {{ "close" | i18n }}
         </button>
+        @if (data.delete) {
+          <button
+            type="button"
+            class="tw-ml-auto"
+            bitIconButton="bwi-trash"
+            buttonType="dangerGhost"
+            [label]="'keykeeperDeleteVersion' | i18n"
+            [bitAction]="deleteVersion"
+          ></button>
+        }
       </ng-container>
     </bit-dialog>
   `,
@@ -191,6 +208,24 @@ export class KeykeeperVersionDialogComponent {
       message: this.i18nService.t("keykeeperVersionRestored"),
     });
     await this.dialogRef.close(saved);
+  };
+
+  protected readonly deleteVersion = async () => {
+    const confirmed = await this.dialogService.openSimpleDialog({
+      title: { key: "keykeeperDeleteVersionTitle" },
+      content: { key: "keykeeperDeleteVersionDesc", placeholders: [this.when] },
+      acceptButtonText: { key: "delete" },
+      type: "danger",
+    });
+    if (!confirmed || !this.data.delete) {
+      return;
+    }
+    await this.data.delete();
+    this.toastService.showToast({
+      variant: "success",
+      message: this.i18nService.t("keykeeperVersionDeleted"),
+    });
+    await this.dialogRef.close("deleted");
   };
 
   static open(dialogService: DialogService, data: VersionDialogData) {

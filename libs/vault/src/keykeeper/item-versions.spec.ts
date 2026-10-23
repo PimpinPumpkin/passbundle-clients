@@ -193,20 +193,31 @@ describe("versionRows", () => {
 });
 
 describe("distinctVersions", () => {
-  it("lists only versions that look different from the one after them", () => {
-    // Newest first. A favorite toggled in the web vault saves the item again
-    // unchanged, so the server keeps a version that looks like the next.
+  it("keeps the oldest of each run that looks the same, so its author is who wrote it", () => {
+    // Newest first. An app that saves the whole item to toggle a favorite
+    // makes the server keep a version that looks like the one before it.
     const current = login("three");
     const versions = [
-      { id: "favorited", view: login("three") },
-      { id: "two", view: login("two") },
-      { id: "two-again", view: login("two") },
+      { id: "favorited-now", view: login("three") },
+      { id: "two-favorited", view: login("two") },
+      { id: "two-written", view: login("two") },
       { id: "one", view: login("one") },
     ];
-    expect(distinctVersions(versions, current).map((v) => v.id)).toEqual(["two", "one"]);
+    expect(distinctVersions(versions, current).map((v) => v.id)).toEqual(["two-written", "one"]);
     expect(sameFields(login("one"), login("one", { favorite: true, folderId: "folder" }))).toBe(
       true,
     );
+  });
+
+  it("still lists an old version that looks like the item now, as after restoring it", () => {
+    const current = login("one");
+    const versions = [
+      { id: "three", view: login("three") },
+      { id: "two", view: login("two") },
+      { id: "one", view: login("one") },
+    ];
+    expect(distinctVersions(versions, current).map((v) => v.id)).toEqual(["three", "two", "one"]);
+    expect(distinctVersions([], current)).toEqual([]);
   });
 });
 

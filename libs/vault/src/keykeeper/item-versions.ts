@@ -18,19 +18,24 @@ export type ItemHistoryResponse = {
   revisionDate: string;
   /** Who saved the item as it is now. */
   savedBy: VersionEditor | null;
+  /** The caller can't see the item's passwords: versions come without their fields. */
+  hidePasswords: boolean;
   /** Newest first. */
   data: {
     object: "keykeeperCipherVersion";
     id: string;
     revisionDate: string;
-    replacedDate: string;
     savedBy: VersionEditor | null;
-    /** The version as an item response, to decrypt like any item. */
+    replacedDate: string;
+    replacedBy: VersionEditor | null;
+    /** The version as an item response, to decrypt like any item; null without its passwords. */
     cipher: unknown;
   }[];
 };
 
 export const historyPath = (cipherId: string) => `/keykeeper/ciphers/${cipherId}/history`;
+export const versionPath = (cipherId: string, versionId: string) =>
+  `${historyPath(cipherId)}/${versionId}`;
 
 /** A translator, like I18nService.t. */
 export type Translate = (key: string, ...args: (string | number)[]) => string;
@@ -311,18 +316,24 @@ export function sameFields(a: CipherView, b: CipherView): boolean {
 }
 
 /**
- * The versions worth listing, newest first: those that differ from the one
- * after them (the newest from the item now). Apps encrypt the whole item on
- * every save, so the server keeps a version for a favorite toggled in the web
- * vault too, and those look like the version after them.
+ * The versions worth listing, newest first. Apps encrypt the whole item on
+ * every save, so the server keeps a version for a save that changed nothing
+ * anyone sees (a favorite toggled by an app that saves the whole item, say).
+ * Of each run of versions that look the same, the oldest stays: it's the one
+ * whose "saved by" names who wrote those contents. Versions that look like
+ * the item now, newer than any change, are the item itself and don't show.
  */
 export function distinctVersions<T extends { view: CipherView }>(
   newestFirst: T[],
   current: CipherView,
 ): T[] {
+  let newest = 0;
+  while (newest < newestFirst.length && sameFields(newestFirst[newest].view, current)) {
+    newest++;
+  }
   return newestFirst.filter((version, i) => {
-    const newer = i === 0 ? current : newestFirst[i - 1].view;
-    return !sameFields(version.view, newer);
+    const older = newestFirst[i + 1];
+    return i >= newest && (older == null || !sameFields(version.view, older.view));
   });
 }
 

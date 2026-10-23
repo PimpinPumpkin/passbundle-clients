@@ -104,6 +104,60 @@
   "keykeeperVersionSameAsNow": {
     "message": "This version looks the same as the item does now."
   },
+  "keykeeperVersionHistoryWhoSees": {
+    "message": "Everyone who can open this item can see its earlier versions, including old passwords."
+  },
+  "keykeeperVersionHistoryHiddenPasswords": {
+    "message": "You can't see this item's passwords, so its earlier versions show only when they were saved and by whom."
+  },
+  "keykeeperClearHistory": {
+    "message": "Clear history"
+  },
+  "keykeeperClearHistoryTitle": {
+    "message": "Clear this item's history?"
+  },
+  "keykeeperClearHistoryDesc": {
+    "message": "Its earlier versions are deleted for everyone who can open it. The item stays as it is now."
+  },
+  "keykeeperHistoryCleared": {
+    "message": "History cleared"
+  },
+  "keykeeperDeleteVersion": {
+    "message": "Delete this version"
+  },
+  "keykeeperDeleteVersionTitle": {
+    "message": "Delete this version?"
+  },
+  "keykeeperDeleteVersionDesc": {
+    "message": "The version from $DATE$ is deleted for everyone who can open this item.",
+    "placeholders": {
+      "date": {
+        "content": "$1",
+        "example": "Oct 23, 2026, 10:04:12 AM"
+      }
+    }
+  },
+  "keykeeperVersionDeleted": {
+    "message": "Version deleted"
+  },
+  "keykeeperClearedHistoryItemId": {
+    "message": "Cleared the earlier versions of item $ID$.",
+    "placeholders": {
+      "id": {
+        "content": "$1",
+        "example": "Google"
+      }
+    }
+  },
+  "keykeeperDeletedVersionItemId": {
+    "message": "Deleted an earlier version of item $ID$.",
+    "placeholders": {
+      "id": {
+        "content": "$1",
+        "example": "Google"
+      }
+    }
+  },
   "keykeeperMspConsole": {
     "message": "MSP console"
   },

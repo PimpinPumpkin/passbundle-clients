@@ -130,6 +130,21 @@ export class EventService {
         msg = this.i18nService.t("editedItemId", this.formatCipherId(ev, options));
         humanReadableMsg = this.i18nService.t("editedItemId", this.getShortId(ev.cipherId));
         break;
+      // Keykeeper: an item's earlier versions cleared, or one deleted.
+      case EventType.Keykeeper_CipherHistoryCleared:
+        msg = this.i18nService.t("keykeeperClearedHistoryItemId", this.formatCipherId(ev, options));
+        humanReadableMsg = this.i18nService.t(
+          "keykeeperClearedHistoryItemId",
+          this.getShortId(ev.cipherId),
+        );
+        break;
+      case EventType.Keykeeper_CipherVersionDeleted:
+        msg = this.i18nService.t("keykeeperDeletedVersionItemId", this.formatCipherId(ev, options));
+        humanReadableMsg = this.i18nService.t(
+          "keykeeperDeletedVersionItemId",
+          this.getShortId(ev.cipherId),
+        );
+        break;
       case EventType.Cipher_Deleted:
         msg = this.i18nService.t("permanentlyDeletedItemId", this.formatCipherId(ev, options));
         humanReadableMsg = this.i18nService.t(
