@@ -141,6 +141,12 @@
         route="settings/scim"
         *ngIf="organization.canManageScim"
       ></bit-nav-item>
+      <!-- Keykeeper: provisioning from Microsoft Entra ID. The server answers only those who manage it. -->
+      <bit-nav-item
+        text="Provisioning"
+        route="settings/provisioning"
+        *ngIf="organization.isAdmin"
+      ></bit-nav-item>
     </bit-nav-group>
   </app-side-nav>
 

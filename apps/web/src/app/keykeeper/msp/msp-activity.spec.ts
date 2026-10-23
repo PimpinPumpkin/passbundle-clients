@@ -109,6 +109,22 @@ describe("MSP activity sentences", () => {
       'The script token "Join domain" for Acme Dental was used from a new address, 203.0.113.7',
     ],
     [
+      { event: "provisioning_token_created" },
+      "ana@northwind.test made a provisioning token for Acme Dental",
+    ],
+    [
+      { event: "provisioning_token_replaced" },
+      "ana@northwind.test replaced Acme Dental's provisioning token",
+    ],
+    [
+      { event: "provisioning_token_revoked" },
+      "ana@northwind.test revoked Acme Dental's provisioning token",
+    ],
+    [
+      { event: "provisioning_let_in", detail: "3 people" },
+      "ana@northwind.test let in 3 people Microsoft Entra ID added to Acme Dental",
+    ],
+    [
       { event: "staff_invited", detail: "admin" },
       "ana@northwind.test invited ben@northwind.test to join as an admin",
     ],

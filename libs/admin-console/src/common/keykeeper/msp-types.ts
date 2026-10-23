@@ -20,6 +20,8 @@ export type MspClient = {
    * owner and 1 admin. vaultItems: whether they see every item there.
    */
   you: { memberId: string; status: number; type: number; vaultItems?: boolean } | null;
+  /** Provisioning from Microsoft Entra ID, when the client has a token. Older servers leave it out. */
+  provisioning?: { lastUsedAt: string | null } | null;
 };
 
 /** The custom role permissions the server enforces. */
@@ -305,4 +307,31 @@ export type StaleScriptGrant = {
   revision: string;
   sealedKey: string;
   sealedSpec: string;
+};
+
+/**
+ * An organization's provisioning from Microsoft Entra ID (SCIM), as its
+ * Provisioning page shows it. See DESIGN.md, "Provisioning from Entra ID".
+ */
+export type ProvisioningView = {
+  /** The Tenant URL to paste into Entra. */
+  scimUrl: string;
+  token: {
+    createdAt: string;
+    createdBy: string;
+    lastUsedAt: string | null;
+    lastUsedIp: string | null;
+  } | null;
+  /** Only in the answer that made a token: the token itself, shown once. */
+  newToken?: string;
+  /** Members the directory knows, and how many of them it invited. */
+  people: number;
+  provisioned: number;
+  groups: number;
+  groupsEnabled: boolean;
+  mailEnabled: boolean;
+  /** People the directory invited whom nothing vouches for yet. */
+  waiting: { memberId: string; email: string; userName: string; joined: boolean }[];
+  /** People the directory turned off whom provisioning never changes. */
+  turnedOff: { memberId: string; email: string; role: string; at: string }[];
 };

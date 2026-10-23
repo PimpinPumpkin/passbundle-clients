@@ -25,6 +25,7 @@ import {
   MspSiteFixes,
   MspSummary,
   OrgJoining,
+  ProvisioningView,
   SiteFixView,
   TechnicianAccess,
 } from "@bitwarden/admin-console/common";
@@ -354,6 +355,64 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
   private async domainsSeal(orgId: string, domains: string[]): Promise<string | undefined> {
     const current = await this.getOrgJoining(orgId);
     return this.sealer.sealDomains(orgId, normalizeDomains(domains), reported(current));
+  }
+
+  // Provisioning from Microsoft Entra ID (DESIGN.md, "Provisioning from Entra ID").
+
+  /** The organization's Provisioning page. Anyone but those who manage it gets "not found". */
+  async getProvisioning(orgId: string): Promise<ProvisioningView> {
+    return this.apiService.send(
+      "GET",
+      `/keykeeper/organizations/${orgId}/provisioning`,
+      null,
+      true,
+      true,
+    );
+  }
+
+  /** Makes the organization's provisioning token, or replaces it; the answer carries it once. */
+  async makeProvisioningToken(orgId: string): Promise<ProvisioningView> {
+    return this.apiService.send(
+      "POST",
+      `/keykeeper/organizations/${orgId}/provisioning/token`,
+      null,
+      true,
+      true,
+    );
+  }
+
+  async revokeProvisioningToken(orgId: string): Promise<ProvisioningView> {
+    return this.apiService.send(
+      "DELETE",
+      `/keykeeper/organizations/${orgId}/provisioning/token`,
+      null,
+      true,
+      true,
+    );
+  }
+
+  /**
+   * Lets in people the directory invited: this browser seals their
+   * invitations, as it does for invitations sent from the Members page, for
+   * the people its person chose from the waiting list.
+   */
+  async letInProvisioned(orgId: string, emails: string[]): Promise<ProvisioningView> {
+    const seals = await this.sealer.inviteSeals(orgId, emails);
+    const list = emails
+      .filter((e) => seals[e] != null)
+      .map((email) => ({ email, seal: seals[email] }));
+    if (list.length !== emails.length) {
+      throw new Error(
+        "This browser doesn't have the organization's key yet. Reload and try again.",
+      );
+    }
+    return this.apiService.send(
+      "PUT",
+      `/keykeeper/organizations/${orgId}/provisioning/seals`,
+      { seals: list },
+      true,
+      true,
+    );
   }
 
   /** Adds a template, or changes its source or which clients get it. */
