@@ -38,10 +38,10 @@ import { ClientPreset, KeykeeperMspApiService } from "../msp/msp-api.service";
           <bit-radio-button value="business">
             <bit-label>A business</bit-label>
             <bit-hint>
-              Starts with account recovery for forgotten master passwords, strong master passwords,
-              one work account per person, and Everyone and Admins collections. You also get an
-              install command for rolling it out. Change any of it on the organization's Settings
-              and Policies pages.
+              Starts with strong master passwords, one work account per person, and Everyone and
+              Admins collections. You also get an install command for rolling it out. Account
+              recovery for forgotten master passwords starts off. Turn it on, or change any of it,
+              on the organization's Settings and Policies pages.
             </bit-hint>
           </bit-radio-button>
           <bit-radio-button value="none">
