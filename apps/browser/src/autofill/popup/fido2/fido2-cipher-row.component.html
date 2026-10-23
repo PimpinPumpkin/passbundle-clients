@@ -6,7 +6,12 @@
     tabindex="0"
     type="button"
   >
-    <app-vault-icon slot="start" [cipher]="cipher"></app-vault-icon>
+    <!-- Keykeeper: the item's tile, as in the vault -->
+    <vault-keykeeper-item-tile
+      slot="start"
+      class="tw-me-1"
+      [cipher]="cipher"
+    ></vault-keykeeper-item-tile>
     <span data-testid="item-name">
       {{ cipher.name }}
       @if (cipher.organizationId) {

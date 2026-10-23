@@ -702,38 +702,39 @@ draw(
     circle(460, 250, 7, C.amber, op(0.8)),
 );
 
-// Tab bar icons.
-const vaultBody = `<rect x="3" y="4" width="18" height="16" rx="3.5"/><circle cx="12" cy="12" r="3.2"/><path d="M12 8.8v1.2M12 14v1.2"/>`;
-const generatorBody = `<path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/>`;
-const sendBody = `<path d="M3.5 11.2 20.5 4l-6.6 16-3.2-6.3-7.2-2.5Z"/><path d="m10.7 13.7 4.2-4.2"/>`;
-// A cog: eight teeth around a ring, as one outline.
-const cog = (() => {
-  const pts = [];
-  for (let i = 0; i < 8; i++) {
-    const a = (i * Math.PI) / 4;
-    for (const [da, r] of [
-      [-0.24, 7.2],
-      [-0.15, 9.4],
-      [0.15, 9.4],
-      [0.24, 7.2],
-    ]) {
-      pts.push(`${n(12 + r * Math.sin(a + da))} ${n(12 - r * Math.cos(a + da))}`);
-    }
-  }
-  return `M${pts.join("L")}Z`;
-})();
+// Tab bar icons, as the design language draws them (DESIGN.md, "The look"):
+// a padlock for the vault, a die for the generator, a paper plane for Send,
+// and a gear for settings. The tab showing fills its shape with the brand's
+// soft tint.
+const lockShape = `<rect x="5.5" y="10.5" width="13" height="10" rx="2.5"/>`;
+const vaultBody = `${lockShape}<path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>`;
+const dieShape = `<rect x="4.5" y="4.5" width="15" height="15" rx="3.5"/>`;
+const pip = (cx, cy) =>
+  `<circle cx="${cx}" cy="${cy}" r="1.25" fill="currentColor" stroke="none"/>`;
+const generatorBody =
+  dieShape +
+  [
+    [9, 9],
+    [15, 9],
+    [12, 12],
+    [9, 15],
+    [15, 15],
+  ]
+    .map(([x, y]) => pip(x, y))
+    .join("");
+const planeShape = `<path d="M21 3l-7 18-4-7-7-4Z"/>`;
+const sendBody = `${planeShape}<path d="M21 3 10 14"/>`;
+const cog =
+  "M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2.1-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2.1 1.2l-2.3-.9-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2.1 1.2L10 21h4l.5-2.6a7 7 0 0 0 2.1-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2Z";
 const settingsBody = `<path d="${cog}"/><circle cx="12" cy="12" r="3"/>`;
 const healthBody = `<path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.4a4.3 4.3 0 0 1 7.5 2.4C19.5 15.4 12 20 12 20Z"/><path d="M7.5 12.5h2.6l1.4-2.4 1.8 4 1.2-1.6h2"/>`;
 const fill = (shape) => shape.replace(/\/>$/, ` class="tw-fill-fg-brand-soft"/>`);
 art.VaultInactive = icon(vaultBody);
-art.VaultActive = icon(vaultBody, fill(`<rect x="3" y="4" width="18" height="16" rx="3.5"/>`));
+art.VaultActive = icon(vaultBody, fill(lockShape));
 art.GeneratorInactive = icon(generatorBody);
-art.GeneratorActive = icon(
-  generatorBody,
-  fill(`<rect x="3" y="4" width="18" height="16" rx="5"/>`),
-);
+art.GeneratorActive = icon(generatorBody, fill(dieShape));
 art.SendInactive = icon(sendBody);
-art.SendActive = icon(sendBody, fill(`<path d="M3.5 11.2 20.5 4l-6.6 16-3.2-6.3-7.2-2.5Z"/>`));
+art.SendActive = icon(sendBody, fill(planeShape));
 art.SettingsInactive = icon(settingsBody);
 art.SettingsActive = icon(settingsBody, fill(`<path d="${cog}"/>`));
 art.HealthInactive = icon(healthBody);

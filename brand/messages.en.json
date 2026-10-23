@@ -570,5 +570,112 @@
   },
   "keykeeperExposedUncheckedOne": {
     "message": "1 item couldn't be checked for breaches, because this browser couldn't reach api.pwnedpasswords.com. It may be offline, or a firewall may block it. Try again later."
+  },
+  "keykeeperWhereIsYourVault": {
+    "message": "Where's your vault?"
+  },
+  "keykeeperMyOwnServer": {
+    "message": "My own server"
+  },
+  "keykeeperServerAddress": {
+    "message": "Server address"
+  },
+  "keykeeperServerAddressHint": {
+    "message": "Just the address. We add https:// for you."
+  },
+  "keykeeperServerAddressInvalid": {
+    "message": "That isn't a server address. Try one like vault.example.com."
+  },
+  "keykeeperSignIn": {
+    "message": "Sign in"
+  },
+  "keykeeperSignInWithPasskey": {
+    "message": "Sign in with a passkey"
+  },
+  "keykeeperNewHere": {
+    "message": "New here?"
+  },
+  "keykeeperNewHereInvite": {
+    "message": "New here? Your admin sends the invite."
+  },
+  "keykeeperForSite": {
+    "message": "For $SITE$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "contoso.example"
+      }
+    }
+  },
+  "keykeeperFillOnThisPage": {
+    "message": "Fill on this page"
+  },
+  "keykeeperItemInVault": {
+    "message": "$KIND$ in $VAULT$",
+    "placeholders": {
+      "kind": {
+        "content": "$1",
+        "example": "Login"
+      },
+      "vault": {
+        "content": "$2",
+        "example": "Personal"
+      }
+    }
+  },
+  "keykeeperPasswordStrong": {
+    "message": "Password strong"
+  },
+  "keykeeperPasswordGood": {
+    "message": "Password good"
+  },
+  "keykeeperPasswordWeak": {
+    "message": "Password weak"
+  },
+  "keykeeperPasswordChanged": {
+    "message": "changed $WHEN$",
+    "placeholders": {
+      "when": {
+        "content": "$1",
+        "example": "3 weeks ago"
+      }
+    }
+  },
+  "keykeeperPasswordAdded": {
+    "message": "added $WHEN$",
+    "placeholders": {
+      "when": {
+        "content": "$1",
+        "example": "3 weeks ago"
+      }
+    }
+  },
+  "keykeeperJustNow": {
+    "message": "just now"
+  },
+  "keykeeperServerAddressOnly": {
+    "message": "Use just the server's address, without @, ? or #."
+  },
+  "keykeeperServerAddressNeeded": {
+    "message": "Type your server's address first."
+  },
+  "keykeeperCustomServerAddresses": {
+    "message": "This browser uses custom server addresses."
+  },
+  "keykeeperEditServerAddresses": {
+    "message": "Edit addresses"
+  },
+  "keykeeperEmailAtServer": {
+    "message": "$EMAIL$ · $SERVER$",
+    "placeholders": {
+      "email": {
+        "content": "$1",
+        "example": "alex@contoso.example"
+      },
+      "server": {
+        "content": "$2",
+        "example": "vault.passbundle.com"
+      }
+    }
   }
 }

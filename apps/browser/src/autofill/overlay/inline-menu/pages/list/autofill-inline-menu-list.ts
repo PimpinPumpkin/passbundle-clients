@@ -9,12 +9,10 @@ import { CipherRepromptType, CipherType } from "@bitwarden/common/vault/enums";
 
 import { InlineMenuCipherData } from "../../../../background/abstractions/overlay.background";
 import { InlineMenuFillType } from "../../../../enums/autofill-overlay.enum";
+import { buildKeykeeperTile } from "../../../../keykeeper/inline-menu-tile";
 import { buildSvgDomElement, specialCharacterToKeyMap, throttle } from "../../../../utils";
 import { EventSecurity } from "../../../../utils/event-security";
 import {
-  creditCardIcon,
-  globeIcon,
-  idCardIcon,
   lockIcon,
   passkeyIcon,
   plusIcon,
@@ -1395,44 +1393,8 @@ export class AutofillInlineMenuList extends AutofillInlineMenuPageElement {
       return cipherIcon;
     }
 
-    if (cipher.icon?.image) {
-      try {
-        const url = new URL(cipher.icon.image);
-        cipherIcon.style.backgroundImage = `url(${url.href})`;
-
-        const dummyImageElement = globalThis.document.createElement("img");
-        dummyImageElement.src = url.href;
-        dummyImageElement.addEventListener("error", () => {
-          cipherIcon.style.backgroundImage = "";
-          cipherIcon.classList.add("cipher-icon");
-          cipherIcon.append(buildSvgDomElement(globeIcon));
-        });
-        dummyImageElement.remove();
-
-        return cipherIcon;
-      } catch {
-        // Silently default to the globe icon element if the image URL is invalid
-      }
-    }
-
-    if (!cipher.icon?.icon) {
-      cipherIcon.append(buildSvgDomElement(globeIcon));
-      return cipherIcon;
-    }
-
-    if (cipher.icon.icon.includes("bwi-credit-card")) {
-      cipherIcon.append(buildSvgDomElement(creditCardIcon));
-      return cipherIcon;
-    }
-
-    if (cipher.icon.icon.includes("bwi-id-card")) {
-      cipherIcon.append(buildSvgDomElement(idCardIcon));
-      return cipherIcon;
-    }
-
-    const iconClasses = cipher.icon.icon.split(" ");
-    cipherIcon.classList.add("cipher-icon", "bwi", ...iconClasses);
-    return cipherIcon;
+    // Keykeeper: the same tiles as the popup's (keykeeper/inline-menu-tile.ts).
+    return buildKeykeeperTile(cipher);
   }
 
   /**

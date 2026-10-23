@@ -3,7 +3,7 @@
 
   <app-vault-list-items-container
     [ciphers]="ciphers"
-    [title]="((currentURIIsBlocked$ | async) ? 'itemSuggestions' : 'autofillSuggestions') | i18n"
+    [title]="title$ | async"
     [description]="showTip ? ('autofillSuggestionsTip' | i18n) : undefined"
     [showRefresh]="showRefresh"
     [disableDescriptionMargin]="showTip"

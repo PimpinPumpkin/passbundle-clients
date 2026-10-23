@@ -4,6 +4,8 @@ import { toSignal } from "@angular/core/rxjs-interop";
 import { combineLatest, map, Observable, startWith } from "rxjs";
 
 import { JslibModule } from "@bitwarden/angular/jslib.module";
+import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
+import { Utils } from "@bitwarden/common/platform/misc/utils";
 import { VaultSettingsService } from "@bitwarden/common/vault/abstractions/vault-settings/vault-settings.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherViewLikeUtils } from "@bitwarden/common/vault/utils/cipher-view-like-utils";
@@ -80,10 +82,33 @@ export class AutofillVaultListItemsComponent {
   currentURIIsBlocked$: Observable<boolean> =
     this.vaultPopupAutofillService.currentTabIsOnBlocklist$;
 
+  /**
+   * Keykeeper: the section is titled with the site in the current tab, "For
+   * contoso.example" (DESIGN.md, "The look"). On a site that's on the
+   * blocklist, upstream's "Item suggestions" (nothing fills there), and
+   * without a website in the tab, upstream's title.
+   */
+  protected title$: Observable<string> = combineLatest([
+    this.vaultPopupAutofillService.currentAutofillTab$,
+    this.currentURIIsBlocked$,
+  ]).pipe(
+    map(([tab, blocked]) => {
+      if (blocked) {
+        return this.i18nService.t("itemSuggestions");
+      }
+      const url = tab?.url ?? "";
+      const site = /^https?:\/\//i.test(url) ? Utils.getHostname(url)?.replace(/^www\./, "") : null;
+      return site
+        ? this.i18nService.t("keykeeperForSite", site)
+        : this.i18nService.t("autofillSuggestions");
+    }),
+  );
+
   constructor(
     private vaultPopupItemsService: VaultPopupItemsService,
     private vaultPopupAutofillService: VaultPopupAutofillService,
     private vaultSettingsService: VaultSettingsService,
+    private i18nService: I18nService,
   ) {}
 
   /**

@@ -118,8 +118,8 @@ export class AppearanceComponent implements OnInit {
     private vaultSettingsService: VaultSettingsService,
   ) {
     this.themeOptions = [
-      // Keykeeper: the System setting is the "Glass" look.
-      { name: i18nService.t("keykeeperThemeGlass"), value: ThemeTypes.System },
+      // Keykeeper: the popup has no Glass; System is light or dark like the device.
+      { name: i18nService.t("systemDefault"), value: ThemeTypes.System },
       { name: i18nService.t("light"), value: ThemeTypes.Light },
       { name: i18nService.t("dark"), value: ThemeTypes.Dark },
     ];

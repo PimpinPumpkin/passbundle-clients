@@ -16,7 +16,6 @@ import {
 import { CurrentAccountComponent } from "@bitwarden/browser/auth/popup/account-switching/current-account.component";
 import AutofillService from "@bitwarden/browser/autofill/services/autofill.service";
 import { PopOutComponent } from "@bitwarden/browser/platform/popup/components/pop-out.component";
-import { PopupHeaderComponent } from "@bitwarden/browser/platform/popup/layout/popup-header.component";
 import { PopupRouterCacheService } from "@bitwarden/browser/platform/popup/view-cache/popup-router-cache.service";
 import { InternalOrganizationServiceAbstraction } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
@@ -58,17 +57,17 @@ import { FillAssistActiveBannerComponent } from "./fill-assist-active-banner/fil
 import { NewItemDropdownComponent } from "./new-item-dropdown/new-item-dropdown.component";
 import { VaultHeaderComponent } from "./vault-header/vault-header.component";
 import { VaultListItemsContainerComponent } from "./vault-list-items-container/vault-list-items-container.component";
+import { VaultSearchComponent } from "./vault-search/vault-search.component";
 import { VaultComponent } from "./vault.component";
 
+// Keykeeper: the search is on top of the page now.
 @Component({
-  selector: "popup-header",
+  selector: "app-vault-search",
   standalone: true,
   template: "",
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class PopupHeaderStubComponent {
-  readonly pageTitle = input("");
-}
+export class VaultSearchStubComponent {}
 
 @Component({
   selector: "app-vault-header",
@@ -345,7 +344,7 @@ describe("VaultComponent", () => {
     TestBed.overrideComponent(VaultComponent, {
       remove: {
         imports: [
-          PopupHeaderComponent,
+          VaultSearchComponent,
           VaultHeaderComponent,
           CurrentAccountComponent,
           NewItemDropdownComponent,
@@ -365,7 +364,7 @@ describe("VaultComponent", () => {
       },
       add: {
         imports: [
-          PopupHeaderStubComponent,
+          VaultSearchStubComponent,
           VaultHeaderStubComponent,
           CurrentAccountStubComponent,
           NewItemDropdownStubComponent,

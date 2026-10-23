@@ -1,7 +1,7 @@
 // FIXME: Update this file to be type safe and remove this and next line
 // @ts-strict-ignore
 import { CommonModule } from "@angular/common";
-import { Component, Input, OnInit, input } from "@angular/core";
+import { booleanAttribute, Component, Input, OnInit, input } from "@angular/core";
 import { toObservable, toSignal } from "@angular/core/rxjs-interop";
 import { Router, RouterLink } from "@angular/router";
 import { combineLatest, map, Observable } from "rxjs";
@@ -11,16 +11,18 @@ import { FeatureFlag } from "@bitwarden/common/enums/feature-flag.enum";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { CollectionId, OrganizationId } from "@bitwarden/common/types/guid";
 import { CipherType } from "@bitwarden/common/vault/enums";
+import { categoryOfType } from "@bitwarden/common/vault/keykeeper/categories";
 import { RestrictedItemTypesService } from "@bitwarden/common/vault/services/restricted-item-types.service";
 import { CipherMenuItem, CIPHER_MENU_ITEMS } from "@bitwarden/common/vault/types/cipher-menu-items";
 import {
   ButtonModule,
   DialogService,
+  IconButtonModule,
   MenuModule,
   NoItemsModule,
   TooltipDirective,
 } from "@bitwarden/components";
-import { AddEditFolderDialogComponent } from "@bitwarden/vault";
+import { AddEditFolderDialogComponent, KeykeeperCategoryTileComponent } from "@bitwarden/vault";
 
 import { BrowserApi } from "../../../../../platform/browser/browser-api";
 import BrowserPopupUtils from "../../../../../platform/browser/browser-popup-utils";
@@ -42,9 +44,11 @@ export interface NewItemInitialValues {
     JslibModule,
     CommonModule,
     ButtonModule,
+    IconButtonModule,
     RouterLink,
     MenuModule,
     TooltipDirective,
+    KeykeeperCategoryTileComponent,
   ],
 })
 export class NewItemDropdownComponent implements OnInit {
@@ -63,6 +67,12 @@ export class NewItemDropdownComponent implements OnInit {
    * `false` when the target organization is suspended, since items cannot be saved to it.
    */
   readonly canCreateCipher = input(true);
+
+  /** Keykeeper: a + with "New" as its name, instead of a button that says New. */
+  readonly iconOnly = input(false, { transform: booleanAttribute });
+
+  /** Keykeeper: the category whose tile a kind of item shows. */
+  protected readonly categoryOf = categoryOfType;
 
   /**
    * Observable of cipher menu items that are not restricted by policy

@@ -44,7 +44,9 @@
     }
     <ng-content select="[slot=title-end]"></ng-content>
     <span bitTypography="body2" slot="end">
+      <!-- Keykeeper: the count, which the extension's look leaves out -->
       <span
+        data-keykeeper="section-count"
         [ngClass]="{
           'group-hover/vault-section-header:tw-hidden group-focus-visible/vault-section-header:tw-hidden':
             collapsibleKey() && sectionOpenState(),
@@ -94,9 +96,10 @@
       }
 
       <cdk-virtual-scroll-viewport [itemSize]="itemHeight$ | async" bitScrollLayout>
+        <!-- Keykeeper: rows of one card, divided by lines (DESIGN.md, "The look") -->
         <bit-item
           *cdkVirtualFor="let cipher of group.ciphers"
-          class="tw-group/vault-item"
+          class="tw-group/vault-item !tw-mb-0 !tw-rounded-none"
           [ngClass]="{
             'hover:tw-bg-hover-default hover:tw-cursor-pointer': showFillTextOnHover(),
           }"
@@ -112,8 +115,9 @@
             "
             class="{{ itemHeightClass }}"
           >
-            <div slot="start" class="tw-justify-start tw-w-7 tw-flex">
-              <app-vault-icon [cipher]="cipher"></app-vault-icon>
+            <!-- Keykeeper: the item's tile: its site's icon, its first letter, or its category's -->
+            <div slot="start" class="tw-flex tw-me-1">
+              <vault-keykeeper-item-tile [cipher]="cipher"></vault-keykeeper-item-tile>
             </div>
             <span data-testid="item-name">{{ cipher.name }}</span>
             <!-- Keykeeper: expiration and template badges -->
@@ -155,19 +159,24 @@
             }
             @if (showAutofillBadge()) {
               <bit-item-action>
+                <!-- Keykeeper: Fill is a small primary button, as the design has it -->
                 <button
                   type="button"
-                  bit-chip-action
-                  variant="primary"
+                  bitButton
+                  buttonType="primary"
+                  size="small"
+                  data-keykeeper="fill"
                   (click)="doAutofill(cipher)"
                   [title]="autofillShortcutTooltip() ?? ('autofillTitle' | i18n: cipher.name)"
                   [attr.aria-label]="'autofillTitle' | i18n: cipher.name"
-                  [label]="'fill' | i18n"
-                ></button>
+                >
+                  {{ "fill" | i18n }}
+                </button>
               </bit-item-action>
             }
             @if (showLaunchButton() && CipherViewLikeUtils.canLaunch(cipher)) {
-              <bit-item-action>
+              <!-- Keykeeper: shown with the row's pointer or focus on it, like More -->
+              <bit-item-action data-keykeeper="row-more">
                 <button
                   type="button"
                   bitIconButton="bwi-external-link"
@@ -179,6 +188,7 @@
             }
             <app-item-copy-actions [cipher]="cipher"></app-item-copy-actions>
             <app-item-more-options
+              data-keykeeper="row-more"
               [cipher]="cipher"
               [showAutofill]="showAutofillInMenu()"
               [showViewOption]="showViewInMenu()"

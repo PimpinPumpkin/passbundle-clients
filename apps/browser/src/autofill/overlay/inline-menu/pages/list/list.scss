@@ -662,3 +662,68 @@ body * {
     }
   }
 }
+
+// Keykeeper: items' tiles, as in the popup (keykeeper/inline-menu-tile.ts and
+// DESIGN.md, "The look"): the site's icon on white, the login's letter on its
+// tint, or the category's jewel tile.
+.inline-menu-list-actions-item .cipher-icon.keykeeper-tile {
+  width: 3.2rem;
+  height: 3.2rem;
+  border-radius: 0.9rem;
+  border: 1px solid transparent;
+  overflow: hidden;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.inline-menu-list-actions-item .cipher-icon.keykeeper-tile-letter {
+  background: #e3e9f8;
+  border-color: #e3e9f8;
+  color: #1d3c99;
+}
+.inline-menu-list-actions-item .cipher-icon.keykeeper-tile-site {
+  background: #ffffff;
+  border-color: #dce5e1;
+
+  img {
+    width: 2rem;
+    height: 2rem;
+    object-fit: contain;
+  }
+}
+.inline-menu-list-actions-item .cipher-icon.keykeeper-tile-jewel {
+  border: 0;
+  background:
+    radial-gradient(120% 90% at 28% 18%, rgb(255 255 255 / 0.32), rgb(255 255 255 / 0) 58%),
+    var(--pb-jewel);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.35),
+    inset 0 -2px 3px rgb(0 0 0 / 0.2);
+
+  svg {
+    width: 1.9rem;
+    height: 1.9rem;
+
+    path {
+      fill: none !important;
+      stroke: #ffffff;
+      stroke-width: 1.9;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+  }
+}
+.theme_dark .inline-menu-list-actions-item .cipher-icon.keykeeper-tile-letter {
+  background: #1c2a4a;
+  border-color: #1c2a4a;
+  color: #9db4f2;
+}
+.theme_dark .inline-menu-list-actions-item .cipher-icon.keykeeper-tile-site {
+  background: #f4f7f6;
+  border-color: #f4f7f6;
+}
+.theme_dark .inline-menu-list-actions-item .cipher-icon.keykeeper-tile-jewel {
+  background:
+    radial-gradient(120% 90% at 28% 18%, rgb(255 255 255 / 0.3), rgb(255 255 255 / 0) 58%),
+    var(--pb-jewel-dark);
+}

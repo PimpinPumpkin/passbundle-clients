@@ -283,6 +283,17 @@ export class VaultPopupItemsService {
   cipherCount$: Observable<number> = this._activeCipherList$.pipe(map((ciphers) => ciphers.length));
 
   /**
+   * Keykeeper: the kinds of item in the vault, ignoring the filters and the
+   * search, for the vault page's category chips.
+   */
+  keykeeperTypesWithItems$: Observable<CipherType[]> = this._activeCipherList$.pipe(
+    map((ciphers) => [...new Set(ciphers.map((cipher) => CipherViewLikeUtils.getType(cipher)))]),
+    map((types) => types.sort((a, b) => a - b)),
+    distinctUntilChanged((a, b) => a.length === b.length && a.every((type, i) => type === b[i])),
+    shareReplay({ refCount: true, bufferSize: 1 }),
+  );
+
+  /**
    * Observable that indicates whether there are no ciphers to show with the current filter.
    */
   noFilteredResults$: Observable<boolean> = this._filteredCipherList$.pipe(

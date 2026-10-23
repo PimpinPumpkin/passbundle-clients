@@ -49,6 +49,7 @@ import {
 } from "@bitwarden/components";
 import {
   AtRiskPasswordCalloutService,
+  KeykeeperItemTileComponent,
   PasswordRepromptService,
   VaultCarouselModule,
 } from "@bitwarden/vault";
@@ -76,6 +77,7 @@ import { AtRiskPasswordPageService } from "./at-risk-password-page.service";
     ButtonModule,
     DialogModule,
     VaultCarouselModule,
+    KeykeeperItemTileComponent,
   ],
   providers: [AtRiskPasswordPageService, AtRiskPasswordCalloutService],
   selector: "vault-at-risk-passwords",

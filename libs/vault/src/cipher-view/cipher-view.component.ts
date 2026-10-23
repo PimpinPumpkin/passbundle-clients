@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { Component, computed, input, resource } from "@angular/core";
+import { Component, computed, input, resource, booleanAttribute } from "@angular/core";
 import { toObservable, toSignal } from "@angular/core/rxjs-interop";
 import { combineLatest, of, switchMap, map, catchError, from, Observable, startWith } from "rxjs";
 
@@ -39,6 +39,8 @@ import {
 
 import { KeykeeperExpirationViewComponent } from "../keykeeper/expiration-view.component";
 import { KeykeeperFillRulesViewComponent } from "../keykeeper/fill-rules-view.component";
+import { KeykeeperItemHeroComponent } from "../keykeeper/item-hero.component";
+import { KeykeeperPasswordHealthLineComponent } from "../keykeeper/password-health-line.component";
 import { visibleCustomFields } from "../keykeeper/reserved-fields";
 import { KeykeeperTemplateLabelComponent } from "../keykeeper/template-label.component";
 
@@ -64,6 +66,8 @@ import { ViewIdentitySectionsComponent } from "./view-identity-sections/view-ide
   imports: [
     KeykeeperExpirationViewComponent,
     KeykeeperFillRulesViewComponent,
+    KeykeeperItemHeroComponent,
+    KeykeeperPasswordHealthLineComponent,
     KeykeeperTemplateLabelComponent,
     CalloutModule,
     CommonModule,
@@ -117,6 +121,13 @@ export class CipherViewComponent {
    * Should be set to true when the component is used within the Admin Console
    */
   readonly isAdminConsole = input<boolean>(false);
+
+  /**
+   * Keykeeper: the item's tile, name, and where it lives on top, instead of
+   * the details card, and a line on its password's health (the extension's
+   * look, DESIGN.md "The look").
+   */
+  readonly keykeeperHero = input(false, { transform: booleanAttribute });
 
   readonly activeUserId$ = getUserId(this.accountService.activeAccount$);
 

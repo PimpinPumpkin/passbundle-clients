@@ -80,7 +80,53 @@ export function selfHostedAddress(url: string | null | undefined): string {
   return scheme[1].toLowerCase() + address.slice(scheme[1].length);
 }
 
-function onlyHttpsValidator(): ValidatorFn {
+/**
+ * Keykeeper: what's wrong with an address (after selfHostedAddress) beyond its
+ * scheme, or null. A server address is just the server: it can't be parsed as
+ * a URL ("invalid"), or it carries a user name or password before the host,
+ * which hides the real host ("passbundle.com@evil.example" is evil.example),
+ * or a query or fragment ("extras").
+ */
+export function selfHostedAddressProblem(url: string): "invalid" | "extras" | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return "invalid";
+  }
+  const authority = /^[a-z][a-z0-9+.-]*:\/\/([^/?#]*)/i.exec(url)?.[1] ?? "";
+  if (
+    parsed.username !== "" ||
+    parsed.password !== "" ||
+    authority.includes("@") ||
+    parsed.search !== "" ||
+    parsed.hash !== "" ||
+    /[?#]/.test(url)
+  ) {
+    return "extras";
+  }
+  return null;
+}
+
+/**
+ * Keykeeper: the host an address reaches, as the URL parser reads it (an
+ * internationalized name in its punycode form), for showing where something
+ * goes. Null for an address that isn't a URL.
+ */
+export function selfHostedAddressHost(url: string | null | undefined): string | null {
+  try {
+    return new URL(url ?? "").host || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Keykeeper: exported, so the extension's own server field on its sign-in
+ * (keykeeper/vault-location.component.ts) refuses the same addresses. It also
+ * refuses an address that isn't just a server (selfHostedAddressProblem).
+ */
+export function onlyHttpsValidator(): ValidatorFn {
   const i18nService = inject(I18nService);
   const platformUtilsService = inject(PlatformUtilsService);
 
@@ -94,6 +140,17 @@ function onlyHttpsValidator(): ValidatorFn {
           message: i18nService.t("selfHostedEnvMustUseHttps"),
         },
       }; // invalid
+    }
+
+    const problem = url ? selfHostedAddressProblem(url) : null;
+    if (problem) {
+      return {
+        keykeeperServerAddress: {
+          message: i18nService.t(
+            problem === "extras" ? "keykeeperServerAddressOnly" : "keykeeperServerAddressInvalid",
+          ),
+        },
+      };
     }
 
     return null; // valid

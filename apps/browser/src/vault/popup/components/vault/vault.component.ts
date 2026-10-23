@@ -61,7 +61,6 @@ import {
 import { CurrentAccountComponent } from "../../../../auth/popup/account-switching/current-account.component";
 import { KeykeeperTwoStepNeededComponent } from "../../../../keykeeper/popup/two-step-needed.component";
 import { PopOutComponent } from "../../../../platform/popup/components/pop-out.component";
-import { PopupHeaderComponent } from "../../../../platform/popup/layout/popup-header.component";
 import { PopupPageComponent } from "../../../../platform/popup/layout/popup-page.component";
 import { IntroCarouselService } from "../../services/intro-carousel.service";
 import { VaultPopupItemsService } from "../../services/vault-popup-items.service";
@@ -80,6 +79,7 @@ import {
   NewItemInitialValues,
 } from "./new-item-dropdown/new-item-dropdown.component";
 import { VaultHeaderComponent } from "./vault-header/vault-header.component";
+import { VaultSearchComponent } from "./vault-search/vault-search.component";
 
 import { AutofillVaultListItemsComponent, VaultListItemsContainerComponent } from ".";
 
@@ -101,7 +101,6 @@ type VaultState = UnionOfValues<typeof VaultState>;
     BlockedInjectionBanner,
     FillAssistActiveBannerComponent,
     PopupPageComponent,
-    PopupHeaderComponent,
     PopOutComponent,
     CurrentAccountComponent,
     NoItemsModule,
@@ -113,6 +112,7 @@ type VaultState = UnionOfValues<typeof VaultState>;
     NewItemDropdownComponent,
     ScrollingModule,
     VaultHeaderComponent,
+    VaultSearchComponent,
     AtRiskPasswordCalloutComponent,
     CalloutModule,
     RouterModule,

@@ -1,31 +1,65 @@
+<!-- Keykeeper: iconOnly is the vault page's New, a + beside the search (DESIGN.md, "The look"). -->
 @if (useNewItemDialog()) {
-  <button
-    bitButton
-    buttonType="primary"
-    type="button"
-    (click)="navigateToNewItemPage()"
-    [disabled]="!canCreateCipher()"
-    [bitTooltip]="!canCreateCipher() ? ('organizationIsDeactivated' | i18n) : ''"
-    startIcon="bwi-plus"
-  >
-    {{ (btnTextAddCreateFeatureFlag() ? "add" : "new") | i18n }}
-  </button>
+  @if (iconOnly()) {
+    <button
+      bitIconButton="bwi-plus"
+      buttonType="primary"
+      type="button"
+      (click)="navigateToNewItemPage()"
+      [disabled]="!canCreateCipher()"
+      [label]="(btnTextAddCreateFeatureFlag() ? 'add' : 'new') | i18n"
+      [bitTooltip]="!canCreateCipher() ? ('organizationIsDeactivated' | i18n) : ''"
+      data-testid="new-item-button"
+    ></button>
+  } @else {
+    <button
+      bitButton
+      buttonType="primary"
+      type="button"
+      (click)="navigateToNewItemPage()"
+      [disabled]="!canCreateCipher()"
+      [bitTooltip]="!canCreateCipher() ? ('organizationIsDeactivated' | i18n) : ''"
+      startIcon="bwi-plus"
+    >
+      {{ (btnTextAddCreateFeatureFlag() ? "add" : "new") | i18n }}
+    </button>
+  }
 } @else {
-  <button
-    bitButton
-    startIcon="bwi-plus"
-    [bitMenuTriggerFor]="itemOptions"
-    buttonType="primary"
-    type="button"
-    [disabled]="!canCreateCipher()"
-    [bitTooltip]="!canCreateCipher() ? ('organizationIsDeactivated' | i18n) : ''"
-  >
-    {{ (btnTextAddCreateFeatureFlag() ? "add" : "new") | i18n }}
-  </button>
+  @if (iconOnly()) {
+    <button
+      bitIconButton="bwi-plus"
+      buttonType="primary"
+      type="button"
+      [bitMenuTriggerFor]="itemOptions"
+      [disabled]="!canCreateCipher()"
+      [label]="(btnTextAddCreateFeatureFlag() ? 'add' : 'new') | i18n"
+      [bitTooltip]="!canCreateCipher() ? ('organizationIsDeactivated' | i18n) : ''"
+      data-testid="new-item-button"
+    ></button>
+  } @else {
+    <button
+      bitButton
+      startIcon="bwi-plus"
+      [bitMenuTriggerFor]="itemOptions"
+      buttonType="primary"
+      type="button"
+      [disabled]="!canCreateCipher()"
+      [bitTooltip]="!canCreateCipher() ? ('organizationIsDeactivated' | i18n) : ''"
+    >
+      {{ (btnTextAddCreateFeatureFlag() ? "add" : "new") | i18n }}
+    </button>
+  }
   <bit-menu #itemOptions>
     @for (menuItem of cipherMenuItems$ | async; track menuItem.type) {
       <a bitMenuItem [routerLink]="['/add-cipher']" [queryParams]="buildQueryParams(menuItem.type)">
-        <i [class]="`bwi ${menuItem.icon}`" slot="start" aria-hidden="true"></i>
+        <!-- Keykeeper: each kind's jewel tile, as in the list -->
+        <vault-keykeeper-category-tile
+          slot="start"
+          class="tw-me-1"
+          [category]="categoryOf(menuItem.type)"
+          [size]="22"
+          flat
+        />
         {{ menuItem.labelKey | i18n }}
       </a>
     }

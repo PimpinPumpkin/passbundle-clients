@@ -15,8 +15,9 @@
             [appA11yTitle]="'viewItemTitle' | i18n: cipher.name"
             (click)="onViewCipher(cipher)"
           >
-            <div slot="start" class="tw-justify-start tw-w-7 tw-flex">
-              <app-vault-icon [cipher]="cipher"></app-vault-icon>
+            <!-- Keykeeper: the item's tile, as in the vault -->
+            <div slot="start" class="tw-flex tw-me-1">
+              <vault-keykeeper-item-tile [cipher]="cipher"></vault-keykeeper-item-tile>
             </div>
             <span data-testid="item-name">{{ cipher.name }}</span>
             @if (cipher.organizationId) {

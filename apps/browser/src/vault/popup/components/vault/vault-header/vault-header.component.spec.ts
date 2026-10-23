@@ -1,4 +1,5 @@
 import { CommonModule } from "@angular/common";
+import { ChangeDetectionStrategy, Component } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormBuilder } from "@angular/forms";
 import { By } from "@angular/platform-browser";
@@ -21,6 +22,8 @@ import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.servi
 import { FolderService } from "@bitwarden/common/vault/abstractions/folder/folder.service.abstraction";
 import { SearchService } from "@bitwarden/common/vault/abstractions/search.service";
 import { VaultSettingsService } from "@bitwarden/common/vault/abstractions/vault-settings/vault-settings.service";
+import { CipherType } from "@bitwarden/common/vault/enums";
+import { FolderView } from "@bitwarden/common/vault/models/view/folder.view";
 import { PasswordRepromptService } from "@bitwarden/vault";
 
 import { AutofillService } from "../../../../../autofill/services/abstractions/autofill.service";
@@ -30,8 +33,16 @@ import {
   VaultPopupListFiltersService,
 } from "../../../services/vault-popup-list-filters.service";
 import { VaultPopupLoadingService } from "../../../services/vault-popup-loading.service";
+import { KeykeeperCategoryChipsComponent } from "../keykeeper-category-chips/keykeeper-category-chips.component";
 
 import { VaultHeaderComponent } from "./vault-header.component";
+
+@Component({
+  selector: "app-keykeeper-category-chips",
+  template: "",
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class KeykeeperCategoryChipsStubComponent {}
 
 describe("VaultHeaderComponent", () => {
   let component: VaultHeaderComponent;
@@ -44,8 +55,14 @@ describe("VaultHeaderComponent", () => {
     cipherType: null,
   };
 
-  const numberOfAppliedFilters$ = new BehaviorSubject<number>(0);
+  // Keykeeper: the button's badge counts the filters behind it: vaults,
+  // collections, and folders. The kind of item is the chips'.
+  const filters$ = new BehaviorSubject<PopupListFilter>(emptyForm);
+  const allFilters$ = new BehaviorSubject<unknown[][]>([[], [], [{ value: { id: "folder" } }]]);
   const state$ = new Subject<boolean | null>();
+  const folder = { id: "folder" } as FolderView;
+  const collection = { id: "collection" } as PopupListFilter["collection"];
+  const organization = { id: "organization" } as PopupListFilter["organization"];
 
   // Mock state provider update
   const update = jest.fn().mockResolvedValue(undefined);
@@ -55,6 +72,8 @@ describe("VaultHeaderComponent", () => {
 
   beforeEach(async () => {
     update.mockClear();
+    filters$.next(emptyForm);
+    allFilters$.next([[], [], [{ value: { id: "folder" } }]]);
 
     await TestBed.configureTestingModule({
       imports: [VaultHeaderComponent, CommonModule],
@@ -94,8 +113,8 @@ describe("VaultHeaderComponent", () => {
         {
           provide: VaultPopupListFiltersService,
           useValue: {
-            numberOfAppliedFilters$,
-            filters$: new BehaviorSubject(emptyForm),
+            filters$,
+            allFilters$,
             filterForm: new FormBuilder().group(emptyForm),
             filterVisibilityState$: state$,
             updateFilterVisibility: update,
@@ -110,7 +129,12 @@ describe("VaultHeaderComponent", () => {
           useValue: { loading$: new BehaviorSubject(false) },
         },
       ],
-    }).compileComponents();
+    })
+      .overrideComponent(VaultHeaderComponent, {
+        remove: { imports: [KeykeeperCategoryChipsComponent] },
+        add: { imports: [KeykeeperCategoryChipsStubComponent] },
+      })
+      .compileComponents();
 
     fixture = TestBed.createComponent(VaultHeaderComponent);
     component = fixture.componentInstance;
@@ -119,7 +143,7 @@ describe("VaultHeaderComponent", () => {
 
   it("does not show filter badge when no filters are selected", () => {
     state$.next(false);
-    numberOfAppliedFilters$.next(0);
+    filters$.next(emptyForm);
     fixture.detectChanges();
 
     expect(getBadge()).toBeNull();
@@ -127,7 +151,7 @@ describe("VaultHeaderComponent", () => {
 
   it("does not show filter badge when disclosure is open", () => {
     state$.next(true);
-    numberOfAppliedFilters$.next(1);
+    filters$.next({ ...emptyForm, folder });
     fixture.detectChanges();
 
     expect(getBadge()).toBeNull();
@@ -135,36 +159,54 @@ describe("VaultHeaderComponent", () => {
 
   it("shows the notification badge when there are populated filters and the disclosure is closed", async () => {
     state$.next(false);
-    numberOfAppliedFilters$.next(1);
+    filters$.next({ ...emptyForm, folder });
     fixture.detectChanges();
 
     expect(getBadge()).not.toBeNull();
   });
 
   it("displays the number of filters populated", () => {
-    numberOfAppliedFilters$.next(1);
+    filters$.next({ ...emptyForm, folder });
     state$.next(false);
     fixture.detectChanges();
 
     expect(getBadge().nativeElement.textContent.trim()).toBe("1");
 
-    numberOfAppliedFilters$.next(2);
+    filters$.next({ ...emptyForm, folder, collection });
 
     fixture.detectChanges();
 
     expect(getBadge().nativeElement.textContent.trim()).toBe("2");
 
-    numberOfAppliedFilters$.next(4);
+    filters$.next({ ...emptyForm, folder, collection, organization });
 
     fixture.detectChanges();
 
-    expect(getBadge().nativeElement.textContent.trim()).toBe("4");
+    expect(getBadge().nativeElement.textContent.trim()).toBe("3");
   });
 
-  it("defaults the initial state to true", (done) => {
+  it("doesn't count the kind of item, which the chips show", () => {
+    state$.next(false);
+    filters$.next({ ...emptyForm, cipherType: CipherType.Card });
+    fixture.detectChanges();
+
+    expect(getBadge()).toBeNull();
+  });
+
+  it("shows the filters button only when there are vaults, collections, or folders to pick", () => {
+    const button = () => fixture.debugElement.query(By.css('[bitIconButton="bwi-sliders"]'));
+    fixture.detectChanges();
+    expect(button()).not.toBeNull();
+
+    allFilters$.next([[], [], []]);
+    fixture.detectChanges();
+    expect(button()).toBeNull();
+  });
+
+  it("defaults the initial state to closed", (done) => {
     // The initial value of the `state$` variable above is undefined
     component["initialDisclosureVisibility$"].subscribe((initialVisibility) => {
-      expect(initialVisibility).toBe(true);
+      expect(initialVisibility).toBe(false);
       done();
     });
 

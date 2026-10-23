@@ -40,14 +40,7 @@
           </bit-chip-filter>
         }
       }
-      <bit-chip-filter
-        formControlName="cipherType"
-        fullWidth
-        placeholderIcon="bwi-list"
-        [placeholderText]="'type' | i18n"
-        [options]="cipherTypes$ | async"
-      >
-      </bit-chip-filter>
+      <!-- Keykeeper: the kind of item is the category chips' (keykeeper-category-chips). -->
     </form>
   }
 </div>
