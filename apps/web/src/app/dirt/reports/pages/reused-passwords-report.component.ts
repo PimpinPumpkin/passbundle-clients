@@ -4,10 +4,10 @@ import { Component, OnInit } from "@angular/core";
 
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import { checksPassword } from "@bitwarden/common/dirt/keykeeper/password-health";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { SyncService } from "@bitwarden/common/vault/abstractions/sync/sync.service.abstraction";
-import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { DialogService } from "@bitwarden/components";
 import { LogService } from "@bitwarden/logging";
@@ -102,15 +102,10 @@ export class ReusedPasswordsReportComponent extends CipherReportComponent implem
     let eligibleCipherCount = 0;
 
     ciphers.forEach((ciph) => {
-      const { type, login, isDeleted, edit, viewPassword } = ciph;
-      if (
-        type !== CipherType.Login ||
-        login.password == null ||
-        login.password === "" ||
-        isDeleted ||
-        (!this.organization && !edit) ||
-        !viewPassword
-      ) {
+      // Keykeeper: Health's one set of rules for which passwords count,
+      // shared with the MSP console and the count beside Health.
+      const { login } = ciph;
+      if (!checksPassword(ciph, !this.organization)) {
         return;
       }
 

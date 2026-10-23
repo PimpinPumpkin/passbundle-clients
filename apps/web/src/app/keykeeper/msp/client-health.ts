@@ -1,16 +1,39 @@
 // Keykeeper: password health for each MSP client, for the MSP console. MSP
 // staff can decrypt their clients' items, so this is computed in the browser
-// and the server never sees it. Weak uses the same rule as upstream's weak
-// passwords report: the username's parts are hints, and a score of 2 or less
-// out of 4 is weak.
+// and the server never sees it. Which items count, and what's weak, reused,
+// and exposed, are the same rules as the Health reports'
+// (libs/common/src/dirt/keykeeper/password-health.ts), with reuse counted
+// within each client. Exposed comes from the k-anonymity breach check
+// (pwned-passwords.ts), whose results come in by password.
 
-import { CipherType } from "@bitwarden/common/vault/enums";
+import {
+  checksPassword,
+  isWeakScore,
+  needsFixing,
+  passwordProblems,
+  passwordScore,
+  StrengthScorer,
+  usernameHints,
+} from "@bitwarden/common/dirt/keykeeper/password-health";
 import {
   ExpirationStatus,
   expirationStatus,
   itemExpiration,
 } from "@bitwarden/common/vault/keykeeper/expiration";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
+
+export { StrengthScorer, usernameHints };
+
+/** An item in a client's vault whose password needs fixing, by name only: never its password. */
+export type ItemToFix = {
+  id: string;
+  name: string;
+  organizationId: string;
+  weak: boolean;
+  reused: boolean;
+  /** Times seen in breaches; null when it couldn't be checked, undefined while the check runs. */
+  exposed: number | null | undefined;
+};
 
 export type ClientHealth = {
   /** Items in the client's vault, not counting the trash. */
@@ -20,57 +43,98 @@ export type ClientHealth = {
   weak: number;
   /** Logins whose password is also used by another login in the same client. */
   reused: number;
+  /** Logins whose password is in known breaches; undefined while the check runs. */
+  exposed: number | undefined;
+  /** Logins whose password couldn't be checked for breaches (offline or blocked). */
+  unchecked: number;
+  /** The logins to fix, the most exposed first, then the most problems, then by name. */
+  toFix: ItemToFix[];
 };
 
-/** A password's strength score from 0 to 4, given hints that make it weaker. */
-export type StrengthScorer = (password: string, hints: string[] | null) => number | null;
-
-/** The parts of a username that make a password easier to guess, as upstream's report uses them. */
-export function usernameHints(username: string | null | undefined): string[] {
-  const trimmed = (username ?? "").trim().toLowerCase();
-  const local = trimmed.includes("@") ? trimmed.slice(0, trimmed.indexOf("@")) : trimmed;
-  return local.split(/[^A-Za-z0-9]/).filter((part) => part.length >= 3);
+function isClientItem(cipher: CipherView, clients: Set<string>): boolean {
+  return cipher.organizationId != null && clients.has(cipher.organizationId) && !cipher.isDeleted;
 }
+
+/** Every password the console checks for breaches, across the clients. Each one once. */
+export function clientPasswords(ciphers: CipherView[], organizationIds: string[]): string[] {
+  const clients = new Set(organizationIds);
+  return [
+    ...new Set(
+      ciphers
+        .filter((cipher) => isClientItem(cipher, clients) && checksPassword(cipher, false))
+        .map((cipher) => cipher.login.password),
+    ),
+  ];
+}
+
+const problemCount = (item: ItemToFix) =>
+  Number(item.weak) + Number(item.reused) + Number((item.exposed ?? 0) > 0);
 
 export function clientHealth(
   ciphers: CipherView[],
   organizationIds: string[],
   score: StrengthScorer,
   today: Date = new Date(),
+  exposed?: ReadonlyMap<string, number | null>,
 ): Map<string, ClientHealth> {
+  const clients = new Set(organizationIds);
   const health = new Map<string, ClientHealth>(
-    organizationIds.map((id) => [id, { items: 0, expiring: 0, weak: 0, reused: 0 }]),
+    organizationIds.map((id): [string, ClientHealth] => [
+      id,
+      {
+        items: 0,
+        expiring: 0,
+        weak: 0,
+        reused: 0,
+        exposed: exposed === undefined ? undefined : 0,
+        unchecked: 0,
+        toFix: [],
+      },
+    ]),
   );
-  const passwordUses = new Map<string, Map<string, number>>();
 
-  for (const cipher of ciphers) {
-    const org = cipher.organizationId ? health.get(cipher.organizationId) : undefined;
-    if (org == null || cipher.isDeleted) {
-      continue;
-    }
+  const inClients = ciphers.filter((cipher) => isClientItem(cipher, clients));
+  for (const cipher of inClients) {
+    const org = health.get(cipher.organizationId)!;
     org.items++;
-
     const expires = itemExpiration(cipher);
     if (expires && expirationStatus(expires, today).state !== "later") {
       org.expiring++;
     }
-
-    const password = cipher.type === CipherType.Login ? cipher.login?.password : null;
-    if (!password) {
-      continue;
-    }
-    const hints = usernameHints(cipher.login.username);
-    const strength = score(password, hints.length > 0 ? hints : null);
-    if (strength != null && strength <= 2) {
-      org.weak++;
-    }
-    const uses = passwordUses.get(cipher.organizationId) ?? new Map<string, number>();
-    uses.set(password, (uses.get(password) ?? 0) + 1);
-    passwordUses.set(cipher.organizationId, uses);
   }
 
-  for (const [orgId, uses] of passwordUses) {
-    health.get(orgId)!.reused = [...uses.values()].filter((n) => n > 1).reduce((a, n) => a + n, 0);
+  const problems = passwordProblems(inClients, {
+    needsEdit: false,
+    weak: (cipher) => isWeakScore(passwordScore(cipher, score)),
+    group: (cipher) => cipher.organizationId,
+    exposed,
+  });
+  for (const found of problems) {
+    const org = health.get(found.cipher.organizationId)!;
+    org.weak += Number(found.weak);
+    org.reused += Number(found.reused);
+    if (org.exposed !== undefined && (found.exposed ?? 0) > 0) {
+      org.exposed++;
+    }
+    org.unchecked += Number(found.exposed === null);
+    if (needsFixing(found)) {
+      org.toFix.push({
+        id: found.cipher.id,
+        name: found.cipher.name,
+        organizationId: found.cipher.organizationId,
+        weak: found.weak,
+        reused: found.reused,
+        exposed: found.exposed,
+      });
+    }
+  }
+  for (const org of health.values()) {
+    org.toFix.sort(
+      (a, b) =>
+        (b.exposed ?? 0) - (a.exposed ?? 0) ||
+        problemCount(b) - problemCount(a) ||
+        (a.name ?? "").localeCompare(b.name ?? ""),
+    );
   }
   return health;
 }

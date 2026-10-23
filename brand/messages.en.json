@@ -528,5 +528,32 @@
         "content": "$1"
       }
     }
+  },
+  "keykeeperExposedPrivacy": {
+    "message": "Each password is checked against Have I Been Pwned's list of breached passwords without sending it: only the first 5 characters of its SHA-1 hash leave your browser, the answer lists hundreds of possible matches, and the match is made here."
+  },
+  "keykeeperExposedUncheckedTitle": {
+    "message": "Couldn't check every password"
+  },
+  "keykeeperExposedUnchecked": {
+    "message": "$COUNT$ passwords couldn't be checked, because this browser couldn't reach api.pwnedpasswords.com. It may be offline, or a firewall may block it. Try again later.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "12"
+      }
+    }
+  },
+  "keykeeperHealthToFix": {
+    "message": "$COUNT$ items to fix: weak, reused, or exposed passwords",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "keykeeperExposedCheckFailed": {
+    "message": "Couldn't check this password, because this browser couldn't reach api.pwnedpasswords.com. It may be offline, or a firewall may block it."
   }
 }

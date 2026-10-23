@@ -426,6 +426,21 @@ describe("LoginDetailsSectionComponent", () => {
           });
           expect(i18nService.t).toHaveBeenCalledWith("passwordSafe");
         });
+
+        it("says the check couldn't be made when the breach service can't be reached", async () => {
+          component.loginDetailsForm.controls.password.setValue("password");
+          auditService.passwordLeaked.mockRejectedValue(new Error("Failed to fetch"));
+          i18nService.t.mockReturnValue("couldntCheckMsg");
+
+          await component.checkPassword();
+
+          expect(toastService.showToast).toHaveBeenCalledWith({
+            variant: "warning",
+            title: null,
+            message: "couldntCheckMsg",
+          });
+          expect(i18nService.t).toHaveBeenCalledWith("keykeeperExposedCheckFailed");
+        });
       });
     });
   });

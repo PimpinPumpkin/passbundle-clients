@@ -3,14 +3,18 @@ import { mergeMap } from "rxjs/operators";
 
 import { ApiService } from "../abstractions/api.service";
 import { AuditService as AuditServiceAbstraction } from "../abstractions/audit.service";
+import { PwnedPasswords } from "../dirt/keykeeper/pwned-passwords";
 import { BreachAccountResponse } from "../dirt/models/response/breach-account.response";
 import { HibpApiService } from "../dirt/services/hibp-api.service";
 import { CryptoFunctionService } from "../key-management/crypto/abstractions/crypto-function.service";
-import { Utils } from "../platform/misc/utils";
-
-const PwnedPasswordsApi = "https://api.pwnedpasswords.com/range/";
 
 export class AuditService implements AuditServiceAbstraction {
+  // Keykeeper: every check goes through one k-anonymity client, which limits
+  // how many range requests run at once, asks once per password per session,
+  // and fails (instead of answering 0) when the service can't be reached. See
+  // libs/common/src/dirt/keykeeper/pwned-passwords.ts.
+  private readonly pwnedPasswords: PwnedPasswords;
+
   private passwordLeakedSubject = new Subject<{
     password: string;
     resolve: (count: number) => void;
@@ -24,6 +28,10 @@ export class AuditService implements AuditServiceAbstraction {
     private readonly maxConcurrent: number = 100, // default to 100, can be overridden
   ) {
     this.maxConcurrent = maxConcurrent;
+    this.pwnedPasswords = new PwnedPasswords(
+      (text) => this.cryptoFunctionService.hash(text, "sha1"),
+      (url, init) => this.apiService.nativeFetch(new Request(url, init)),
+    );
     this.passwordLeakedSubject
       .pipe(
         mergeMap(
@@ -54,21 +62,8 @@ export class AuditService implements AuditServiceAbstraction {
    * @returns A promise that resolves to the number of times the password has been leaked.
    */
   protected async fetchLeakedPasswordCount(password: string): Promise<number> {
-    const hashBytes = await this.cryptoFunctionService.hash(password, "sha1");
-    const hash = Utils.fromArrayToHex(hashBytes)!.toUpperCase();
-    const hashStart = hash.substr(0, 5);
-    const hashEnding = hash.substr(5);
-
-    const request = new Request(PwnedPasswordsApi + hashStart, {
-      headers: { "Add-Padding": "true" },
-    });
-    const response = await this.apiService.nativeFetch(request);
-    const leakedHashes = await response.text();
-    const match = leakedHashes.split(/\r?\n/).find((v) => {
-      return v.split(":")[0] === hashEnding;
-    });
-
-    return match != null ? parseInt(match.split(":")[1], 10) : 0;
+    // Keykeeper: only the hash's first 5 characters are sent, with padding.
+    return this.pwnedPasswords.timesExposed(password);
   }
 
   async breachedAccounts(username: string): Promise<BreachAccountResponse[]> {

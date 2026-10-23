@@ -26,6 +26,8 @@ describe("AuditService", () => {
 
     mockApi = {
       nativeFetch: jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
         text: jest.fn().mockResolvedValue(`CDDEEFF:4\nDDEEFF:2\n123456:1`),
       }),
     } as unknown as jest.Mocked<ApiService>;
@@ -69,7 +71,9 @@ describe("AuditService", () => {
     expect(Math.max(...maxInFlight)).toBeLessThanOrEqual(2);
     expect((auditService as any).fetchLeakedPasswordCount).toHaveBeenCalledTimes(4);
     expect(mockCrypto.hash).toHaveBeenCalledTimes(4);
-    expect(mockApi.nativeFetch).toHaveBeenCalledTimes(4);
+    // Keykeeper: the mock gives every password the same hash, and a hash is
+    // asked about once per session.
+    expect(mockApi.nativeFetch).toHaveBeenCalledTimes(1);
   });
 
   it("should include Add-Padding header when checking leaked passwords", async () => {

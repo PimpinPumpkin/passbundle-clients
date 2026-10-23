@@ -68,6 +68,7 @@ import { CoachmarkComponent, CoachmarkService } from "../../vault/components/coa
 import { OrganizationOptionsComponent } from "../../vault/individual-vault/vault-filter/components/organization-options.component";
 import { VaultFilterComponent } from "../../vault/individual-vault/vault-filter/components/vault-filter.component";
 import { OptionsInput } from "../../vault/individual-vault/vault-filter/shared/components/vault-filter-section.component";
+import { KeykeeperHealthCountService } from "../health/health-count.service";
 
 import { KeykeeperPickedLabelService } from "./picked-label.service";
 import { buildVaultMenu, folderPick, pickedLabel, VaultMenuActions } from "./vault-menu";
@@ -115,6 +116,21 @@ export function isVaultUrl(router: Router): boolean {
       text-transform: uppercase;
       color: inherit;
       opacity: 0.72;
+    }
+    /* Health's count of items to fix: a pill, so it reads as something to do. */
+    app-keykeeper-vault-menu .keykeeper-menu-alert {
+      min-width: 1.25rem;
+      padding: 0 0.4rem;
+      border-radius: 999px;
+      text-align: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      line-height: 1.25rem;
+      font-variant-numeric: tabular-nums;
+      /* Amber with the menu's own dark color, readable on every theme's dark menu. */
+      background: rgb(var(--color-warning-600));
+      color: var(--color-nav-bg-primary);
+      cursor: pointer;
     }
     app-keykeeper-vault-menu .keykeeper-menu-count {
       min-width: 1.25rem;
@@ -176,6 +192,11 @@ export class KeykeeperVaultMenuComponent extends VaultFilterComponent implements
   protected readonly sideNavService = inject(SideNavService);
   protected readonly coachmarkService = inject(CoachmarkService);
   private readonly terminology = inject(Vfo1TerminologyService);
+
+  /** How many items Health asks to fix, beside it; worked out after unlocking, never blocking. */
+  protected readonly healthCount = toSignal(inject(KeykeeperHealthCountService).count$, {
+    initialValue: undefined,
+  });
 
   protected readonly organizationOptions = OrganizationOptionsComponent;
   protected readonly reportsCoachmarkOpen = computed(

@@ -292,7 +292,19 @@ export class LoginDetailsSectionComponent implements OnInit {
       return;
     }
 
-    const matches = await this.auditService.passwordLeaked(password);
+    // Keykeeper: say so when the breach service can't be reached (offline, or
+    // a firewall blocks it), instead of an unexpected error.
+    let matches: number;
+    try {
+      matches = await this.auditService.passwordLeaked(password);
+    } catch {
+      this.toastService.showToast({
+        variant: "warning",
+        title: null,
+        message: this.i18nService.t("keykeeperExposedCheckFailed"),
+      });
+      return;
+    }
 
     if (matches > 0) {
       this.toastService.showToast({

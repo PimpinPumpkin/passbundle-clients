@@ -3,12 +3,20 @@ import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
 import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
 
-import { clientHealth, expiringItems, StrengthScorer, usernameHints } from "./client-health";
+import {
+  clientHealth,
+  clientPasswords,
+  expiringItems,
+  StrengthScorer,
+  usernameHints,
+} from "./client-health";
 
 const today = new Date(2026, 9, 15);
 
 function login(org: string, password: string | null, username = "alex@acme.test"): CipherView {
   const cipher = new CipherView();
+  cipher.id = `${org}-${password}-${Math.random()}`;
+  cipher.name = `${org} ${password}`;
   cipher.type = CipherType.Login;
   cipher.organizationId = org;
   cipher.login = new LoginView();
@@ -46,10 +54,20 @@ describe("MSP client health", () => {
 
     const health = clientHealth(ciphers, ["acme", "baker", "empty"], byLength, today);
 
-    expect(health.get("acme")).toEqual({ items: 6, expiring: 1, weak: 1, reused: 2 });
+    expect(health.get("acme")).toMatchObject({ items: 6, expiring: 1, weak: 1, reused: 2 });
     // The same password in another client isn't reuse within a client.
-    expect(health.get("baker")).toEqual({ items: 1, expiring: 0, weak: 1, reused: 0 });
-    expect(health.get("empty")).toEqual({ items: 0, expiring: 0, weak: 0, reused: 0 });
+    expect(health.get("baker")).toMatchObject({ items: 1, expiring: 0, weak: 1, reused: 0 });
+    expect(health.get("empty")).toEqual({
+      items: 0,
+      expiring: 0,
+      weak: 0,
+      reused: 0,
+      exposed: undefined,
+      unchecked: 0,
+      toFix: [],
+    });
+    // Until the breach check has run, exposed is unknown.
+    expect(health.get("acme")!.exposed).toBeUndefined();
   });
 
   it("leaves out trashed items, personal items, other organizations, and logins without passwords", () => {
@@ -62,12 +80,59 @@ describe("MSP client health", () => {
       login("acme", null),
     ];
 
-    expect(clientHealth(ciphers, ["acme"], byLength, today).get("acme")).toEqual({
+    expect(clientHealth(ciphers, ["acme"], byLength, today).get("acme")).toMatchObject({
       items: 1,
       expiring: 0,
       weak: 0,
       reused: 0,
     });
+  });
+
+  it("counts exposed passwords from the breach check, and the ones it couldn't check", () => {
+    const ciphers = [
+      login("acme", "password1"),
+      login("acme", "password1"),
+      login("acme", "a-long-unique-passphrase"),
+      login("acme", "another-long-unique-one"),
+      login("baker", "password1"),
+      login("baker", "never-checked-but-long"),
+    ];
+    const exposed = new Map<string, number | null>([
+      ["password1", 2_400_000],
+      ["a-long-unique-passphrase", 0],
+      ["another-long-unique-one", 3],
+      ["never-checked-but-long", null],
+    ]);
+
+    const health = clientHealth(ciphers, ["acme", "baker"], byLength, today, exposed);
+
+    expect(health.get("acme")).toMatchObject({ weak: 2, reused: 2, exposed: 3, unchecked: 0 });
+    expect(health.get("baker")).toMatchObject({ weak: 1, reused: 0, exposed: 1, unchecked: 1 });
+    // The items to fix, by name, the most exposed first; never the passwords.
+    expect(health.get("acme")!.toFix.map((i) => [i.name, i.weak, i.reused, i.exposed])).toEqual([
+      ["acme password1", true, true, 2_400_000],
+      ["acme password1", true, true, 2_400_000],
+      ["acme another-long-unique-one", false, false, 3],
+    ]);
+    expect(Object.keys(health.get("acme")!.toFix[0]).sort()).toEqual(
+      ["exposed", "id", "name", "organizationId", "reused", "weak"].sort(),
+    );
+    // A password that couldn't be checked and has nothing else wrong isn't listed.
+    expect(health.get("baker")!.toFix.map((i) => i.name)).toEqual(["baker password1"]);
+  });
+
+  it("checks each password once across every client, and only passwords staff may see", () => {
+    const hidden = login("acme", "hidden-one");
+    hidden.viewPassword = false;
+    const ciphers = [
+      login("acme", "password1"),
+      login("baker", "password1"),
+      login("baker", "other"),
+      login("elsewhere", "not-a-client"),
+      hidden,
+    ];
+
+    expect(clientPasswords(ciphers, ["acme", "baker"]).sort()).toEqual(["other", "password1"]);
   });
 
   it("gives the scorer the username's parts as hints, as upstream's weak passwords report does", () => {
