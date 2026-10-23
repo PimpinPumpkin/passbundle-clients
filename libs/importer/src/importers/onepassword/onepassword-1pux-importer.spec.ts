@@ -143,6 +143,42 @@ describe("1Password 1Pux Importer", () => {
     expect(cipher.favorite).toBe(true);
   });
 
+  // Keykeeper: favIndex is the place among the favorites, so the second favorite is 2.
+  it("should set favourite for every favorite, not only the first", async () => {
+    const importer = new OnePassword1PuxImporter();
+    const data: typeof LoginData = JSON.parse(JSON.stringify(LoginData));
+    const item = data.accounts[0].vaults[0].items[0];
+    data.accounts[0].vaults[0].items = [
+      { ...item, uuid: "first-favorite", favIndex: 1 },
+      { ...item, uuid: "second-favorite", favIndex: 2 },
+      { ...item, uuid: "not-a-favorite", favIndex: 0 },
+    ];
+    const result = await importer.parse(JSON.stringify(data));
+
+    expect(result.ciphers.map((c) => c.favorite)).toEqual([true, true, false]);
+  });
+
+  // Keykeeper: a field on more than one line goes to the notes; the item's own notes must not
+  // replace it.
+  it("should keep a field on more than one line when the item has notes", async () => {
+    const importer = new OnePassword1PuxImporter();
+    const data: typeof LoginData = JSON.parse(JSON.stringify(LoginData));
+    const details = data.accounts[0].vaults[0].items[0].details;
+    details.notesPlain = "The item's own notes.";
+    details.sections[0].fields.push({
+      ...details.sections[0].fields[0],
+      title: "Backup codes",
+      id: "backupcodes",
+      value: { string: "11111\n22222\n33333" },
+      multiline: true,
+    });
+    const result = await importer.parse(JSON.stringify(data));
+
+    expect(result.ciphers[0].notes).toEqual(
+      "The item's own notes.\n\nBackup codes: 11111\n22222\n33333",
+    );
+  });
+
   it("should handle custom boolean fields", async () => {
     const importer = new OnePassword1PuxImporter();
     const result = await importer.parse(LoginDataJson);

@@ -36,6 +36,8 @@ describe("Dashlane CSV Importer", () => {
 
     const cipher = result.ciphers.shift();
     expect(cipher.login.totp).toEqual("anotherTOTPSeed");
+    // Keykeeper: and not a plain text field with the secret in it too.
+    expect(cipher.fields.map((f) => f.name)).not.toContain("otpUrl");
   });
 
   it("should parse an item and create a folder", async () => {

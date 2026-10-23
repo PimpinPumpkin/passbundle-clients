@@ -148,7 +148,8 @@ export abstract class OnePasswordCsvImporter extends BaseImporter implements Imp
       "\n" +
       this.getValueOrDefault(this.getProp(importRecord, "notes"), "") +
       "\n";
-    cipher.notes.trim();
+    // Keykeeper: keep the trimmed notes (trim() returns a new string).
+    cipher.notes = cipher.notes.trim();
   }
 
   protected setKnownLoginValue(context: CipherImportContext): boolean {
@@ -378,7 +379,10 @@ export abstract class OnePasswordCsvImporter extends BaseImporter implements Imp
       if (context.cipher.login.uris == null) {
         context.cipher.login.uris = [];
       }
-      context.cipher.login.uris.concat(this.makeUriArray(context.importRecord[context.property]));
+      // Keykeeper: keep the address (concat() returns a new array).
+      context.cipher.login.uris = context.cipher.login.uris.concat(
+        this.makeUriArray(context.importRecord[context.property]) ?? [],
+      );
       return true;
     }
     return false;

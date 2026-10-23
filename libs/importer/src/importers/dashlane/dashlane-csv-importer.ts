@@ -25,6 +25,8 @@ const _mappedCredentialsColumns = new Set([
   "password",
   "url",
   "otpSecret",
+  // Keykeeper: the TOTP secret in newer exports, already the item's TOTP; not a text field too.
+  "otpUrl",
   "category",
 ]);
 
