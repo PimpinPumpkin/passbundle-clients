@@ -34,6 +34,44 @@ describe("KeePass2 Xml Importer", () => {
     expect(result.ciphers[0].login.password != null).toBe(true);
   });
 
+  // Keykeeper: KeePass exports its Recycle Bin; what's in it was deleted.
+  it("should leave out the Recycle Bin and what's in it", async () => {
+    const importer = new KeePass2XmlImporter();
+    const entry = (title: string) =>
+      `<Entry><String><Key>Title</Key><Value>${title}</Value></String>` +
+      `<String><Key>Password</Key><Value ProtectInMemory="True">not-a-real-password</Value></String></Entry>`;
+    const result = await importer.parse(
+      `<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<KeePassFile>
+  <Meta>
+    <RecycleBinEnabled>True</RecycleBinEnabled>
+    <RecycleBinUUID>cmVjeWNsZS1iaW4tMDAwMQ==</RecycleBinUUID>
+  </Meta>
+  <Root>
+    <Group>
+      <UUID>cm9vdC1ncm91cC0wMDAwMQ==</UUID>
+      <Name>Database</Name>
+      ${entry("At the top")}
+      <Group>
+        <UUID>d29yay1ncm91cC0wMDAwMQ==</UUID>
+        <Name>Work</Name>
+        ${entry("At work")}
+      </Group>
+      <Group>
+        <UUID>cmVjeWNsZS1iaW4tMDAwMQ==</UUID>
+        <Name>Recycle Bin</Name>
+        ${entry("Deleted")}
+      </Group>
+    </Group>
+  </Root>
+</KeePassFile>`,
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.ciphers.map((c) => c.name)).toEqual(["At the top", "At work"]);
+    expect(result.folders.map((f) => f.name)).toEqual(["Work"]);
+  });
+
   it("should return error with missing root tag", async () => {
     const importer = new KeePass2XmlImporter();
     const result = await importer.parse(TestData1);

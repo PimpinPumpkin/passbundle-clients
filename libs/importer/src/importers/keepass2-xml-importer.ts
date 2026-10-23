@@ -11,6 +11,8 @@ import { Importer } from "./importer";
 
 export class KeePass2XmlImporter extends BaseImporter implements Importer {
   result = new ImportResult();
+  /** Keykeeper: the Recycle Bin group's UUID, if the database has one. */
+  private recycleBin: string | null = null;
 
   parse(data: string): Promise<ImportResult> {
     const doc = this.parseXml(data);
@@ -40,6 +42,19 @@ export class KeePass2XmlImporter extends BaseImporter implements Importer {
       this.result.errorMessage = "Missing `KeePassFile > Root > Group` node.";
       this.result.success = false;
       return Promise.resolve(this.result);
+    }
+
+    // Keykeeper: KeePass exports its Recycle Bin too. What's in it was deleted, so it's
+    // left out rather than coming back as a "Recycle Bin" folder.
+    const meta = this.querySelectorDirectChild(KeePassFileNode, "Meta");
+    const recycleBin = meta == null ? null : this.querySelectorDirectChild(meta, "RecycleBinUUID");
+    const noUuid = "AAAAAAAAAAAAAAAAAAAAAA==";
+    this.recycleBin =
+      recycleBin == null || this.isNullOrWhitespace(recycleBin.textContent)
+        ? null
+        : recycleBin.textContent.trim();
+    if (this.recycleBin === noUuid) {
+      this.recycleBin = null;
     }
 
     this.traverse(rootGroup, true, "");
@@ -125,6 +140,12 @@ export class KeePass2XmlImporter extends BaseImporter implements Importer {
     });
 
     this.querySelectorAllDirectChild(node, "Group").forEach((group) => {
+      if (
+        this.recycleBin != null &&
+        this.querySelectorDirectChild(group, "UUID")?.textContent.trim() === this.recycleBin
+      ) {
+        return;
+      }
       this.traverse(group, false, groupName);
     });
   }

@@ -23,7 +23,32 @@ class FakeBaseImporter extends BaseImporter {
   processFolder(result: ImportResult, folderName: string, addRelationship: boolean = true): void {
     return super.processFolder(result, folderName, addRelationship);
   }
+
+  processKvp(cipher: CipherView, key: string, value: string): void {
+    return super.processKvp(cipher, key, value);
+  }
 }
+
+// Keykeeper: a value too long or on more than one line goes to the notes, on a line of its own.
+describe("processKvp method", () => {
+  const importer = new FakeBaseImporter();
+
+  it("should start a value moved to the notes on a new line after notes already there", () => {
+    const cipher = importer.initLoginCipher();
+    cipher.notes = "The item's own notes.";
+    importer.processKvp(cipher, "Backup codes", "11111\n22222");
+
+    expect(cipher.notes).toBe("The item's own notes.\nBackup codes: 11111\n22222\n");
+  });
+
+  it("should not add a blank line when the notes are empty or end with one", () => {
+    const cipher = importer.initLoginCipher();
+    importer.processKvp(cipher, "First", "a\nb");
+    importer.processKvp(cipher, "Second", "c\nd");
+
+    expect(cipher.notes).toBe("First: a\nb\nSecond: c\nd\n");
+  });
+});
 
 describe("processFolder method", () => {
   let result: ImportResult;

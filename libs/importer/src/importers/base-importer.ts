@@ -335,6 +335,10 @@ export abstract class BaseImporter {
       if (cipher.notes == null) {
         cipher.notes = "";
       }
+      // Keykeeper: on a line of its own when the notes already have something.
+      if (cipher.notes.length > 0 && !cipher.notes.endsWith("\n")) {
+        cipher.notes += "\n";
+      }
       cipher.notes += key + ": " + this.splitNewLine(value).join("\n") + "\n";
     } else {
       if (cipher.fields == null) {

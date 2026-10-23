@@ -62,6 +62,24 @@ describe("1Password mac CSV Importer", () => {
     expectCreditCard(cipher);
   });
 
+  // Keykeeper: 1Password 8's CSV has a Url column; its address was dropped, and the notes kept
+  // a newline at each end.
+  it("should keep the website and notes of a 1Password 8 CSV", async () => {
+    const importer = new OnePasswordMacCsvImporter();
+    const result = await importer.parse(
+      [
+        "Title,Url,Username,Password,OTPAuth,Favorite,Archived,Tags,Notes",
+        "Example Mail,https://mail.example.com/login,test.person,not-a-real-password,,false,false,,A note.",
+      ].join("\n"),
+    );
+
+    expect(result.ciphers.length).toBe(1);
+    const cipher = result.ciphers[0];
+    expect(cipher.login.uris.map((u) => u.uri)).toEqual(["https://mail.example.com/login"]);
+    expect(cipher.login.username).toBe("test.person");
+    expect(cipher.notes).toBe("A note.");
+  });
+
   it("should parse csv's with multiple record type", async () => {
     const importer = new OnePasswordMacCsvImporter();
     const result = await importer.parse(multiTypeData);

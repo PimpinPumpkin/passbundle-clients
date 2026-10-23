@@ -93,7 +93,9 @@ export class OnePassword1PuxImporter extends BaseImporter implements Importer {
               break;
           }
 
-          cipher.favorite = item.favIndex === 1 ? true : false;
+          // Keykeeper: favIndex is the item's place among the favorites (1, 2, 3, ...);
+          // 0 is not a favorite.
+          cipher.favorite = item.favIndex > 0;
 
           this.processOverview(item.overview, cipher);
 
@@ -106,7 +108,12 @@ export class OnePassword1PuxImporter extends BaseImporter implements Importer {
           this.processSections(category, item.details.sections, cipher);
 
           if (!this.isNullOrWhitespace(item.details.notesPlain)) {
-            cipher.notes = item.details.notesPlain.split(this.newLineRegex).join("\n").trimEnd();
+            const notes = item.details.notesPlain.split(this.newLineRegex).join("\n").trimEnd();
+            // Keykeeper: keep what the fields above already put in the notes (a value on
+            // more than one line, or a long one), after the item's own notes.
+            cipher.notes = this.isNullOrWhitespace(cipher.notes)
+              ? notes
+              : `${notes}\n\n${cipher.notes.trimEnd()}`;
           }
 
           this.convertToNoteIfNeeded(cipher);
