@@ -455,13 +455,15 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     policy: { enabled: boolean; data: any },
     keep: string[] = [],
   ): Promise<DefaultPolicyResult> {
-    return this.apiService.send(
+    const result: DefaultPolicyResult = await this.apiService.send(
       "PUT",
       `/keykeeper/msp/${mspId}/policies/${type}`,
       { ...policy, keep },
       true,
       true,
     );
+    await this.syncChangedPolicies(result);
+    return result;
   }
 
   /** Puts clients back on the default for one policy, replacing their own setting. */
@@ -470,13 +472,28 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     type: number,
     clients: string[],
   ): Promise<Omit<DefaultPolicyResult, "kept">> {
-    return this.apiService.send(
+    const result: Omit<DefaultPolicyResult, "kept"> = await this.apiService.send(
       "POST",
       `/keykeeper/msp/${mspId}/policies/${type}/apply`,
       { clients },
       true,
       true,
     );
+    await this.syncChangedPolicies(result);
+    return result;
+  }
+
+  /**
+   * Clients' policies reach this vault when it syncs, and nothing tells it to
+   * sync when a default changes them. Upstream's admin console puts a policy
+   * it saves straight into the vault; after a default changed clients, a sync
+   * does the same, so their admin consoles act on it at once, such as
+   * offering Recover account right after account recovery is turned on.
+   */
+  private async syncChangedPolicies(result: { changed?: unknown[] }) {
+    if ((result.changed?.length ?? 0) > 0) {
+      await this.syncService.fullSync(true);
+    }
   }
 
   /** For a client's own owners: removes the MSP and all of its staff from the organization. */
