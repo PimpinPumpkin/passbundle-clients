@@ -8,6 +8,7 @@ import { FieldType, CipherType } from "@bitwarden/common/vault/enums";
 import { testData } from "../spec-data/protonpass-json/protonpass.json";
 
 import { ProtonPassJsonImporter } from "./protonpass-json-importer";
+import { ProtonPassItemState } from "./types/protonpass-json-type";
 
 describe("Protonpass Json Importer", () => {
   let importer: ProtonPassJsonImporter;
@@ -103,6 +104,61 @@ describe("Protonpass Json Importer", () => {
     expect(result.folderRelationships[1]).toEqual([1, 0]);
     // "Other vault login" is assigned to folder "Test"
     expect(result.folderRelationships[7]).toEqual([7, 1]);
+  });
+
+  // Keykeeper: with everything in one vault, there's nothing to tell apart.
+  it("should leave items unfiled when they're all in one vault", async () => {
+    const [[shareId, personal]] = Object.entries(testData.vaults);
+    const oneVault = { ...testData, vaults: { [shareId]: personal } };
+    const result = await importer.parse(JSON.stringify(oneVault));
+
+    expect(result.success).toBe(true);
+    expect(result.ciphers.length).toBeGreaterThan(0);
+    expect(result.folders).toEqual([]);
+    expect(result.folderRelationships).toEqual([]);
+  });
+
+  it("should count only vaults with items in them, not ones that are empty or trashed", async () => {
+    const [[shareId, personal], [otherId, other]] = Object.entries(testData.vaults);
+    const trashedOnly = {
+      ...other,
+      items: other.items.map((item) => ({ ...item, state: ProtonPassItemState.TRASHED })),
+    };
+    const result = await importer.parse(
+      JSON.stringify({
+        ...testData,
+        vaults: { [shareId]: personal, [otherId]: trashedOnly, empty: { ...other, items: [] } },
+      }),
+    );
+
+    expect(result.folders).toEqual([]);
+  });
+
+  it("should put the street on the first address line, and an organization in the company", async () => {
+    const [[shareId, personal]] = Object.entries(testData.vaults);
+    const identity = personal.items.find((item) => item.data.type === "identity");
+    const content = {
+      ...identity.data.content,
+      company: "",
+      organization: "Example Corp",
+      streetAddress: "1 Example Street",
+      floor: "",
+      county: "",
+    };
+    const result = await importer.parse(
+      JSON.stringify({
+        ...testData,
+        vaults: {
+          [shareId]: { ...personal, items: [{ ...identity, data: { ...identity.data, content } }] },
+        },
+      }),
+    );
+
+    const cipher = result.ciphers[0];
+    expect(cipher.identity.company).toBe("Example Corp");
+    expect(cipher.identity.address1).toBe("1 Example Street");
+    expect(cipher.identity.address2).toBeNull();
+    expect(cipher.identity.address3).toBeNull();
   });
 
   it("should create collections if part of an organization", async () => {
@@ -216,9 +272,10 @@ describe("Protonpass Json Importer", () => {
     expect(cipher.identity.ssn).toBe("98378264782");
     expect(cipher.identity.passportNumber).toBe("7173716378612");
     expect(cipher.identity.licenseNumber).toBe("21234");
-    expect(cipher.identity.address1).toBe("Bitwarden");
-    expect(cipher.identity.address2).toBe("23 Street");
-    expect(cipher.identity.address3).toBe("12th Floor Test County");
+    // Keykeeper: the street first; the organization is the company already.
+    expect(cipher.identity.address1).toBe("23 Street");
+    expect(cipher.identity.address2).toBe("12th Floor Test County");
+    expect(cipher.identity.address3).toBeNull();
     expect(cipher.identity.city).toBe("New York");
     expect(cipher.identity.state).toBe("Test");
     expect(cipher.identity.postalCode).toBe("4038456");
