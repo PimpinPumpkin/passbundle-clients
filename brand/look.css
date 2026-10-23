@@ -141,7 +141,10 @@
 .pb-glass bit-table,
 .pb-glass app-vault-filter > div,
 .pb-glass app-vault-onboarding > div,
-.pb-glass bit-layout main .tw-rounded-lg.tw-border {
+/* Keykeeper: not the small icon tiles (bit-icon-tile), which are rounded and
+   bordered too; this rule would make them block and push their icon into the
+   corner. */
+.pb-glass bit-layout main .tw-rounded-lg.tw-border:not(bit-icon-tile > div) {
   display: block;
   background: var(--frost-surface) !important;
   -webkit-backdrop-filter: var(--frost-blur);
@@ -435,4 +438,12 @@ bit-avatar text {
 }
 .theme_light:not(.pb-glass) bit-side-nav nav[style*="nav-fg-secondary"] .pb-wm-bundle {
   fill: #0e7a5a;
+}
+
+/* Keykeeper: our mark in an icon tile sits in the middle. As an inline block on
+   the text baseline it left room for a descender under it, which put it 2px
+   high. */
+bit-icon-tile .bwi-bitwarden-shield:before,
+bit-icon-tile .bwi-shield:before {
+  vertical-align: top;
 }
