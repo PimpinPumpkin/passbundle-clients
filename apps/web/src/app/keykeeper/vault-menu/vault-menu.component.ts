@@ -60,6 +60,7 @@ import {
   VAULT_FILTER_BASE_ROUTE,
   VaultFilterList,
   VaultFilterSection,
+  KeykeeperCategoryTileComponent,
   Vfo1TerminologyService,
 } from "@bitwarden/vault";
 
@@ -112,10 +113,10 @@ export function isVaultUrl(router: Router): boolean {
       margin: 0;
       font-size: 0.6875rem;
       font-weight: 700;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
-      color: inherit;
-      opacity: 0.72;
+      /* The design's muted text (brand/look.css), 4.5:1 or more on the menu. */
+      color: var(--pb-muted, inherit);
     }
     /* Health's count of items to fix: a pill, so it reads as something to do. */
     app-keykeeper-vault-menu .keykeeper-menu-alert {
@@ -131,9 +132,9 @@ export function isVaultUrl(router: Router): boolean {
       font-weight: 700;
       line-height: 1.25rem;
       font-variant-numeric: tabular-nums;
-      /* Amber with the menu's own dark color, readable on every theme's dark menu. */
-      background: rgb(var(--color-warning-600));
-      color: var(--color-nav-bg-primary);
+      /* Topaz, a tint with dark text (light) or the other way around (dark). */
+      background: var(--pb-alert-bg, rgb(var(--color-warning-600)));
+      color: var(--pb-alert-text, var(--color-nav-bg-primary));
       cursor: pointer;
     }
     app-keykeeper-vault-menu .keykeeper-menu-count {
@@ -141,8 +142,8 @@ export function isVaultUrl(router: Router): boolean {
       text-align: end;
       font-size: 0.8125rem;
       font-variant-numeric: tabular-nums;
-      /* 4.5:1 or more on the nav, and on the brighter pill of the entry showing. */
-      opacity: 0.8;
+      /* 4.5:1 or more on the menu, and on the tint of the entry showing. */
+      color: var(--pb-muted, inherit);
       cursor: pointer;
     }
     /* A folder's edit button and an organization's options show on hover and
@@ -162,7 +163,7 @@ export function isVaultUrl(router: Router): boolean {
     /* The vault a category or folder is showing inside of: outlined, where
        the entry showing is filled. */
     app-keykeeper-vault-menu bit-nav-item.keykeeper-menu-scope [data-testid="nav-item-container"] {
-      box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.3);
+      box-shadow: inset 0 0 0 1px var(--pb-scope-ring, rgb(255 255 255 / 0.3));
     }
   `,
   imports: [
@@ -171,6 +172,7 @@ export function isVaultUrl(router: Router): boolean {
     I18nPipe,
     IconButtonModule,
     IconModule,
+    KeykeeperCategoryTileComponent,
     MenuModule,
     NavigationModule,
     NgComponentOutlet,

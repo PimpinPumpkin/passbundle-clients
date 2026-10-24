@@ -53,8 +53,10 @@ import {
 import { VaultItemEvent } from "./vault-item-event";
 
 // Fixed manual row height required due to how cdk-virtual-scroll works
-export const RowHeight = 76.5;
-export const RowHeightClass = `tw-h-[76.5px]`;
+// Keykeeper: rows of a 40px tile with room around it, as the design has them
+// (DESIGN.md, "The look"); brand/look.css draws each as a rounded row.
+export const RowHeight = 64;
+export const RowHeightClass = `tw-h-[64px]`;
 
 const MaxSelectionCount = 500;
 

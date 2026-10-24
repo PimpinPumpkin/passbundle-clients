@@ -10,25 +10,36 @@ import { ConfigService } from "@bitwarden/common/platform/abstractions/config/co
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
+import {
+  categoryOfItem,
+  categoryOfType,
+  KeykeeperCategory,
+} from "@bitwarden/common/vault/keykeeper/categories";
 import { RestrictedItemTypesService } from "@bitwarden/common/vault/services/restricted-item-types.service";
 import {
   CIPHER_MENU_ITEMS,
   DIALOG_CIPHER_MENU_ITEMS,
 } from "@bitwarden/common/vault/types/cipher-menu-items";
 import {
-  BitwardenIcon,
   ButtonModule,
   DIALOG_DATA,
   DialogModule,
   DialogRef,
   DialogService,
-  IconTileComponent,
   LinkModule,
   TypographyModule,
 } from "@bitwarden/components";
 import { I18nPipe } from "@bitwarden/ui-common";
 
-import { BUILT_IN_TEMPLATES, ItemTemplate, TemplateBase, templateGroups } from "./templates";
+import { KeykeeperCategoryTileComponent } from "./category-tile.component";
+import {
+  BUILT_IN_TEMPLATES,
+  ItemTemplate,
+  TemplateBase,
+  templateCipherType,
+  templateFields,
+  templateGroups,
+} from "./templates";
 
 /** What the person picked: a kind of item, a template, a new template, or a container. */
 export type NewItemResult =
@@ -53,19 +64,27 @@ const MAIN_TYPES: readonly CipherType[] = [
   CipherType.Identity,
 ];
 
-type Choice = { key: string; name: string; icon: string; result: NewItemResult };
+type Choice = { key: string; name: string; category: KeykeeperCategory; result: NewItemResult };
 
 /**
  * Keykeeper: the New item picker (DESIGN.md, "Our own screens"). The kinds
  * people save most first, as big tiles; "More categories" opens the rest of
  * the item types and the templates (built-in, the person's, and their
  * organizations'), with a search. Folders and collections, which aren't
- * items, are buttons at the bottom.
+ * items, are buttons at the bottom. Every kind and template shows its jewel
+ * tile, as in the menu and the list (DESIGN.md, "The look").
  */
 @Component({
   selector: "vault-keykeeper-new-item-dialog",
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ButtonModule, DialogModule, I18nPipe, IconTileComponent, LinkModule, TypographyModule],
+  imports: [
+    ButtonModule,
+    DialogModule,
+    I18nPipe,
+    KeykeeperCategoryTileComponent,
+    LinkModule,
+    TypographyModule,
+  ],
   template: `
     <bit-dialog dialogSize="large" background="alt">
       <span bitDialogTitle>What are you saving?</span>
@@ -81,7 +100,7 @@ type Choice = { key: string; name: string; icon: string; result: NewItemResult }
                 class="tw-flex tw-min-h-32 tw-flex-col tw-items-start tw-gap-2 tw-rounded-xl tw-border tw-border-solid tw-border-secondary-300 tw-bg-background tw-p-4 tw-text-start tw-text-main hover:tw-border-primary-600 focus-visible:tw-outline-primary-600"
                 (click)="close({ kind: 'type', cipherType: t.type })"
               >
-                <bit-icon-tile [icon]="t.icon" variant="primary" size="base"></bit-icon-tile>
+                <vault-keykeeper-category-tile [category]="t.category" [size]="36" />
                 <span class="tw-font-semibold">{{ t.labelKey | i18n }}</span>
                 <span bitTypography="helper" class="tw-text-muted">{{ t.subtitleKey | i18n }}</span>
               </button>
@@ -109,7 +128,7 @@ type Choice = { key: string; name: string; icon: string; result: NewItemResult }
                     class="tw-flex tw-items-center tw-gap-3 tw-rounded-lg tw-border tw-border-solid tw-border-secondary-300 tw-bg-background tw-px-3 tw-py-2 tw-text-start tw-text-main hover:tw-border-primary-600"
                     (click)="close(c.result)"
                   >
-                    <i class="bwi bwi-fw {{ c.icon }} tw-text-primary-600" aria-hidden="true"></i>
+                    <vault-keykeeper-category-tile [category]="c.category" [size]="24" />
                     {{ c.name }}
                   </button>
                 } @empty {
@@ -128,10 +147,7 @@ type Choice = { key: string; name: string; icon: string; result: NewItemResult }
                         class="tw-flex tw-items-center tw-gap-3 tw-rounded-lg tw-border tw-border-dashed tw-border-secondary-300 tw-bg-background tw-px-3 tw-py-2 tw-text-start tw-text-main hover:tw-border-primary-600"
                         (click)="close(c.result)"
                       >
-                        <i
-                          class="bwi bwi-fw {{ c.icon }} tw-text-primary-600"
-                          aria-hidden="true"
-                        ></i>
+                        <vault-keykeeper-category-tile [category]="c.category" [size]="24" />
                         {{ c.name }}
                       </button>
                     }
@@ -250,7 +266,7 @@ export class KeykeeperNewItemDialogComponent {
   protected readonly main = computed(() =>
     MAIN_TYPES.map((type) => this.allowedTypes().find((item) => item.type === type))
       .filter((item) => item != null)
-      .map((item) => ({ ...item, icon: item.icon as BitwardenIcon })),
+      .map((item) => ({ ...item, category: categoryOfType(item.type) })),
   );
 
   private readonly matches = (name: string) =>
@@ -263,7 +279,7 @@ export class KeykeeperNewItemDialogComponent {
       .map((item) => ({
         key: `type-${item.type}`,
         name: this.i18nService.t(item.labelKey),
-        icon: item.icon,
+        category: categoryOfType(item.type),
         result: { kind: "type", cipherType: item.type },
       }));
     const builtIn = this.data.canCreateCipher ? this.templateChoices(BUILT_IN_TEMPLATES) : [];
@@ -287,7 +303,10 @@ export class KeykeeperNewItemDialogComponent {
     return templates.map((template) => ({
       key: `template-${template.source?.cipherId ?? template.id}`,
       name: template.name,
-      icon: template.icon,
+      category: categoryOfItem({
+        type: templateCipherType(template),
+        fields: templateFields(template),
+      }),
       result: { kind: "template", template },
     }));
   }

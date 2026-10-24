@@ -1,7 +1,7 @@
 import { OverlayContainer } from "@angular/cdk/overlay";
 import { CommonModule } from "@angular/common";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
-import { RouterModule } from "@angular/router";
+import { Router, RouterModule } from "@angular/router";
 import { mock } from "jest-mock-extended";
 import { BehaviorSubject, of } from "rxjs";
 
@@ -25,6 +25,7 @@ import {
   CopyCipherFieldDirective,
   CopyCipherFieldService,
   KeykeeperExpirationBadgeComponent,
+  KeykeeperItemTileComponent,
   KeykeeperTemplateBadgeComponent,
   OrganizationNameBadgeComponent,
   VaultCopyButtonsService,
@@ -66,6 +67,7 @@ describe("VaultCipherRowComponent", () => {
         OrganizationNameBadgeComponent,
         PremiumBadgeComponent,
         KeykeeperExpirationBadgeComponent,
+        KeykeeperItemTileComponent,
         KeykeeperTemplateBadgeComponent,
       ],
       providers: [
@@ -170,6 +172,37 @@ describe("VaultCipherRowComponent", () => {
       const overlayContent = openMenuAndGetContent();
 
       expect(overlayContent).not.toContain('appcopyfield="password"');
+    });
+  });
+
+  describe("the open item", () => {
+    beforeEach(() => {
+      const cipher = new CipherView();
+      cipher.id = "cipher-1";
+      cipher.name = "Contoso Mail";
+      cipher.type = CipherType.Login;
+      cipher.login = new LoginView();
+      component.cipher = cipher;
+    });
+
+    it("marks the row whose item the address has open, and no other", async () => {
+      const router = TestBed.inject(Router);
+      const open = () => fixture.nativeElement.getAttribute("data-keykeeper-open");
+      fixture.detectChanges();
+      expect(open()).toBeNull();
+
+      await router.navigate([], { queryParams: { itemId: "cipher-1", action: "view" } });
+      fixture.detectChanges();
+      expect(open()).toBe("");
+
+      await router.navigate([], { queryParams: { itemId: "cipher-2", action: "view" } });
+      fixture.detectChanges();
+      expect(open()).toBeNull();
+
+      // Old links name it as cipherId.
+      await router.navigate([], { queryParams: { cipherId: "cipher-1" } });
+      fixture.detectChanges();
+      expect(open()).toBe("");
     });
   });
 

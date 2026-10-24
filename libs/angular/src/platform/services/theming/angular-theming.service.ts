@@ -1,14 +1,5 @@
 import { Inject, Injectable } from "@angular/core";
-import {
-  combineLatest,
-  fromEvent,
-  map,
-  merge,
-  Observable,
-  of,
-  Subscription,
-  switchMap,
-} from "rxjs";
+import { fromEvent, map, merge, Observable, of, Subscription, switchMap } from "rxjs";
 
 import { ThemeTypes, Theme } from "@bitwarden/common/platform/enums";
 import { ThemeStateService } from "@bitwarden/common/platform/theming/theme-state.service";
@@ -64,21 +55,12 @@ export class AngularThemingService implements AbstractThemingService {
   ) {}
 
   applyThemeChangesTo(document: Document): Subscription {
-    // Keykeeper: the System setting is PassBundle's "Glass" look, light or dark
-    // like the device, with translucent surfaces; Light and Dark are solid.
-    // `pb-glass` turns the translucency on (brand/look.css).
-    return combineLatest([this.themeStateService.selectedTheme$, this.theme$]).subscribe(
-      ([configuredTheme, theme]) => {
-        document.documentElement.classList.remove(
-          "theme_" + ThemeTypes.Light,
-          "theme_" + ThemeTypes.Dark,
-        );
-        document.documentElement.classList.add("theme_" + theme);
-        document.documentElement.classList.toggle(
-          "pb-glass",
-          configuredTheme === ThemeTypes.System,
-        );
-      },
-    );
+    return this.theme$.subscribe((theme) => {
+      document.documentElement.classList.remove(
+        "theme_" + ThemeTypes.Light,
+        "theme_" + ThemeTypes.Dark,
+      );
+      document.documentElement.classList.add("theme_" + theme);
+    });
   }
 }

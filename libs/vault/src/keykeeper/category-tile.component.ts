@@ -9,12 +9,14 @@ import {
 import {
   KEYKEEPER_CATEGORY_LOOKS,
   KeykeeperCategory,
+  KeykeeperCategoryLook,
 } from "@bitwarden/common/vault/keykeeper/categories";
 
 /**
  * Keykeeper: a category's jewel tile, a rounded square in the category's
- * color with its glyph in white and a little sheen (DESIGN.md, "The look").
- * Decorative: what it stands for is always written beside it.
+ * color with its glyph in white and a little sheen (DESIGN.md, "The look"),
+ * or a tile with a look of its own, such as a Health report's. Decorative:
+ * what it stands for is always written beside it.
  */
 @Component({
   selector: "vault-keykeeper-category-tile",
@@ -26,9 +28,9 @@ import {
       [style.width.px]="size()"
       [style.height.px]="size()"
       [style.border-radius.px]="radius()"
-      [style.--pb-jewel]="look().light"
-      [style.--pb-jewel-dark]="look().dark"
-      [attr.data-category]="category()"
+      [style.--pb-jewel]="drawn().light"
+      [style.--pb-jewel-dark]="drawn().dark"
+      [attr.data-category]="category() ?? null"
       aria-hidden="true"
     >
       <svg
@@ -41,7 +43,7 @@ import {
         stroke-linecap="round"
         stroke-linejoin="round"
       >
-        <path [attr.d]="look().glyph"></path>
+        <path [attr.d]="drawn().glyph"></path>
       </svg>
     </span>
   `,
@@ -85,13 +87,17 @@ import {
   `,
 })
 export class KeykeeperCategoryTileComponent {
-  readonly category = input.required<KeykeeperCategory>();
+  readonly category = input<KeykeeperCategory>();
+  /** A color and glyph of its own, instead of a category's. */
+  readonly look = input<KeykeeperCategoryLook>();
   /** The tile's width and height, in pixels. */
   readonly size = input<number>(36);
   /** No shadows: for the tiny tiles inside chips and lines of text. */
   readonly flat = input(false, { transform: booleanAttribute });
 
-  protected readonly look = computed(() => KEYKEEPER_CATEGORY_LOOKS[this.category()]);
+  protected readonly drawn = computed(
+    () => this.look() ?? KEYKEEPER_CATEGORY_LOOKS[this.category() ?? "all"],
+  );
   protected readonly radius = computed(() => Math.round(this.size() * 0.28));
   protected readonly glyphSize = computed(() => Math.round(this.size() * 0.58));
   protected readonly strokeWidth = computed(() => (this.size() <= 20 ? 2.4 : 1.9));

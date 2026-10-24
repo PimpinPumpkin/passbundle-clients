@@ -229,6 +229,12 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
   private destroy$ = new Subject<void>();
 
   private vaultItemDialogRef?: DialogRef<VaultItemDialogResult> | undefined;
+  /** Keykeeper: the item the side panel shows, while it's open. */
+  private panelItemId?: string;
+  /** Keykeeper: the side panel's item is being edited, so another row doesn't replace it. */
+  private panelEditing = false;
+  /** Keykeeper: the page is gone (the panel closes when another page opens). */
+  private destroyed = false;
 
   protected showAddCipherBtn: boolean = false;
 
@@ -543,7 +549,8 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
       .pipe(
         switchMap(() => this.route.queryParams),
         // Only process the queryParams if the dialog is not open
-        filter(() => this.vaultItemDialogRef == undefined),
+        // Keykeeper: or the side panel is, showing another item than these name.
+        filter((params) => this.canOpenFromAddress(params)),
         switchMap(async (params) => {
           const cipherId = getCipherIdFromParams(params);
           if (cipherId) {
@@ -670,6 +677,7 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
   }
 
   ngOnDestroy() {
+    this.destroyed = true;
     this.broadcasterService.unsubscribe(BroadcasterSubscriptionId);
     this.destroy$.next();
     this.destroy$.complete();
@@ -978,15 +986,36 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
     formConfig: CipherFormConfig,
     activeCollectionId?: CollectionId,
   ) {
-    this.vaultItemDialogRef = VaultItemDialogComponent.open(this.dialogService, {
-      mode,
-      formConfig,
-      activeCollectionId,
-      restore: this.restore,
-    });
+    const params = { mode, formConfig, activeCollectionId, restore: this.restore };
+    // Keykeeper: an item opens to view in the side panel beside the list
+    // (DESIGN.md, "The look"), and picking another row shows that one there.
+    // A new item, or one opened to edit, opens in a dialog, as before, and
+    // closes the panel first, unless its item is being edited there.
+    if (mode !== "view" && this.vaultItemDialogRef?.isDrawer && !this.panelEditing) {
+      await this.vaultItemDialogRef.close();
+    }
+    const shownId = formConfig.originalCipher?.id;
+    const ref =
+      mode === "view"
+        ? await VaultItemDialogComponent.openDrawer(this.dialogService, params, {
+            closeOnNavigation: true,
+          })
+        : VaultItemDialogComponent.open(this.dialogService, params);
+    if (ref == null) {
+      return;
+    }
+    this.vaultItemDialogRef = ref;
+    if (ref.isDrawer) {
+      this.panelItemId = shownId;
+      this.panelEditing = false;
+    }
 
-    const result = await lastValueFrom(this.vaultItemDialogRef.closed);
-    this.vaultItemDialogRef = undefined;
+    const result = await lastValueFrom(ref.closed);
+    if (this.vaultItemDialogRef === ref) {
+      this.vaultItemDialogRef = undefined;
+      this.panelItemId = undefined;
+      this.panelEditing = false;
+    }
 
     // When the dialog is closed for a premium upgrade, return early as the user
     // should be navigated to the subscription settings elsewhere
@@ -999,11 +1028,43 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
       this.refresh();
     }
 
+    // Keykeeper: the panel closed because another page opened, or another
+    // row's item took its place and the address names that one now.
+    if (this.destroyed) {
+      return;
+    }
+    const inAddress = getCipherIdFromParams(this.route.snapshot?.queryParams ?? {});
+    if (ref.isDrawer && inAddress != null && inAddress !== shownId) {
+      return;
+    }
+
     // Clear the query params when the dialog closes
     await this.go(
       { cipherId: null, itemId: null, action: null },
       this.configureRouterFocusToCipher(formConfig.originalCipher?.id),
     );
+  }
+
+  /**
+   * Keykeeper: whether the address may open the item it names: when nothing
+   * is open, as upstream has it, or when the side panel shows another item
+   * and isn't being edited. The panel's own address changes (to edit and back)
+   * say whether it's being edited.
+   */
+  private canOpenFromAddress(params: Params): boolean {
+    const ref = this.vaultItemDialogRef;
+    if (ref == null) {
+      return true;
+    }
+    if (!ref.isDrawer) {
+      return false;
+    }
+    const id = getCipherIdFromParams(params);
+    if (id == null || id === this.panelItemId) {
+      this.panelEditing = id != null && params.action === "edit";
+      return false;
+    }
+    return !this.panelEditing;
   }
 
   /**

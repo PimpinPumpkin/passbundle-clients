@@ -6,6 +6,8 @@ $font-family-source-code-pro: "Source Code Pro", monospace;
 $font-size-base: 14px;
 
 // Keykeeper: PassBundle's palette, as in content/components/constants/styles.ts.
+// Dark is the graphite of brand/look.css, solid, since the menu floats over a
+// website: never green.
 $text-color-light: #18221f;
 $muted-text-color-light: #4e635c;
 $background-color-light: #ffffff;
@@ -16,19 +18,20 @@ $password-number-color-light: #185748;
 $success-color-light: #017e45;
 $error-color-light: #c83522;
 
-$text-color-dark: #ffffff;
-$muted-text-color-dark: #a0b6ae;
-$background-color-dark: #14201d;
-$background-offset-color-dark: #0c1513;
+$text-color-dark: #eef0f3;
+$muted-text-color-dark: #a2a8b2;
+$background-color-dark: #1c1f25;
+$background-offset-color-dark: #111318;
 $border-color-dark: #ddd;
-$brand-primary-dark: #79a99d;
+$brand-primary-dark: #6fd4b4;
+$text-contrast-dark: #06231b;
 $password-special-color-dark: #ff8d85;
 $password-number-color-dark: #8fd9c1;
 $success-color-dark: #8db89b;
 $error-color-dark: #ee9792;
 
 $muted-blue: #4e635c;
-$muted-grey: #a0b6ae;
+$muted-grey: #a2a8b2;
 $border-color: #bbcdc7;
 
 $border-radius: 3px;
@@ -60,10 +63,10 @@ $themes: (
     backgroundOffsetColor: $background-offset-color-dark,
     buttonPrimaryColor: $brand-primary-dark,
     primaryColor: $brand-primary-dark,
-    textContrast: $background-color-dark,
-    inputBorderColor: #3a4f48,
+    textContrast: $text-contrast-dark,
+    inputBorderColor: #3c414a,
     inputBackgroundColor: $background-color-dark,
-    borderColor: #3a4f48,
+    borderColor: #3c414a,
     focusOutlineColor: lighten($focus-outline-color, 25%),
     successColor: $success-color-dark,
     errorColor: $error-color-dark,

@@ -37,6 +37,7 @@ import {
 import {
   CipherFormConfig,
   CipherFormConfigService,
+  KeykeeperItemTileComponent,
   PasswordRepromptService,
   RoutedVaultFilterBridgeService,
   RoutedVaultFilterService,
@@ -70,6 +71,7 @@ import {
     PasskeyReportService,
   ],
   imports: [
+    KeykeeperItemTileComponent,
     CommonModule,
     JslibModule,
     HeaderModule,

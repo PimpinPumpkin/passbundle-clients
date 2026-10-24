@@ -49,7 +49,7 @@
           </ng-container>
           <ng-template bitRowDef let-row>
             <td bitCell>
-              <app-vault-icon [cipher]="row.cipher"></app-vault-icon>
+              <vault-keykeeper-item-tile [cipher]="row.cipher" />
             </td>
             <td bitCell class="tw-truncate tw-max-w-0">
               @if (canManageCipher(row.cipher)) {

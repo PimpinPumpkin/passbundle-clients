@@ -12,6 +12,7 @@ import {
   CipherFormConfigService,
   DefaultCipherFormConfigService,
   KeykeeperExpirationBadgeComponent,
+  KeykeeperItemTileComponent,
   RoutedVaultFilterBridgeService,
   RoutedVaultFilterService,
   Vfo1IconPipe,
@@ -52,6 +53,7 @@ import { ReportsSharedModule } from "./shared";
     PasskeyReportComponent,
     TooltipDirective,
     KeykeeperExpirationBadgeComponent,
+    KeykeeperItemTileComponent,
     Vfo1IconPipe,
   ],
   declarations: [

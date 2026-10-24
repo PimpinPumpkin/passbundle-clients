@@ -1,7 +1,39 @@
-<bit-dialog dialogSize="large" background="alt" [loading]="performingInitialLoad">
-  <span bitDialogTitle class="tw-flex tw-items-center tw-gap-1" aria-live="polite">
+<!-- Keykeeper: in the web vault, an item opens to view in the side panel
+     beside the list (DESIGN.md, "The look"): narrower, with the item's tile and
+     name on top and Edit beside Close. It's named by its title, as the dialog
+     was. -->
+<bit-dialog
+  [dialogSize]="inPanel ? 'default' : 'large'"
+  background="alt"
+  [loading]="performingInitialLoad"
+  [attr.data-keykeeper]="inPanel ? 'item-panel' : null"
+  [attr.data-keykeeper-viewing]="inPanel && showCipherView ? '' : null"
+  [attr.role]="inPanel ? 'dialog' : null"
+  [attr.aria-labelledby]="inPanel ? panelTitleId : null"
+>
+  <span
+    bitDialogTitle
+    class="tw-flex tw-items-center tw-gap-1"
+    aria-live="polite"
+    [attr.id]="inPanel ? panelTitleId : null"
+  >
     {{ title }}
   </span>
+
+  @if (inPanel && showEdit) {
+    <button
+      bitDialogHeaderEnd
+      bitButton
+      [bitAction]="switchToEdit"
+      buttonType="secondary"
+      size="small"
+      type="button"
+      data-keykeeper="panel-edit"
+      [disabled]="disableEdit"
+    >
+      {{ "edit" | i18n }}
+    </button>
+  }
 
   @if (isCipherArchived && !params.isAdminConsoleAction) {
     <button type="button" bit-chip-action bitDialogHeaderEnd [label]="'archived' | i18n"></button>
@@ -13,6 +45,8 @@
         [cipher]="cipher"
         [collections]="collections"
         [isAdminConsole]="formConfig.isAdminConsole"
+        [keykeeperHero]="inPanel"
+        [keykeeperHeroHeading]="2"
       ></app-cipher-view>
       <!-- Keykeeper: the item's earlier versions, to compare and restore, for
            people whose shared folders let them view its history -->
@@ -60,7 +94,7 @@
       </button>
     }
 
-    @if (showEdit) {
+    @if (showEdit && !inPanel) {
       <button
         bitButton
         [bitAction]="switchToEdit"

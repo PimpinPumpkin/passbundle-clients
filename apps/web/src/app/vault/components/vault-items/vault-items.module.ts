@@ -13,6 +13,7 @@ import {
 import {
   CopyCipherFieldDirective,
   KeykeeperExpirationBadgeComponent,
+  KeykeeperItemTileComponent,
   KeykeeperTemplateBadgeComponent,
   VaultItemCopyActionsComponent,
   Vfo1I18nPipe,
@@ -44,6 +45,7 @@ import { VaultItemsComponent } from "./vault-items.component";
     CopyCipherFieldDirective,
     VaultItemCopyActionsComponent,
     KeykeeperExpirationBadgeComponent,
+    KeykeeperItemTileComponent,
     KeykeeperTemplateBadgeComponent,
     ScrollLayoutDirective,
     PremiumBadgeComponent,

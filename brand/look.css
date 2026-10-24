@@ -1,25 +1,31 @@
 /* PassBundle's look, appended to the component library's theme by
    brand/apply.mjs. See DESIGN.md, "The look".
 
-   Every theme gets the identity: Google Sans Flex (brand/fonts.css),
-   green-tinted darks, and the brand's illustration colors. In the web vault,
-   the Glass theme (upstream's System setting, so light or dark like the
-   device) adds translucent surfaces over a soft color field; html.pb-glass
-   turns it on. Light and Dark stay solid, for legibility.
+   The web vault (html.pb-web, set in apps/web/src/index.html) and the
+   extension's popup (html.pb-popup, set in popup/index.ejs) have the same
+   design language, in System, Light, and Dark alike: a calm ground, cards at
+   three depths (resting lists and panels, raised for what's selected or
+   suggested, floating menus and dialogs), jewel-toned category tiles, and the
+   brand's green for what you act on. Dark mode is graphite glass: a neutral
+   graphite ground with faint jewel washes and translucent cards, never green.
 
-   The extension's popup (html.pb-popup) has the design language instead, in
-   every theme: a calm, solid ground, cards at three depths, and jewel-toned
-   category tiles. Its section is at the end of this file.
+   The palette is the --pb-* tokens below, one block for light and one for
+   dark; upstream's tokens are mapped onto them, so upstream's components
+   follow without template changes, and our own components read them
+   directly. Every text color passes WCAG AA on what it sits on, translucent
+   cards over the washes included.
 
    Rules target upstream's components (bit-*, popup-*) rather than its utility
    classes, so changes to the markup inside them don't break the look. */
 
-/* Identity, in every theme. The typeface, Google Sans Flex, is in
-   brand/fonts.css. */
+/* ======================================================================
+   Identity, in every theme. The typeface, Google Sans Flex, is in
+   brand/fonts.css. Upstream's grays lean blue; in light mode ours lean
+   toward the brand's green, at the same lightness, so every surface built
+   from them follows.
+   ====================================================================== */
 :root,
 .theme_light {
-  /* Upstream's grays lean blue; ours lean toward the brand's green, at the same
-     lightness, so every surface built from them follows. */
   --color-gray-050: #f8f9f9;
   --color-gray-100: #e9efed;
   --color-gray-200: #d9e4e0;
@@ -37,367 +43,434 @@
   --color-illustration-bg-tertiary: 255 255 255;
   --color-illustration-tertiary: 232 163 61;
   --color-illustration-logo: 31 111 92;
-}
-/* Secondary text in green-tinted gray (upstream's leans blue): 6.4:1 on
-   white; on Glass, a step darker for the colored field behind it. Subtle
-   text (placeholders, hints) is the same gray: upstream's lighter one is
-   under 4.5:1 on white once tinted green. */
-:root,
-.theme_light {
+  /* Secondary text in green-tinted gray (upstream's leans blue): 6.4:1 on
+     white. Subtle text (placeholders, hints) is the same gray: upstream's
+     lighter one is under 4.5:1 on white once tinted green. */
   --color-text-muted: 78 99 92;
   --color-fg-body-subtle: var(--color-gray-600);
 }
-.pb-glass:not(.theme_dark) {
-  --color-text-muted: 58 79 72;
-  /* Links and code on the colored field: a step darker, so they stay at
-     4.5:1 where the field is lightest behind them. */
-  --color-fg-brand: var(--color-brand-800);
-  --color-primary-600: 24 87 72;
-  --color-text-code: 163 15 100;
-  /* Body text and the required-field asterisk, where they sit on the field
-     itself (a breadcrumb, a form outside a card): a step darker too. */
-  --color-fg-body: var(--color-gray-700);
-  --color-fg-danger: var(--color-red-800);
+
+/* ======================================================================
+   The palette, light: the approved mockups.
+   ====================================================================== */
+:root,
+.theme_light {
+  --pb-ground: #eef2f0;
+  /* Light mode's ground is calm and solid; a wash could go here. */
+  --pb-wash: none;
+  --pb-surface: #ffffff;
+  --pb-raised: #ffffff;
+  --pb-floating: #ffffff;
+  --pb-edge: transparent;
+  --pb-sunken: #e1e8e5;
+  --pb-inset: #f7faf9;
+  --pb-inset-line: #e3eae7;
+  --pb-field: #ffffff;
+  --pb-field-border: #cbd7d2;
+  --pb-line: #dce5e1;
+  --pb-divider: #edf2f0;
+  --pb-text: #14201c;
+  --pb-label: #3c4a45;
+  --pb-muted: #52615c;
+  --pb-placeholder: #6b7a75;
+  --pb-brand: #1f6f5c;
+  --pb-brand-strong: #185a4a;
+  --pb-on-brand: #ffffff;
+  --pb-brand-tint: #e7f1ed;
+  --pb-brand-tint-strong: #dcebe5;
+  --pb-link: #1f6f5c;
+  --pb-focus: #1f6f5c;
+  --pb-hover: rgb(16 32 27 / 0.05);
+  --pb-selected: #e7f1ed;
+  --pb-selected-ring: #cfe3da;
+  --pb-scope-ring: #cfe3da;
+  --pb-star: #b07a12;
+  --pb-chip: #e6ece9;
+  --pb-chip-edge: #d8e1dd;
+  --pb-chip-text: #3c4a45;
+  --pb-tinted-card: #f3f8f6;
+  --pb-tinted-edge: #dce8e3;
+  --pb-dialog: #ffffff;
+  --pb-dialog-edge: transparent;
+  --pb-danger-tint: #fbeceb;
+  --pb-danger-tint-strong: #f7dedb;
+  --pb-danger-text: #b42318;
+  --pb-danger-line: #efc3be;
+  --pb-dot-strong: #1e8a5a;
+  --pb-dot-good: #b7791f;
+  --pb-dot-weak: #c4321f;
+  --pb-alert-bg: #f6e7cd;
+  --pb-alert-text: #6b3f00;
+  --pb-letter-bg: #e3e9f8;
+  --pb-letter: #1d3c99;
+  --pb-site-bg: #ffffff;
+  --pb-site-edge: #dce5e1;
+  --pb-shadow-resting: 0 1px 2px rgb(16 32 27 / 0.06), 0 1px 1px rgb(16 32 27 / 0.04);
+  --pb-shadow-raised: 0 4px 12px rgb(16 32 27 / 0.08), 0 1px 3px rgb(16 32 27 / 0.06);
+  --pb-shadow-floating: 0 16px 40px rgb(16 32 27 / 0.14), 0 4px 12px rgb(16 32 27 / 0.08);
+  --pb-chip-shadow: 0 1px 3px rgb(16 32 27 / 0.12), 0 0 0 1px #dce5e1;
+  --pb-segment-shadow: 0 1px 3px rgb(16 32 27 / 0.12), 0 1px 1px rgb(16 32 27 / 0.06);
+  --pb-field-shadow: 0 1px 2px rgb(16 32 27 / 0.05);
+  --pb-button-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 1px 2px rgb(16 32 27 / 0.2);
+  /* Solid colors and RGB triples for upstream's tokens (mapped below). */
+  --pb-solid-surface: #ffffff;
+  --pb-solid-raised: #ffffff;
+  --pb-solid-sunken: #e1e8e5;
+  --pb-solid-brand-tint: #eef5f2;
+  --pb-solid-brand-tint-strong: #dcebe5;
+  --pb-solid-divider: #edf2f0;
+  --pb-solid-line: #dce5e1;
+  --pb-solid-line-strong: #cbd7d2;
+  --pb-rgb-surface: 255 255 255;
+  --pb-rgb-ground: 238 242 240;
+  --pb-rgb-deep: 31 111 92;
+  --pb-rgb-deeper: 24 90 74;
+  --pb-rgb-deepest: 14 52 44;
+  --pb-rgb-text: 20 32 28;
+  --pb-rgb-muted: 82 97 92;
+  --pb-rgb-on-brand: 255 255 255;
+  --pb-rgb-brand-tint: 231 241 237;
+  --pb-rgb-brand-soft: 143 196 178;
+  --pb-rgb-brand: 31 111 92;
+  --pb-rgb-brand-strong: 24 90 74;
+  --pb-rgb-gray-100: 230 236 233;
+  --pb-rgb-gray-300: 220 229 225;
+  --pb-rgb-gray-500: 108 132 124;
+  --pb-rgb-gray-600: 82 97 92;
+  --pb-rgb-gray-700: 60 74 69;
+  --pb-ring-offset: #ffffff;
+  --pb-wordmark-pass: #1b3a33;
+  --pb-wordmark-bundle: #0e7a5a;
 }
+
+/* ======================================================================
+   The palette, dark: graphite glass. Every dark-mode color is in this one
+   block, so the owner can swap it for another set (DESIGN.md, "The look"):
+
+   - Plain graphite: --pb-ground #121417 with only a faint emerald glow at
+     the top for --pb-wash, radial-gradient(80% 50% at 50% 0%, rgb(14 122 90
+     / 0.12), transparent 70%); --pb-surface, --pb-raised, and --pb-field
+     #1a1d21; --pb-edge and --pb-line #262a30.
+   - True black: --pb-ground #000000, --pb-wash none; --pb-surface,
+     --pb-raised, and --pb-field #111214; --pb-edge and --pb-line #1e2023.
+
+   Cards and panels are translucent white over the ground and its washes,
+   with a light edge, and no backdrop blur (it draws differently from browser
+   to browser, and costs performance). What floats over other content
+   (menus) is solid, so nothing shows through it; a dialog is the same
+   translucent card laid over the ground, with a stronger edge, over the page
+   dimmed nearly to the ground. The washes are a hint: the top-left sapphire a little stronger than
+   the others (0.24, against the mockup's 0.28), the amethyst and emerald toned
+   down from 0.22 and 0.18, so secondary text keeps 4.5:1 where they're
+   brightest. Emerald is only the accent: primary buttons with dark text,
+   focus rings, selection, and links.
+   ====================================================================== */
 :root.theme_dark,
 .theme_dark {
-  --color-background: 20 32 29;
-  --color-background-alt: 12 21 19;
-  --color-text-main: 232 242 238;
-  --color-text-muted: 160 182 174;
-  --color-fg-body-subtle: var(--color-gray-300);
-  --color-nav-bg-primary: #0e211d;
-  --color-nav-bg-secondary: #0e211d;
-  --color-nav-bg-primary-strong: #1d4a3f;
-  --color-nav-bg-secondary-strong: #1d4a3f;
+  --pb-ground: #111318;
+  --pb-wash:
+    radial-gradient(75% 55% at 0% 0%, rgb(36 72 184 / 0.24), transparent 72%),
+    radial-gradient(60% 40% at 100% 10%, rgb(107 48 184 / 0.14), transparent 70%),
+    radial-gradient(80% 50% at 50% 100%, rgb(14 122 90 / 0.12), transparent 70%);
+  --pb-surface: rgb(255 255 255 / 0.055);
+  --pb-raised: rgb(255 255 255 / 0.085);
+  --pb-floating: #1c1f25;
+  --pb-edge: rgb(255 255 255 / 0.11);
+  --pb-sunken: rgb(0 0 0 / 0.24);
+  --pb-inset: rgb(255 255 255 / 0.04);
+  --pb-inset-line: rgb(255 255 255 / 0.08);
+  --pb-field: rgb(255 255 255 / 0.06);
+  --pb-field-border: rgb(255 255 255 / 0.16);
+  --pb-line: rgb(255 255 255 / 0.09);
+  --pb-divider: rgb(255 255 255 / 0.07);
+  --pb-text: #eef0f3;
+  --pb-label: #c9ced6;
+  --pb-muted: #a9afb8;
+  --pb-placeholder: #a9afb8;
+  --pb-brand: #6fd4b4;
+  --pb-brand-strong: #8fe0c6;
+  --pb-on-brand: #06231b;
+  --pb-brand-tint: rgb(111 212 180 / 0.12);
+  --pb-brand-tint-strong: rgb(111 212 180 / 0.2);
+  --pb-link: #6fd4b4;
+  --pb-focus: #6fd4b4;
+  --pb-hover: rgb(255 255 255 / 0.05);
+  --pb-selected: rgb(111 212 180 / 0.12);
+  --pb-selected-ring: rgb(111 212 180 / 0.35);
+  --pb-scope-ring: rgb(255 255 255 / 0.18);
+  --pb-star: #e8b23a;
+  --pb-chip: rgb(255 255 255 / 0.1);
+  --pb-chip-edge: rgb(255 255 255 / 0.12);
+  --pb-chip-text: #d0d4db;
+  --pb-tinted-card: rgb(111 212 180 / 0.06);
+  --pb-tinted-edge: rgb(111 212 180 / 0.16);
+  /* A dialog is the cards' translucent white laid over the ground, so it
+     looks like one and the dimmed page never shows through it. */
+  --pb-dialog: linear-gradient(rgb(255 255 255 / 0.07), rgb(255 255 255 / 0.07)) #111318;
+  --pb-dialog-edge: rgb(255 255 255 / 0.16);
+  /* Error text and required marks, light enough for 4.5:1 on a panel. */
+  --color-fg-danger: #ff8a85;
+  --pb-danger-tint: rgb(255 120 110 / 0.1);
+  --pb-danger-tint-strong: rgb(255 120 110 / 0.16);
+  --pb-danger-text: #ff9e96;
+  --pb-danger-line: rgb(255 120 110 / 0.32);
+  --pb-dot-strong: #6fd4b4;
+  --pb-dot-good: #e8b23a;
+  --pb-dot-weak: #ff7b6e;
+  --pb-alert-bg: rgb(232 178 58 / 0.18);
+  --pb-alert-text: #f2c46b;
+  --pb-letter-bg: #1c2a4a;
+  --pb-letter: #9db4f2;
+  --pb-site-bg: #f2f4f7;
+  --pb-site-edge: #f2f4f7;
+  --pb-shadow-resting: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 0 0 1px var(--pb-edge);
+  --pb-shadow-raised:
+    inset 0 1px 0 rgb(255 255 255 / 0.06), 0 0 0 1px rgb(255 255 255 / 0.12),
+    0 12px 32px rgb(0 0 0 / 0.4);
+  --pb-shadow-floating: 0 0 0 1px rgb(255 255 255 / 0.1), 0 16px 40px rgb(0 0 0 / 0.55);
+  --pb-chip-shadow: 0 0 0 1px rgb(255 255 255 / 0.14);
+  --pb-segment-shadow: 0 0 0 1px rgb(255 255 255 / 0.14), 0 1px 2px rgb(0 0 0 / 0.3);
+  --pb-field-shadow: inset 0 1px 0 rgb(255 255 255 / 0.03);
+  --pb-button-shadow: inset 0 1px 0 rgb(255 255 255 / 0.3);
+  --pb-solid-surface: #1c1f25;
+  --pb-solid-raised: #22252c;
+  --pb-solid-sunken: #2a2e36;
+  --pb-solid-brand-tint: #172a25;
+  --pb-solid-brand-tint-strong: #1d3a32;
+  --pb-solid-divider: #23262c;
+  --pb-solid-line: #2b2f36;
+  --pb-solid-line-strong: #3c414a;
+  --pb-rgb-surface: 30 32 37;
+  --pb-rgb-ground: 17 19 24;
+  --pb-rgb-deep: 43 47 53;
+  --pb-rgb-deeper: 28 31 37;
+  --pb-rgb-deepest: 17 19 24;
+  --pb-rgb-text: 238 240 243;
+  --pb-rgb-muted: 169 175 184;
+  --pb-rgb-on-brand: 6 35 27;
+  --pb-rgb-brand-tint: 23 48 41;
+  --pb-rgb-brand-soft: 47 120 98;
+  --pb-rgb-brand: 111 212 180;
+  --pb-rgb-brand-strong: 143 224 198;
+  --pb-rgb-gray-100: 42 46 54;
+  --pb-rgb-gray-300: 62 67 77;
+  --pb-rgb-gray-500: 122 129 140;
+  --pb-rgb-gray-600: 143 150 161;
+  --pb-rgb-gray-700: 169 175 184;
+  --pb-ring-offset: #111318;
+  /* The grays are neutral graphite, not green, so whatever upstream draws
+     from them is too; the illustrations keep the brand's colors. */
+  --color-gray-050: #f7f8f9;
+  --color-gray-100: #eceef1;
+  --color-gray-200: #dcdfe4;
+  --color-gray-300: #c2c7cf;
+  --color-gray-400: #9aa1ab;
+  --color-gray-400-rgb: 154, 161, 171;
+  --color-gray-500: #7a818c;
+  --color-gray-600: #5c626c;
+  --color-gray-700: #41464e;
+  --color-gray-800: #2b2f35;
+  --color-gray-900: #1c1f24;
+  --color-gray-950: #111318;
+  --color-gray-950-rgb: 17, 19, 24;
   --color-illustration-outline: 143 217 193;
-  --color-illustration-bg-primary: 22 60 52;
+  --color-illustration-bg-primary: 32 52 47;
   --color-illustration-bg-secondary: 46 156 128;
-  --color-illustration-bg-tertiary: 20 32 29;
+  --color-illustration-bg-tertiary: 17 19 24;
   --color-illustration-tertiary: 232 163 61;
   --color-illustration-logo: 255 255 255;
-  /* The wordmark: the brand palette's green is too dark on dark surfaces. */
+  /* The wordmark's color on dark surfaces. */
   --color-marketing-logo: 143 217 193;
+  --pb-wordmark-pass: #e7efec;
+  --pb-wordmark-bundle: #6fd4b4;
 }
 
-/* Glass. The field is calm enough, and the surfaces solid enough, that
-   secondary text on them stays at 4.5:1 or better wherever it lands. */
-.pb-glass {
-  --frost-field:
-    radial-gradient(80vmax 70vmax at -5% -5%, rgb(38 150 120 / 0.45), transparent 64%),
-    radial-gradient(80vmax 70vmax at 112% 36%, rgb(86 120 214 / 0.36), transparent 64%),
-    radial-gradient(70vmax 60vmax at 22% 114%, rgb(236 176 104 / 0.4), transparent 64%), #d9e7e2;
-  --frost-surface: rgb(255 255 255 / 0.62);
-  --frost-surface-strong: rgb(255 255 255 / 0.78);
-  --frost-bar: rgb(255 255 255 / 0.34);
-  --frost-edge: rgb(255 255 255 / 0.8);
-  --frost-line: rgb(18 52 44 / 0.08);
-  --frost-shadow: 0 1px 0 rgb(255 255 255 / 0.6) inset, 0 10px 30px rgb(18 52 44 / 0.1);
-  /* The side nav: deep enough that the field barely shifts it from top to
-     bottom, so its white text reads the same everywhere. */
-  --frost-nav: rgb(14 52 44 / 0.9);
-  --frost-nav-sticky: rgb(14 52 44 / 0.55);
-  /* Dialogs: nearly solid, so they don't go gray over the dimmed page, with
-     their cards in white on them, as in the solid themes. */
-  --frost-dialog: rgb(239 244 242 / 0.96);
-  --frost-dialog-card: rgb(255 255 255 / 0.94);
-  --frost-blur: blur(22px) saturate(170%);
-  --frost-radius: 16px;
+/* ======================================================================
+   Upstream's tokens, on ours, in the web vault and the popup, light and
+   dark. Upstream's own surfaces get solid colors (in dark mode, what a
+   translucent card looks like over the bare ground), so nothing of theirs
+   turns see-through by accident; the rules below make cards and panels
+   translucent where that's safe.
+   ====================================================================== */
+html:is(.pb-web, .pb-popup) {
+  --color-background: var(--pb-rgb-surface);
+  --color-background-alt: var(--pb-rgb-ground);
+  --color-background-alt2: var(--pb-rgb-deep);
+  --color-background-alt3: var(--pb-rgb-deeper);
+  --color-background-alt4: var(--pb-rgb-deepest);
+  --color-text-main: var(--pb-rgb-text);
+  --color-text-muted: var(--pb-rgb-muted);
+  --color-text-contrast: var(--pb-rgb-on-brand);
+  --color-primary-100: var(--pb-rgb-brand-tint);
+  --color-primary-300: var(--pb-rgb-brand-soft);
+  --color-primary-600: var(--pb-rgb-brand);
+  --color-primary-700: var(--pb-rgb-brand-strong);
+  --color-secondary-100: var(--pb-rgb-gray-100);
+  --color-secondary-300: var(--pb-rgb-gray-300);
+  --color-secondary-500: var(--pb-rgb-gray-500);
+  --color-secondary-600: var(--pb-rgb-gray-600);
+  --color-secondary-700: var(--pb-rgb-gray-700);
+  --color-hover-default: var(--pb-hover);
+  --color-transparent-hover: var(--pb-hover);
+  --tw-ring-offset-color: var(--pb-ring-offset);
+  --color-fg-heading: var(--pb-text);
+  --color-fg-body: var(--pb-label);
+  --color-fg-body-subtle: var(--pb-muted);
+  --color-fg-brand: var(--pb-link);
+  --color-fg-brand-strong: var(--pb-brand-strong);
+  --color-fg-contrast: var(--pb-on-brand);
+  --color-bg-primary: var(--pb-solid-surface);
+  --color-bg-secondary: var(--pb-solid-raised);
+  --color-bg-tertiary: var(--pb-ground);
+  --color-bg-quaternary: var(--pb-solid-sunken);
+  --color-bg-brand: var(--pb-brand);
+  --color-bg-brand-strong: var(--pb-brand-strong);
+  --color-bg-brand-softer: var(--pb-solid-brand-tint);
+  --color-bg-brand-soft: var(--pb-solid-brand-tint-strong);
+  --color-bg-hover: var(--pb-hover);
+  --color-border-light: var(--pb-solid-divider);
+  --color-border-base: var(--pb-solid-line);
+  --color-border-strong: var(--pb-solid-line-strong);
+  --color-border-brand: var(--pb-brand);
+  --color-border-brand-strong: var(--pb-brand-strong);
+  --color-border-focus: var(--pb-focus);
 }
-.pb-glass.theme_dark {
-  --frost-field:
-    radial-gradient(80vmax 70vmax at -5% -5%, rgb(46 156 128 / 0.38), transparent 64%),
-    radial-gradient(80vmax 70vmax at 112% 36%, rgb(84 104 214 / 0.4), transparent 64%),
-    radial-gradient(70vmax 60vmax at 22% 114%, rgb(170 110 60 / 0.3), transparent 64%), #0a1412;
-  --frost-surface: rgb(24 38 35 / 0.55);
-  --frost-surface-strong: rgb(28 44 40 / 0.82);
-  --frost-bar: rgb(18 30 27 / 0.45);
-  --frost-edge: rgb(255 255 255 / 0.09);
-  --frost-line: rgb(255 255 255 / 0.07);
-  --frost-shadow: 0 1px 0 rgb(255 255 255 / 0.05) inset, 0 12px 32px rgb(0 0 0 / 0.35);
-  --frost-nav: rgb(8 22 19 / 0.78);
-  --frost-nav-sticky: rgb(8 22 19 / 0.5);
-  --frost-dialog: rgb(17 29 26 / 0.96);
-  --frost-dialog-card: rgb(255 255 255 / 0.045);
+/* The web vault's side nav is a card on the ground: its text is the page's,
+   the entry showing has the selection's tint. The admin console's light
+   variant follows the same tokens. */
+html.pb-web {
+  --color-nav-fg-primary: var(--pb-text);
+  --color-nav-fg-secondary: var(--pb-text);
+  --color-nav-bg-primary: transparent;
+  --color-nav-bg-secondary: transparent;
+  --color-nav-bg-primary-strong: var(--pb-selected);
+  --color-nav-bg-secondary-strong: var(--pb-selected);
+  --color-nav-bg-primary-hover: var(--pb-hover);
+  --color-nav-bg-secondary-hover: var(--pb-hover);
+  --color-nav-bg-primary-hover-strong: var(--pb-selected);
+  --color-nav-bg-secondary-hover-strong: var(--pb-selected);
+  --color-nav-border-primary: var(--pb-line);
+  --color-nav-border-secondary: var(--pb-line);
+  --color-nav-border-primary-focus: var(--pb-focus);
+  --color-nav-border-secondary-focus: var(--pb-focus);
 }
 
-.pb-glass,
-.pb-glass body {
-  background: var(--frost-field) fixed !important;
+/* ======================================================================
+   In both: the pieces of the design language that look the same in the web
+   vault and the popup.
+   ====================================================================== */
+
+/* Buttons: rounded rectangles (10px), not pills. The primary one is the
+   brand's green with white text (6:1), and in dark mode emerald with dark
+   text (9:1), raised a little; the secondary one is a field-colored button
+   with a hairline. */
+:is(.pb-web, .pb-popup) :is(button, a)[bitbutton] {
+  border-radius: 10px !important;
+}
+:is(.pb-web, .pb-popup) [bitbutton].tw-bg-bg-brand.tw-text-fg-contrast {
+  box-shadow: var(--pb-button-shadow);
+}
+:is(.pb-web, .pb-popup) [bitbutton].tw-bg-bg-secondary {
+  border-color: var(--pb-field-border) !important;
+  box-shadow: var(--pb-field-shadow);
+}
+:is(.pb-web, .pb-popup) :is(a, button)[bitlink] {
+  color: var(--pb-link);
 }
 
-/* The page shows the field; bars, groups, cards, and panels are glass. */
-.pb-glass .tw-bg-background-alt,
-.pb-glass bit-layout main {
+/* Fields: a field color, a hairline, and rounder corners. */
+:is(.pb-web, .pb-popup) [bitfieldcontainer] {
+  border-radius: 10px !important;
+  box-shadow: var(--pb-field-shadow);
+}
+:is(.pb-web, .pb-popup) bit-form-field label {
+  color: var(--pb-label);
+}
+:is(.pb-web, .pb-popup) bit-form-field :is(input, textarea)::placeholder,
+:is(.pb-web, .pb-popup) bit-search input::placeholder {
+  color: var(--pb-placeholder) !important;
+}
+
+/* Segmented choices (Password, Passphrase, Username; All, Text, File): a
+   sunken track with the picked one raised. */
+:is(.pb-web, .pb-popup) bit-toggle-group {
+  background: var(--pb-sunken) !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+}
+:is(.pb-web, .pb-popup) bit-toggle-group::after {
+  background: var(--pb-solid-raised) !important;
+  border-radius: 9px !important;
+  box-shadow: var(--pb-segment-shadow);
+}
+:is(.pb-web, .pb-popup) bit-toggle-group bit-toggle label {
+  border-radius: 9px !important;
+  font-weight: 600 !important;
+  color: var(--pb-label) !important;
+}
+:is(.pb-web, .pb-popup) bit-toggle-group bit-toggle label::after {
+  display: none;
+}
+:is(.pb-web, .pb-popup) bit-toggle-group bit-toggle input:checked + label[for] {
+  color: var(--pb-text) !important;
+}
+
+/* Callouts and banners: the cards' rounded corners. */
+:is(.pb-web, .pb-popup) bit-callout > div {
+  border-radius: 12px !important;
+}
+
+/* Menus float, solid, above everything. Dialogs float over the page
+   dimmed nearly to the ground: in dark mode they're the cards' translucent
+   white with a stronger edge, so they lift off it. */
+:is(.pb-web, .pb-popup) .cdk-overlay-pane [role="menu"] {
+  background: var(--pb-floating) !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  box-shadow: var(--pb-shadow-floating) !important;
+}
+:is(.pb-web, .pb-popup) .cdk-overlay-pane bit-dialog > section,
+:is(.pb-web, .pb-popup) .cdk-overlay-pane bit-simple-dialog > section {
+  background: var(--pb-dialog) !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  box-shadow:
+    0 0 0 1px var(--pb-dialog-edge),
+    var(--pb-shadow-floating) !important;
+}
+:is(.pb-web, .pb-popup) [role="menu"] [bitmenuitem] {
   background-color: transparent !important;
+  border-radius: 8px;
 }
-.pb-glass bit-item-group,
-.pb-glass bit-card,
-.pb-glass bit-table,
-.pb-glass app-vault-filter > div,
-.pb-glass app-vault-onboarding > div,
-/* Keykeeper: not the small icon tiles (bit-icon-tile), which are rounded and
-   bordered too; this rule would make them block and push their icon into the
-   corner. */
-.pb-glass bit-layout main .tw-rounded-lg.tw-border:not(bit-icon-tile > div) {
-  display: block;
-  background: var(--frost-surface) !important;
-  -webkit-backdrop-filter: var(--frost-blur);
-  backdrop-filter: var(--frost-blur);
-  border: 1px solid var(--frost-edge) !important;
-  border-radius: var(--frost-radius) !important;
-  box-shadow: var(--frost-shadow);
-  overflow: hidden;
-}
-.pb-glass bit-item-group > h3 {
-  margin: 0;
-  padding: 10px 14px 4px;
-}
-.pb-glass bit-item-group [class*="tw-bg-background"],
-.pb-glass bit-card [class*="tw-bg-background"],
-.pb-glass bit-table table,
-.pb-glass bit-table tr,
-.pb-glass bit-table td,
-.pb-glass bit-table th {
-  background-color: transparent !important;
-}
-.pb-glass bit-item-group bit-item,
-.pb-glass bit-card bit-item {
-  background: transparent !important;
-  border-color: var(--frost-line) !important;
-  border-radius: 0 !important;
-}
-.pb-glass bit-item + bit-item {
-  border-top: 1px solid var(--frost-line);
-}
-.pb-glass bit-item:hover {
-  background: rgb(var(--color-primary-600) / 0.07) !important;
-}
-.pb-glass bit-table td {
-  border-color: var(--frost-line) !important;
-}
-.pb-glass bit-card input {
-  background-color: rgb(var(--color-background) / 0.35) !important;
-}
-
-/* Segmented choices (Password, Passphrase, Username; All, Text, File) sit on
-   a glass strip like the cards around them, not straight on the field. */
-.pb-glass bit-toggle-group.tw-grid-flow-col {
-  background: var(--frost-surface);
-  -webkit-backdrop-filter: var(--frost-blur);
-  backdrop-filter: var(--frost-blur);
-}
-
-/* Fields and search: lighter glass. */
-.pb-glass bit-search input {
-  background-color: var(--frost-surface-strong) !important;
-  border-color: var(--frost-edge) !important;
-}
-.pb-glass bit-search input {
-  border-radius: 13px !important;
-}
-
-/* Primary buttons: a pill with a soft glow, in every theme. A solid primary
-   button is the one with the brand fill and contrast text, however its type
-   was set. */
-button[bitbutton][buttontype="primary"],
-a[bitbutton][buttontype="primary"],
-[bitbutton].tw-bg-bg-brand.tw-text-fg-contrast {
-  border-radius: 999px !important;
-}
-.pb-glass button[bitbutton][buttontype="primary"],
-.pb-glass a[bitbutton][buttontype="primary"],
-.pb-glass [bitbutton].tw-bg-bg-brand.tw-text-fg-contrast {
-  box-shadow: 0 6px 16px rgb(var(--color-primary-600) / 0.28);
-}
-/* In dark themes, upstream fills them pale (the brand's 400) with dark text,
-   which reads as washed out on a dark page. Ours: the brand's green, deep
-   enough for white text (4.8:1) and light enough to stand out from the page
-   (3.2:1 or more). Hover goes a step deeper, so white text only gets
-   stronger. */
-.theme_dark .tw-bg-bg-brand.tw-text-fg-contrast {
-  --color-bg-brand: #24806a;
-  --color-bg-brand-strong: #1c6d59;
-  --color-border-brand: #24806a;
-  --color-border-brand-strong: #1c6d59;
-  --color-fg-contrast: var(--color-white);
-}
-.pb-glass.theme_dark [bitbutton].tw-bg-bg-brand.tw-text-fg-contrast {
-  box-shadow: 0 6px 18px rgb(0 0 0 / 0.35);
-}
-
-/* Banners and callouts: tinted glass instead of solid color. */
-.pb-glass bit-callout > div,
-.pb-glass bit-banner > div {
-  background: var(--frost-surface) !important;
-  -webkit-backdrop-filter: var(--frost-blur);
-  backdrop-filter: var(--frost-blur);
-  border: 1px solid var(--frost-edge) !important;
-  border-radius: var(--frost-radius) !important;
-}
-
-/* Dialogs and menus float above everything: the strongest glass. */
-.pb-glass bit-dialog > section,
-.pb-glass bit-simple-dialog > section,
-.pb-glass .cdk-overlay-pane [role="menu"] {
-  background: var(--frost-surface-strong) !important;
-  -webkit-backdrop-filter: var(--frost-blur);
-  backdrop-filter: var(--frost-blur);
-  border: 1px solid var(--frost-edge) !important;
-  border-radius: 18px !important;
-  box-shadow: 0 24px 60px rgb(0 0 0 / 0.18);
-}
-/* A dialog is one surface: its header, body, and footer share its color
-   (upstream paints the footer and some bodies solid, which on glass made two
-   shades in one dialog), and the cards in it are white, as in the solid
-   themes. Over the dimmed page, near-solid reads cleaner than see-through. */
-.pb-glass bit-dialog > section,
-.pb-glass bit-simple-dialog > section {
-  background: var(--frost-dialog) !important;
-}
-.pb-glass bit-dialog > section > header,
-.pb-glass bit-dialog > section > footer,
-.pb-glass bit-dialog > section > div[class*="tw-bg-background"],
-.pb-glass bit-simple-dialog > section [class*="tw-bg-background"] {
-  background-color: transparent !important;
-}
-.pb-glass bit-dialog bit-card,
-.pb-glass bit-dialog bit-item-group {
-  background: var(--frost-dialog-card) !important;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  border-color: var(--frost-line) !important;
-  box-shadow: none;
-}
-
-/* The web vault's side nav: smoked glass, so its white text reads in both
-   modes. Its sticky parts sit over scrolled items, so they keep a tint; the
-   footer with the collapse button never does, so it has none of its own and
-   the nav is one even color down to the bottom. */
-.pb-glass bit-side-nav > div > nav {
-  background: var(--frost-nav) !important;
-  -webkit-backdrop-filter: var(--frost-blur);
-  backdrop-filter: var(--frost-blur);
-}
-.pb-glass bit-side-nav > div > nav > div > div > [class*="tw-bg-bg-nav"] {
-  background: var(--frost-nav-sticky) !important;
-}
-.pb-glass bit-side-nav > div > nav > [class*="tw-bg-bg-nav"],
-.pb-glass .keykeeper-menu bit-side-nav > div > nav > div > div > [class*="tw-bg-bg-nav"] {
-  background: transparent !important;
-}
-/* The admin console's nav is upstream's light variant (dark text). On glass
-   every nav is the same smoked green, so it takes the white text too. */
-.pb-glass:not(.theme_dark) bit-side-nav {
-  --color-nav-fg-secondary: var(--color-nav-fg-primary);
-  --color-nav-bg-secondary-hover: var(--color-nav-bg-primary-hover);
-  --color-nav-bg-secondary-hover-strong: var(--color-nav-bg-primary-hover-strong);
-  --color-nav-border-secondary: var(--color-nav-border-primary);
-  --color-nav-border-secondary-focus: var(--color-nav-border-primary-focus);
-}
-/* Lines in the nav: the same faint white everywhere, not the brand green. */
-.pb-glass bit-side-nav bit-nav-divider > div {
-  background: rgb(255 255 255 / 0.14) !important;
-}
-.pb-glass bit-side-nav bit-nav-item [class*="tw-bg-bg-nav"],
-.pb-glass bit-side-nav bit-nav-group [class*="tw-bg-bg-nav"],
-.pb-glass bit-side-nav bit-nav-logo [class*="tw-bg-bg-nav"] {
-  background: transparent !important;
-}
-.pb-glass.theme_dark bit-side-nav > div > nav {
-  border-right: 1px solid var(--frost-line);
-}
-
-/* A soft pill under the pointer and a brighter one for the entry showing,
-   like 1Password's sidebar, in every nav (the user pages' one left menu,
-   DESIGN.md "The left menu", and the admin console's). Upstream marks the
-   entry showing with its strong nav colors, which the glass above clears. */
-.pb-glass bit-side-nav bit-nav-item [class*="tw-bg-bg-nav"]:hover {
-  background: rgb(255 255 255 / 0.08) !important;
-}
-.pb-glass bit-side-nav bit-nav-item [class*="tw-bg-bg-nav"][style*="-strong"] {
-  background: rgb(255 255 255 / 0.16) !important;
-}
-/* It's one list that scrolls: the logo and "More from" scroll with it, rather
-   than staying put over the entries (see-through on glass). */
-.keykeeper-menu bit-nav-logo > div,
-.keykeeper-menu #bit-side-nav--scroll [class*="tw-sticky"] {
-  position: static !important;
-}
-/* An entry inside a group (Import and export's, Settings') lines its text up
-   with its group's, past the group's icon. Upstream indents it by a fixed
-   amount that stops 5px short. */
-bit-side-nav bit-nav-group > div[role="group"] > bit-nav-item [data-testid="nav-item-container"] {
-  padding-inline-start: calc(2.75rem + 1.28571429em) !important;
-}
-/* Its lines are inset like the pills: between the vault's entries and the
-   tools, above "More from", and above the collapse button. */
-.keykeeper-menu bit-nav-divider > div {
-  width: auto;
-  margin: 0.5rem 0.75rem;
-  background: rgb(255 255 255 / 0.16);
-}
-/* The list fades out at its bottom edge rather than cutting an entry in
-   half, so a long menu (a phone, or many collections) reads as one that
-   scrolls. The space at its end keeps the last entry clear of the fade. */
-.keykeeper-menu #bit-side-nav--scroll {
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 1.5rem), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 1.5rem), transparent);
-}
-.keykeeper-menu #bit-side-nav--scroll > div {
-  padding-bottom: 1.5rem;
-}
-/* "More from PassBundle" is a heading like the menu's others (Categories,
-   Vaults, Folders), and its links line up with the entries above them. */
-.keykeeper-menu navigation-product-switcher section > span {
-  display: block;
-  padding: 0.75rem 1.25rem 0 3rem;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.72;
-}
-.keykeeper-menu navigation-product-switcher section > div {
-  padding-inline: 0.75rem;
-}
-.keykeeper-menu navigation-product-switcher section a {
-  padding-inline-start: 2rem;
-}
-/* Its search field is one white field, not a field in a field. */
-.pb-glass .keykeeper-menu bit-search input {
-  background-color: transparent !important;
-}
-
-/* Item cards and checklists keep the glass they're on: no solid header band
-   over a see-through body. */
-.pb-glass bit-accordion [data-accordion-trigger]:not(:hover) {
-  background-color: transparent !important;
-}
-/* The vault's checklist shows all of itself, on a phone too, rather than
-   scrolling inside its card with "Dismiss" cut off at the bottom. */
-app-vault-onboarding [data-accordion-content] > div {
-  max-height: none;
-}
-
-/* Sign-in and sign-up: the form is on a glass card at every width, so its
-   labels and links don't sit straight on the colored field on a phone. */
-.pb-glass bit-landing-card > bit-base-card {
-  background: var(--frost-surface-strong) !important;
-  -webkit-backdrop-filter: var(--frost-blur);
-  backdrop-filter: var(--frost-blur);
-  border: 1px solid var(--frost-edge) !important;
-  box-shadow: var(--frost-shadow) !important;
-}
-@media (max-width: 639px) {
-  .pb-glass bit-landing-card > bit-base-card {
-    padding: 1.25rem;
-  }
+:is(.pb-web, .pb-popup) [role="menu"] [bitmenuitem]:hover,
+:is(.pb-web, .pb-popup) [role="menu"] [bitmenuitem]:focus-visible {
+  background-color: var(--pb-hover) !important;
 }
 
 /* An avatar's initials, in the typeface (upstream names Inter in the SVG). */
 bit-avatar text {
   font-family: var(--font-sans);
+}
+
+/* The logo (brand/wordmark.py): the jewel tile and "passbundle", two-tone,
+   "pass" in the deep green and "bundle" in emerald, or light and mint on dark
+   surfaces, where the tile loses its shadow. */
+.pb-wm-pass {
+  fill: var(--pb-wordmark-pass);
+}
+.pb-wm-bundle {
+  fill: var(--pb-wordmark-bundle);
+}
+.theme_dark .pb-wm-tile {
+  filter: none;
+}
+
+/* Keykeeper: our mark in an icon tile sits in the middle. As an inline block on
+   the text baseline it left room for a descender under it, which put it 2px
+   high. */
+bit-icon-tile .bwi-bitwarden-shield:before,
+bit-icon-tile .bwi-shield:before {
+  vertical-align: top;
 }
 
 /* A long item name in the vault list ends in an ellipsis where its column is
@@ -412,186 +485,605 @@ bit-avatar text {
   text-overflow: ellipsis;
 }
 
-/* The logo (brand/wordmark.py): the jewel tile and "passbundle", two-tone.
-   The shared logo (sign-in pages, the extension's) is drawn for light
-   backgrounds; on dark ones the name lightens and the tile's shadow goes. The
-   navigation's is drawn for its dark background; upstream's light nav (the
-   admin console in the solid Light theme) takes the light colors. */
-.theme_dark .pb-wm-pass {
-  fill: #e7efec;
+/* ======================================================================
+   The web vault (html.pb-web): the menu and the pages as cards on the
+   ground, the vault's list as rows of tiles, and the item that's open in a
+   raised panel beside it (DESIGN.md, "The look").
+   ====================================================================== */
+
+/* The ground, and in dark mode its washes, behind everything. */
+html.pb-web,
+.pb-web body {
+  background-color: var(--pb-ground) !important;
+  background-image: var(--pb-wash) !important;
+  background-attachment: fixed;
 }
-.theme_dark .pb-wm-bundle {
-  fill: #6fd4b4;
+.pb-web bit-layout main,
+.pb-web bit-layout > div {
+  background-color: transparent !important;
 }
-.theme_dark .pb-wm-tile {
-  filter: none;
-}
-.theme_light:not(.pb-glass) bit-side-nav nav[style*="nav-fg-secondary"] .pb-wm-pass {
-  fill: #1b3a33;
-}
-.theme_light:not(.pb-glass) bit-side-nav nav[style*="nav-fg-secondary"] .pb-wm-bundle {
-  fill: #0e7a5a;
+.pb-web bit-layout main {
+  padding: 1.25rem 1.5rem 1.5rem 1.25rem;
 }
 
-/* Keykeeper: our mark in an icon tile sits in the middle. As an inline block on
-   the text baseline it left room for a descender under it, which put it 2px
-   high. */
-bit-icon-tile .bwi-bitwarden-shield:before,
-bit-icon-tile .bwi-shield:before {
-  vertical-align: top;
+/* The menu: a card in the corner, resting on the ground. */
+.pb-web bit-side-nav #bit-side-nav {
+  margin: 12px 0 12px 12px;
+  height: calc(100% - 24px);
+  border-radius: 16px;
+  background: var(--pb-surface) !important;
+  box-shadow: var(--pb-shadow-resting);
+  color: var(--pb-text);
+}
+/* Beside the page it fills its column, less the margin; over the page (a
+   phone) it keeps its own width. */
+.pb-web bit-side-nav > div:not([role="dialog"]) > #bit-side-nav[style*="width"] {
+  width: auto !important;
+}
+.pb-web bit-side-nav [class*="tw-bg-bg-nav"]:not([data-testid="nav-item-container"]) {
+  background-color: transparent !important;
+}
+/* Its lines: inset, quiet. */
+.pb-web bit-side-nav bit-nav-divider > div {
+  width: auto;
+  margin: 0.5rem 0.75rem;
+  background: var(--pb-line) !important;
+}
+/* Its entries: a soft pill under the pointer, and the selection's tint for
+   the one showing. Upstream marks that one with its strong nav colors. */
+.pb-web bit-side-nav [data-testid="nav-item-container"] {
+  border-radius: 10px !important;
+}
+/* Entries start 10px into their pill, with 20px more for each level of
+   folders, where upstream leaves 36px for a group's arrow. A group's arrow
+   (Import and export, Settings, the admin console's) sits at the pill's end
+   instead. */
+.pb-web bit-side-nav [data-testid="nav-item-container"][style*="padding-inline-start: 2.25rem"] {
+  padding-inline-start: 0.625rem !important;
+}
+.pb-web bit-side-nav [data-testid="nav-item-container"][style*="padding-inline-start: 3.75rem"] {
+  padding-inline-start: 1.875rem !important;
+}
+.pb-web bit-side-nav [data-testid="nav-item-container"][style*="padding-inline-start: 5.25rem"] {
+  padding-inline-start: 3.125rem !important;
+}
+.pb-web bit-side-nav [data-testid="nav-item-container"][style*="padding-inline-start: 6.75rem"] {
+  padding-inline-start: 4.375rem !important;
+}
+.pb-web bit-side-nav div:has(> [data-testid="nav-group-collapse-arrow"]) {
+  left: auto !important;
+  right: 0.25rem;
+  transform: none !important;
+}
+.pb-web bit-side-nav bit-nav-group > bit-nav-item [data-testid="nav-item-interactive"] {
+  padding-inline-end: 1.75rem !important;
+}
+.pb-web bit-side-nav bit-nav-item {
+  font-size: 0.875rem;
+}
+.pb-web bit-side-nav bit-nav-item .tw-font-semibold {
+  font-weight: 700;
+}
+.pb-web bit-side-nav bit-nav-item bit-icon,
+.pb-web bit-side-nav bit-nav-group bit-icon {
+  color: var(--pb-muted);
+}
+.pb-web bit-side-nav vault-keykeeper-category-tile {
+  margin-inline: -4px 2px;
+}
+
+/* The logo: the jewel tile and the two-tone name, at the top of the menu. */
+.pb-web bit-nav-logo > div {
+  padding-top: 0.25rem;
+}
+
+/* The vault's part (app-keykeeper-vault-menu): the categories' and folders'
+   headings, Personal and each organization over their folders, and the
+   counts at the end of each row. */
+.pb-web .keykeeper-menu-heading {
+  padding-inline-start: 1.125rem !important;
+}
+.pb-web .keykeeper-menu-owner [data-testid="nav-item-interactive"] > div {
+  font-weight: 600 !important;
+}
+.pb-web .keykeeper-menu-owner bit-icon {
+  color: var(--pb-text) !important;
+}
+.pb-web app-keykeeper-vault-menu bit-search input {
+  background: var(--pb-field) !important;
+}
+/* The tools (Generator, Send, Import and export, the MSP console, Settings)
+   in the label color, under the line. */
+.pb-web .keykeeper-menu > bit-nav-item [data-testid="nav-item-interactive"],
+.pb-web .keykeeper-menu > bit-nav-group [data-testid="nav-item-interactive"] {
+  color: var(--pb-label) !important;
+}
+
+/* It's one list that scrolls: the logo and "More from" scroll with it, rather
+   than staying put over the entries. */
+.keykeeper-menu bit-nav-logo > div,
+.keykeeper-menu #bit-side-nav--scroll [class*="tw-sticky"] {
+  position: static !important;
+}
+/* An entry inside a group (Import and export's, Settings') lines its text up
+   with its group's, past the group's icon (16px and an 8px gap). */
+.pb-web
+  bit-side-nav
+  bit-nav-group
+  > div[role="group"]
+  > bit-nav-item
+  [data-testid="nav-item-container"] {
+  padding-inline-start: 2.125rem !important;
+}
+/* The list fades out at its bottom edge rather than cutting an entry in
+   half, so a long menu (a phone, or many folders) reads as one that scrolls.
+   The space at its end keeps the last entry clear of the fade. */
+.keykeeper-menu #bit-side-nav--scroll {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 1.5rem), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 1.5rem), transparent);
+}
+.keykeeper-menu #bit-side-nav--scroll > div {
+  padding-bottom: 1.5rem;
+}
+/* "More from PassBundle" is a heading like the menu's others (Categories,
+   Folders), and its links line up with the entries above them. */
+.keykeeper-menu navigation-product-switcher section > span {
+  display: block;
+  padding: 0.75rem 1.25rem 0 1.125rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pb-muted);
+}
+.keykeeper-menu navigation-product-switcher section > div {
+  padding-inline: 0.75rem;
+}
+.keykeeper-menu navigation-product-switcher section a {
+  padding-inline-start: 2rem;
+}
+
+/* A page's header: its title, and the page's buttons, the product switcher,
+   and the account beside it. */
+.pb-web bit-header h1 {
+  font-size: 1.5rem !important;
+  line-height: 2.25rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em;
+  color: var(--pb-text);
+}
+.pb-web bit-header > header {
+  margin-bottom: 0.5rem;
+}
+
+/* Cards, panels, and tables rest on the ground. */
+.pb-web bit-layout bit-card,
+.pb-web bit-layout bit-item-group,
+.pb-web bit-layout bit-table,
+.pb-web bit-layout app-vault-filter > div,
+.pb-web bit-layout app-report-card bit-base-card {
+  display: block;
+  background: var(--pb-surface) !important;
+  border: 0 !important;
+  border-radius: 16px !important;
+  box-shadow: var(--pb-shadow-resting) !important;
+  overflow: hidden;
+}
+.pb-web bit-layout bit-card,
+.pb-web bit-layout bit-item-group {
+  border-radius: 12px !important;
+}
+.pb-web bit-layout :is(bit-card, bit-item-group, bit-table) [class*="tw-bg-background"],
+.pb-web bit-layout bit-table :is(table, tr, td, th) {
+  background-color: transparent !important;
+}
+.pb-web bit-layout bit-table :is(td, th) {
+  border-color: var(--pb-divider) !important;
+}
+.pb-web bit-layout bit-table thead {
+  border-bottom-color: var(--pb-line) !important;
+}
+.pb-web bit-layout bit-table thead th {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--pb-muted);
+}
+.pb-web bit-layout bit-table tbody tr {
+  border-color: var(--pb-divider) !important;
+}
+.pb-web bit-layout bit-table tbody tr:hover {
+  background-color: var(--pb-hover) !important;
+}
+.pb-web bit-layout bit-item bit-item {
+  border-color: var(--pb-divider) !important;
+}
+.pb-web bit-layout bit-item-group bit-item {
+  margin: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  border-bottom: 1px solid var(--pb-divider) !important;
+}
+.pb-web bit-layout bit-item-group bit-item:last-of-type {
+  border-bottom-color: transparent !important;
+}
+.pb-web bit-layout bit-item:hover {
+  background: var(--pb-hover) !important;
+}
+.pb-web bit-layout bit-item-group > h3 {
+  margin: 0;
+  padding: 10px 14px 4px;
+}
+/* The Health reports' cards: each report's jewel tile on a resting card
+   (report-card.component.html), like the menu's and the list's. */
+.pb-web app-report-card bit-card-content h3 {
+  font-size: 1.0625rem !important;
+  font-weight: 600 !important;
+  margin-bottom: 0.375rem !important;
+  color: var(--pb-text);
+}
+.pb-web app-report-card bit-card-content p {
+  font-size: 0.875rem;
+  color: var(--pb-label);
+}
+
+/* A report's floating Back to reports button is solid, so its white text
+   keeps 4.5:1 (upstream draws it at 90% opacity). */
+.pb-web .cdk-overlay-pane div:has(> a[bitbutton][buttontype="primary"][routerlink]) {
+  opacity: 1 !important;
+}
+
+/* The vault's checklist: one quiet, tinted card at the top of the list, with
+   a smaller title, less room, and its buttons secondary. */
+.pb-web app-vault-onboarding > div {
+  margin-bottom: 1rem !important;
+}
+.pb-web app-vault-onboarding bit-accordion {
+  background: var(--pb-tinted-card) !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  box-shadow: inset 0 0 0 1px var(--pb-tinted-edge);
+  overflow: hidden;
+}
+.pb-web app-vault-onboarding [data-accordion-trigger] {
+  padding: 0.75rem 1rem !important;
+  background: transparent !important;
+}
+.pb-web app-vault-onboarding [data-accordion-trigger] bit-icon-tile > div {
+  width: 2.25rem !important;
+  height: 2.25rem !important;
+  border-radius: 10px !important;
+}
+.pb-web app-vault-onboarding [data-accordion-trigger] bit-icon-tile i {
+  font-size: 1.25rem !important;
+}
+.pb-web app-vault-onboarding [data-accordion-trigger] > div > span:first-child {
+  font-size: 0.9375rem !important;
+  font-weight: 600 !important;
+  line-height: 1.3 !important;
+}
+.pb-web app-vault-onboarding [data-accordion-trigger] > div > span:last-child {
+  font-size: 0.8125rem !important;
+  color: var(--pb-muted) !important;
+}
+.pb-web app-vault-onboarding [data-accordion-content] {
+  padding-block: 0 0.5rem !important;
+}
+.pb-web app-vault-onboarding app-onboarding-task {
+  display: block;
+  padding-block: 0.5rem;
+  border-top: 1px solid var(--pb-tinted-edge);
+}
+.pb-web app-vault-onboarding app-onboarding-task .tw-text-base {
+  font-size: 0.875rem;
+}
+.pb-web app-vault-onboarding [bitbutton].tw-bg-bg-brand {
+  background: var(--pb-field) !important;
+  color: var(--pb-text) !important;
+  border: 1px solid var(--pb-field-border) !important;
+  box-shadow: var(--pb-field-shadow) !important;
+}
+.pb-web app-vault-onboarding [bitbutton].tw-bg-bg-brand:hover {
+  background: var(--pb-hover) !important;
+}
+
+/* The Danger zone's buttons: tinted, not solid red; the dialog that asks to
+   confirm keeps a solid red button for the last step. */
+.pb-web bit-layout [bitbutton][buttontype="danger"] {
+  background: var(--pb-danger-tint) !important;
+  color: var(--pb-danger-text) !important;
+  border: 1px solid var(--pb-danger-line) !important;
+  box-shadow: none !important;
+}
+.pb-web bit-layout [bitbutton][buttontype="danger"]:hover {
+  background: var(--pb-danger-tint-strong) !important;
+}
+.pb-web app-danger-zone > div {
+  border-color: var(--pb-danger-line) !important;
+  border-radius: 12px !important;
+}
+
+/* The vault's checklist shows all of itself, on a phone too, rather than
+   scrolling inside its card with "Dismiss" cut off at the bottom. */
+app-vault-onboarding [data-accordion-content] > div {
+  max-height: none;
+}
+.pb-web bit-accordion [data-accordion-trigger]:not(:hover) {
+  background-color: transparent !important;
+}
+
+/* Fields and the search box: the field color, a hairline. */
+.pb-web bit-search input,
+.pb-web [bitfieldcontainer] {
+  background-color: var(--pb-field) !important;
+}
+/* A search box's input inside its own field container takes the
+   container's color, so the field color isn't laid on twice. */
+.pb-web bit-search [bitfieldcontainer] input {
+  background-color: transparent !important;
+}
+.pb-web bit-search input {
+  border-radius: 10px !important;
+  border-color: var(--pb-line) !important;
+  color: var(--pb-text) !important;
+}
+.pb-web bit-search bit-icon {
+  color: var(--pb-muted);
+}
+
+/* ----- The vault's list: rows of tiles on the ground, the open one raised. */
+.pb-web app-vault-items bit-table {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  overflow: visible;
+}
+.pb-web app-vault-items table {
+  border-collapse: separate !important;
+  border-spacing: 0;
+}
+.pb-web app-vault-items thead {
+  border: 0 !important;
+}
+.pb-web app-vault-items thead th {
+  border-bottom: 1px solid var(--pb-line) !important;
+  padding-block: 0.5rem;
+}
+.pb-web app-vault-items tbody tr {
+  border: 0 !important;
+  background: transparent !important;
+}
+.pb-web app-vault-items tbody td {
+  border: 0 !important;
+  padding-block: 0 !important;
+  vertical-align: middle;
+}
+.pb-web app-vault-items tbody tr td:first-child {
+  border-radius: 12px 0 0 12px;
+}
+.pb-web app-vault-items tbody tr td:last-child {
+  border-radius: 0 12px 12px 0;
+}
+.pb-web app-vault-items tbody tr:hover td {
+  background: var(--pb-hover) !important;
+}
+/* The row whose item is open in the panel: raised, with the selection's ring. */
+.pb-web app-vault-items tbody tr[data-keykeeper-open] td {
+  background: var(--pb-raised) !important;
+  box-shadow:
+    inset 0 1px 0 var(--pb-selected-ring),
+    inset 0 -1px 0 var(--pb-selected-ring);
+}
+.pb-web app-vault-items tbody tr[data-keykeeper-open] td:first-child {
+  box-shadow:
+    inset 1px 0 0 var(--pb-selected-ring),
+    inset 0 1px 0 var(--pb-selected-ring),
+    inset 0 -1px 0 var(--pb-selected-ring);
+}
+.pb-web app-vault-items tbody tr[data-keykeeper-open] td:last-child {
+  box-shadow:
+    inset -1px 0 0 var(--pb-selected-ring),
+    inset 0 1px 0 var(--pb-selected-ring),
+    inset 0 -1px 0 var(--pb-selected-ring);
+}
+.pb-web app-vault-items tbody tr[data-keykeeper-open] {
+  filter: drop-shadow(0 4px 10px rgb(0 0 0 / 0.07));
+}
+/* A row's name, and its username or what it is under it. */
+.pb-web app-vault-items [id^="cipher-btn-"] {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--pb-text) !important;
+  text-decoration: none !important;
+}
+.pb-web app-vault-items [id^="cipher-btn-"]:hover {
+  color: var(--pb-link) !important;
+}
+.pb-web app-vault-items tbody td .tw-text-muted {
+  font-size: 0.8125rem;
+  color: var(--pb-muted) !important;
+}
+/* The whole row opens its item: the name's button reaches over the row, and
+   the row's other controls sit above it. */
+.pb-web app-vault-items tbody tr[appvaultcipherrow] {
+  position: relative;
+}
+.pb-web app-vault-items tbody tr[appvaultcipherrow] [id^="cipher-btn-"] {
+  position: static !important;
+}
+.pb-web app-vault-items tbody tr[appvaultcipherrow] [id^="cipher-btn-"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.pb-web
+  app-vault-items
+  tbody
+  tr[appvaultcipherrow]
+  :is(
+    input,
+    app-org-badge,
+    [biticonbutton],
+    vault-keykeeper-expiration-badge,
+    vault-keykeeper-template-badge,
+    app-collection-badge
+  ) {
+  position: relative;
+  z-index: 1;
+}
+/* Where it lives, as a quiet chip. */
+.pb-web app-vault-items app-org-badge [bitbadge],
+.pb-web app-vault-items app-org-badge button {
+  border: 0 !important;
+  border-radius: 7px !important;
+  background: var(--pb-chip) !important;
+  box-shadow: inset 0 0 0 1px var(--pb-chip-edge);
+  color: var(--pb-chip-text) !important;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.pb-web app-vault-items tbody [biticonbutton] {
+  color: var(--pb-muted);
+}
+
+/* ----- The item's panel (a drawer: vault-item-dialog in the web vault). */
+.pb-web bit-layout bit-dialog > section {
+  margin: 12px 12px 12px 0;
+  height: calc(100% - 24px) !important;
+  border: 0 !important;
+  border-radius: 16px;
+  background: var(--pb-raised) !important;
+  box-shadow: var(--pb-shadow-raised);
+}
+.pb-web bit-layout bit-dialog > section > header,
+.pb-web bit-layout bit-dialog > section > footer,
+.pb-web bit-layout bit-dialog > section [class*="tw-bg-background"] {
+  background-color: transparent !important;
+  border-color: var(--pb-divider) !important;
+}
+/* Its title ("View Login") names it for screen readers; the item's tile and
+   name are its top. Close and Edit sit in the corner beside them. */
+.pb-web [data-keykeeper="item-panel"] > section {
+  position: relative;
+}
+.pb-web [data-keykeeper="item-panel"][data-keykeeper-viewing] > section > header {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  padding: 1.5rem 1rem 0 0 !important;
+  border: 0 !important;
+}
+.pb-web [data-keykeeper="item-panel"][data-keykeeper-viewing] > section > header h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.pb-web [data-keykeeper="item-panel"] > section > header > div {
+  gap: 0.25rem;
+}
+.pb-web [data-keykeeper="item-panel"] [bitdialogcontent] {
+  padding-top: 1.25rem;
+}
+.pb-web [data-keykeeper="item-panel"] vault-keykeeper-item-hero [data-part="hero"] {
+  padding-inline-end: 9.5rem;
+  min-height: 56px;
+}
+.pb-web [data-keykeeper="item-panel"] vault-keykeeper-item-hero [data-part="name"] {
+  font-size: 1.375rem;
+}
+/* Its fields: one inset card (the rules for the fields themselves are the
+   popup's, below), with a little more room. */
+.pb-web [data-keykeeper="item-panel"] :is(bit-card, bit-item-group) {
+  background: var(--pb-inset) !important;
+  box-shadow: inset 0 0 0 1px var(--pb-inset-line) !important;
+  border-radius: 12px !important;
+}
+.pb-web
+  [data-keykeeper="item-panel"]
+  :is(read-only-cipher-card, app-autofill-options-view)
+  bit-form-field {
+  padding: 12px 10px 12px 16px;
+  border-bottom-color: var(--pb-inset-line);
+}
+.pb-web
+  [data-keykeeper="item-panel"]
+  :is(read-only-cipher-card, app-autofill-options-view)
+  bit-form-field
+  label {
+  font-weight: 600;
+}
+.pb-web [data-keykeeper="item-panel"] app-cipher-view section {
+  margin-bottom: 14px !important;
+}
+/* The password's health: the quiet line with its strength's dot, as in the
+   popup, a little larger here. */
+.pb-web [data-keykeeper="item-panel"] [data-testid="keykeeper-password-health"] {
+  margin: 0 0 14px;
+  padding: 0 4px;
+  font-size: 13px;
+}
+.pb-web [data-keykeeper="item-panel"] app-item-history-v2 bit-card {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding-inline: 2px !important;
+}
+.pb-web [data-keykeeper="item-panel"] app-item-history-v2 :is(p, span, a) {
+  font-size: 12px;
+}
+
+/* ----- Dialogs (the new item picker, an item opened to edit): floating. */
+.pb-web .cdk-overlay-pane bit-dialog > section > :is(header, footer) {
+  background-color: transparent !important;
+  border-color: var(--pb-divider) !important;
+}
+.pb-web .cdk-overlay-pane bit-dialog :is(bit-card, bit-item-group) {
+  background: var(--pb-surface) !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  box-shadow: var(--pb-shadow-resting) !important;
+}
+
+/* ----- Sign-in, unlock, and the other pages before the vault: the logo in
+   the corner, the form on a card resting on the ground. */
+.pb-web bit-landing-card > bit-base-card {
+  background: var(--pb-surface) !important;
+  border: 0 !important;
+  border-radius: 16px !important;
+  box-shadow: var(--pb-shadow-raised) !important;
+}
+@media (max-width: 639px) {
+  .pb-web bit-landing-card > bit-base-card {
+    padding: 1.25rem;
+  }
+}
+.pb-web bit-landing-hero h1 {
+  font-weight: 700 !important;
+  letter-spacing: -0.01em;
+  color: var(--pb-text) !important;
+}
+.pb-web auth-anon-layout,
+.pb-web auth-anon-layout > main {
+  background: transparent !important;
 }
 
 /* ======================================================================
-   The extension's popup: the design language (DESIGN.md, "The look").
-   Color says what a thing is, depth says what you can touch. A calm, solid
-   ground; cards at three depths (resting lists, raised for what's
-   suggested, floating menus and dialogs); jewel-toned tiles for categories
-   (libs/common/src/vault/keykeeper/categories.ts); and the brand's green for
-   what you act on. The same in System, Light, and Dark: System is light or
-   dark like the device, and the popup never gets Glass.
-
-   The --pb-* tokens are the palette; upstream's tokens are mapped onto them,
-   so upstream's components follow. Our own components read the --pb-*
-   tokens directly. Every text color passes WCAG AA on what it sits on.
+   The extension's popup (html.pb-popup): the vault, an item, and the pages
+   before them, at the popup's size (DESIGN.md, "The look").
    ====================================================================== */
-html.pb-popup {
-  --pb-ground: #eef2f0;
-  --pb-surface: #ffffff;
-  --pb-raised: #ffffff;
-  --pb-sunken: #e1e8e5;
-  --pb-field: #ffffff;
-  --pb-field-border: #cbd7d2;
-  --pb-line: #dce5e1;
-  --pb-divider: #edf2f0;
-  --pb-text: #14201c;
-  --pb-label: #3c4a45;
-  --pb-muted: #52615c;
-  --pb-placeholder: #6b7a75;
-  --pb-brand: #1f6f5c;
-  --pb-brand-strong: #185a4a;
-  --pb-on-brand: #ffffff;
-  --pb-brand-tint: #eef5f2;
-  --pb-brand-tint-strong: #dcebe5;
-  --pb-link: #1f6f5c;
-  --pb-focus: #1f6f5c;
-  --pb-hover: rgb(16 32 27 / 0.05);
-  --pb-star: #b07a12;
-  --pb-shadow-resting: 0 1px 2px rgb(16 32 27 / 0.06), 0 1px 1px rgb(16 32 27 / 0.04);
-  --pb-shadow-raised: 0 4px 12px rgb(16 32 27 / 0.08), 0 1px 3px rgb(16 32 27 / 0.06);
-  --pb-shadow-floating: 0 16px 40px rgb(16 32 27 / 0.14), 0 4px 12px rgb(16 32 27 / 0.08);
-  --pb-chip-shadow: 0 1px 3px rgb(16 32 27 / 0.12), 0 0 0 1px #dce5e1;
-  --pb-segment-shadow: 0 1px 3px rgb(16 32 27 / 0.12), 0 1px 1px rgb(16 32 27 / 0.06);
-  --pb-field-shadow: 0 1px 2px rgb(16 32 27 / 0.05);
-  --pb-button-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 1px 2px rgb(16 32 27 / 0.2);
-
-  /* Upstream's tokens, on ours. */
-  --color-background: 255 255 255;
-  --color-background-alt: 238 242 240;
-  --color-text-main: 20 32 28;
-  --color-text-muted: 82 97 92;
-  --color-secondary-300: 220 229 225;
-  --color-primary-600: 31 111 92;
-  --color-primary-700: 24 90 74;
-  --color-hover-default: rgb(16 32 27 / 0.05);
-  --color-fg-heading: #14201c;
-  --color-fg-body: #3c4a45;
-  --color-fg-body-subtle: #52615c;
-  --color-fg-brand: #1f6f5c;
-  --color-fg-brand-strong: #185a4a;
-  --color-fg-contrast: #ffffff;
-  --color-bg-primary: #ffffff;
-  --color-bg-secondary: #ffffff;
-  --color-bg-tertiary: #eef2f0;
-  --color-bg-quaternary: #e1e8e5;
-  --color-bg-brand: #1f6f5c;
-  --color-bg-brand-strong: #185a4a;
-  --color-bg-brand-softer: #eef5f2;
-  --color-bg-brand-soft: #dcebe5;
-  --color-bg-hover: rgb(16 32 27 / 0.05);
-  --color-border-light: #edf2f0;
-  --color-border-base: #dce5e1;
-  --color-border-strong: #cbd7d2;
-  --color-border-brand: #1f6f5c;
-  --color-border-brand-strong: #185a4a;
-  --color-border-focus: #1f6f5c;
-}
-html.pb-popup.theme_dark {
-  --pb-ground: #0e1513;
-  --pb-surface: #16201d;
-  --pb-raised: #1c2824;
-  --pb-sunken: #16201d;
-  --pb-field: #1c2824;
-  --pb-field-border: #34443f;
-  --pb-line: #22302b;
-  --pb-divider: #22302b;
-  --pb-text: #e7efec;
-  --pb-label: #b9c6c2;
-  --pb-muted: #a3b2ad;
-  --pb-placeholder: #8c9c97;
-  --pb-brand: #5fc3a6;
-  --pb-brand-strong: #7dd3ba;
-  --pb-on-brand: #0b1f19;
-  --pb-brand-tint: #1b2e28;
-  --pb-brand-tint-strong: #22392f;
-  --pb-link: #7dd3ba;
-  --pb-focus: #7dd3ba;
-  --pb-hover: rgb(255 255 255 / 0.05);
-  --pb-star: #e8b23a;
-  --pb-shadow-resting: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 0 0 1px #22302b;
-  --pb-shadow-raised: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 6px 16px rgb(0 0 0 / 0.35);
-  --pb-shadow-floating: 0 16px 40px rgb(0 0 0 / 0.5), 0 0 0 1px #2a3833;
-  --pb-chip-shadow: 0 0 0 1px #34443f;
-  --pb-segment-shadow: 0 0 0 1px #34443f;
-  --pb-field-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
-  --pb-button-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25);
-
-  --color-background: 22 32 29;
-  --color-background-alt: 14 21 19;
-  --color-text-main: 231 239 236;
-  --color-text-muted: 163 178 173;
-  --color-secondary-300: 52 68 63;
-  --color-primary-600: 125 211 186;
-  --color-primary-700: 166 227 209;
-  --color-hover-default: rgb(255 255 255 / 0.05);
-  --color-fg-heading: #e7efec;
-  --color-fg-body: #b9c6c2;
-  --color-fg-body-subtle: #a3b2ad;
-  --color-fg-brand: #7dd3ba;
-  --color-fg-brand-strong: #a6e3d1;
-  --color-fg-contrast: #0b1f19;
-  --color-bg-primary: #16201d;
-  --color-bg-secondary: #1c2824;
-  --color-bg-tertiary: #0e1513;
-  --color-bg-quaternary: #24332e;
-  --color-bg-brand: #5fc3a6;
-  --color-bg-brand-strong: #7dd3ba;
-  --color-bg-brand-softer: #1b2e28;
-  --color-bg-brand-soft: #22392f;
-  --color-bg-hover: rgb(255 255 255 / 0.05);
-  --color-border-light: #22302b;
-  --color-border-base: #22302b;
-  --color-border-strong: #34443f;
-  --color-border-brand: #5fc3a6;
-  --color-border-brand-strong: #7dd3ba;
-  --color-border-focus: #7dd3ba;
-}
-/* The dark primary button is the design's mint with dark text (8:1), not the
-   web vault's deep green with white. */
-.pb-popup.theme_dark .tw-bg-bg-brand.tw-text-fg-contrast {
-  --color-bg-brand: #5fc3a6;
-  --color-bg-brand-strong: #7dd3ba;
-  --color-border-brand: #5fc3a6;
-  --color-border-brand-strong: #7dd3ba;
-  --color-fg-contrast: #0b1f19;
-}
-
-/* The ground. */
+/* The ground, and in dark mode its washes. The washes are fixed to the
+   window, so the header and the vault's top, which stay put over what
+   scrolls, paint the same ground and match it exactly. */
 html.pb-popup,
 .pb-popup body,
 .pb-popup popup-page main,
 .pb-popup popup-header header,
 .pb-popup [data-keykeeper="vault-top"] {
   background-color: var(--pb-ground) !important;
+  background-image: var(--pb-wash) !important;
+  background-attachment: fixed !important;
 }
 .pb-popup popup-header header {
   border-bottom-color: transparent !important;
@@ -746,117 +1238,115 @@ html.pb-popup,
   box-shadow: var(--pb-button-shadow);
 }
 
-/* Buttons: rounded rectangles, not pills, a raised primary and a white
-   secondary with a hairline. */
-.pb-popup button[bitbutton],
-.pb-popup a[bitbutton],
-.pb-popup button[bitbutton][buttontype="primary"],
-.pb-popup a[bitbutton][buttontype="primary"],
-.pb-popup [bitbutton].tw-bg-bg-brand.tw-text-fg-contrast {
-  border-radius: 10px !important;
-}
-.pb-popup [bitbutton].tw-bg-bg-brand.tw-text-fg-contrast {
-  box-shadow: var(--pb-button-shadow);
-}
-.pb-popup [bitbutton].tw-bg-bg-secondary {
-  border-color: var(--pb-field-border) !important;
-  box-shadow: var(--pb-field-shadow);
-}
+/* Buttons, a little larger in the popup when they take its width. */
 .pb-popup [bitbutton][block] {
   min-height: 44px;
   font-size: 15px;
 }
-.pb-popup a[bitlink],
-.pb-popup button[bitlink] {
-  color: var(--pb-link);
-}
-
-/* Fields: white, a hairline, and rounder corners. */
-.pb-popup [bitfieldcontainer] {
-  border-radius: 10px !important;
-  box-shadow: var(--pb-field-shadow);
-}
 .pb-popup bit-form-field label {
   font-size: 13px;
   font-weight: 600;
-  color: var(--pb-label);
-}
-.pb-popup bit-form-field input::placeholder,
-.pb-popup bit-form-field textarea::placeholder {
-  color: var(--pb-placeholder);
 }
 
-/* An item's fields: a label over its value, no field chrome, a line between
-   each, and the copy button tinted. Upstream's headings over the login's
-   fields and its website go; the fields say what they are. */
-.pb-popup :is(read-only-cipher-card, app-autofill-options-view) bit-card {
+/* An item's fields, in the popup and the web vault's item panel: a label over
+   its value, no field chrome, a line between each, and the copy button
+   tinted. Upstream's headings over the login's fields and its website go;
+   the fields say what they are. */
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  :is(read-only-cipher-card, app-autofill-options-view)
+  bit-card {
   padding: 0 !important;
 }
-.pb-popup :is(read-only-cipher-card, app-autofill-options-view) bit-form-field {
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  :is(read-only-cipher-card, app-autofill-options-view)
+  bit-form-field {
   margin: 0 !important;
   padding: 10px 8px 10px 14px;
   border-bottom: 1px solid var(--pb-divider);
 }
-.pb-popup :is(read-only-cipher-card, app-autofill-options-view) bit-form-field:last-of-type {
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  :is(read-only-cipher-card, app-autofill-options-view)
+  bit-form-field:last-of-type {
   border-bottom: 0;
 }
-.pb-popup :is(read-only-cipher-card, app-autofill-options-view) bit-form-field label {
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  :is(read-only-cipher-card, app-autofill-options-view)
+  bit-form-field
+  label {
   font-size: 12px;
   color: var(--pb-muted);
 }
-.pb-popup :is(read-only-cipher-card, app-autofill-options-view) [bitfieldcontainer] {
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  :is(read-only-cipher-card, app-autofill-options-view)
+  [bitfieldcontainer] {
   border: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
   min-height: 0;
   --tw-ring-shadow: 0 0 #0000 !important;
 }
-.pb-popup
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
   :is(read-only-cipher-card, app-autofill-options-view)
   [bitfieldcontainer]
   > div:last-child {
   padding-inline-start: 0;
 }
-.pb-popup :is(read-only-cipher-card, app-autofill-options-view) input {
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  :is(read-only-cipher-card, app-autofill-options-view)
+  input {
   font-size: 15px !important;
   color: var(--pb-text) !important;
 }
-.pb-popup app-autofill-options-view input[data-testid="login-website"] {
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  app-autofill-options-view
+  input[data-testid="login-website"] {
   color: var(--pb-link) !important;
 }
-.pb-popup read-only-cipher-card input[type="password"],
-.pb-popup read-only-cipher-card #totp {
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"]) read-only-cipher-card input[type="password"],
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"]) read-only-cipher-card #totp {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   letter-spacing: 0.06em;
 }
-.pb-popup :is(read-only-cipher-card, app-autofill-options-view) button[biticonbutton="bwi-clone"] {
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  :is(read-only-cipher-card, app-autofill-options-view)
+  button[biticonbutton="bwi-clone"] {
   width: 36px;
   height: 36px;
   border-radius: 9px !important;
   background: var(--pb-brand-tint) !important;
   color: var(--pb-brand) !important;
 }
-.pb-popup
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
   :is(read-only-cipher-card, app-autofill-options-view)
   button[biticonbutton="bwi-clone"]:hover {
   background: var(--pb-brand-tint-strong) !important;
 }
 /* The two-step code's countdown: a ring in the brand's green on a faint track. */
-.pb-popup [bittotpcountdown] circle[r="9.5"]:not(.tw-stroke-danger-600) {
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  [bittotpcountdown]
+  circle[r="9.5"]:not(.tw-stroke-danger-600) {
   stroke: var(--pb-brand);
 }
-.pb-popup [bittotpcountdown] circle[r="11"]:not(.tw-stroke-danger-600) {
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  [bittotpcountdown]
+  circle[r="11"]:not(.tw-stroke-danger-600) {
   stroke: var(--pb-line);
 }
-.pb-popup [bittotpcountdown] .tw-text-main {
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"]) [bittotpcountdown] .tw-text-main {
   color: var(--pb-brand);
   font-weight: 700;
 }
-.pb-popup app-cipher-view app-login-credentials-view bit-section-header,
-.pb-popup app-cipher-view app-autofill-options-view bit-section-header {
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  app-cipher-view
+  app-login-credentials-view
+  bit-section-header,
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  app-cipher-view
+  app-autofill-options-view
+  bit-section-header {
   display: none;
 }
-.pb-popup app-cipher-view section {
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"]) app-cipher-view section {
   margin-bottom: 12px !important;
 }
 
@@ -866,30 +1356,6 @@ html.pb-popup,
 }
 .pb-popup [data-keykeeper="favorite"][data-on] {
   color: var(--pb-star) !important;
-}
-
-/* Segmented choices (Password, Passphrase, Username; All, Text, File): a
-   sunken track with the picked one raised, like "Where's your vault?". */
-.pb-popup bit-toggle-group {
-  background: var(--pb-sunken) !important;
-  border: 0 !important;
-  border-radius: 12px !important;
-}
-.pb-popup bit-toggle-group::after {
-  background: var(--pb-raised) !important;
-  border-radius: 9px !important;
-  box-shadow: var(--pb-segment-shadow);
-}
-.pb-popup bit-toggle-group bit-toggle label {
-  border-radius: 9px !important;
-  font-weight: 600 !important;
-  color: var(--pb-label) !important;
-}
-.pb-popup bit-toggle-group bit-toggle label::after {
-  display: none;
-}
-.pb-popup bit-toggle-group bit-toggle input:checked + label[for] {
-  color: var(--pb-text) !important;
 }
 
 /* The tabs: a white bar, the tab showing in the brand's green. */
@@ -923,27 +1389,15 @@ html.pb-popup,
   box-shadow: 0 -1px 0 var(--pb-line);
 }
 
-/* Callouts and banners: the same rounded corners as the cards. */
-.pb-popup bit-callout > div {
-  border-radius: 12px !important;
-}
-
-/* Menus and dialogs float. */
-.pb-popup .cdk-overlay-pane [role="menu"],
+/* Dialogs float, as in the web vault (the shared rules above). */
 .pb-popup bit-dialog > section,
 .pb-popup bit-simple-dialog > section {
-  background: var(--pb-raised) !important;
+  background: var(--pb-dialog) !important;
   border: 0 !important;
-  border-radius: 12px !important;
-  box-shadow: var(--pb-shadow-floating) !important;
-}
-.pb-popup [role="menu"] [bitmenuitem] {
-  background-color: transparent !important;
-  border-radius: 8px;
-}
-.pb-popup [role="menu"] [bitmenuitem]:hover,
-.pb-popup [role="menu"] [bitmenuitem]:focus-visible {
-  background-color: var(--pb-hover) !important;
+  border-radius: 14px !important;
+  box-shadow:
+    0 0 0 1px var(--pb-dialog-edge),
+    var(--pb-shadow-floating) !important;
 }
 
 /* Sign-in, unlock, and the other pages before the vault: on the ground, no

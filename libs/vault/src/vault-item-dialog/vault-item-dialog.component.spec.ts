@@ -528,6 +528,43 @@ describe("VaultItemDialogComponent", () => {
         data: baseParams,
       });
     });
+
+    // Keykeeper: the web vault's item panel closes when another page opens.
+    it("passes on closing when another page opens", async () => {
+      const fakeDialogService = { openDrawer: jest.fn() } as any;
+
+      await VaultItemDialogComponent.openDrawer(fakeDialogService, baseParams, {
+        closeOnNavigation: true,
+      });
+
+      expect(fakeDialogService.openDrawer).toHaveBeenCalledWith(VaultItemDialogComponent, {
+        data: baseParams,
+        closeOnNavigation: true,
+      });
+    });
+  });
+
+  // Keykeeper: in the web vault, an item opens to view in a side panel (a
+  // drawer), still a dialog to assistive technology, named by its title.
+  describe("as the web vault's side panel", () => {
+    it("is a dialog named by its title and marked as the item panel", () => {
+      (TestBed.inject(DialogRef) as { isDrawer?: boolean }).isDrawer = true;
+      fixture.detectChanges();
+
+      const host: HTMLElement = fixture.nativeElement.querySelector("bit-dialog");
+      const title: HTMLElement = fixture.nativeElement.querySelector("[bitDialogTitle]");
+      expect(host.getAttribute("data-keykeeper")).toBe("item-panel");
+      expect(host.getAttribute("role")).toBe("dialog");
+      expect(title.id).toMatch(/^keykeeper-item-panel-title-/);
+      expect(host.getAttribute("aria-labelledby")).toBe(title.id);
+    });
+
+    it("leaves a dialog as upstream has it", () => {
+      const host: HTMLElement = fixture.nativeElement.querySelector("bit-dialog");
+      expect(host.getAttribute("data-keykeeper")).toBeNull();
+      expect(host.getAttribute("role")).toBeNull();
+      expect(host.getAttribute("aria-labelledby")).toBeNull();
+    });
   });
 
   describe("onCipherSaved", () => {

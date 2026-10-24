@@ -85,6 +85,9 @@
         [attr.aria-hidden]="open"
         [attr.aria-label]="text()"
       ></bit-icon>
+    } @else {
+      <!-- Keykeeper: a drawn icon in its place, such as PassBundle's category tiles -->
+      <ng-content select="[slot=icon]"></ng-content>
     }
     @if (open) {
       <span class="tw-truncate">{{ text() }}</span>

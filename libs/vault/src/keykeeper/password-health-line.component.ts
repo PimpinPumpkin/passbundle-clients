@@ -29,30 +29,52 @@ export function keykeeperTimeAgo(then: Date, now: Date, locale: string, justNow:
 }
 
 /**
- * Keykeeper: a quiet line under a login's fields in the extension (DESIGN.md,
- * "The look"): how strong its password is and when it last changed, "Password
- * strong · changed 3 weeks ago". Strength is zxcvbn's score, as in the
- * password health report: 4 strong, 3 good, anything less weak.
+ * Keykeeper: a quiet line under a login's fields in the extension and the web
+ * vault's item panel (DESIGN.md, "The look"): a small dot in the strength's
+ * color (green, amber, or red), then how strong its password is and when it
+ * last changed, "Password strong · changed 3 weeks ago". Strength is zxcvbn's
+ * score, as in the password health report: 4 strong, 3 good, anything less
+ * weak.
  */
 @Component({
   selector: "vault-keykeeper-password-health-line",
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (line(); as l) {
-      <p [attr.data-weak]="l.weak || null" data-testid="keykeeper-password-health">
+      <p
+        [attr.data-weak]="l.weak || null"
+        [attr.data-strength]="l.strength"
+        data-testid="keykeeper-password-health"
+      >
         {{ l.text }}
       </p>
     }
   `,
   styles: `
     p {
+      display: flex;
+      align-items: center;
+      gap: 7px;
       margin: 0 0 12px;
       padding: 0 4px;
       font-size: 12px;
       color: var(--pb-muted, rgb(var(--color-text-muted)));
     }
-    p[data-weak] {
-      color: var(--color-fg-danger, rgb(var(--color-danger-600)));
+    /* The dot carries the strength; the words stay quiet. Colors are tokens
+       in brand/look.css, light and dark, with these as the fallback. */
+    p::before {
+      content: "";
+      flex: none;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--pb-dot-strong, #1e8a5a);
+    }
+    p[data-strength="good"]::before {
+      background: var(--pb-dot-good, #b7791f);
+    }
+    p[data-strength="weak"]::before {
+      background: var(--pb-dot-weak, #c4321f);
     }
   `,
 })
@@ -73,10 +95,11 @@ export class KeykeeperPasswordHealthLineComponent {
       undefined,
       [cipher.login.username, cipher.name].filter((s): s is string => !!s),
     ).score;
+    const level = score >= 4 ? "strong" : score === 3 ? "good" : "weak";
     const strength =
-      score >= 4
+      level === "strong"
         ? "keykeeperPasswordStrong"
-        : score === 3
+        : level === "good"
           ? "keykeeperPasswordGood"
           : "keykeeperPasswordWeak";
     const changed = cipher.login.passwordRevisionDate;
@@ -93,6 +116,6 @@ export class KeykeeperPasswordHealthLineComponent {
         this.i18nService.t(changed ? "keykeeperPasswordChanged" : "keykeeperPasswordAdded", ago),
       );
     }
-    return { text: parts.join(" · "), weak: score < 3 };
+    return { text: parts.join(" · "), weak: score < 3, strength: level };
   });
 }

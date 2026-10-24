@@ -106,6 +106,24 @@ describe("KeykeeperPasswordHealthLineComponent", () => {
     expect((fixture.nativeElement as HTMLElement).querySelector("[data-weak]")).not.toBeNull();
   });
 
+  it("gives the strength's dot its level: strong, good, or weak", () => {
+    const level = () =>
+      (fixture.nativeElement as HTMLElement)
+        .querySelector("[data-testid=keykeeper-password-health]")
+        ?.getAttribute("data-strength");
+    for (const [s, expected] of [
+      [4, "strong"],
+      [3, "good"],
+      [2, "weak"],
+    ] as const) {
+      score = s;
+      fixture = TestBed.createComponent(KeykeeperPasswordHealthLineComponent);
+      fixture.componentRef.setInput("cipher", login("x"));
+      fixture.detectChanges();
+      expect(level()).toBe(expected);
+    }
+  });
+
   it("says nothing for a login without a password, or one its owner can't see", () => {
     fixture.componentRef.setInput("cipher", login(null));
     fixture.detectChanges();

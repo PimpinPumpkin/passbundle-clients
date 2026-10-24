@@ -116,10 +116,10 @@ describe("AppearanceComponent", () => {
     });
 
     describe("theme options setup", () => {
-      // Keykeeper: Glass (the System setting) first, then the solid themes.
-      it("should create theme options with Glass, Light, and Dark", () => {
+      // Keykeeper: System first, as in the extension, then Light and Dark.
+      it("should create theme options with System, Light, and Dark", () => {
         expect(component.themeOptions).toEqual([
-          { name: "keykeeperThemeGlass-used-i18n", value: ThemeTypes.System },
+          { name: "keykeeperThemeSystem-used-i18n", value: ThemeTypes.System },
           { name: "themeLight-used-i18n", value: ThemeTypes.Light },
           { name: "themeDark-used-i18n", value: ThemeTypes.Dark },
         ]);

@@ -23,6 +23,7 @@ import {
 } from "@bitwarden/components";
 import {
   CipherFormConfigService,
+  KeykeeperItemTileComponent,
   PasswordRepromptService,
   RoutedVaultFilterBridgeService,
   RoutedVaultFilterService,
@@ -50,6 +51,7 @@ import { InactiveTwoFactorReportComponent as BaseInactiveTwoFactorReportComponen
     RoutedVaultFilterBridgeService,
   ],
   imports: [
+    KeykeeperItemTileComponent,
     SharedModule,
     HeaderModule,
     OrganizationBadgeModule,

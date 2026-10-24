@@ -80,21 +80,23 @@ import { KeykeeperCategoryTileComponent } from "./category-tile.component";
       display: inline-flex;
       flex: none;
     }
+    /* The colors are tokens in brand/look.css, light and dark, with these as
+       the fallback. */
     [data-site] {
       display: flex;
       align-items: center;
       justify-content: center;
       box-sizing: border-box;
       overflow: hidden;
-      background: #e3e9f8;
-      border: 1px solid #e3e9f8;
-      color: #1d3c99;
+      background: var(--pb-letter-bg, #e3e9f8);
+      border: 1px solid var(--pb-letter-bg, #e3e9f8);
+      color: var(--pb-letter, #1d3c99);
       font-weight: 700;
       line-height: 1;
     }
     [data-site][data-tile="site-icon"] {
-      background: #ffffff;
-      border-color: #dce5e1;
+      background: var(--pb-site-bg, #ffffff);
+      border-color: var(--pb-site-edge, #dce5e1);
     }
     [data-site][data-hero] {
       box-shadow: 0 4px 12px rgb(16 32 27 / 0.08);
@@ -104,13 +106,13 @@ import { KeykeeperCategoryTileComponent } from "./category-tile.component";
       visibility: hidden;
     }
     :host-context(.theme_dark) [data-site] {
-      background: #1c2a4a;
-      border-color: #1c2a4a;
-      color: #9db4f2;
+      background: var(--pb-letter-bg, #1c2a4a);
+      border-color: var(--pb-letter-bg, #1c2a4a);
+      color: var(--pb-letter, #9db4f2);
     }
     :host-context(.theme_dark) [data-site][data-tile="site-icon"] {
-      background: #f4f7f6;
-      border-color: #f4f7f6;
+      background: var(--pb-site-bg, #f2f4f7);
+      border-color: var(--pb-site-bg, #f2f4f7);
     }
     :host-context(.theme_dark) [data-site][data-hero] {
       box-shadow: 0 6px 16px rgb(0 0 0 / 0.35);
@@ -128,13 +130,24 @@ export class KeykeeperItemTileComponent {
   readonly cipher = input.required<CipherViewLike>();
   /** The big tile at the top of an item's page, instead of a list's. */
   readonly hero = input(false, { transform: booleanAttribute });
+  /** A size of its own, in pixels, such as the web vault's (40 in its list, 56 on top of an item). */
+  readonly tileSize = input<number | undefined>(undefined);
 
   protected readonly imageLoaded = signal(false);
 
-  protected readonly size = computed(() => (this.hero() ? 52 : 36));
-  protected readonly radius = computed(() => (this.hero() ? 14 : 10));
-  protected readonly imageSize = computed(() => (this.hero() ? 30 : 22));
-  protected readonly letterSize = computed(() => (this.hero() ? 24 : 16));
+  protected readonly size = computed(() => this.tileSize() ?? (this.hero() ? 52 : 36));
+  protected readonly radius = computed(() => this.scaled(0.28, 14, 10));
+  protected readonly imageSize = computed(() => this.scaled(0.58, 30, 22));
+  protected readonly letterSize = computed(() => this.scaled(0.44, 24, 16));
+
+  /** A share of the size it was given, or the hero's or the list's own. */
+  private scaled(share: number, hero: number, list: number): number {
+    const size = this.tileSize();
+    if (size != null) {
+      return Math.round(size * share);
+    }
+    return this.hero() ? hero : list;
+  }
 
   protected readonly category = computed(() => {
     const cipher = this.cipher();

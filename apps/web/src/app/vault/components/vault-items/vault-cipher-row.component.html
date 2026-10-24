@@ -12,7 +12,8 @@
   }
 </td>
 <td bitCell [ngClass]="RowHeightClass" class="tw-min-w-fit [&>*]:tw-flex tw-flex">
-  <app-vault-icon [cipher]="cipher"></app-vault-icon>
+  <!-- Keykeeper: the item's tile: its site's icon, its letter, or its category's jewel -->
+  <vault-keykeeper-item-tile [cipher]="cipher" [tileSize]="40" />
 </td>
 <td bitCell [ngClass]="RowHeightClass" class="tw-truncate tw-pr-7 lg:tw-pr-0">
   <div class="tw-inline-flex tw-w-full">

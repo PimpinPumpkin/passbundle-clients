@@ -1,4 +1,5 @@
 import { Unassigned } from "@bitwarden/common/admin-console/models/collections";
+import { categoryOfType, KeykeeperCategory } from "@bitwarden/common/vault/keykeeper/categories";
 import { ITreeNodeObject, TreeNode } from "@bitwarden/common/vault/models/domain/tree-node";
 import { CipherViewLike } from "@bitwarden/common/vault/utils/cipher-view-like-utils";
 import { BitwardenIcon } from "@bitwarden/components";
@@ -29,6 +30,11 @@ export interface VaultMenuEntry {
   key: string;
   label: string;
   icon?: BitwardenIcon;
+  /**
+   * The jewel tile it shows in the open menu, in place of its icon: All
+   * items, Favorites, and the categories (DESIGN.md, "The look").
+   */
+  tile?: KeykeeperCategory;
   /** How many items the list shows once this is picked, as things are now. */
   count?: number;
   /** Nesting: folders inside Personal or their organization, and inside their parent. */
@@ -135,6 +141,14 @@ function countAfter(
   return ciphers.filter((c) => keep(c)).length;
 }
 
+/** A kind of item's tile, and Favorites'. Archive and Trash keep their icons. */
+function tileOf(type: CipherTypeFilter["type"]): KeykeeperCategory | undefined {
+  if (type === "favorites") {
+    return "favorites";
+  }
+  return typeof type === "number" ? categoryOfType(type) : undefined;
+}
+
 /** Depth first: each node, then its children a level in. */
 function flatten<T extends ITreeNodeObject>(
   nodes: TreeNode<T>[],
@@ -160,6 +174,7 @@ export function buildVaultMenu(state: VaultMenuState, actions: VaultMenuActions)
     key: `type-${tree.node.id}`,
     label: tree.node.name ?? "",
     icon: tree.node.icon,
+    tile: tileOf(tree.node.type),
     count: countAfter(ciphers, routed, (f) => (f.selectedCipherTypeNode = tree)),
     depth: 0,
     active: picked(routed.type === tree.node.id),
@@ -171,6 +186,7 @@ export function buildVaultMenu(state: VaultMenuState, actions: VaultMenuActions)
     key: "all",
     label: state.allItemsLabel,
     icon: "bwi-grid",
+    tile: "all",
     count: countAfter(ciphers, routed, (f) => f.resetFilter()),
     depth: 0,
     active: picked(onlyVault && routed.organizationId === undefined),

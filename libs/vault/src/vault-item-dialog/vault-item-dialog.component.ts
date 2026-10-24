@@ -124,6 +124,9 @@ export const VaultItemDialogResult = {
 
 export type VaultItemDialogResult = UnionOfValues<typeof VaultItemDialogResult>;
 
+/** Keykeeper: for each side panel's title's id. */
+let nextPanelId = 0;
+
 // FIXME(https://bitwarden.atlassian.net/browse/CL-764): Migrate to OnPush
 // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
 @Component({
@@ -273,6 +276,14 @@ export class VaultItemDialogComponent implements OnInit, OnDestroy {
   protected get showEdit() {
     return this.showCipherView && !this.isTrashFilter && !this.showRestore;
   }
+
+  /** Keykeeper: opened in the web vault's side panel (a drawer), not a dialog. */
+  protected get inPanel(): boolean {
+    return this.dialogRef.isDrawer === true;
+  }
+
+  /** Keykeeper: the panel's name is its title ("View Login"), as the dialog's was. */
+  protected readonly panelTitleId = `keykeeper-item-panel-title-${nextPanelId++}`;
 
   protected get showCipherView() {
     return this.cipher != undefined && (this.params.mode === "view" || this.loadingForm);
@@ -873,12 +884,18 @@ export class VaultItemDialogComponent implements OnInit, OnDestroy {
 
   /**
    * Opens the VaultItemDialog as a drawer.
+   * Keykeeper: the web vault's item panel closes when another page opens (`closeOnNavigation`).
    */
-  static openDrawer(dialogService: DialogService, params: VaultItemDialogParams) {
+  static openDrawer(
+    dialogService: DialogService,
+    params: VaultItemDialogParams,
+    config?: { closeOnNavigation?: boolean },
+  ) {
     return dialogService.openDrawer<VaultItemDialogResult, VaultItemDialogParams>(
       VaultItemDialogComponent,
       {
         data: params,
+        ...config,
       },
     );
   }
