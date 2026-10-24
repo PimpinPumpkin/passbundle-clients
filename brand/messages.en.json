@@ -1,4 +1,44 @@
 {
+  "keykeeperSsoSignedIn": {
+    "message": "$ID$ signed in with single sign-on.",
+    "placeholders": {
+      "id": {
+        "content": "$1",
+        "example": "John Smith"
+      }
+    }
+  },
+  "keykeeperSsoRefused": {
+    "message": "Single sign-on refused: $REASON$.",
+    "placeholders": {
+      "reason": {
+        "content": "$1",
+        "example": "no account or invitation for ana@example.com"
+      }
+    }
+  },
+  "keykeeperSsoRefusedFor": {
+    "message": "Single sign-on refused for $ID$: $REASON$.",
+    "placeholders": {
+      "id": {
+        "content": "$1",
+        "example": "John Smith"
+      },
+      "reason": {
+        "content": "$2",
+        "example": "ana@example.com is turned off"
+      }
+    }
+  },
+  "keykeeperSsoSettingsChanged": {
+    "message": "Changed the single sign-on settings: $WHAT$.",
+    "placeholders": {
+      "what": {
+        "content": "$1",
+        "example": "tenant, app, client secret"
+      }
+    }
+  },
   "keykeeperImportFromBrowser": {
     "message": "Import from your browser"
   },

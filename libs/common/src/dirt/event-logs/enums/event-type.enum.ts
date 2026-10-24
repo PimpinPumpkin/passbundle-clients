@@ -88,6 +88,11 @@ export enum EventType {
   OrganizationUser_InviteLinkAccepted = 1524,
   OrganizationUser_AdminChangedEmail = 1525,
   OrganizationUser_InviteLinkConfirmed = 1526,
+  // Keykeeper: someone signed in with the organization's single sign-on, or
+  // it refused them (why, in keykeeperDetail). See DESIGN.md, "Sign in with
+  // Microsoft Entra ID".
+  Keykeeper_SsoSignedIn = 1590,
+  Keykeeper_SsoRefused = 1591,
 
   Organization_Updated = 1600,
   Organization_PurgedVault = 1601,
@@ -120,6 +125,8 @@ export enum EventType {
   Organization_InviteLinkRefreshed = 1628,
   Organization_InviteLinkConfirmEnabled = 1629,
   Organization_InviteLinkConfirmDisabled = 1630,
+  // Keykeeper: the organization's single sign-on settings changed (what, in keykeeperDetail).
+  Keykeeper_SsoSettingsChanged = 1694,
 
   Policy_Updated = 1700,
 

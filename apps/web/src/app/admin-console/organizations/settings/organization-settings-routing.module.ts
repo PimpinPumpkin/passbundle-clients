@@ -56,6 +56,19 @@ const routes: Routes = [
           ),
         canActivate: [organizationPermissionsGuard((org) => org.isAdmin)],
       },
+      // Keykeeper: sign in with Microsoft Entra ID, per organization (DESIGN.md,
+      // "Sign in with Microsoft Entra ID"). Upstream's nav item links here.
+      {
+        path: "sso",
+        loadComponent: () =>
+          import("../../../keykeeper/organizations/sso.component").then(
+            (mod) => mod.KeykeeperSsoComponent,
+          ),
+        canActivate: [organizationPermissionsGuard((org) => org.canManageSso)],
+        data: {
+          titleId: "singleSignOn",
+        },
+      },
       {
         path: "tools",
         children: [
