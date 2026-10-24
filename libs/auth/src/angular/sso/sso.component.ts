@@ -490,6 +490,8 @@ export class SsoComponent implements OnInit {
       // Standard SSO login success case
       return await this.handleSuccessfulLogin();
     } catch (e) {
+      // Keykeeper: offer the same identifier again after a refusal.
+      this.identifierFormControl.setValue(orgSsoIdentifier || null);
       await this.handleLoginError(e);
     }
   }
@@ -571,7 +573,15 @@ export class SsoComponent implements OnInit {
         title: "",
         message: this.i18nService.t("ssoKeyConnectorError"),
       });
+      return;
     }
+
+    // Keykeeper: say why the server refused the sign-in (say, "isn't a member
+    // of" the organization, or a token that didn't check out), and offer the
+    // identifier again instead of a spinner. See DESIGN.md, "Sign in with
+    // Microsoft Entra ID".
+    this.validationService.showError(e);
+    this.loggingIn = false;
   }
 
   private getOrgIdentifierFromState(state: string): string {
