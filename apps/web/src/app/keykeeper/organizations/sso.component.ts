@@ -121,7 +121,9 @@ import { KeykeeperMspApiService } from "../msp/msp-api.service";
             <p bitTypography="body2" class="tw-mt-4" data-testid="sso-sign-in-url">
               A link that starts this sign-in, for an intranet page or a bookmark:
               <code class="tw-break-all">{{ url }}</code>
-              <button bitLink type="button" (click)="copy(url, 'link')">Copy</button>
+              <button bitLink type="button" class="tw-ml-2" (click)="copy(url, 'link')">
+                Copy
+              </button>
             </p>
           }
 
