@@ -29,7 +29,29 @@
   [position]="coachmarkService.getStepPosition('monitorSecurity')"
   [closeOnBackdropClick]="false"
   [spotlight]="true"
-></bit-nav-item>
+>
+  <!-- Keykeeper: items to fix (weak, reused, or exposed), once worked out,
+       and a sign when the breach check couldn't be made. -->
+  @if (healthPill(); as pill) {
+    <a
+      slot="end"
+      class="keykeeper-menu-alert tw-no-underline"
+      routerLink="/reports"
+      tabindex="-1"
+      data-testid="keykeeper-health-count"
+      [title]="pill.label"
+      [attr.aria-label]="pill.label"
+      >{{ pill.text }}
+      @if (pill.couldntCheck) {
+        <bit-icon
+          name="bwi-exclamation-triangle"
+          class="tw-text-[0.625rem]"
+          data-testid="keykeeper-health-unchecked"
+        />
+      }
+    </a>
+  }
+</bit-nav-item>
 <app-coachmark #reportsCoachmark stepId="monitorSecurity" />
 
 @if (m.categories.length > 0) {

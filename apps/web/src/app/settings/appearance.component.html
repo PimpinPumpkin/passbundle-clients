@@ -43,6 +43,17 @@
         <vault-permit-cipher-details-popover></vault-permit-cipher-details-popover>
       </div>
     </div>
+    <!-- Keykeeper: whether passwords are checked against known breaches on their own. -->
+    <bit-form-control>
+      <input
+        type="checkbox"
+        bitCheckbox
+        [formControl]="checkBreachesAfterUnlock"
+        data-testid="keykeeper-breach-check-after-unlock"
+      />
+      <bit-label>{{ "keykeeperBreachCheckAfterUnlock" | i18n }}</bit-label>
+      <bit-hint>{{ "keykeeperBreachCheckAfterUnlockHint" | i18n }}</bit-hint>
+    </bit-form-control>
 
     @if (showQuickCopyActionsSetting()) {
       <div class="tw-flex tw-items-start tw-gap-1.5">

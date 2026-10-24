@@ -4,12 +4,17 @@ import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { mock, MockProxy } from "jest-mock-extended";
 import { BehaviorSubject } from "rxjs";
 
+import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { DomainSettingsService } from "@bitwarden/common/autofill/services/domain-settings.service";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { Theme, ThemeTypes } from "@bitwarden/common/platform/enums";
 import { ThemeStateService } from "@bitwarden/common/platform/theming/theme-state.service";
+import { mockAccountServiceWith } from "@bitwarden/common/spec";
+import { UserId } from "@bitwarden/common/types/guid";
 import { VaultCopyButtonsService } from "@bitwarden/vault";
+
+import { KeykeeperBreachCheckSetting } from "../keykeeper/health/breach-check-setting.service";
 
 import { AppearanceComponent } from "./appearance.component";
 
@@ -21,12 +26,14 @@ describe("AppearanceComponent", () => {
   let mockDomainSettingsService: MockProxy<DomainSettingsService>;
   let mockConfigService: MockProxy<ConfigService>;
   let mockVaultCopyButtonsService: MockProxy<VaultCopyButtonsService>;
+  let mockBreachCheck: MockProxy<KeykeeperBreachCheckSetting>;
 
   const mockShowFavicons$ = new BehaviorSubject<boolean>(true);
   const mockSelectedTheme$ = new BehaviorSubject<Theme>(ThemeTypes.Light);
   const mockUserSetLocale$ = new BehaviorSubject<string | undefined>("en");
   const mockShowQuickCopyActions$ = new BehaviorSubject<boolean>(false);
   const mockFeatureFlag$ = new BehaviorSubject<boolean>(true);
+  const mockChecksAfterUnlock$ = new BehaviorSubject<boolean>(true);
 
   const mockSupportedLocales = ["en", "es", "fr", "de"];
   const mockLocaleNames = new Map([
@@ -42,6 +49,9 @@ describe("AppearanceComponent", () => {
     mockDomainSettingsService = mock<DomainSettingsService>();
     mockConfigService = mock<ConfigService>();
     mockVaultCopyButtonsService = mock<VaultCopyButtonsService>();
+    mockBreachCheck = mock<KeykeeperBreachCheckSetting>();
+    (mockBreachCheck as any).activeChecksAfterUnlock$ = mockChecksAfterUnlock$;
+    mockBreachCheck.setChecksAfterUnlock.mockResolvedValue(undefined);
 
     mockI18nService.supportedTranslationLocales = mockSupportedLocales;
     mockI18nService.localeNames = mockLocaleNames;
@@ -69,6 +79,8 @@ describe("AppearanceComponent", () => {
         { provide: DomainSettingsService, useValue: mockDomainSettingsService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: VaultCopyButtonsService, useValue: mockVaultCopyButtonsService },
+        { provide: KeykeeperBreachCheckSetting, useValue: mockBreachCheck },
+        { provide: AccountService, useValue: mockAccountServiceWith("user-1" as UserId) },
       ],
     })
       .overrideComponent(AppearanceComponent, {
@@ -248,6 +260,20 @@ describe("AppearanceComponent", () => {
       flush();
 
       expect(mockVaultCopyButtonsService.setShowQuickCopyActions).toHaveBeenCalledWith(false);
+    }));
+  });
+
+  // Keykeeper: "Check my passwords against known breaches after unlocking".
+  describe("checking passwords against known breaches after unlocking", () => {
+    it("shows the account's setting and saves a change for that account", fakeAsync(() => {
+      mockChecksAfterUnlock$.next(false);
+      fixture.detectChanges();
+      flush();
+      expect(component.checkBreachesAfterUnlock.value).toBe(false);
+
+      component.checkBreachesAfterUnlock.setValue(true);
+      flush();
+      expect(mockBreachCheck.setChecksAfterUnlock).toHaveBeenCalledWith("user-1", true);
     }));
   });
 });

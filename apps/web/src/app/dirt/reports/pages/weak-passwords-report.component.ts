@@ -4,6 +4,11 @@ import { Component, OnInit } from "@angular/core";
 
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import {
+  checksPassword,
+  isWeakScore,
+  usernameHints,
+} from "@bitwarden/common/dirt/keykeeper/password-health";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
 import { PasswordStrengthServiceAbstraction } from "@bitwarden/common/tools/password-strength";
@@ -155,41 +160,15 @@ export class WeakPasswordsReportComponent extends CipherReportComponent implemen
   }
 
   protected determineWeakPasswordScore(ciph: CipherView): ReportResult | null {
-    const { type, login, isDeleted, edit, viewPassword } = ciph;
-    if (
-      type !== CipherType.Login ||
-      login == null ||
-      login.password == null ||
-      login.password === "" ||
-      isDeleted ||
-      (!this.organization && !edit) ||
-      !viewPassword
-    ) {
+    // Keykeeper: Health's one set of rules for which passwords count and
+    // what's weak, shared with the MSP console and the count beside Health
+    // (libs/common/src/dirt/keykeeper/password-health.ts). They're upstream's.
+    const { login } = ciph;
+    if (!checksPassword(ciph, !this.organization)) {
       return;
     }
 
-    const hasUserName = this.isUserNameNotEmpty(ciph);
-    let userInput: string[] = [];
-    if (hasUserName) {
-      const atPosition = login.username.indexOf("@");
-      if (atPosition > -1) {
-        userInput = userInput
-          .concat(
-            login.username
-              .substr(0, atPosition)
-              .trim()
-              .toLowerCase()
-              .split(/[^A-Za-z0-9]/),
-          )
-          .filter((i) => i.length >= 3);
-      } else {
-        userInput = login.username
-          .trim()
-          .toLowerCase()
-          .split(/[^A-Za-z0-9]/)
-          .filter((i) => i.length >= 3);
-      }
-    }
+    const userInput = usernameHints(login.username);
     const result = this.passwordStrengthService.getPasswordStrength(
       login.password,
       null,
@@ -203,7 +182,7 @@ export class WeakPasswordsReportComponent extends CipherReportComponent implemen
       return null;
     }
 
-    if (result.score <= 2) {
+    if (isWeakScore(result.score)) {
       const scoreValue = this.scoreKey(result.score);
       return {
         ...ciph,

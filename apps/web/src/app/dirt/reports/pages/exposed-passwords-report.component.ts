@@ -3,10 +3,11 @@ import { Component, OnInit } from "@angular/core";
 import { AuditService } from "@bitwarden/common/abstractions/audit.service";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import { checksPassword } from "@bitwarden/common/dirt/keykeeper/password-health";
+import { shuffled } from "@bitwarden/common/dirt/keykeeper/pwned-passwords";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { SyncService } from "@bitwarden/common/vault/abstractions/sync/sync.service.abstraction";
-import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { DialogService } from "@bitwarden/components";
 import { LogService } from "@bitwarden/logging";
@@ -31,6 +32,11 @@ type ReportResult = CipherView & { exposedXTimes: number };
 })
 export class ExposedPasswordsReportComponent extends CipherReportComponent implements OnInit {
   disabled = true;
+  /**
+   * Keykeeper: passwords the breach service couldn't be asked about (offline,
+   * or a firewall blocks it), said in the report instead of failing it.
+   */
+  unchecked = 0;
 
   constructor(
     protected cipherService: CipherService,
@@ -74,30 +80,28 @@ export class ExposedPasswordsReportComponent extends CipherReportComponent imple
     this.logService.info("[ExposedPasswordsReport] analysis start");
     try {
       const allCiphers = await this.getAllCiphers();
-      const exposedPasswordCiphers: ReportResult[] = [];
+      const found = new Map<CipherView, ReportResult>();
       const promises: Promise<void>[] = [];
       let eligibleCipherCount = 0;
       this.filterStatus = [0];
+      this.unchecked = 0;
 
-      allCiphers.forEach((ciph) => {
-        const { type, login, isDeleted, edit, viewPassword } = ciph;
-        if (
-          type !== CipherType.Login ||
-          login.password == null ||
-          login.password === "" ||
-          isDeleted ||
-          (!this.organization && !edit) ||
-          !viewPassword
-        ) {
-          return;
-        }
-
+      // Keykeeper: Health's one set of rules for which passwords count,
+      // shared with the MSP console and the count beside Health.
+      const eligible = allCiphers.filter((ciph) => checksPassword(ciph, !this.organization));
+      // Keykeeper: asked in random order, so requests don't go out in the
+      // vault's; listed in the vault's order below.
+      shuffled(eligible).forEach((ciph) => {
         eligibleCipherCount++;
-        const promise = this.isPasswordExposed(ciph).then((result) => {
-          if (result) {
-            exposedPasswordCiphers.push(result);
-          }
-        });
+        const promise = this.isPasswordExposed(ciph)
+          .then((result) => {
+            if (result) {
+              found.set(ciph, result);
+            }
+          })
+          .catch(() => {
+            this.unchecked++;
+          });
         promises.push(promise);
       });
       this.logService.info(
@@ -105,6 +109,9 @@ export class ExposedPasswordsReportComponent extends CipherReportComponent imple
       );
 
       await Promise.all(promises);
+      const exposedPasswordCiphers = eligible.flatMap((ciph) =>
+        found.has(ciph) ? [found.get(ciph)!] : [],
+      );
       this.logService.info(
         `[ExposedPasswordsReport] analysis complete exposed=${exposedPasswordCiphers.length}`,
       );

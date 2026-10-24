@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, signal } from "@angular/core";
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  OnInit,
+  computed,
+  inject,
+  signal,
+} from "@angular/core";
 import { FormBuilder, Validators } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { firstValueFrom } from "rxjs";
@@ -11,6 +19,7 @@ import {
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
+import { PwnedPasswordsCancelledError } from "@bitwarden/common/dirt/keykeeper/pwned-passwords";
 import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
@@ -32,9 +41,19 @@ import {
 } from "../../admin-console/organizations/policies";
 import { HeaderModule } from "../../layouts/header/header.module";
 import { SharedModule } from "../../shared";
+import { KeykeeperBreachCheckSetting } from "../health/breach-check-setting.service";
+import { KeykeeperExposureChecks } from "../health/exposure-checks.service";
 import { KeykeeperJoinSealer } from "../joining/join-sealer.service";
 
-import { ClientHealth, clientHealth, ExpiringItem, expiringItems } from "./client-health";
+import {
+  ClientHealth,
+  clientHealth,
+  clientItemsToCheck,
+  ExpiringItem,
+  expiringItems,
+  ItemToFix,
+  StrengthScorer,
+} from "./client-health";
 import { KeykeeperDefaultPoliciesComponent } from "./default-policies.component";
 import { describeEvent, MspEvent } from "./msp-activity";
 import {
@@ -129,6 +148,51 @@ const CLIENT_FEATURES = {
 
         <section class="tw-mb-8" aria-label="Clients">
           <h2 bitTypography="h3">Clients</h2>
+          @if (exposedCheck(); as check) {
+            @if (check.state === "checking") {
+              <p
+                bitTypography="helper"
+                class="tw-mb-2"
+                role="status"
+                data-testid="msp-exposed-progress"
+              >
+                <bit-icon name="bwi-spinner" class="bwi-spin tw-mr-1" />
+                Checking passwords against known breaches: {{ check.checked }} of {{ check.total }}
+              </p>
+            } @else if (check.state === "off") {
+              <div class="tw-mb-3 tw-flex tw-items-center tw-gap-3" data-testid="msp-exposed-off">
+                <button
+                  bitButton
+                  buttonType="secondary"
+                  type="button"
+                  class="tw-shrink-0 tw-whitespace-nowrap"
+                  (click)="checkByHand(m)"
+                >
+                  Check exposed passwords
+                </button>
+                <span bitTypography="helper">
+                  Your settings don't check passwords against known breaches after unlocking.
+                  Checking sends only the first 5 characters of each password's SHA-1 hash.
+                </span>
+              </div>
+            } @else if (check.unchecked > 0) {
+              <bit-callout
+                type="warning"
+                title="Couldn't check for exposed passwords"
+                data-testid="msp-exposed-unchecked"
+              >
+                <p>
+                  {{ itemCount(check.unchecked) }}
+                  couldn't be checked against known breaches: this browser couldn't reach
+                  api.pwnedpasswords.com. It may be offline, or a firewall may block it. Weak and
+                  reused counts don't need it and are up to date.
+                </p>
+                <button bitButton buttonType="secondary" type="button" (click)="checkAgain(m)">
+                  Try again
+                </button>
+              </bit-callout>
+            }
+          }
           @if (m.clients.length === 0) {
             <p bitTypography="body1">No clients yet.</p>
           } @else {
@@ -145,6 +209,7 @@ const CLIENT_FEATURES = {
                   <th bitCell title="Expired, or expiring within 30 days">Expiring</th>
                   <th bitCell title="Passwords with a strength of 2 or less out of 4">Weak</th>
                   <th bitCell title="Passwords used by more than one login">Reused</th>
+                  <th bitCell [title]="exposedTitle">Exposed</th>
                   <th bitCell></th>
                 </tr>
               </ng-container>
@@ -170,40 +235,90 @@ const CLIENT_FEATURES = {
                     <td bitCell>{{ client.members.invited }}</td>
                     @let clientHealth = healthOf(client);
                     <td bitCell data-testid="msp-client-expiring">{{ clientHealth.expiring }}</td>
-                    <td bitCell data-testid="msp-client-weak">{{ clientHealth.weak }}</td>
-                    <td bitCell data-testid="msp-client-reused">{{ clientHealth.reused }}</td>
-                    <td bitCell class="tw-whitespace-nowrap tw-text-right">
-                      @if (m.role === "admin" || m.access?.installCommands !== false) {
-                        <button
-                          type="button"
-                          bitLink
-                          class="tw-mr-4"
-                          [attr.aria-expanded]="installFor()?.client.id === client.id"
-                          (click)="toggleInstall(client)"
-                        >
-                          Install command
-                        </button>
-                      }
-                      @if (client.you?.status === CONFIRMED && m.role === "admin") {
-                        <a
-                          bitLink
-                          class="tw-mr-4"
-                          [routerLink]="['/organizations', client.id, 'settings', 'provisioning']"
-                          [attr.aria-label]="'Provisioning for ' + client.name"
-                        >
-                          Provisioning
-                        </a>
-                      }
-                      @if (client.you?.status === CONFIRMED) {
-                        <a bitLink [routerLink]="openLink(client)">Open</a>
-                      } @else {
-                        <span class="tw-text-muted">Waiting for access</span>
-                      }
+                    <!-- A count with something to fix opens the client's list of what to fix. -->
+                    <td bitCell data-testid="msp-client-weak">
+                      <ng-container
+                        *ngTemplateOutlet="
+                          healthCount;
+                          context: { client: client, value: clientHealth.weak, what: 'weak' }
+                        "
+                      />
+                    </td>
+                    <td bitCell data-testid="msp-client-reused">
+                      <ng-container
+                        *ngTemplateOutlet="
+                          healthCount;
+                          context: { client: client, value: clientHealth.reused, what: 'reused' }
+                        "
+                      />
+                    </td>
+                    <td
+                      bitCell
+                      data-testid="msp-client-exposed"
+                      [attr.title]="clientHealth.exposedNote"
+                    >
+                      <ng-container
+                        *ngTemplateOutlet="
+                          healthCount;
+                          context: { client: client, value: clientHealth.exposed, what: 'exposed' }
+                        "
+                      />
+                    </td>
+                    <td bitCell>
+                      <!-- The actions wrap, each kept whole, so the table fits beside the health columns. -->
+                      <div
+                        class="tw-flex tw-flex-wrap tw-items-center tw-justify-end tw-gap-x-4 tw-gap-y-1"
+                      >
+                        @if (m.role === "admin" || m.access?.installCommands !== false) {
+                          <button
+                            type="button"
+                            bitLink
+                            class="tw-whitespace-nowrap"
+                            [attr.aria-expanded]="installFor()?.client.id === client.id"
+                            (click)="toggleInstall(client)"
+                          >
+                            Install command
+                          </button>
+                        }
+                        @if (client.you?.status === CONFIRMED && m.role === "admin") {
+                          <a
+                            bitLink
+                            class="tw-whitespace-nowrap"
+                            [routerLink]="['/organizations', client.id, 'settings', 'provisioning']"
+                            [attr.aria-label]="'Provisioning for ' + client.name"
+                          >
+                            Provisioning
+                          </a>
+                        }
+                        @if (client.you?.status === CONFIRMED) {
+                          <a bitLink [routerLink]="openLink(client)">Open</a>
+                        } @else {
+                          <span class="tw-whitespace-nowrap tw-text-muted">Waiting for access</span>
+                        }
+                      </div>
                     </td>
                   </tr>
                 }
               </ng-template>
             </bit-table>
+            <ng-template #healthCount let-client="client" let-value="value" let-what="what">
+              @if (opensDetails(client, value)) {
+                <button
+                  type="button"
+                  bitLink
+                  class="tw-text-start"
+                  [attr.aria-expanded]="detailsFor()?.id === client.id"
+                  [attr.aria-label]="
+                    'Show the ' + what + ' passwords in ' + client.name + ': ' + value
+                  "
+                  (click)="toggleDetails(client)"
+                >
+                  {{ value }}
+                </button>
+              } @else {
+                {{ value }}
+              }
+            </ng-template>
           }
           @if (installFor(); as install) {
             <section
@@ -301,6 +416,82 @@ const CLIENT_FEATURES = {
                 <p bitTypography="body2">
                   Ask an MSP admin to create this client's install command.
                 </p>
+              }
+            </section>
+          }
+          @if (detailsFor(); as client) {
+            @let details = health()?.get(client.id);
+            <section
+              class="tw-mt-4 tw-rounded-lg tw-border tw-border-solid tw-border-secondary-300 tw-p-4"
+              aria-label="Password health"
+              data-testid="msp-health-details"
+            >
+              <h3 bitTypography="h5">Passwords to fix in {{ client.name }}</h3>
+              <p bitTypography="body2">
+                Weak, reused, and exposed passwords in {{ client.name }}'s items that you can open.
+                Exposed passwords are in known data breaches. Checking never sends a password: only
+                the first 5 characters of each password's SHA-1 hash leave this browser, and the
+                match is made here.
+              </p>
+              @if (details?.unchecked && details!.toFix.length > 0) {
+                <p bitTypography="body2" data-testid="msp-health-unchecked">
+                  {{ itemCount(details!.unchecked) }} couldn't be checked for breaches.
+                </p>
+              }
+              @if (details == null) {
+                <bit-icon name="bwi-spinner" class="bwi-spin tw-text-muted" title="Loading" />
+              } @else if (details.toFix.length === 0) {
+                <p bitTypography="body2" class="tw-mb-0" data-testid="msp-health-nothing">
+                  @if (details.exposed === undefined && exposedCheck()?.state === "off") {
+                    Nothing weak or reused. Exposed passwords aren't checked yet.
+                  } @else if (details.exposed === undefined) {
+                    Nothing weak or reused so far. Still checking for exposed passwords.
+                  } @else if (details.unchecked > 0) {
+                    Nothing weak or reused; {{ itemCount(details.unchecked) }} couldn't be checked
+                    for breaches.
+                  } @else {
+                    Nothing to fix.
+                  }
+                </p>
+              } @else {
+                <bit-table>
+                  <ng-container header>
+                    <tr>
+                      <th bitCell>Item</th>
+                      <th bitCell>What's wrong</th>
+                      <th bitCell></th>
+                    </tr>
+                  </ng-container>
+                  <ng-template body>
+                    @for (item of details.toFix; track item.id) {
+                      <tr bitRow [attr.data-testid]="'msp-health-item-' + item.name">
+                        <td bitCell>{{ item.name }}</td>
+                        <td bitCell class="tw-space-x-1">
+                          @if (item.exposed) {
+                            <span bitBadge variant="danger">{{ exposedLabel(item) }}</span>
+                          } @else if (item.exposed === null) {
+                            <span bitBadge variant="secondary">Couldn't check for breaches</span>
+                          }
+                          @if (item.weak) {
+                            <span bitBadge variant="warning">Weak</span>
+                          }
+                          @if (item.reused) {
+                            <span bitBadge variant="warning">Reused</span>
+                          }
+                        </td>
+                        <td bitCell class="tw-text-right">
+                          <a
+                            bitLink
+                            [routerLink]="itemLink(client, item).path"
+                            [queryParams]="itemLink(client, item).query"
+                            [attr.aria-label]="'Open ' + item.name"
+                            >Open</a
+                          >
+                        </td>
+                      </tr>
+                    }
+                  </ng-template>
+                </bit-table>
               }
             </section>
           }
@@ -671,6 +862,30 @@ export class KeykeeperMspComponent implements OnInit {
 
   /** Password health per client, computed here from items MSP staff can decrypt. */
   protected readonly health = signal<Map<string, ClientHealth> | null>(null);
+  /** How far the breach check has got, across every client. */
+  protected readonly exposedCheck = signal<
+    | { state: "checking"; checked: number; total: number }
+    | { state: "done"; unchecked: number }
+    | { state: "off" }
+    | null
+  >(null);
+  /**
+   * The person asked for the breach check on this visit, with their setting
+   * for checking after unlocking off (KeykeeperBreachCheckSetting).
+   */
+  protected readonly exposedAsked = signal(false);
+  /** The client whose passwords to fix are showing. */
+  protected readonly detailsFor = signal<MspClient | null>(null);
+  protected readonly exposedTitle =
+    "Passwords found in known data breaches. Only the first 5 characters of each password's SHA-1 hash leave this browser.";
+  /**
+   * The newest health computation. Starting another, or leaving the console,
+   * calls it off, with the breach checks it's still waiting on.
+   */
+  private readonly healthRuns: { latest: AbortController | null } = { latest: null };
+  private readonly stopHealthOnLeave = inject(DestroyRef).onDestroy(() =>
+    this.healthRuns.latest?.abort(),
+  );
   /** Expired and soon-expiring items across the clients, from the same items. */
   protected readonly expiring = signal<ExpiringItem[] | null>(null);
   protected readonly installFor = signal<{
@@ -714,6 +929,8 @@ export class KeykeeperMspComponent implements OnInit {
     private readonly accountService: AccountService,
     private readonly cipherService: CipherService,
     private readonly passwordStrengthService: PasswordStrengthServiceAbstraction,
+    private readonly exposureChecks: KeykeeperExposureChecks,
+    private readonly breachCheck: KeykeeperBreachCheckSetting,
     private readonly syncService: SyncService,
     private readonly route: ActivatedRoute,
     private readonly router: Router,
@@ -1087,11 +1304,17 @@ export class KeykeeperMspComponent implements OnInit {
   }
 
   private async computeHealth(msp: MspDetails) {
+    this.healthRuns.latest?.abort();
+    const run = new AbortController();
+    this.healthRuns.latest = run;
     try {
       // Picks up items added elsewhere, such as in a client's admin console.
       await this.syncService.fullSync(false);
       const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
       const ciphers = await this.cipherService.getAllDecrypted(userId);
+      if (run.signal.aborted) {
+        return;
+      }
       this.templateNames.set(
         new Map(
           ciphers.flatMap((c) => {
@@ -1106,17 +1329,126 @@ export class KeykeeperMspComponent implements OnInit {
           msp.clients.map(({ id, name }) => ({ id, name })),
         ),
       );
-      this.health.set(
-        clientHealth(
-          ciphers,
-          msp.clients.map((c) => c.id),
-          (password, hints) =>
+      const clientIds = msp.clients.map((c) => c.id);
+      // Scored once per password and username for both passes below; kept
+      // only while this runs.
+      const scores = new Map<string, number | null>();
+      const score: StrengthScorer = (password, hints) => {
+        const key = `${password}\u0000${hints?.join("\u0000") ?? ""}`;
+        if (!scores.has(key)) {
+          scores.set(
+            key,
             this.passwordStrengthService.getPasswordStrength(password, null, hints)?.score ?? null,
-        ),
-      );
+          );
+        }
+        return scores.get(key)!;
+      };
+      // Weak and reused first; exposed follows when the breach check is done.
+      this.health.set(clientHealth(ciphers, clientIds, score));
+      // With checking after unlocking off, nothing goes to the breach service
+      // until the person asks. Automatic checks read the setting again just
+      // before each request, so one turned off meanwhile sends nothing more.
+      const automatic = !this.exposedAsked();
+      const mayAsk = () => firstValueFrom(this.breachCheck.activeChecksAfterUnlock$);
+      if (automatic && !(await mayAsk())) {
+        if (!run.signal.aborted) {
+          this.exposedCheck.set({ state: "off" });
+        }
+        return;
+      }
+
+      // Each different password once, across every client, in random order,
+      // through the one k-anonymity client (only 5 characters of each hash
+      // are sent).
+      let exposed: Map<string, number | null>;
+      try {
+        exposed = await this.exposureChecks.check(clientItemsToCheck(ciphers, clientIds), {
+          signal: run.signal,
+          mayAsk: automatic ? mayAsk : undefined,
+          progress: (checked, total) => {
+            if (!run.signal.aborted) {
+              this.exposedCheck.set({ state: "checking", checked, total });
+            }
+          },
+        });
+      } catch (e) {
+        if (e instanceof PwnedPasswordsCancelledError) {
+          // Turned off meanwhile; a newer run or leaving says nothing.
+          if (!run.signal.aborted) {
+            this.exposedCheck.set({ state: "off" });
+          }
+          return;
+        }
+        throw e;
+      }
+      if (run.signal.aborted) {
+        return;
+      }
+      const health = clientHealth(ciphers, clientIds, score, new Date(), exposed);
+      this.health.set(health);
+      // Items, as everywhere else that counts what couldn't be checked.
+      const unchecked = [...health.values()].reduce((sum, client) => sum + client.unchecked, 0);
+      this.exposedCheck.set({ state: "done", unchecked });
     } catch (e) {
-      this.showError(e);
+      if (!run.signal.aborted) {
+        this.showError(e);
+      }
     }
+  }
+
+  /** "1 item" or "N items": what couldn't be checked is counted in items everywhere. */
+  protected itemCount(count: number): string {
+    return count === 1 ? "1 item" : `${count} items`;
+  }
+
+  /** Checks for exposed passwords when the person's setting doesn't on its own. */
+  protected checkByHand(msp: MspDetails) {
+    this.exposedAsked.set(true);
+    this.exposedCheck.set(null);
+    void this.computeHealth(msp);
+  }
+
+  /** Checks for exposed passwords again, after the breach service couldn't be reached. */
+  protected checkAgain(msp: MspDetails) {
+    this.exposedCheck.set(null);
+    void this.computeHealth(msp);
+  }
+
+  /** Whether the person can open a client's items, so its health details can list them by name. */
+  protected seesItems(client: MspClient): boolean {
+    return client.you?.status === CONFIRMED && client.you.vaultItems !== false;
+  }
+
+  /** A health count opens the client's list of what to fix when there's something in it. */
+  protected opensDetails(client: MspClient, value: number | string): boolean {
+    return (
+      this.seesItems(client) &&
+      value !== 0 &&
+      value !== "..." &&
+      value !== "-" &&
+      value !== "Not checked"
+    );
+  }
+
+  protected toggleDetails(client: MspClient) {
+    this.detailsFor.set(this.detailsFor()?.id === client.id ? null : client);
+  }
+
+  protected exposedLabel(item: ItemToFix): string {
+    const times = (item.exposed ?? 0).toLocaleString("en-US");
+    return item.exposed === 1 ? "Exposed once" : `Exposed ${times} times`;
+  }
+
+  /**
+   * Opens an item: in the client's admin console for its owners and admins,
+   * otherwise in the person's own vault, since a custom role can't load the
+   * admin console's vault.
+   */
+  protected itemLink(client: MspClient, item: ItemToFix) {
+    const query = { itemId: item.id, action: "view" };
+    return (client.you?.type ?? 2) <= 1
+      ? { path: ["/organizations", item.organizationId, "vault"], query }
+      : { path: ["/vault"], query };
   }
 
   protected badgeLabel(item: ExpiringItem) {
@@ -1128,12 +1460,29 @@ export class KeykeeperMspComponent implements OnInit {
   }
 
   /** A client's health figures for the table: a dash where you can't see its items. */
-  protected healthOf(client: MspClient): Record<keyof ClientHealth, number | string> {
-    const health = this.health();
-    if (client.you?.status !== CONFIRMED || client.you.vaultItems === false) {
-      return { items: "-", expiring: "-", weak: "-", reused: "-" };
+  protected healthOf(client: MspClient): {
+    expiring: number | string;
+    weak: number | string;
+    reused: number | string;
+    exposed: number | string;
+    exposedNote: string | null;
+  } {
+    if (!this.seesItems(client)) {
+      return { expiring: "-", weak: "-", reused: "-", exposed: "-", exposedNote: null };
     }
-    return health?.get(client.id) ?? { items: "...", expiring: "...", weak: "...", reused: "..." };
+    const health = this.health()?.get(client.id);
+    if (health == null) {
+      return { expiring: "...", weak: "...", reused: "...", exposed: "...", exposedNote: null };
+    }
+    const off = this.exposedCheck()?.state === "off";
+    let exposed: number | string = health.exposed ?? (off ? "Not checked" : "...");
+    let exposedNote: string | null =
+      health.exposed !== undefined ? null : off ? "Checking after unlocking is off" : "Checking";
+    if (health.unchecked > 0) {
+      exposed = health.exposed ? `${health.exposed}+` : "Couldn't check";
+      exposedNote = `${this.itemCount(health.unchecked)} couldn't be checked for breaches`;
+    }
+    return { ...health, exposed, exposedNote };
   }
 
   private async confirmWaiting(mspId: string) {

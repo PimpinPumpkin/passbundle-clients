@@ -33,6 +33,7 @@ import {
 import { OrganizationWarningsService } from "@bitwarden/web-vault/app/billing/organizations/warnings/services";
 
 import { CoachmarkService } from "../../vault/components/coachmark";
+import { HealthCount, KeykeeperHealthCountService } from "../health/health-count.service";
 
 import { KeykeeperPickedLabelService } from "./picked-label.service";
 import { KeykeeperVaultMenuComponent } from "./vault-menu.component";
@@ -119,10 +120,12 @@ describe("KeykeeperVaultMenuComponent", () => {
   let vaultFilterService: ReturnType<typeof mock<VaultFilterServiceAbstraction>>;
   const sideNav = { open: signal(true), isOverlay: signal(false) };
   const ciphers$ = new BehaviorSubject<CipherViewLike[]>([]);
+  const healthCount$ = new BehaviorSubject<HealthCount | undefined>(undefined);
 
   beforeEach(async () => {
     sideNav.open.set(true);
     sideNav.isOverlay.set(false);
+    healthCount$.next(undefined);
     ciphers$.next([
       item(CipherType.Login, { favorite: true, folderId: "f-bank" }),
       item(CipherType.Login, { organizationId: ORG, collectionIds: ["c-office"] }),
@@ -182,6 +185,7 @@ describe("KeykeeperVaultMenuComponent", () => {
         { provide: OrganizationWarningsService, useValue: mock<OrganizationWarningsService>() },
         { provide: Vfo1TerminologyService, useValue: { enabled: () => false } },
         { provide: SideNavService, useValue: sideNav },
+        { provide: KeykeeperHealthCountService, useValue: { count$: healthCount$ } },
         {
           provide: CoachmarkService,
           useValue: {
@@ -238,6 +242,48 @@ describe("KeykeeperVaultMenuComponent", () => {
     }
     button.click();
   }
+
+  it("shows beside Health how many items to fix, once that's worked out, and nothing when there are none", async () => {
+    const count = () => el().querySelector<HTMLElement>("[data-testid=keykeeper-health-count]");
+    const unchecked = () => el().querySelector("[data-testid=keykeeper-health-unchecked]");
+    expect(count()).toBeNull();
+
+    healthCount$.next({ toFix: 3, couldntCheck: false });
+    await settle();
+    expect(count()!.textContent!.trim()).toBe("3");
+    expect(count()!.getAttribute("aria-label")).toBe("keykeeperHealthToFix");
+    expect(count()!.getAttribute("href")).toBe("/reports");
+    expect(unchecked()).toBeNull();
+    // Beside the entry, not in its name.
+    const health = Array.from(el().querySelectorAll("[data-testid=nav-item-interactive]")).find(
+      (entry) => entry.textContent!.trim() === "keykeeperHealth",
+    );
+    expect(health).toBeDefined();
+
+    healthCount$.next({ toFix: 1, couldntCheck: false });
+    await settle();
+    expect(count()!.getAttribute("aria-label")).toBe("keykeeperHealthToFixOne");
+
+    healthCount$.next({ toFix: 0, couldntCheck: false });
+    await settle();
+    expect(count()).toBeNull();
+  });
+
+  it("says beside Health when the breach check couldn't be made, rather than looking clean", async () => {
+    const count = () => el().querySelector<HTMLElement>("[data-testid=keykeeper-health-count]");
+    healthCount$.next({ toFix: 0, couldntCheck: true });
+    await settle();
+    expect(count()!.textContent!.trim()).toBe("");
+    expect(count()!.getAttribute("aria-label")).toBe("keykeeperHealthCouldntCheck");
+    expect(el().querySelector("[data-testid=keykeeper-health-unchecked]")).not.toBeNull();
+
+    healthCount$.next({ toFix: 2, couldntCheck: true });
+    await settle();
+    expect(count()!.textContent!.trim()).toBe("2");
+    expect(count()!.getAttribute("aria-label")).toBe(
+      "keykeeperHealthToFix. keykeeperHealthCouldntCheck",
+    );
+  });
 
   it("lists search, everything, Health, then categories, and the folders: Personal's, then each organization's", () => {
     expect(el().querySelector("bit-search")).not.toBeNull();

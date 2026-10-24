@@ -1,3 +1,5 @@
+import { createHash } from "crypto";
+
 import { ApiService } from "../abstractions/api.service";
 import { HibpApiService } from "../dirt/services/hibp-api.service";
 import { CryptoFunctionService } from "../key-management/crypto/abstractions/crypto-function.service";
@@ -20,14 +22,26 @@ describe("AuditService", () => {
   let mockHibpApi: jest.Mocked<HibpApiService>;
 
   beforeEach(() => {
+    // Keykeeper: real SHA-1, and an answer padded the way the service pads
+    // (the client refuses one too short to be the service's).
     mockCrypto = {
-      hash: jest.fn().mockResolvedValue(new Uint8Array([0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff])),
+      hash: jest.fn(
+        async (text: string) => new Uint8Array(createHash("sha1").update(text).digest()),
+      ),
     } as unknown as jest.Mocked<CryptoFunctionService>;
+    const padding = Array.from(
+      { length: 200 },
+      (_, i) => `${createHash("sha1").update(`decoy ${i}`).digest("hex").toUpperCase().slice(5)}:0`,
+    );
+    // SHA-1("password") is 5BAA61E4C9B93F3F0682250B6CF8331B7EE68FD8.
+    const body = [...padding, "1E4C9B93F3F0682250B6CF8331B7EE68FD8:4"].join("\r\n");
 
     mockApi = {
-      nativeFetch: jest.fn().mockResolvedValue({
-        text: jest.fn().mockResolvedValue(`CDDEEFF:4\nDDEEFF:2\n123456:1`),
-      }),
+      nativeFetch: jest.fn().mockImplementation(async () => ({
+        status: 200,
+        headers: { get: (): string | null => null },
+        text: jest.fn().mockResolvedValue(body),
+      })),
     } as unknown as jest.Mocked<ApiService>;
 
     mockHibpApi = {
@@ -78,8 +92,20 @@ describe("AuditService", () => {
     expect(result).toBe(4);
     expect(mockApi.nativeFetch).toHaveBeenCalledTimes(1);
     const request = mockApi.nativeFetch.mock.calls[0][0] as any;
-    expect(request.url).toBe("https://api.pwnedpasswords.com/range/AABBC");
+    expect(request.url).toBe("https://api.pwnedpasswords.com/range/5BAA6");
     expect(request.headers).toEqual(expect.objectContaining({ "Add-Padding": "true" }));
+  });
+
+  // Keykeeper: no hash of any password (a master password included) is kept,
+  // so asking again asks the service again.
+  it("keeps nothing about a checked password", async () => {
+    for (let i = 0; i < 2; i++) {
+      const check = auditService.passwordLeaked("password");
+      // Past the client's spacing between requests.
+      await jest.runAllTimersAsync();
+      expect(await check).toBe(4);
+    }
+    expect(mockApi.nativeFetch).toHaveBeenCalledTimes(2);
   });
 
   it("should return empty array for breachedAccounts when no breaches found", async () => {

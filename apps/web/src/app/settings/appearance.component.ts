@@ -1,8 +1,10 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, OnInit } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit } from "@angular/core";
 import { takeUntilDestroyed, toSignal } from "@angular/core/rxjs-interop";
-import { FormBuilder } from "@angular/forms";
+import { FormBuilder, FormControl } from "@angular/forms";
 import { filter, firstValueFrom, switchMap } from "rxjs";
 
+import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { DomainSettingsService } from "@bitwarden/common/autofill/services/domain-settings.service";
 import { FeatureFlag } from "@bitwarden/common/enums/feature-flag.enum";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
@@ -16,6 +18,7 @@ import {
   ShowQuickCopyActionsDetailsPopoverComponent,
 } from "@bitwarden/vault";
 
+import { KeykeeperBreachCheckSetting } from "../keykeeper/health/breach-check-setting.service";
 import { HeaderModule } from "../layouts/header/header.module";
 import { SharedModule } from "../shared";
 
@@ -57,6 +60,13 @@ export class AppearanceComponent implements OnInit {
     showQuickCopyActions: false,
   });
 
+  // Keykeeper: "Check my passwords against known breaches after unlocking",
+  // per account, on by default (DESIGN.md, "Exposed passwords"). Its own
+  // control, beside upstream's form.
+  private readonly breachCheck = inject(KeykeeperBreachCheckSetting);
+  private readonly accountService = inject(AccountService);
+  readonly checkBreachesAfterUnlock = new FormControl(true, { nonNullable: true });
+
   constructor(
     private readonly formBuilder: FormBuilder,
     private readonly i18nService: I18nService,
@@ -97,6 +107,20 @@ export class AppearanceComponent implements OnInit {
       },
       { emitEvent: false },
     );
+
+    this.checkBreachesAfterUnlock.setValue(
+      await firstValueFrom(this.breachCheck.activeChecksAfterUnlock$),
+      { emitEvent: false },
+    );
+    this.checkBreachesAfterUnlock.valueChanges
+      .pipe(
+        switchMap(async (on) => {
+          const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
+          await this.breachCheck.setChecksAfterUnlock(userId, on);
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe();
 
     this.form.controls.enableFavicons.valueChanges
       .pipe(

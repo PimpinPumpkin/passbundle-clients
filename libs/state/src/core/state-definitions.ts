@@ -285,3 +285,10 @@ export const KEYKEEPER_REMINDERS_DISK = new StateDefinition("keykeeperReminders"
 export const KEYKEEPER_JOINS_DISK = new StateDefinition("keykeeperJoins", "disk");
 /** Whether someone shares site fixes, and the fixes that apply on their server. */
 export const KEYKEEPER_SITE_FIXES_DISK = new StateDefinition("keykeeperSiteFixes", "disk");
+/**
+ * Whether someone's passwords are checked against known breaches on their own
+ * after unlocking, per account. Kept across browser sessions in the web vault.
+ */
+export const KEYKEEPER_HEALTH_DISK = new StateDefinition("keykeeperHealth", "disk", {
+  web: "disk-local",
+});
