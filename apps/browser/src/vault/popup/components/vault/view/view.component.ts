@@ -328,6 +328,39 @@ export class ViewComponent {
     });
   };
 
+  /**
+   * Keykeeper: the star in the header adds the item to Favorites or takes it
+   * out, as the list's More menu does: from a fresh copy of the item, so a
+   * second press, or one after the item changed elsewhere, saves what's there
+   * now. The page shows what the server saved, or says it couldn't.
+   */
+  toggleFavorite = async () => {
+    try {
+      const fresh = await this.getCipherData(this.cipher.id, this.activeUserId);
+      if (!fresh) {
+        throw new Error("The item is gone.");
+      }
+      // A copy, so a failed save leaves the cached item (and the star) as it was.
+      const draft: CipherView = Object.assign(Object.create(Object.getPrototypeOf(fresh)), fresh);
+      draft.favorite = !fresh.favorite;
+      const saved = await this.cipherService.updateWithServer(draft, this.activeUserId);
+      this.cipher = saved ?? draft;
+    } catch (e) {
+      this.logService.error(e);
+      this.toastService.showToast({
+        variant: "error",
+        message: this.i18nService.t("errorOccurred"),
+      });
+      return;
+    }
+    this.toastService.showToast({
+      variant: "success",
+      message: this.i18nService.t(
+        this.cipher.favorite ? "itemAddedToFavorites" : "itemRemovedFromFavorites",
+      ),
+    });
+  };
+
   archive = async () => {
     const cipherResponse = await this.archiveCipherUtilsService.archiveCipher(this.cipher, true);
 

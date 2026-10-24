@@ -1,26 +1,50 @@
 <popup-page>
-  <popup-header slot="header" [pageTitle]="headerText" showBackButton>
+  <!-- Keykeeper: no title; the item's name is the page's heading, under the header.
+       The star and Edit are up here (DESIGN.md, "The look"). -->
+  <popup-header slot="header" [pageTitle]="''" showBackButton>
     <ng-container slot="end">
       @if (cipher?.isArchived) {
         <button type="button" bit-chip-action [label]="'archived' | i18n"></button>
+      }
+      @if (cipher && !cipher.isDeleted) {
+        <button
+          type="button"
+          [bitIconButton]="cipher.favorite ? 'bwi-star-f' : 'bwi-star'"
+          data-keykeeper="favorite"
+          [attr.data-on]="cipher.favorite || null"
+          [attr.aria-pressed]="cipher.favorite"
+          [label]="'favorite' | i18n"
+          [bitAction]="toggleFavorite"
+          data-testid="keykeeper-favorite"
+        ></button>
+        <button
+          type="button"
+          bitButton
+          buttonType="secondary"
+          size="small"
+          (click)="editCipher()"
+          data-testid="keykeeper-edit"
+        >
+          {{ "edit" | i18n }}
+        </button>
       }
       <app-pop-out />
     </ng-container>
   </popup-header>
 
   @if (cipher) {
-    <app-cipher-view [cipher]="cipher">
+    <app-cipher-view [cipher]="cipher" keykeeperHero>
       @if (showAutofillButton()) {
         <button
           type="button"
-          class="tw-mt-4"
           slot="button"
           bitButton
           buttonType="primary"
           block
+          startIcon="bwi-sign-in"
           (click)="doAutofill()"
         >
-          {{ "autofillVerb" | i18n }}
+          {{ "keykeeperFillOnThisPage" | i18n }}
         </button>
       }
     </app-cipher-view>
@@ -28,11 +52,6 @@
 
   @if (showFooter$ | async) {
     <popup-footer slot="footer">
-      @if (!cipher.isDeleted) {
-        <button buttonType="primary" type="button" bitButton (click)="editCipher()">
-          {{ "edit" | i18n }}
-        </button>
-      }
       @if (cipher.isDeleted && cipher.permissions.restore) {
         <button buttonType="primary" type="button" bitButton [bitAction]="restore">
           {{ "restore" | i18n }}

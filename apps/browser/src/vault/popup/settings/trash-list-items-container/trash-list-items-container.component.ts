@@ -27,6 +27,7 @@ import {
 import {
   CanDeleteCipherDirective,
   DecryptionFailureDialogComponent,
+  KeykeeperItemTileComponent,
   OrgIconDirective,
   PasswordRepromptService,
 } from "@bitwarden/vault";
@@ -47,6 +48,7 @@ import { PopupCipherViewLike } from "../../views/popup-cipher.view";
     IconButtonModule,
     OrgIconDirective,
     TypographyModule,
+    KeykeeperItemTileComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

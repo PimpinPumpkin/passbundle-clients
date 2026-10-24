@@ -11,7 +11,7 @@ import {
   ItemModule,
   TypographyModule,
 } from "@bitwarden/components";
-import { Vfo1IconPipe } from "@bitwarden/vault";
+import { KeykeeperItemTileComponent, Vfo1IconPipe } from "@bitwarden/vault";
 
 @Component({
   selector: "app-fido2-cipher-row",
@@ -27,6 +27,7 @@ import { Vfo1IconPipe } from "@bitwarden/vault";
     JslibModule,
     TypographyModule,
     Vfo1IconPipe,
+    KeykeeperItemTileComponent,
   ],
 })
 export class Fido2CipherRowComponent {

@@ -40,15 +40,28 @@
   }
 
   <!-- ITEM DETAILS -->
-  <app-item-details-v2
-    [cipher]="cipher()"
-    [organization]="organization()"
-    [collections]="resolvedCollections()"
-    [folder]="folder()"
-    [hideOwner]="isAdminConsole()"
-  >
-    <ng-content select="[slot=button]"></ng-content>
-  </app-item-details-v2>
+  <!-- Keykeeper: the extension shows the item's tile, name, and where it lives instead -->
+  <ng-template #detailsButton><ng-content select="[slot=button]"></ng-content></ng-template>
+  @if (keykeeperHero()) {
+    <vault-keykeeper-item-hero
+      [cipher]="cipher()"
+      [organization]="organization()"
+      [collections]="resolvedCollections()"
+      [folder]="folder()"
+    >
+      <ng-container *ngTemplateOutlet="detailsButton"></ng-container>
+    </vault-keykeeper-item-hero>
+  } @else {
+    <app-item-details-v2
+      [cipher]="cipher()"
+      [organization]="organization()"
+      [collections]="resolvedCollections()"
+      [folder]="folder()"
+      [hideOwner]="isAdminConsole()"
+    >
+      <ng-container *ngTemplateOutlet="detailsButton"></ng-container>
+    </app-item-details-v2>
+  }
 
   <!-- LOGIN CREDENTIALS -->
   @if (hasLogin()) {
@@ -65,6 +78,11 @@
   @if (hasAutofill()) {
     <app-autofill-options-view [loginUris]="cipher()!.login.uris" [cipherId]="cipher()!.id">
     </app-autofill-options-view>
+  }
+
+  <!-- Keykeeper: how strong the password is and when it changed, under the fields -->
+  @if (keykeeperHero() && hasLogin()) {
+    <vault-keykeeper-password-health-line [cipher]="cipher()" />
   }
 
   <!-- CARD DETAILS -->

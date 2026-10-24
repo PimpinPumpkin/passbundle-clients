@@ -30,7 +30,6 @@ import {
 import {
   LoginComponent,
   LoginDecryptionOptionsComponent,
-  LoginSecondaryContentComponent,
   LoginViaAuthRequestComponent,
   NewDeviceVerificationComponent,
   PasswordHintComponent,
@@ -72,6 +71,7 @@ import { PhishingWarningComponent } from "../dirt/phishing-detection/popup/phish
 import { ProtectedByComponent } from "../dirt/phishing-detection/popup/protected-by-component";
 import { KeykeeperBrowserImportPageComponent } from "../keykeeper/popup/browser-import-page.component";
 import { KeykeeperJoinPageComponent } from "../keykeeper/popup/join-page.component";
+import { KeykeeperLoginSecondaryContentComponent } from "../keykeeper/popup/login-secondary-content.component";
 import BrowserPopupUtils from "../platform/browser/browser-popup-utils";
 import { popupRouterCacheGuard } from "../platform/popup/view-cache/popup-router-cache.service";
 import { RouteCacheOptions } from "../platform/services/popup-view-cache-background.service";
@@ -495,7 +495,8 @@ const routes: Routes = [
         ],
         data: {
           pageTitle: {
-            key: "loginPageEmailEntryScreenTitle",
+            // Keykeeper: "Sign in" (DESIGN.md, "The look")
+            key: "keykeeperSignIn",
           },
           elevation: 1,
           showAcctSwitcher: true,
@@ -505,14 +506,13 @@ const routes: Routes = [
           heroTextAlignment: "left",
           secondaryContentLocation: "footer",
         } satisfies RouteDataProperties & ExtensionAnonLayoutWrapperData,
+        // Keykeeper: where the vault is, PassBundle's or the person's own
+        // server, is asked at the top of the form (auth-keykeeper-vault-location),
+        // instead of upstream's menu at the bottom; and "New here?" says how
+        // to get an account.
         children: [
           { path: "", component: LoginComponent },
-          { path: "", component: LoginSecondaryContentComponent, outlet: "secondary" },
-          {
-            path: "",
-            component: EnvironmentSelectorComponent,
-            outlet: "environment-selector",
-          },
+          { path: "", component: KeykeeperLoginSecondaryContentComponent, outlet: "secondary" },
         ],
       },
       {

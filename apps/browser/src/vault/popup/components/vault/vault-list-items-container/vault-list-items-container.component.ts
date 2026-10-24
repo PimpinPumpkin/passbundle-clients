@@ -47,12 +47,12 @@ import {
   SectionHeaderComponent,
   TypographyModule,
   ScrollLayoutDirective,
-  ChipActionComponent,
   IconComponent,
 } from "@bitwarden/components";
 import {
   DecryptionFailureDialogComponent,
   KeykeeperExpirationBadgeComponent,
+  KeykeeperItemTileComponent,
   KeykeeperTemplateBadgeComponent,
   OrgIconDirective,
   PasswordRepromptService,
@@ -73,6 +73,7 @@ import { ItemMoreOptionsComponent } from "../item-more-options/item-more-options
   imports: [
     KeykeeperExpirationBadgeComponent,
     KeykeeperTemplateBadgeComponent,
+    KeykeeperItemTileComponent,
     CommonModule,
     ItemModule,
     ButtonModule,
@@ -88,7 +89,6 @@ import { ItemMoreOptionsComponent } from "../item-more-options/item-more-options
     DisclosureComponent,
     DisclosureTriggerForDirective,
     ScrollLayoutDirective,
-    ChipActionComponent,
     IconComponent,
   ],
   selector: "app-vault-list-items-container",
@@ -144,7 +144,9 @@ export class VaultListItemsContainerComponent implements AfterViewInit {
    * Compact mode: 52px + 1px border = 53px
    */
   protected readonly itemHeight$ = this.compactModeService.enabled$.pipe(
-    map((enabled) => (enabled ? 53 : 59)),
+    // Keykeeper: the rows are one card, divided by lines, without the space
+    // between them, in both modes: 52px + 1px border.
+    map(() => 53),
   );
 
   /**

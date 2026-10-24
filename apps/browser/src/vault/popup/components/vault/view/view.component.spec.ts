@@ -25,6 +25,7 @@ import { LogService } from "@bitwarden/common/platform/abstractions/log.service"
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
 import { FakeAccountService, mockAccountServiceWith } from "@bitwarden/common/spec";
+import { PasswordStrengthServiceAbstraction } from "@bitwarden/common/tools/password-strength";
 import { UserId } from "@bitwarden/common/types/guid";
 import { ChangeLoginPasswordService } from "@bitwarden/common/vault/abstractions/change-login-password.service";
 import { CipherArchiveService } from "@bitwarden/common/vault/abstractions/cipher-archive.service";
@@ -116,6 +117,7 @@ describe("ViewComponent", () => {
     getKeyForCipherKeyDecryption: jest.fn().mockResolvedValue({}),
     deleteWithServer: jest.fn().mockResolvedValue(undefined),
     softDeleteWithServer: jest.fn().mockResolvedValue(undefined),
+    updateWithServer: jest.fn().mockResolvedValue(undefined),
   };
 
   const cipherArchiveService = mock<CipherArchiveService>();
@@ -124,6 +126,7 @@ describe("ViewComponent", () => {
     mockCipherService.cipherViews$.mockClear();
     mockCipherService.deleteWithServer.mockClear();
     mockCipherService.softDeleteWithServer.mockClear();
+    mockCipherService.updateWithServer.mockClear();
     mockNavigate.mockClear();
     collect.mockClear();
     doAutofill.mockClear();
@@ -142,6 +145,11 @@ describe("ViewComponent", () => {
     await TestBed.configureTestingModule({
       imports: [ViewComponent],
       providers: [
+        // Keykeeper: the item's page shows its password's health (password-health-line.component.ts).
+        {
+          provide: PasswordStrengthServiceAbstraction,
+          useValue: { getPasswordStrength: () => ({ score: 4 }) },
+        },
         { provide: Router, useValue: { navigate: mockNavigate } },
         { provide: CipherService, useValue: mockCipherService },
         { provide: LogService, useValue: mock<LogService>() },
@@ -545,6 +553,65 @@ describe("ViewComponent", () => {
       );
       expect(unarchiveBtn).toBeFalsy();
     }));
+  });
+
+  // Keykeeper: the star in the header.
+  describe("toggleFavorite", () => {
+    beforeEach(() => {
+      component["activeUserId"] = mockUserId;
+    });
+
+    it("saves a fresh copy of the item, and shows what the server saved", async () => {
+      // The page's copy is stale: the item was made a favorite elsewhere.
+      component.cipher = { ...mockCipher, favorite: false } as CipherView;
+      const fresh = { ...mockCipher, favorite: true } as CipherView;
+      mockCipherService.cipherViews$.mockReturnValueOnce(of([fresh]));
+      const saved = { ...mockCipher, favorite: false, revisionDate: new Date() } as CipherView;
+      mockCipherService.updateWithServer.mockResolvedValueOnce(saved);
+
+      await component.toggleFavorite();
+
+      expect(mockCipherService.updateWithServer).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "122-333-444", favorite: false }),
+        mockUserId,
+      );
+      expect(component.cipher).toBe(saved);
+      expect(showToast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "success", message: "itemRemovedFromFavorites" }),
+      );
+    });
+
+    it("works a second time on the same page", async () => {
+      component.cipher = { ...mockCipher, favorite: false } as CipherView;
+      mockCipherService.updateWithServer.mockImplementation(async (c: CipherView) => ({ ...c }));
+      mockCipherService.cipherViews$.mockImplementation(() => of([component.cipher]));
+
+      await component.toggleFavorite();
+      expect(component.cipher.favorite).toBe(true);
+
+      await component.toggleFavorite();
+      expect(component.cipher.favorite).toBe(false);
+      expect(mockCipherService.updateWithServer).toHaveBeenCalledTimes(2);
+
+      mockCipherService.updateWithServer.mockReset();
+      mockCipherService.cipherViews$.mockImplementation(() => of([mockCipher]));
+    });
+
+    it("says it couldn't, and keeps the star as it was, when saving fails", async () => {
+      // The same object the item list caches: a failed save must not change it.
+      const cached = { ...mockCipher, favorite: false } as CipherView;
+      component.cipher = cached;
+      mockCipherService.cipherViews$.mockReturnValueOnce(of([cached]));
+      mockCipherService.updateWithServer.mockRejectedValueOnce(new Error("offline"));
+
+      await component.toggleFavorite();
+
+      expect(component.cipher).toBe(cached);
+      expect(cached.favorite).toBe(false);
+      expect(showToast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error", message: "errorOccurred" }),
+      );
+    });
   });
 
   describe("archive", () => {

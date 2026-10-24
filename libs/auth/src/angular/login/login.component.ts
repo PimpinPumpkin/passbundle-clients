@@ -1,18 +1,22 @@
 import { CommonModule } from "@angular/common";
 import {
   Component,
+  computed,
   DestroyRef,
   ElementRef,
   NgZone,
   OnDestroy,
   OnInit,
   ViewChild,
+  viewChild,
 } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from "@angular/forms";
 import { ActivatedRoute, Params, Router, RouterModule } from "@angular/router";
 import { firstValueFrom, Subject, take, takeUntil, skip, combineLatest, startWith } from "rxjs";
 
+import { KeykeeperVaultLocationComponent } from "@bitwarden/angular/auth/keykeeper/vault-location.component";
+import { selfHostedAddressHost } from "@bitwarden/angular/auth/self-hosted-env-config-dialog";
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { VaultIcon, WaveIcon } from "@bitwarden/assets/svg";
 import {
@@ -77,6 +81,7 @@ export enum LoginUiState {
     AsyncActionsModule,
     ButtonModule,
     CheckboxModule,
+    KeykeeperVaultLocationComponent,
     CommonModule,
     FormFieldModule,
     IconButtonModule,
@@ -92,6 +97,19 @@ export class LoginComponent implements OnInit, OnDestroy {
   // FIXME(https://bitwarden.atlassian.net/browse/CL-903): Migrate to Signals
   // eslint-disable-next-line @angular-eslint/prefer-signals
   @ViewChild("masterPasswordInputRef") masterPasswordInputRef: ElementRef | undefined;
+
+  /**
+   * Keykeeper: the extension's "Where's your vault?" (vault-location.component.ts).
+   * While it can't be used (My own server with a blank or refused address),
+   * the buttons that go on are off, and going on waits for it to be saved,
+   * so signing in never goes to a server other than the one shown.
+   */
+  protected readonly keykeeperLocation = viewChild(KeykeeperVaultLocationComponent);
+  protected readonly keykeeperLocationBlocks = computed(
+    () => this.keykeeperLocation()?.blocksSignIn() ?? false,
+  );
+  /** Keykeeper: the password step shows the default layout, whose subtitle names the server. */
+  private keykeeperDefaultPasswordStep = false;
 
   private destroy$ = new Subject<void>();
   readonly Icons = { WaveIcon, VaultIcon };
@@ -222,6 +240,12 @@ export class LoginComponent implements OnInit, OnDestroy {
           this.formGroup.controls.masterPassword.updateValueAndValidity();
           // Fetch new prelogin data for the updated region
           this.prefetchPasswordPreloginData();
+          // Keykeeper: and the subtitle names the new server.
+          if (this.keykeeperDefaultPasswordStep) {
+            void this.keykeeperPasswordStepSubtitle().then((pageSubtitle) =>
+              this.anonLayoutWrapperDataService.setAnonLayoutWrapperData({ pageSubtitle }),
+            );
+          }
         }
       });
   }
@@ -526,7 +550,13 @@ export class LoginComponent implements OnInit, OnDestroy {
       this.loginComponentService.showBackButton(false);
 
       this.anonLayoutWrapperDataService.setAnonLayoutWrapperData({
-        pageTitle: { key: "loginPageEmailEntryScreenTitle" },
+        // Keykeeper: the extension's says "Sign in" (DESIGN.md, "The look").
+        pageTitle: {
+          key:
+            this.clientType === ClientType.Browser
+              ? "keykeeperSignIn"
+              : "loginPageEmailEntryScreenTitle",
+        },
         pageIcon: this.Icons.VaultIcon, // layout decides whether to render it via hidePageIcon
         pageSubtitle: null, // remove subtitle when going back to email entry
       });
@@ -539,10 +569,12 @@ export class LoginComponent implements OnInit, OnDestroy {
     } else if (this.loginUiState === LoginUiState.MASTER_PASSWORD_ENTRY) {
       this.loginComponentService.showBackButton(true);
 
+      this.keykeeperDefaultPasswordStep = mpEntryLayoutOverride == null;
       this.anonLayoutWrapperDataService.setAnonLayoutWrapperData(
         mpEntryLayoutOverride ?? {
           pageTitle: { key: "loginPageMasterPasswordEntryScreenTitle" },
-          pageSubtitle: this.emailFormControl.value,
+          // Keykeeper: in the extension, the email and the server it signs in to.
+          pageSubtitle: await this.keykeeperPasswordStepSubtitle(),
           pageIcon: this.Icons.WaveIcon, // layout decides whether to render it via hidePageIcon
         },
       );
@@ -571,6 +603,27 @@ export class LoginComponent implements OnInit, OnDestroy {
     return this.loginComponentService.isLoginWithPasskeySupported();
   }
 
+  /** Keykeeper: true when there's no location to wait for, or it's saved and usable. */
+  private async keykeeperLocationReady(): Promise<boolean> {
+    const location = this.keykeeperLocation();
+    return location == null || (await location.commit());
+  }
+
+  /**
+   * Keykeeper: the password step's subtitle. In the extension, the email and
+   * the server the password goes to ("alex@contoso.example · vault.example.com"),
+   * the identity server's host as the URL parser reads it.
+   */
+  private async keykeeperPasswordStepSubtitle(): Promise<string | null> {
+    const email = this.emailFormControl.value;
+    if (this.clientType !== ClientType.Browser) {
+      return email;
+    }
+    const env = await firstValueFrom(this.environmentService.environment$);
+    const host = selfHostedAddressHost(env.getIdentityUrl()) ?? env.getHostname();
+    return host ? this.i18nService.t("keykeeperEmailAtServer", email ?? "", host) : email;
+  }
+
   protected async goToHint(): Promise<void> {
     await this.router.navigateByUrl("/hint");
   }
@@ -583,6 +636,10 @@ export class LoginComponent implements OnInit, OnDestroy {
    * client-specific flows (e.g. SSO invited-user redirect) that need a different title/subtitle/icon.
    */
   protected async continuePressed(mpEntryLayoutOverride?: Partial<AnonLayoutWrapperData>) {
+    // Keykeeper: not before the extension's location is saved and usable.
+    if (!(await this.keykeeperLocationReady())) {
+      return;
+    }
     // Add a new entry to the browser's history so that there is a history entry to go back to
     history.pushState({}, "", window.location.href);
     await this.continue(mpEntryLayoutOverride);
@@ -595,7 +652,8 @@ export class LoginComponent implements OnInit, OnDestroy {
   protected async continue(mpEntryLayoutOverride?: Partial<AnonLayoutWrapperData>): Promise<void> {
     const isEmailValid = this.validateEmail();
 
-    if (isEmailValid) {
+    // Keykeeper: and the extension's location is saved and usable.
+    if (isEmailValid && (await this.keykeeperLocationReady())) {
       this.prefetchPasswordPreloginData();
 
       await this.toggleLoginUiState(LoginUiState.MASTER_PASSWORD_ENTRY, mpEntryLayoutOverride);
@@ -608,6 +666,10 @@ export class LoginComponent implements OnInit, OnDestroy {
    * @param event - The event object.
    */
   async handleLoginWithPasskeyClick() {
+    // Keykeeper: not before the extension's location is saved and usable.
+    if (!(await this.keykeeperLocationReady())) {
+      return;
+    }
     await this.router.navigate(["/login-with-passkey"]);
   }
 
@@ -619,6 +681,10 @@ export class LoginComponent implements OnInit, OnDestroy {
     // Make sure the email is valid
     const isEmailValid = this.validateEmail();
     if (!isEmailValid) {
+      return;
+    }
+    // Keykeeper: and the extension's location is saved and usable.
+    if (!(await this.keykeeperLocationReady())) {
       return;
     }
 

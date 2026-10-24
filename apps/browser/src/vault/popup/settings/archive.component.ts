@@ -36,6 +36,7 @@ import {
 import {
   CanDeleteCipherDirective,
   DecryptionFailureDialogComponent,
+  KeykeeperItemTileComponent,
   OrgIconDirective,
   PasswordRepromptService,
   Vfo1I18nPipe,
@@ -66,6 +67,7 @@ import { ROUTES_AFTER_EDIT_DELETION } from "../services/vault-popup-after-deleti
     SectionHeaderComponent,
     TypographyModule,
     OrgIconDirective,
+    KeykeeperItemTileComponent,
     CardComponent,
     ButtonComponent,
     IconModule,

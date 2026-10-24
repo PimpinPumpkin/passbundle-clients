@@ -2,10 +2,14 @@
    brand/apply.mjs. See DESIGN.md, "The look".
 
    Every theme gets the identity: Google Sans Flex (brand/fonts.css),
-   green-tinted darks, and the brand's illustration colors. The Glass theme
-   (upstream's System setting, so light or dark like the device) adds
-   translucent surfaces over a soft color field; html.pb-glass turns it on.
-   Light and Dark stay solid, for legibility.
+   green-tinted darks, and the brand's illustration colors. In the web vault,
+   the Glass theme (upstream's System setting, so light or dark like the
+   device) adds translucent surfaces over a soft color field; html.pb-glass
+   turns it on. Light and Dark stay solid, for legibility.
+
+   The extension's popup (html.pb-popup) has the design language instead, in
+   every theme: a calm, solid ground, cards at three depths, and jewel-toned
+   category tiles. Its section is at the end of this file.
 
    Rules target upstream's components (bit-*, popup-*) rather than its utility
    classes, so changes to the markup inside them don't break the look. */
@@ -123,18 +127,9 @@
 }
 
 /* The page shows the field; bars, groups, cards, and panels are glass. */
-.pb-glass popup-page main,
 .pb-glass .tw-bg-background-alt,
 .pb-glass bit-layout main {
   background-color: transparent !important;
-}
-.pb-glass popup-header header,
-.pb-glass popup-footer footer,
-.pb-glass bit-bottom-navigation footer {
-  background: var(--frost-bar) !important;
-  -webkit-backdrop-filter: var(--frost-blur);
-  backdrop-filter: var(--frost-blur);
-  border-color: var(--frost-line) !important;
 }
 .pb-glass bit-item-group,
 .pb-glass bit-card,
@@ -193,10 +188,8 @@
   backdrop-filter: var(--frost-blur);
 }
 
-/* Fields, search, and filter menus: lighter glass. */
-.pb-glass bit-search input,
-.pb-glass popup-page button[bitbutton][buttontype="secondary"],
-.pb-glass app-vault-list-filters button {
+/* Fields and search: lighter glass. */
+.pb-glass bit-search input {
   background-color: var(--frost-surface-strong) !important;
   border-color: var(--frost-edge) !important;
 }
@@ -446,4 +439,531 @@ bit-avatar text {
 bit-icon-tile .bwi-bitwarden-shield:before,
 bit-icon-tile .bwi-shield:before {
   vertical-align: top;
+}
+
+/* ======================================================================
+   The extension's popup: the design language (DESIGN.md, "The look").
+   Color says what a thing is, depth says what you can touch. A calm, solid
+   ground; cards at three depths (resting lists, raised for what's
+   suggested, floating menus and dialogs); jewel-toned tiles for categories
+   (libs/common/src/vault/keykeeper/categories.ts); and the brand's green for
+   what you act on. The same in System, Light, and Dark: System is light or
+   dark like the device, and the popup never gets Glass.
+
+   The --pb-* tokens are the palette; upstream's tokens are mapped onto them,
+   so upstream's components follow. Our own components read the --pb-*
+   tokens directly. Every text color passes WCAG AA on what it sits on.
+   ====================================================================== */
+html.pb-popup {
+  --pb-ground: #eef2f0;
+  --pb-surface: #ffffff;
+  --pb-raised: #ffffff;
+  --pb-sunken: #e1e8e5;
+  --pb-field: #ffffff;
+  --pb-field-border: #cbd7d2;
+  --pb-line: #dce5e1;
+  --pb-divider: #edf2f0;
+  --pb-text: #14201c;
+  --pb-label: #3c4a45;
+  --pb-muted: #52615c;
+  --pb-placeholder: #6b7a75;
+  --pb-brand: #1f6f5c;
+  --pb-brand-strong: #185a4a;
+  --pb-on-brand: #ffffff;
+  --pb-brand-tint: #eef5f2;
+  --pb-brand-tint-strong: #dcebe5;
+  --pb-link: #1f6f5c;
+  --pb-focus: #1f6f5c;
+  --pb-hover: rgb(16 32 27 / 0.05);
+  --pb-star: #b07a12;
+  --pb-shadow-resting: 0 1px 2px rgb(16 32 27 / 0.06), 0 1px 1px rgb(16 32 27 / 0.04);
+  --pb-shadow-raised: 0 4px 12px rgb(16 32 27 / 0.08), 0 1px 3px rgb(16 32 27 / 0.06);
+  --pb-shadow-floating: 0 16px 40px rgb(16 32 27 / 0.14), 0 4px 12px rgb(16 32 27 / 0.08);
+  --pb-chip-shadow: 0 1px 3px rgb(16 32 27 / 0.12), 0 0 0 1px #dce5e1;
+  --pb-segment-shadow: 0 1px 3px rgb(16 32 27 / 0.12), 0 1px 1px rgb(16 32 27 / 0.06);
+  --pb-field-shadow: 0 1px 2px rgb(16 32 27 / 0.05);
+  --pb-button-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 1px 2px rgb(16 32 27 / 0.2);
+
+  /* Upstream's tokens, on ours. */
+  --color-background: 255 255 255;
+  --color-background-alt: 238 242 240;
+  --color-text-main: 20 32 28;
+  --color-text-muted: 82 97 92;
+  --color-secondary-300: 220 229 225;
+  --color-primary-600: 31 111 92;
+  --color-primary-700: 24 90 74;
+  --color-hover-default: rgb(16 32 27 / 0.05);
+  --color-fg-heading: #14201c;
+  --color-fg-body: #3c4a45;
+  --color-fg-body-subtle: #52615c;
+  --color-fg-brand: #1f6f5c;
+  --color-fg-brand-strong: #185a4a;
+  --color-fg-contrast: #ffffff;
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #ffffff;
+  --color-bg-tertiary: #eef2f0;
+  --color-bg-quaternary: #e1e8e5;
+  --color-bg-brand: #1f6f5c;
+  --color-bg-brand-strong: #185a4a;
+  --color-bg-brand-softer: #eef5f2;
+  --color-bg-brand-soft: #dcebe5;
+  --color-bg-hover: rgb(16 32 27 / 0.05);
+  --color-border-light: #edf2f0;
+  --color-border-base: #dce5e1;
+  --color-border-strong: #cbd7d2;
+  --color-border-brand: #1f6f5c;
+  --color-border-brand-strong: #185a4a;
+  --color-border-focus: #1f6f5c;
+}
+html.pb-popup.theme_dark {
+  --pb-ground: #0e1513;
+  --pb-surface: #16201d;
+  --pb-raised: #1c2824;
+  --pb-sunken: #16201d;
+  --pb-field: #1c2824;
+  --pb-field-border: #34443f;
+  --pb-line: #22302b;
+  --pb-divider: #22302b;
+  --pb-text: #e7efec;
+  --pb-label: #b9c6c2;
+  --pb-muted: #a3b2ad;
+  --pb-placeholder: #8c9c97;
+  --pb-brand: #5fc3a6;
+  --pb-brand-strong: #7dd3ba;
+  --pb-on-brand: #0b1f19;
+  --pb-brand-tint: #1b2e28;
+  --pb-brand-tint-strong: #22392f;
+  --pb-link: #7dd3ba;
+  --pb-focus: #7dd3ba;
+  --pb-hover: rgb(255 255 255 / 0.05);
+  --pb-star: #e8b23a;
+  --pb-shadow-resting: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 0 0 1px #22302b;
+  --pb-shadow-raised: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 6px 16px rgb(0 0 0 / 0.35);
+  --pb-shadow-floating: 0 16px 40px rgb(0 0 0 / 0.5), 0 0 0 1px #2a3833;
+  --pb-chip-shadow: 0 0 0 1px #34443f;
+  --pb-segment-shadow: 0 0 0 1px #34443f;
+  --pb-field-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+  --pb-button-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25);
+
+  --color-background: 22 32 29;
+  --color-background-alt: 14 21 19;
+  --color-text-main: 231 239 236;
+  --color-text-muted: 163 178 173;
+  --color-secondary-300: 52 68 63;
+  --color-primary-600: 125 211 186;
+  --color-primary-700: 166 227 209;
+  --color-hover-default: rgb(255 255 255 / 0.05);
+  --color-fg-heading: #e7efec;
+  --color-fg-body: #b9c6c2;
+  --color-fg-body-subtle: #a3b2ad;
+  --color-fg-brand: #7dd3ba;
+  --color-fg-brand-strong: #a6e3d1;
+  --color-fg-contrast: #0b1f19;
+  --color-bg-primary: #16201d;
+  --color-bg-secondary: #1c2824;
+  --color-bg-tertiary: #0e1513;
+  --color-bg-quaternary: #24332e;
+  --color-bg-brand: #5fc3a6;
+  --color-bg-brand-strong: #7dd3ba;
+  --color-bg-brand-softer: #1b2e28;
+  --color-bg-brand-soft: #22392f;
+  --color-bg-hover: rgb(255 255 255 / 0.05);
+  --color-border-light: #22302b;
+  --color-border-base: #22302b;
+  --color-border-strong: #34443f;
+  --color-border-brand: #5fc3a6;
+  --color-border-brand-strong: #7dd3ba;
+  --color-border-focus: #7dd3ba;
+}
+/* The dark primary button is the design's mint with dark text (8:1), not the
+   web vault's deep green with white. */
+.pb-popup.theme_dark .tw-bg-bg-brand.tw-text-fg-contrast {
+  --color-bg-brand: #5fc3a6;
+  --color-bg-brand-strong: #7dd3ba;
+  --color-border-brand: #5fc3a6;
+  --color-border-brand-strong: #7dd3ba;
+  --color-fg-contrast: #0b1f19;
+}
+
+/* The ground. */
+html.pb-popup,
+.pb-popup body,
+.pb-popup popup-page main,
+.pb-popup popup-header header,
+.pb-popup [data-keykeeper="vault-top"] {
+  background-color: var(--pb-ground) !important;
+}
+.pb-popup popup-header header {
+  border-bottom-color: transparent !important;
+}
+.pb-popup popup-header header.tw-border-secondary-300 {
+  border-bottom-color: var(--pb-line) !important;
+}
+.pb-popup popup-page main > div:first-of-type {
+  border-bottom-color: transparent !important;
+}
+.pb-popup popup-page main > div.tw-border-secondary-300:first-of-type {
+  border-bottom-color: var(--pb-line) !important;
+}
+
+/* The vault's top: the search and New, then the category chips. */
+.pb-popup [data-keykeeper="vault-top"] {
+  padding: 12px 12px 0;
+}
+.pb-popup [data-keykeeper="vault-top"] app-current-account > div {
+  margin: 0;
+}
+.pb-popup bit-search form[bitfieldcontainer] {
+  min-height: 40px;
+  height: 40px;
+  border-radius: 10px !important;
+  border-color: transparent !important;
+  background-color: var(--pb-field) !important;
+  box-shadow:
+    var(--pb-field-shadow),
+    0 0 0 1px var(--pb-line);
+}
+.pb-popup bit-search form[bitfieldcontainer]:focus-within {
+  box-shadow: 0 0 0 2px var(--pb-focus);
+  --tw-ring-shadow: 0 0 #0000 !important;
+}
+.pb-popup bit-search input {
+  font-size: 15px;
+  color: var(--pb-text) !important;
+}
+.pb-popup bit-search input::placeholder {
+  color: var(--pb-placeholder) !important;
+}
+.pb-popup bit-search bit-icon {
+  color: var(--pb-muted);
+}
+.pb-popup app-new-item-dropdown [biticonbutton] {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px !important;
+  box-shadow: var(--pb-button-shadow);
+  color: var(--pb-on-brand) !important;
+}
+.pb-popup app-new-item-dropdown [biticonbutton] * {
+  color: inherit !important;
+}
+
+/* Section headings: small, quiet, and without upstream's counts. */
+.pb-popup bit-section-header h2,
+.pb-popup bit-section-header h3 {
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+  font-weight: 600 !important;
+  color: var(--pb-label) !important;
+  margin: 0 !important;
+}
+.pb-popup bit-section-header {
+  padding-inline: 4px;
+  padding-bottom: 2px;
+}
+.pb-popup app-vault-list-items-container [data-keykeeper="section-count"] {
+  display: none;
+}
+.pb-popup app-vault-list-items-container button[bitdisclosuretriggerfor],
+.pb-popup app-vault-list-items-container button.tw-group\/vault-section-header {
+  border-color: transparent !important;
+}
+.pb-popup bit-section {
+  margin-bottom: 12px;
+}
+
+/* Cards: lists and panels rest on the ground; what's suggested for the page
+   rises. */
+.pb-popup bit-item-group,
+.pb-popup bit-card,
+.pb-popup read-only-cipher-card > *:first-child {
+  display: block;
+  background: var(--pb-surface) !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  box-shadow: var(--pb-shadow-resting) !important;
+  overflow: hidden;
+}
+.pb-popup app-autofill-vault-list-items bit-item-group {
+  background: var(--pb-raised) !important;
+  box-shadow: var(--pb-shadow-raised) !important;
+}
+.pb-popup bit-item-group bit-item,
+.pb-popup bit-card bit-item {
+  margin: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  border-bottom: 1px solid var(--pb-divider) !important;
+}
+.pb-popup bit-item-group bit-item:last-of-type,
+.pb-popup bit-card bit-item:last-of-type {
+  border-bottom-color: transparent !important;
+}
+.pb-popup bit-item:hover {
+  background: var(--pb-hover) !important;
+}
+.pb-popup bit-item-group > h3 {
+  padding: 8px 14px 2px;
+  margin: 0 !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--pb-muted) !important;
+}
+
+/* A vault row: tile, name, username, and copy; More and the site's link show
+   with the pointer or focus on the row. */
+.pb-popup app-vault-list-items-container bit-item [bit-item-content] {
+  padding-inline: 10px 4px;
+}
+.pb-popup app-vault-list-items-container bit-item [data-testid="item-name"] {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--pb-text);
+}
+.pb-popup app-vault-list-items-container bit-item [slot="secondary"] {
+  font-size: 13px;
+  color: var(--pb-muted);
+}
+.pb-popup
+  app-vault-list-items-container
+  bit-item:not(:hover):not(:focus-within)
+  [data-keykeeper="row-more"] {
+  display: block;
+  width: 0;
+  overflow: hidden;
+  margin: 0 !important;
+}
+.pb-popup app-vault-list-items-container bit-item [biticonbutton] {
+  color: var(--pb-muted);
+}
+.pb-popup [data-keykeeper="fill"] {
+  height: 34px;
+  min-width: 0;
+  padding: 0 14px !important;
+  border-radius: 9px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  box-shadow: var(--pb-button-shadow);
+}
+
+/* Buttons: rounded rectangles, not pills, a raised primary and a white
+   secondary with a hairline. */
+.pb-popup button[bitbutton],
+.pb-popup a[bitbutton],
+.pb-popup button[bitbutton][buttontype="primary"],
+.pb-popup a[bitbutton][buttontype="primary"],
+.pb-popup [bitbutton].tw-bg-bg-brand.tw-text-fg-contrast {
+  border-radius: 10px !important;
+}
+.pb-popup [bitbutton].tw-bg-bg-brand.tw-text-fg-contrast {
+  box-shadow: var(--pb-button-shadow);
+}
+.pb-popup [bitbutton].tw-bg-bg-secondary {
+  border-color: var(--pb-field-border) !important;
+  box-shadow: var(--pb-field-shadow);
+}
+.pb-popup [bitbutton][block] {
+  min-height: 44px;
+  font-size: 15px;
+}
+.pb-popup a[bitlink],
+.pb-popup button[bitlink] {
+  color: var(--pb-link);
+}
+
+/* Fields: white, a hairline, and rounder corners. */
+.pb-popup [bitfieldcontainer] {
+  border-radius: 10px !important;
+  box-shadow: var(--pb-field-shadow);
+}
+.pb-popup bit-form-field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pb-label);
+}
+.pb-popup bit-form-field input::placeholder,
+.pb-popup bit-form-field textarea::placeholder {
+  color: var(--pb-placeholder);
+}
+
+/* An item's fields: a label over its value, no field chrome, a line between
+   each, and the copy button tinted. Upstream's headings over the login's
+   fields and its website go; the fields say what they are. */
+.pb-popup :is(read-only-cipher-card, app-autofill-options-view) bit-card {
+  padding: 0 !important;
+}
+.pb-popup :is(read-only-cipher-card, app-autofill-options-view) bit-form-field {
+  margin: 0 !important;
+  padding: 10px 8px 10px 14px;
+  border-bottom: 1px solid var(--pb-divider);
+}
+.pb-popup :is(read-only-cipher-card, app-autofill-options-view) bit-form-field:last-of-type {
+  border-bottom: 0;
+}
+.pb-popup :is(read-only-cipher-card, app-autofill-options-view) bit-form-field label {
+  font-size: 12px;
+  color: var(--pb-muted);
+}
+.pb-popup :is(read-only-cipher-card, app-autofill-options-view) [bitfieldcontainer] {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  min-height: 0;
+  --tw-ring-shadow: 0 0 #0000 !important;
+}
+.pb-popup
+  :is(read-only-cipher-card, app-autofill-options-view)
+  [bitfieldcontainer]
+  > div:last-child {
+  padding-inline-start: 0;
+}
+.pb-popup :is(read-only-cipher-card, app-autofill-options-view) input {
+  font-size: 15px !important;
+  color: var(--pb-text) !important;
+}
+.pb-popup app-autofill-options-view input[data-testid="login-website"] {
+  color: var(--pb-link) !important;
+}
+.pb-popup read-only-cipher-card input[type="password"],
+.pb-popup read-only-cipher-card #totp {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  letter-spacing: 0.06em;
+}
+.pb-popup :is(read-only-cipher-card, app-autofill-options-view) button[biticonbutton="bwi-clone"] {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px !important;
+  background: var(--pb-brand-tint) !important;
+  color: var(--pb-brand) !important;
+}
+.pb-popup
+  :is(read-only-cipher-card, app-autofill-options-view)
+  button[biticonbutton="bwi-clone"]:hover {
+  background: var(--pb-brand-tint-strong) !important;
+}
+/* The two-step code's countdown: a ring in the brand's green on a faint track. */
+.pb-popup [bittotpcountdown] circle[r="9.5"]:not(.tw-stroke-danger-600) {
+  stroke: var(--pb-brand);
+}
+.pb-popup [bittotpcountdown] circle[r="11"]:not(.tw-stroke-danger-600) {
+  stroke: var(--pb-line);
+}
+.pb-popup [bittotpcountdown] .tw-text-main {
+  color: var(--pb-brand);
+  font-weight: 700;
+}
+.pb-popup app-cipher-view app-login-credentials-view bit-section-header,
+.pb-popup app-cipher-view app-autofill-options-view bit-section-header {
+  display: none;
+}
+.pb-popup app-cipher-view section {
+  margin-bottom: 12px !important;
+}
+
+/* The item page's header: back, the star, and Edit. */
+.pb-popup [data-keykeeper="favorite"] {
+  color: var(--pb-muted);
+}
+.pb-popup [data-keykeeper="favorite"][data-on] {
+  color: var(--pb-star) !important;
+}
+
+/* Segmented choices (Password, Passphrase, Username; All, Text, File): a
+   sunken track with the picked one raised, like "Where's your vault?". */
+.pb-popup bit-toggle-group {
+  background: var(--pb-sunken) !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+}
+.pb-popup bit-toggle-group::after {
+  background: var(--pb-raised) !important;
+  border-radius: 9px !important;
+  box-shadow: var(--pb-segment-shadow);
+}
+.pb-popup bit-toggle-group bit-toggle label {
+  border-radius: 9px !important;
+  font-weight: 600 !important;
+  color: var(--pb-label) !important;
+}
+.pb-popup bit-toggle-group bit-toggle label::after {
+  display: none;
+}
+.pb-popup bit-toggle-group bit-toggle input:checked + label[for] {
+  color: var(--pb-text) !important;
+}
+
+/* The tabs: a white bar, the tab showing in the brand's green. */
+.pb-popup bit-bottom-navigation footer {
+  background: var(--pb-surface) !important;
+  border-top: 0 !important;
+  box-shadow: 0 -1px 0 var(--pb-line);
+}
+.pb-popup bit-bottom-navigation button {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pb-muted) !important;
+}
+.pb-popup bit-bottom-navigation button[aria-current="page"] {
+  color: var(--pb-brand) !important;
+}
+.pb-popup.theme_dark bit-bottom-navigation button[aria-current="page"] {
+  color: var(--pb-link) !important;
+}
+.pb-popup bit-bottom-navigation svg g[stroke] path {
+  fill: none !important;
+}
+/* The tab showing fills its shape with a tint, light enough (or, in dark
+   mode, deep enough) that the glyph's own lines and dots still show. */
+.pb-popup bit-bottom-navigation svg .tw-fill-fg-brand-soft {
+  fill: var(--pb-brand-tint-strong) !important;
+}
+.pb-popup popup-footer footer {
+  background: var(--pb-surface) !important;
+  border-top: 0 !important;
+  box-shadow: 0 -1px 0 var(--pb-line);
+}
+
+/* Callouts and banners: the same rounded corners as the cards. */
+.pb-popup bit-callout > div {
+  border-radius: 12px !important;
+}
+
+/* Menus and dialogs float. */
+.pb-popup .cdk-overlay-pane [role="menu"],
+.pb-popup bit-dialog > section,
+.pb-popup bit-simple-dialog > section {
+  background: var(--pb-raised) !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  box-shadow: var(--pb-shadow-floating) !important;
+}
+.pb-popup [role="menu"] [bitmenuitem] {
+  background-color: transparent !important;
+  border-radius: 8px;
+}
+.pb-popup [role="menu"] [bitmenuitem]:hover,
+.pb-popup [role="menu"] [bitmenuitem]:focus-visible {
+  background-color: var(--pb-hover) !important;
+}
+
+/* Sign-in, unlock, and the other pages before the vault: on the ground, no
+   card around the form, the logo's wordmark in the corner. */
+.pb-popup bit-landing-card > bit-base-card,
+.pb-popup bit-landing-card > div {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+.pb-popup bit-landing-hero h1 {
+  font-size: 22px !important;
+  line-height: 1.3 !important;
+  font-weight: 700 !important;
+  color: var(--pb-text) !important;
+}
+.pb-popup bit-landing-footer {
+  color: var(--pb-muted);
+}
+.pb-popup auth-anon-layout bit-form-field label sup {
+  display: none;
 }

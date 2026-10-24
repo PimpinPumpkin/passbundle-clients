@@ -1,5 +1,10 @@
 <form [bitSubmit]="submit" [formGroup]="formGroup">
   <div [ngClass]="{ 'tw-hidden': loginUiState !== LoginUiState.EMAIL_ENTRY }">
+    <!-- Keykeeper: the extension asks where the vault is first (DESIGN.md, "The look") -->
+    @if (clientType === ClientType.Browser) {
+      <auth-keykeeper-vault-location></auth-keykeeper-vault-location>
+    }
+
     <!-- Email Address input -->
     <bit-form-field>
       <bit-label>{{ "emailAddress" | i18n }}</bit-label>
@@ -38,12 +43,15 @@
         (click)="continuePressed()"
         [bitTooltip]="ssoRequired ? ('yourOrganizationRequiresSingleSignOn' | i18n) : ''"
         [addTooltipToDescribedby]="ssoRequired"
-        [disabled]="ssoRequired"
+        [disabled]="ssoRequired || keykeeperLocationBlocks()"
       >
         {{ "continue" | i18n }}
       </button>
 
-      <div class="tw-text-center">{{ "or" | i18n }}</div>
+      <!-- Keykeeper: the extension's buttons go straight on, without "or" -->
+      @if (clientType !== ClientType.Browser) {
+        <div class="tw-text-center">{{ "or" | i18n }}</div>
+      }
 
       <!-- Button to Login with Passkey -->
       <ng-container *ngIf="isLoginWithPasskeySupported()">
@@ -56,25 +64,44 @@
           (click)="handleLoginWithPasskeyClick()"
           [bitTooltip]="ssoRequired ? ('yourOrganizationRequiresSingleSignOn' | i18n) : ''"
           [addTooltipToDescribedby]="ssoRequired"
-          [disabled]="ssoRequired"
+          [disabled]="ssoRequired || keykeeperLocationBlocks()"
         >
           <bit-icon name="bwi-passkey" class="tw-mr-1"></bit-icon>
-          {{ "logInWithPasskey" | i18n }}
+          {{
+            (clientType === ClientType.Browser ? "keykeeperSignInWithPasskey" : "logInWithPasskey")
+              | i18n
+          }}
         </button>
       </ng-container>
 
       <!-- Button to Login with SSO -->
-      <button
-        type="button"
-        bitButton
-        block
-        [buttonType]="ssoRequired ? 'primary' : 'secondary'"
-        data-testid="login-sso-button"
-        (click)="handleSsoClick()"
-      >
-        <bit-icon name="bwi-provider" class="tw-mr-1"></bit-icon>
-        {{ "useSingleSignOn" | i18n }}
-      </button>
+      <!-- Keykeeper: in the extension, a quiet link unless the organization requires it -->
+      @if (clientType === ClientType.Browser && !ssoRequired) {
+        <button
+          type="button"
+          bitLink
+          linkType="primary"
+          class="tw-justify-self-center tw-text-sm"
+          data-testid="login-sso-button"
+          [disabled]="keykeeperLocationBlocks()"
+          (click)="handleSsoClick()"
+        >
+          {{ "useSingleSignOn" | i18n }}
+        </button>
+      } @else {
+        <button
+          type="button"
+          bitButton
+          block
+          [buttonType]="ssoRequired ? 'primary' : 'secondary'"
+          data-testid="login-sso-button"
+          [disabled]="keykeeperLocationBlocks()"
+          (click)="handleSsoClick()"
+        >
+          <bit-icon name="bwi-provider" class="tw-mr-1"></bit-icon>
+          {{ "useSingleSignOn" | i18n }}
+        </button>
+      }
     </div>
   </div>
 

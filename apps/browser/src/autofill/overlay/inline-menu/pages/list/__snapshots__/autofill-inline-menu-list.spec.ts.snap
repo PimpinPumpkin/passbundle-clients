@@ -182,25 +182,16 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon"
+            class="cipher-icon keykeeper-tile keykeeper-tile-jewel"
+            data-category="identity"
+            style="--pb-jewel: #08788A; --pb-jewel-dark: #0A8599;"
           >
             <svg
               aria-hidden="true"
-              fill="none"
-              height="24"
               viewBox="0 0 24 24"
-              width="24"
-              xmlns="http://www.w3.org/2000/svg"
             >
               <path
-                d="M13.25 9.313c0-.518.42-.938.938-.938h3.124a.937.937 0 1 1 0 1.875h-3.125a.937.937 0 0 1-.937-.938Zm.938 2.188a.937.937 0 1 0 0 1.875h1.874a.938.938 0 0 0 0-1.875h-1.875ZM10.75 9.625a1.875 1.875 0 1 1-3.75 0 1.875 1.875 0 0 1 3.75 0ZM12 14.442c0-.387-.08-.769-.238-1.126-.157-.357-.387-.681-.677-.954s-.635-.49-1.014-.638a3.294 3.294 0 0 0-2.392 0c-.379.148-.724.365-1.014.638-.29.273-.52.597-.677.954-.157.357-.238.74-.238 1.126 0 .446.362.808.809.808h4.632a.809.809 0 0 0 .809-.808Z"
-                fill="#1B2029"
-              />
-              <path
-                clip-rule="evenodd"
-                d="M4.6 4A2.6 2.6 0 0 0 2 6.6v9.8A2.6 2.6 0 0 0 4.6 19h14.8a2.6 2.6 0 0 0 2.6-2.6V6.6A2.6 2.6 0 0 0 19.4 4H4.6Zm14.8 1.5H4.6a1.1 1.1 0 0 0-1.1 1.1v9.8a1.1 1.1 0 0 0 1.1 1.1h14.8a1.1 1.1 0 0 0 1.1-1.1V6.6a1.1 1.1 0 0 0-1.1-1.1Z"
-                fill="#1B2029"
-                fill-rule="evenodd"
+                d="M4 5h16v14H4Z M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z M5.5 16c.6-1.8 2-2.8 3.5-2.8s2.9 1 3.5 2.8 M14 9h4 M14 13h4"
               />
             </svg>
           </span>
@@ -301,9 +292,10 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon"
-            style="background-image: url(https://jest-testing-website.com/image.png);"
-          />
+            class="cipher-icon keykeeper-tile keykeeper-tile-letter"
+          >
+            W
+          </span>
           <span
             class="cipher-details"
           >
@@ -365,8 +357,10 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon bwi bw-icon"
-          />
+            class="cipher-icon keykeeper-tile keykeeper-tile-letter"
+          >
+            W
+          </span>
           <span
             class="cipher-details"
           >
@@ -427,8 +421,19 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon bwi bw-icon"
-          />
+            class="cipher-icon keykeeper-tile keykeeper-tile-jewel"
+            data-category="login"
+            style="--pb-jewel: #2448B8; --pb-jewel-dark: #2E55C9;"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+            >
+              <path
+                d="M8 14a4 4 0 1 1 3.87-5H21v3h-2v3h-3v-3h-4.13A4 4 0 0 1 8 14Z M7 10h.01"
+              />
+            </svg>
+          </span>
           <span
             class="cipher-details"
           />
@@ -477,23 +482,9 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon"
+            class="cipher-icon keykeeper-tile keykeeper-tile-letter"
           >
-            <svg
-              aria-hidden="true"
-              fill="none"
-              height="24"
-              viewBox="0 0 24 24"
-              width="24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                clip-rule="evenodd"
-                d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12s4.477 10 10 10 10-4.477 10-10Zm-7.806 6.4c-.825 1.65-1.688 2.1-2.194 2.1-.507 0-1.369-.45-2.194-2.1-.704-1.407-1.2-3.384-1.291-5.65h6.97c-.09 2.266-.587 4.243-1.291 5.65Zm1.291-7.15h-6.97c.09-2.266.587-4.243 1.291-5.65.825-1.65 1.688-2.1 2.194-2.1.507 0 1.369.45 2.194 2.1.704 1.407 1.2 3.384 1.291 5.65Zm1.501 1.5c-.108 2.928-.847 5.505-1.946 7.19a8.507 8.507 0 0 0 5.427-7.19h-3.48Zm3.481-1.5h-3.48c-.11-2.928-.848-5.505-1.947-7.19a8.507 8.507 0 0 1 5.427 7.19Zm-13.453 0c.108-2.928.847-5.505 1.946-7.19a8.507 8.507 0 0 0-5.427 7.19h3.48Zm-3.481 1.5a8.507 8.507 0 0 0 5.427 7.19c-1.099-1.685-1.838-4.262-1.946-7.19H3.533Z"
-                fill="#1B2029"
-                fill-rule="evenodd"
-              />
-            </svg>
+            W
           </span>
           <span
             class="cipher-details"
@@ -556,9 +547,10 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon"
-            style="background-image: url(https://jest-testing-website.com/image.png);"
-          />
+            class="cipher-icon keykeeper-tile keykeeper-tile-letter"
+          >
+            W
+          </span>
           <span
             class="cipher-details"
           >
@@ -620,9 +612,10 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon"
-            style="background-image: url(https://jest-testing-website.com/image.png);"
-          />
+            class="cipher-icon keykeeper-tile keykeeper-tile-letter"
+          >
+            W
+          </span>
           <span
             class="cipher-details"
           >
@@ -813,9 +806,10 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon"
-            style="background-image: url(https://jest-testing-website.com/image.png);"
-          />
+            class="cipher-icon keykeeper-tile keykeeper-tile-letter"
+          >
+            W
+          </span>
           <span
             class="cipher-details"
           >
@@ -877,8 +871,10 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon bwi bw-icon"
-          />
+            class="cipher-icon keykeeper-tile keykeeper-tile-letter"
+          >
+            W
+          </span>
           <span
             class="cipher-details"
           >
@@ -939,8 +935,19 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon bwi bw-icon"
-          />
+            class="cipher-icon keykeeper-tile keykeeper-tile-jewel"
+            data-category="login"
+            style="--pb-jewel: #2448B8; --pb-jewel-dark: #2E55C9;"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+            >
+              <path
+                d="M8 14a4 4 0 1 1 3.87-5H21v3h-2v3h-3v-3h-4.13A4 4 0 0 1 8 14Z M7 10h.01"
+              />
+            </svg>
+          </span>
           <span
             class="cipher-details"
           />
@@ -989,23 +996,9 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon"
+            class="cipher-icon keykeeper-tile keykeeper-tile-letter"
           >
-            <svg
-              aria-hidden="true"
-              fill="none"
-              height="24"
-              viewBox="0 0 24 24"
-              width="24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                clip-rule="evenodd"
-                d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12s4.477 10 10 10 10-4.477 10-10Zm-7.806 6.4c-.825 1.65-1.688 2.1-2.194 2.1-.507 0-1.369-.45-2.194-2.1-.704-1.407-1.2-3.384-1.291-5.65h6.97c-.09 2.266-.587 4.243-1.291 5.65Zm1.291-7.15h-6.97c.09-2.266.587-4.243 1.291-5.65.825-1.65 1.688-2.1 2.194-2.1.507 0 1.369.45 2.194 2.1.704 1.407 1.2 3.384 1.291 5.65Zm1.501 1.5c-.108 2.928-.847 5.505-1.946 7.19a8.507 8.507 0 0 0 5.427-7.19h-3.48Zm3.481-1.5h-3.48c-.11-2.928-.848-5.505-1.947-7.19a8.507 8.507 0 0 1 5.427 7.19Zm-13.453 0c.108-2.928.847-5.505 1.946-7.19a8.507 8.507 0 0 0-5.427 7.19h3.48Zm-3.481 1.5a8.507 8.507 0 0 0 5.427 7.19c-1.099-1.685-1.838-4.262-1.946-7.19H3.533Z"
-                fill="#1B2029"
-                fill-rule="evenodd"
-              />
-            </svg>
+            W
           </span>
           <span
             class="cipher-details"
@@ -1068,9 +1061,10 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon"
-            style="background-image: url(https://jest-testing-website.com/image.png);"
-          />
+            class="cipher-icon keykeeper-tile keykeeper-tile-letter"
+          >
+            W
+          </span>
           <span
             class="cipher-details"
           >
@@ -1132,9 +1126,10 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon"
-            style="background-image: url(https://jest-testing-website.com/image.png);"
-          />
+            class="cipher-icon keykeeper-tile keykeeper-tile-letter"
+          >
+            W
+          </span>
           <span
             class="cipher-details"
           >
@@ -1208,9 +1203,10 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon"
-            style="background-image: url(https://jest-testing-website.com/image.png);"
-          />
+            class="cipher-icon keykeeper-tile keykeeper-tile-letter"
+          >
+            W
+          </span>
           <span
             class="cipher-details"
           >
@@ -1272,8 +1268,10 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon bwi bw-icon"
-          />
+            class="cipher-icon keykeeper-tile keykeeper-tile-letter"
+          >
+            W
+          </span>
           <span
             class="cipher-details"
           >
@@ -1334,8 +1332,19 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon bwi bw-icon"
-          />
+            class="cipher-icon keykeeper-tile keykeeper-tile-jewel"
+            data-category="login"
+            style="--pb-jewel: #2448B8; --pb-jewel-dark: #2E55C9;"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+            >
+              <path
+                d="M8 14a4 4 0 1 1 3.87-5H21v3h-2v3h-3v-3h-4.13A4 4 0 0 1 8 14Z M7 10h.01"
+              />
+            </svg>
+          </span>
           <span
             class="cipher-details"
           />
@@ -1384,23 +1393,9 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon"
+            class="cipher-icon keykeeper-tile keykeeper-tile-letter"
           >
-            <svg
-              aria-hidden="true"
-              fill="none"
-              height="24"
-              viewBox="0 0 24 24"
-              width="24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                clip-rule="evenodd"
-                d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12s4.477 10 10 10 10-4.477 10-10Zm-7.806 6.4c-.825 1.65-1.688 2.1-2.194 2.1-.507 0-1.369-.45-2.194-2.1-.704-1.407-1.2-3.384-1.291-5.65h6.97c-.09 2.266-.587 4.243-1.291 5.65Zm1.291-7.15h-6.97c.09-2.266.587-4.243 1.291-5.65.825-1.65 1.688-2.1 2.194-2.1.507 0 1.369.45 2.194 2.1.704 1.407 1.2 3.384 1.291 5.65Zm1.501 1.5c-.108 2.928-.847 5.505-1.946 7.19a8.507 8.507 0 0 0 5.427-7.19h-3.48Zm3.481-1.5h-3.48c-.11-2.928-.848-5.505-1.947-7.19a8.507 8.507 0 0 1 5.427 7.19Zm-13.453 0c.108-2.928.847-5.505 1.946-7.19a8.507 8.507 0 0 0-5.427 7.19h3.48Zm-3.481 1.5a8.507 8.507 0 0 0 5.427 7.19c-1.099-1.685-1.838-4.262-1.946-7.19H3.533Z"
-                fill="#1B2029"
-                fill-rule="evenodd"
-              />
-            </svg>
+            W
           </span>
           <span
             class="cipher-details"
@@ -1463,9 +1458,10 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon"
-            style="background-image: url(https://jest-testing-website.com/image.png);"
-          />
+            class="cipher-icon keykeeper-tile keykeeper-tile-letter"
+          >
+            W
+          </span>
           <span
             class="cipher-details"
           >
@@ -1527,9 +1523,10 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon"
-            style="background-image: url(https://jest-testing-website.com/image.png);"
-          />
+            class="cipher-icon keykeeper-tile keykeeper-tile-letter"
+          >
+            W
+          </span>
           <span
             class="cipher-details"
           >
@@ -1606,9 +1603,10 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon"
-            style="background-image: url(https://jest-testing-website.com/image.png);"
-          />
+            class="cipher-icon keykeeper-tile keykeeper-tile-letter"
+          >
+            H
+          </span>
           <span
             class="cipher-details"
           >
@@ -1685,9 +1683,10 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon"
-            style="background-image: url(https://jest-testing-website.com/image.png);"
-          />
+            class="cipher-icon keykeeper-tile keykeeper-tile-letter"
+          >
+            H
+          </span>
           <span
             class="cipher-details"
           >
@@ -1764,9 +1763,10 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon"
-            style="background-image: url(https://jest-testing-website.com/image.png);"
-          />
+            class="cipher-icon keykeeper-tile keykeeper-tile-letter"
+          >
+            W
+          </span>
           <span
             class="cipher-details"
           >
@@ -1852,9 +1852,10 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon"
-            style="background-image: url(https://jest-testing-website.com/image.png);"
-          />
+            class="cipher-icon keykeeper-tile keykeeper-tile-letter"
+          >
+            W
+          </span>
           <span
             class="cipher-details"
           >
@@ -1916,9 +1917,10 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon"
-            style="background-image: url(https://jest-testing-website.com/image.png);"
-          />
+            class="cipher-icon keykeeper-tile keykeeper-tile-letter"
+          >
+            W
+          </span>
           <span
             class="cipher-details"
           >
@@ -1980,9 +1982,10 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
         >
           <span
             aria-hidden="true"
-            class="cipher-icon"
-            style="background-image: url(https://jest-testing-website.com/image.png);"
-          />
+            class="cipher-icon keykeeper-tile keykeeper-tile-letter"
+          >
+            W
+          </span>
           <span
             class="cipher-details"
           >

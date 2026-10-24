@@ -14,8 +14,8 @@ import {
 
 import { runInsideAngular } from "../../../../../platform/browser/run-inside-angular.operator";
 import { VaultPopupListFiltersService } from "../../../services/vault-popup-list-filters.service";
+import { KeykeeperCategoryChipsComponent } from "../keykeeper-category-chips/keykeeper-category-chips.component";
 import { VaultListFiltersComponent } from "../vault-list-filters/vault-list-filters.component";
-import { VaultSearchComponent } from "../vault-search/vault-search.component";
 
 // FIXME(https://bitwarden.atlassian.net/browse/CL-764): Migrate to OnPush
 // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
@@ -23,7 +23,7 @@ import { VaultSearchComponent } from "../vault-search/vault-search.component";
   selector: "app-vault-header",
   templateUrl: "vault-header.component.html",
   imports: [
-    VaultSearchComponent,
+    KeykeeperCategoryChipsComponent,
     VaultListFiltersComponent,
     DisclosureComponent,
     IconButtonModule,
@@ -37,16 +37,34 @@ export class VaultHeaderComponent {
   // eslint-disable-next-line @angular-eslint/prefer-signals
   @ViewChild(DisclosureComponent) disclosure: DisclosureComponent;
 
-  /** Emits the visibility status of the disclosure component. */
+  /**
+   * Emits the visibility status of the disclosure component. Keykeeper: closed
+   * until someone opens it, since the chips above the list do the most common
+   * filtering (by kind of item).
+   */
   protected isDisclosureShown$ = this.vaultPopupListFiltersService.filterVisibilityState$.pipe(
     runInsideAngular(inject(NgZone)), // Browser state updates can happen outside of `ngZone`
-    map((v) => v ?? true),
+    map((v) => v ?? false),
   );
 
   // Only use the first value to avoid an infinite loop from two-way binding
   protected initialDisclosureVisibility$ = this.isDisclosureShown$.pipe(take(1));
 
-  protected numberOfAppliedFilters$ = this.vaultPopupListFiltersService.numberOfAppliedFilters$;
+  /**
+   * Keykeeper: the filters behind the button, the ones besides the kind of
+   * item, which the chips show on their own.
+   */
+  protected numberOfAppliedFilters$ = this.vaultPopupListFiltersService.filters$.pipe(
+    map(
+      (filters) =>
+        [filters.organization, filters.collection, filters.folder].filter(Boolean).length,
+    ),
+  );
+
+  /** Keykeeper: the button shows only when there are vaults, collections, or folders to pick. */
+  protected hasMoreFilters$ = this.vaultPopupListFiltersService.allFilters$.pipe(
+    map((lists) => lists.some((list) => (list?.length ?? 0) > 0)),
+  );
 
   /** Emits true when the number of filters badge should be applied. */
   protected showBadge$ = combineLatest([

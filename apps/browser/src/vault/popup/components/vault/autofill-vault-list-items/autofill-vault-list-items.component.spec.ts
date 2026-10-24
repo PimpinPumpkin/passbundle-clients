@@ -22,6 +22,7 @@ import { VaultPopupAutofillService } from "../../../services/vault-popup-autofil
 import { VaultPopupItemsService } from "../../../services/vault-popup-items.service";
 import { PopupCipherViewLike } from "../../../views/popup-cipher.view";
 import { SimplifiedAutofillInfoComponent } from "../simplified-autofill-info/simplified-autofill-info.component";
+import { VaultListItemsContainerComponent } from "../vault-list-items-container/vault-list-items-container.component";
 
 import { AutofillVaultListItemsComponent } from "./autofill-vault-list-items.component";
 
@@ -33,6 +34,7 @@ describe("AutofillVaultListItemsComponent", () => {
   const autofillAllowed$ = new BehaviorSubject<boolean>(true);
   const currentTabIsOnBlocklist$ = new BehaviorSubject<boolean>(false);
   const clickItemsToAutofillVaultView$ = new BehaviorSubject<boolean>(true);
+  const currentAutofillTab$ = new BehaviorSubject<chrome.tabs.Tab | null>(null);
 
   beforeEach(async () => {
     // Mock getAnimations for all span elements before any components are created
@@ -56,7 +58,10 @@ describe("AutofillVaultListItemsComponent", () => {
         { provide: PlatformUtilsService, useValue: mock<PlatformUtilsService>() },
         { provide: ToastService, useValue: mock<ToastService>() },
         { provide: DialogService, useValue: mock<DialogService>() },
-        { provide: I18nService, useValue: { t: (key: string) => key } },
+        {
+          provide: I18nService,
+          useValue: { t: (key: string, ...args: string[]) => [key, ...args].join(" ") },
+        },
         { provide: CompactModeService, useValue: { enabled$: new BehaviorSubject(false) } },
         { provide: ConfigService, useValue: { getFeatureFlag$: () => new BehaviorSubject(true) } },
         {
@@ -80,7 +85,7 @@ describe("AutofillVaultListItemsComponent", () => {
             autofillAllowed$,
             currentTabIsOnBlocklist$,
             refreshCurrentTab: jest.fn(),
-            currentAutofillTab$: of(null),
+            currentAutofillTab$,
           },
         },
         {
@@ -145,6 +150,47 @@ describe("AutofillVaultListItemsComponent", () => {
 
       expect(reportLink()).toBeNull();
       hasFilterApplied$.next(false);
+    });
+  });
+
+  // Keykeeper: the section says which site it's for.
+  describe("title", () => {
+    const title = () =>
+      fixture.debugElement
+        .query(By.directive(VaultListItemsContainerComponent))
+        .componentInstance.title();
+
+    afterEach(() => {
+      currentAutofillTab$.next(null);
+      currentTabIsOnBlocklist$.next(false);
+    });
+
+    it("names the site in the current tab", async () => {
+      currentAutofillTab$.next({ url: "https://mail.contoso.example/sign-in" } as chrome.tabs.Tab);
+      autoFillCiphers$.next([{ type: CipherType.Login } as PopupCipherViewLike]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(title()).toBe("keykeeperForSite mail.contoso.example");
+    });
+
+    it("is upstream's without a website in the tab", async () => {
+      currentAutofillTab$.next({ url: "chrome://newtab/" } as chrome.tabs.Tab);
+      autoFillCiphers$.next([{ type: CipherType.Login } as PopupCipherViewLike]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(title()).toBe("autofillSuggestions");
+    });
+
+    it("is upstream's Item suggestions on a site on the blocklist", async () => {
+      currentAutofillTab$.next({ url: "https://blocked.example/" } as chrome.tabs.Tab);
+      currentTabIsOnBlocklist$.next(true);
+      autoFillCiphers$.next([{ type: CipherType.Login } as PopupCipherViewLike]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(title()).toBe("itemSuggestions");
     });
   });
 });

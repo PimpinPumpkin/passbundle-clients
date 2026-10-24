@@ -1,15 +1,21 @@
 <popup-page [hideOverflow]="showSkeletonsLoaders$ | async">
-  <popup-header slot="header" [pageTitle]="'vault' | i18n">
-    <ng-container slot="end">
-      <app-new-item-dropdown
-        [initialValues]="newItemItemValues$ | async"
-        [canCreateCipher]="(canCreateCipher$ | async) ?? true"
-      ></app-new-item-dropdown>
-
-      <app-pop-out></app-pop-out>
-      <app-current-account></app-current-account>
-    </ng-container>
-  </popup-header>
+  <!-- Keykeeper: the search and New on top, where the page's title was (DESIGN.md, "The look").
+       The title stays, for screen readers. -->
+  <header slot="header" data-keykeeper="vault-top" class="tw-flex tw-items-center tw-gap-2">
+    <h1 class="tw-sr-only">{{ "vault" | i18n }}</h1>
+    @if (vaultState !== VaultStateEnum.Empty) {
+      <app-vault-search class="tw-flex-1 tw-min-w-0"></app-vault-search>
+    } @else {
+      <span class="tw-flex-1"></span>
+    }
+    <app-new-item-dropdown
+      iconOnly
+      [initialValues]="newItemItemValues$ | async"
+      [canCreateCipher]="(canCreateCipher$ | async) ?? true"
+    ></app-new-item-dropdown>
+    <app-pop-out></app-pop-out>
+    <app-current-account></app-current-account>
+  </header>
 
   @if (vaultState === VaultStateEnum.Empty) {
     <vault-fade-in-out>

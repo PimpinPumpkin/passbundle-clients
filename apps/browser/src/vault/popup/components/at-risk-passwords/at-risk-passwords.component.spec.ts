@@ -24,7 +24,11 @@ import { EndUserNotificationService } from "@bitwarden/common/vault/notification
 import { NotificationView } from "@bitwarden/common/vault/notifications/models";
 import { SecurityTask, SecurityTaskType, TaskService } from "@bitwarden/common/vault/tasks";
 import { DialogService, ToastService } from "@bitwarden/components";
-import { PasswordRepromptService, AtRiskPasswordCalloutService } from "@bitwarden/vault";
+import {
+  PasswordRepromptService,
+  AtRiskPasswordCalloutService,
+  KeykeeperItemTileComponent,
+} from "@bitwarden/vault";
 
 import { PopupHeaderComponent } from "../../../../platform/popup/layout/popup-header.component";
 import { PopupPageComponent } from "../../../../platform/popup/layout/popup-page.component";
@@ -60,6 +64,16 @@ class MockPopupPageComponent {
 // FIXME(https://bitwarden.atlassian.net/browse/PM-28231): Use Component suffix
 // eslint-disable-next-line @angular-eslint/component-class-suffix
 class MockAppIcon {
+  readonly cipher = input<CipherView | undefined>(undefined);
+}
+
+// Keykeeper: the list shows the item's tile.
+@Component({
+  selector: "vault-keykeeper-item-tile",
+  template: "",
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class MockItemTileComponent {
   readonly cipher = input<CipherView | undefined>(undefined);
 }
 
@@ -185,11 +199,11 @@ describe("AtRiskPasswordsComponent", () => {
       })
       .overrideComponent(AtRiskPasswordsComponent, {
         remove: {
-          imports: [PopupHeaderComponent, PopupPageComponent],
+          imports: [PopupHeaderComponent, PopupPageComponent, KeykeeperItemTileComponent],
           providers: [AtRiskPasswordPageService, DialogService],
         },
         add: {
-          imports: [MockPopupHeaderComponent, MockPopupPageComponent],
+          imports: [MockPopupHeaderComponent, MockPopupPageComponent, MockItemTileComponent],
           providers: [
             { provide: AtRiskPasswordPageService, useValue: mockAtRiskPasswordPageService },
             { provide: ChangeLoginPasswordService, useValue: mockChangeLoginPasswordService },

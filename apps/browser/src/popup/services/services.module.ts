@@ -8,6 +8,7 @@ import { DeviceManagementComponentServiceAbstraction } from "@bitwarden/angular/
 import { LoginViaWebAuthnComponentService } from "@bitwarden/angular/auth/login-via-webauthn/login-via-webauthn-component.service";
 import { ChangePasswordService } from "@bitwarden/angular/auth/password-management/change-password";
 import { AngularThemingService } from "@bitwarden/angular/platform/services/theming/angular-theming.service";
+import { AbstractThemingService } from "@bitwarden/angular/platform/services/theming/theming.service.abstraction";
 import { SafeProvider, safeProvider } from "@bitwarden/angular/platform/utils/safe-provider";
 import { ViewCacheService } from "@bitwarden/angular/platform/view-cache";
 import {
@@ -145,6 +146,7 @@ import { WindowStorageService } from "@bitwarden/common/platform/storage/window-
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { SystemNotificationsService } from "@bitwarden/common/platform/system-notifications/system-notifications.service";
 import { UnsupportedSystemNotificationsService } from "@bitwarden/common/platform/system-notifications/unsupported-system-notifications.service";
+import { ThemeStateService } from "@bitwarden/common/platform/theming/theme-state.service";
 import { SendApiService } from "@bitwarden/common/tools/send/services/send-api.service.abstraction";
 import { InternalSendService } from "@bitwarden/common/tools/send/services/send.service.abstraction";
 import { CipherArchiveService } from "@bitwarden/common/vault/abstractions/cipher-archive.service";
@@ -207,6 +209,7 @@ import { ExtensionLockComponentService } from "../../key-management/lock/service
 import { BrowserSessionTimeoutSettingsComponentService } from "../../key-management/session-timeout/services/browser-session-timeout-settings-component.service";
 import { BrowserSessionTimeoutTypeService } from "../../key-management/session-timeout/services/browser-session-timeout-type.service";
 import { ForegroundVaultTimeoutService } from "../../key-management/vault-timeout/foreground-vault-timeout.service";
+import { KeykeeperPopupThemingService } from "../../keykeeper/popup/popup-theming.service";
 import { BrowserActionsService } from "../../platform/actions/browser-actions.service";
 import { BrowserApi } from "../../platform/browser/browser-api";
 import { runInsideAngular } from "../../platform/browser/run-inside-angular.operator";
@@ -523,6 +526,12 @@ const safeProviders: SafeProvider[] = [
       }
     },
     deps: [PlatformUtilsService],
+  }),
+  // Keykeeper: the popup's look has no Glass (keykeeper/popup/popup-theming.service.ts).
+  safeProvider({
+    provide: AbstractThemingService,
+    useClass: KeykeeperPopupThemingService,
+    deps: [ThemeStateService, SYSTEM_THEME_OBSERVABLE],
   }),
   safeProvider({
     provide: DerivedStateProvider,
