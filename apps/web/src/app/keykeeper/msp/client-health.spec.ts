@@ -5,7 +5,7 @@ import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
 
 import {
   clientHealth,
-  clientPasswords,
+  clientItemsToCheck,
   expiringItems,
   StrengthScorer,
   usernameHints,
@@ -121,7 +121,7 @@ describe("MSP client health", () => {
     expect(health.get("baker")!.toFix.map((i) => i.name)).toEqual(["baker password1"]);
   });
 
-  it("checks each password once across every client, and only passwords staff may see", () => {
+  it("checks the passwords staff may see, in every client and nowhere else", () => {
     const hidden = login("acme", "hidden-one");
     hidden.viewPassword = false;
     const ciphers = [
@@ -132,7 +132,7 @@ describe("MSP client health", () => {
       hidden,
     ];
 
-    expect(clientPasswords(ciphers, ["acme", "baker"]).sort()).toEqual(["other", "password1"]);
+    expect(clientItemsToCheck(ciphers, ["acme", "baker"])).toEqual(ciphers.slice(0, 3));
   });
 
   it("gives the scorer the username's parts as hints, as upstream's weak passwords report does", () => {

@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, signal } from "@angular/core";
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  OnInit,
+  computed,
+  inject,
+  signal,
+} from "@angular/core";
 import { FormBuilder, Validators } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { firstValueFrom } from "rxjs";
@@ -8,11 +16,10 @@ import {
   InstallCommandParts,
   installCommand,
 } from "@bitwarden/admin-console/common";
-import { AuditService } from "@bitwarden/common/abstractions/audit.service";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
-import { checkPasswords } from "@bitwarden/common/dirt/keykeeper/pwned-passwords";
+import { PwnedPasswordsCancelledError } from "@bitwarden/common/dirt/keykeeper/pwned-passwords";
 import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
@@ -35,12 +42,13 @@ import {
 import { HeaderModule } from "../../layouts/header/header.module";
 import { SharedModule } from "../../shared";
 import { KeykeeperBreachCheckSetting } from "../health/breach-check-setting.service";
+import { KeykeeperExposureChecks } from "../health/exposure-checks.service";
 import { KeykeeperJoinSealer } from "../joining/join-sealer.service";
 
 import {
   ClientHealth,
   clientHealth,
-  clientPasswords,
+  clientItemsToCheck,
   ExpiringItem,
   expiringItems,
   ItemToFix,
@@ -174,7 +182,7 @@ const CLIENT_FEATURES = {
                 data-testid="msp-exposed-unchecked"
               >
                 <p>
-                  {{ check.unchecked === 1 ? "1 password" : check.unchecked + " passwords" }}
+                  {{ itemCount(check.unchecked) }}
                   couldn't be checked against known breaches: this browser couldn't reach
                   api.pwnedpasswords.com. It may be offline, or a firewall may block it. Weak and
                   reused counts don't need it and are up to date.
@@ -425,10 +433,9 @@ const CLIENT_FEATURES = {
                 the first 5 characters of each password's SHA-1 hash leave this browser, and the
                 match is made here.
               </p>
-              @if (details?.unchecked) {
+              @if (details?.unchecked && details!.toFix.length > 0) {
                 <p bitTypography="body2" data-testid="msp-health-unchecked">
-                  {{ details!.unchecked === 1 ? "1 password" : details!.unchecked + " passwords" }}
-                  couldn't be checked against known breaches.
+                  {{ itemCount(details!.unchecked) }} couldn't be checked for breaches.
                 </p>
               }
               @if (details == null) {
@@ -439,6 +446,9 @@ const CLIENT_FEATURES = {
                     Nothing weak or reused. Exposed passwords aren't checked yet.
                   } @else if (details.exposed === undefined) {
                     Nothing weak or reused so far. Still checking for exposed passwords.
+                  } @else if (details.unchecked > 0) {
+                    Nothing weak or reused; {{ itemCount(details.unchecked) }} couldn't be checked
+                    for breaches.
                   } @else {
                     Nothing to fix.
                   }
@@ -868,8 +878,14 @@ export class KeykeeperMspComponent implements OnInit {
   protected readonly detailsFor = signal<MspClient | null>(null);
   protected readonly exposedTitle =
     "Passwords found in known data breaches. Only the first 5 characters of each password's SHA-1 hash leave this browser.";
-  /** The newest health computation; an older one that finishes later is dropped. */
-  private readonly healthRuns = { latest: 0 };
+  /**
+   * The newest health computation. Starting another, or leaving the console,
+   * calls it off, with the breach checks it's still waiting on.
+   */
+  private readonly healthRuns: { latest: AbortController | null } = { latest: null };
+  private readonly stopHealthOnLeave = inject(DestroyRef).onDestroy(() =>
+    this.healthRuns.latest?.abort(),
+  );
   /** Expired and soon-expiring items across the clients, from the same items. */
   protected readonly expiring = signal<ExpiringItem[] | null>(null);
   protected readonly installFor = signal<{
@@ -913,7 +929,7 @@ export class KeykeeperMspComponent implements OnInit {
     private readonly accountService: AccountService,
     private readonly cipherService: CipherService,
     private readonly passwordStrengthService: PasswordStrengthServiceAbstraction,
-    private readonly auditService: AuditService,
+    private readonly exposureChecks: KeykeeperExposureChecks,
     private readonly breachCheck: KeykeeperBreachCheckSetting,
     private readonly syncService: SyncService,
     private readonly route: ActivatedRoute,
@@ -1288,13 +1304,15 @@ export class KeykeeperMspComponent implements OnInit {
   }
 
   private async computeHealth(msp: MspDetails) {
-    const run = ++this.healthRuns.latest;
+    this.healthRuns.latest?.abort();
+    const run = new AbortController();
+    this.healthRuns.latest = run;
     try {
       // Picks up items added elsewhere, such as in a client's admin console.
       await this.syncService.fullSync(false);
       const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
       const ciphers = await this.cipherService.getAllDecrypted(userId);
-      if (run !== this.healthRuns.latest) {
+      if (run.signal.aborted) {
         return;
       }
       this.templateNames.set(
@@ -1328,37 +1346,59 @@ export class KeykeeperMspComponent implements OnInit {
       // Weak and reused first; exposed follows when the breach check is done.
       this.health.set(clientHealth(ciphers, clientIds, score));
       // With checking after unlocking off, nothing goes to the breach service
-      // until the person asks.
-      if (
-        !this.exposedAsked() &&
-        !(await firstValueFrom(this.breachCheck.activeChecksAfterUnlock$))
-      ) {
-        if (run === this.healthRuns.latest) {
+      // until the person asks. Automatic checks read the setting again just
+      // before each request, so one turned off meanwhile sends nothing more.
+      const automatic = !this.exposedAsked();
+      const mayAsk = () => firstValueFrom(this.breachCheck.activeChecksAfterUnlock$);
+      if (automatic && !(await mayAsk())) {
+        if (!run.signal.aborted) {
           this.exposedCheck.set({ state: "off" });
         }
         return;
       }
 
-      // Each different password once, across every client, through the one
-      // k-anonymity client (only 5 characters of each hash are sent).
-      const exposed = await checkPasswords(
-        clientPasswords(ciphers, clientIds),
-        (password) => this.auditService.passwordLeaked(password),
-        (checked, total) => {
-          if (run === this.healthRuns.latest) {
-            this.exposedCheck.set({ state: "checking", checked, total });
+      // Each different password once, across every client, in random order,
+      // through the one k-anonymity client (only 5 characters of each hash
+      // are sent).
+      let exposed: Map<string, number | null>;
+      try {
+        exposed = await this.exposureChecks.check(clientItemsToCheck(ciphers, clientIds), {
+          signal: run.signal,
+          mayAsk: automatic ? mayAsk : undefined,
+          progress: (checked, total) => {
+            if (!run.signal.aborted) {
+              this.exposedCheck.set({ state: "checking", checked, total });
+            }
+          },
+        });
+      } catch (e) {
+        if (e instanceof PwnedPasswordsCancelledError) {
+          // Turned off meanwhile; a newer run or leaving says nothing.
+          if (!run.signal.aborted) {
+            this.exposedCheck.set({ state: "off" });
           }
-        },
-      );
-      if (run !== this.healthRuns.latest) {
+          return;
+        }
+        throw e;
+      }
+      if (run.signal.aborted) {
         return;
       }
-      this.health.set(clientHealth(ciphers, clientIds, score, new Date(), exposed));
-      const unchecked = [...exposed.values()].filter((count) => count === null).length;
+      const health = clientHealth(ciphers, clientIds, score, new Date(), exposed);
+      this.health.set(health);
+      // Items, as everywhere else that counts what couldn't be checked.
+      const unchecked = [...health.values()].reduce((sum, client) => sum + client.unchecked, 0);
       this.exposedCheck.set({ state: "done", unchecked });
     } catch (e) {
-      this.showError(e);
+      if (!run.signal.aborted) {
+        this.showError(e);
+      }
     }
+  }
+
+  /** "1 item" or "N items": what couldn't be checked is counted in items everywhere. */
+  protected itemCount(count: number): string {
+    return count === 1 ? "1 item" : `${count} items`;
   }
 
   /** Checks for exposed passwords when the person's setting doesn't on its own. */
@@ -1440,7 +1480,7 @@ export class KeykeeperMspComponent implements OnInit {
       health.exposed !== undefined ? null : off ? "Checking after unlocking is off" : "Checking";
     if (health.unchecked > 0) {
       exposed = health.exposed ? `${health.exposed}+` : "Couldn't check";
-      exposedNote = `${health.unchecked === 1 ? "1 password" : `${health.unchecked} passwords`} couldn't be checked`;
+      exposedNote = `${this.itemCount(health.unchecked)} couldn't be checked for breaches`;
     }
     return { ...health, exposed, exposedNote };
   }

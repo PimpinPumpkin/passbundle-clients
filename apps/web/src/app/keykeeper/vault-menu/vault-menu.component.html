@@ -30,18 +30,26 @@
   [closeOnBackdropClick]="false"
   [spotlight]="true"
 >
-  <!-- Keykeeper: items to fix (weak, reused, or exposed), once worked out. -->
-  @if (healthCount(); as count) {
+  <!-- Keykeeper: items to fix (weak, reused, or exposed), once worked out,
+       and a sign when the breach check couldn't be made. -->
+  @if (healthPill(); as pill) {
     <a
       slot="end"
       class="keykeeper-menu-alert tw-no-underline"
       routerLink="/reports"
       tabindex="-1"
       data-testid="keykeeper-health-count"
-      [title]="'keykeeperHealthToFix' | i18n: count"
-      [attr.aria-label]="'keykeeperHealthToFix' | i18n: count"
-      >{{ count }}</a
-    >
+      [title]="pill.label"
+      [attr.aria-label]="pill.label"
+      >{{ pill.text }}
+      @if (pill.couldntCheck) {
+        <bit-icon
+          name="bwi-exclamation-triangle"
+          class="tw-text-[0.625rem]"
+          data-testid="keykeeper-health-unchecked"
+        />
+      }
+    </a>
   }
 </bit-nav-item>
 <app-coachmark #reportsCoachmark stepId="monitorSecurity" />

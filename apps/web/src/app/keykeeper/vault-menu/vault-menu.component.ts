@@ -119,7 +119,11 @@ export function isVaultUrl(router: Router): boolean {
     }
     /* Health's count of items to fix: a pill, so it reads as something to do. */
     app-keykeeper-vault-menu .keykeeper-menu-alert {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.125rem;
       min-width: 1.25rem;
+      justify-content: center;
       padding: 0 0.4rem;
       border-radius: 999px;
       text-align: center;
@@ -196,6 +200,28 @@ export class KeykeeperVaultMenuComponent extends VaultFilterComponent implements
   /** How many items Health asks to fix, beside it; worked out after unlocking, never blocking. */
   protected readonly healthCount = toSignal(inject(KeykeeperHealthCountService).count$, {
     initialValue: undefined,
+  });
+  /** The pill beside Health: how many to fix, and whether the breach check couldn't be made. */
+  protected readonly healthPill = computed(() => {
+    const count = this.healthCount();
+    if (count == null || (count.toFix === 0 && !count.couldntCheck)) {
+      return undefined;
+    }
+    const label = [
+      count.toFix === 1
+        ? this.i18nService.t("keykeeperHealthToFixOne")
+        : count.toFix > 1
+          ? this.i18nService.t("keykeeperHealthToFix", String(count.toFix))
+          : "",
+      count.couldntCheck ? this.i18nService.t("keykeeperHealthCouldntCheck") : "",
+    ]
+      .filter((part) => part !== "")
+      .join(". ");
+    return {
+      text: count.toFix > 0 ? String(count.toFix) : "",
+      couldntCheck: count.couldntCheck,
+      label,
+    };
   });
 
   protected readonly organizationOptions = OrganizationOptionsComponent;

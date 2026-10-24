@@ -4,7 +4,7 @@
 // and exposed, are the same rules as the Health reports'
 // (libs/common/src/dirt/keykeeper/password-health.ts), with reuse counted
 // within each client. Exposed comes from the k-anonymity breach check
-// (pwned-passwords.ts), whose results come in by password.
+// (pwned-passwords.ts), whose results come in by password, for one run.
 
 import {
   checksPassword,
@@ -55,16 +55,10 @@ function isClientItem(cipher: CipherView, clients: Set<string>): boolean {
   return cipher.organizationId != null && clients.has(cipher.organizationId) && !cipher.isDeleted;
 }
 
-/** Every password the console checks for breaches, across the clients. Each one once. */
-export function clientPasswords(ciphers: CipherView[], organizationIds: string[]): string[] {
+/** The items whose passwords the console checks for breaches, across the clients. */
+export function clientItemsToCheck(ciphers: CipherView[], organizationIds: string[]): CipherView[] {
   const clients = new Set(organizationIds);
-  return [
-    ...new Set(
-      ciphers
-        .filter((cipher) => isClientItem(cipher, clients) && checksPassword(cipher, false))
-        .map((cipher) => cipher.login.password),
-    ),
-  ];
+  return ciphers.filter((cipher) => isClientItem(cipher, clients) && checksPassword(cipher, false));
 }
 
 const problemCount = (item: ItemToFix) =>
