@@ -119,6 +119,11 @@ export const EventCategoryEventTypes: Record<EventCategory, EventType[]> = {
     EventType.Organization_CollectionManagement_LimitItemDeletionDisabled,
     EventType.Organization_CollectionManagement_AllowAdminAccessToAllCollectionItemsEnabled,
     EventType.Organization_CollectionManagement_AllowAdminAccessToAllCollectionItemsDisabled,
+    // Keykeeper: event streaming.
+    EventType.Keykeeper_EventStreamAdded,
+    EventType.Keykeeper_EventStreamChanged,
+    EventType.Keykeeper_EventStreamRemoved,
+    EventType.Keykeeper_EventStreamStopped,
   ],
   [EventCategory.ProviderEvents]: [
     EventType.ProviderUser_Invited,

@@ -62,6 +62,12 @@
         route="reporting/events"
         *ngIf="organization.canAccessEventLogs || organization.isOwner"
       ></bit-nav-item>
+      <!-- Keykeeper: where the organization's events are sent. -->
+      <bit-nav-item
+        [text]="'keykeeperEventStreaming' | i18n"
+        route="reporting/event-streaming"
+        *ngIf="organization.isAdmin"
+      ></bit-nav-item>
       <bit-nav-item
         [text]="'reports' | i18n"
         route="reporting/reports"

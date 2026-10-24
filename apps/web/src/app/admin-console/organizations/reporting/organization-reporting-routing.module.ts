@@ -107,6 +107,20 @@ const routes: Routes = [
           titleId: "eventLogs",
         },
       },
+      // Keykeeper: where the organization's events are sent (DESIGN.md,
+      // "Sending events to security tools"). Owners and admins; the server
+      // also turns away an MSP's technicians, and the page says so.
+      {
+        path: "event-streaming",
+        loadComponent: () =>
+          import("../../../keykeeper/event-streaming/org-event-streaming.component").then(
+            (m) => m.KeykeeperOrgEventStreamingComponent,
+          ),
+        canActivate: [organizationPermissionsGuard((org) => org.isAdmin)],
+        data: {
+          titleId: "keykeeperEventStreaming",
+        },
+      },
     ],
   },
 ];
