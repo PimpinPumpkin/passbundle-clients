@@ -12,7 +12,8 @@ import {
   ViewChild,
 } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
-import { firstValueFrom, Observable } from "rxjs";
+import { ActivatedRoute } from "@angular/router";
+import { firstValueFrom, map, Observable, of } from "rxjs";
 
 import { CollectionView } from "@bitwarden/common/admin-console/models/collections";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
@@ -48,11 +49,29 @@ import { RowHeightClass } from "./vault-items.component";
   selector: "tr[appVaultCipherRow]",
   templateUrl: "vault-cipher-row.component.html",
   standalone: false,
-  host: { class: "tw-group/cipher-row" },
+  host: {
+    class: "tw-group/cipher-row",
+    "[attr.data-keykeeper-open]": "keykeeperOpen ? '' : null",
+  },
 })
 export class VaultCipherRowComponent<C extends CipherViewLike> implements OnInit {
   private readonly vfo1TerminologyService = inject(Vfo1TerminologyService);
   private readonly vaultCopyButtonsService = inject(VaultCopyButtonsService);
+
+  /**
+   * Keykeeper: the item open in the side panel (or a dialog) is in the
+   * address while it's open, so its row shows raised (brand/look.css).
+   */
+  private readonly openItemId = toSignal(
+    inject(ActivatedRoute, { optional: true })?.queryParamMap.pipe(
+      map((params) => params.get("itemId") ?? params.get("cipherId")),
+    ) ?? of(null),
+    { initialValue: null },
+  );
+  protected get keykeeperOpen(): boolean {
+    const open = this.openItemId();
+    return open != null && open === this.cipher?.id;
+  }
 
   private readonly quickCopyIconFeatureFlag = toSignal(
     this.configService.getFeatureFlag$(FeatureFlag.PM40435_QuickCopyIconSetting),

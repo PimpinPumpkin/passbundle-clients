@@ -231,8 +231,8 @@
   "keykeeperBiometricsNotEnrolled": {
     "message": "Unlock with biometrics is still off. It wasn't confirmed, or the desktop app isn't running."
   },
-  "keykeeperThemeGlass": {
-    "message": "Glass (default)"
+  "keykeeperThemeSystem": {
+    "message": "System default"
   },
   "keykeeperSearchAllItems": {
     "message": "Search all items"

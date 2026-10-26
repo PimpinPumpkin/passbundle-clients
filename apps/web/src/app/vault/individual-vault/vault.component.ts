@@ -127,6 +127,7 @@ import {
   VaultItem,
   VaultItemDialogComponent,
   VaultItemDialogMode,
+  VaultItemDialogParams,
   VaultItemDialogResult,
   VaultItemsTransferService,
   VaultOrganizationUserNotificationsComponent,
@@ -229,6 +230,20 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
   private destroy$ = new Subject<void>();
 
   private vaultItemDialogRef?: DialogRef<VaultItemDialogResult> | undefined;
+  /**
+   * Keykeeper: the side panel, kept apart from a dialog over it, and the item
+   * it shows. Whether that item is being edited is the panel's own state
+   * (VaultItemDialogComponent), never a guess from the address.
+   */
+  private panelRef?: DialogRef<VaultItemDialogResult, VaultItemDialogComponent>;
+  private panelItemId?: string;
+  /**
+   * Keykeeper: the item on its way into the panel (being decrypted, or asking
+   * for the master password), so the address naming it doesn't open it twice.
+   */
+  private panelOpeningId?: string;
+  /** Keykeeper: the page is gone (the panel closes when another page opens). */
+  private destroyed = false;
 
   protected showAddCipherBtn: boolean = false;
 
@@ -389,7 +404,9 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
         if (params.action === "clone") {
           await this.cloneCipher(cipherView);
         } else if (params.action === "view") {
-          await this.viewCipher(cipherView);
+          // Keykeeper: the item opens in the side panel beside the list, so
+          // the list loads now rather than once the panel closes.
+          void this.viewCipher(cipherView).catch((e) => this.logService.error(e));
         } else if (params.action === "edit") {
           await this.editCipher(cipherView);
         }
@@ -543,7 +560,8 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
       .pipe(
         switchMap(() => this.route.queryParams),
         // Only process the queryParams if the dialog is not open
-        filter(() => this.vaultItemDialogRef == undefined),
+        // Keykeeper: or the side panel is, showing another item than these name.
+        filter((params) => this.canOpenFromAddress(params)),
         switchMap(async (params) => {
           const cipherId = getCipherIdFromParams(params);
           if (cipherId) {
@@ -670,6 +688,7 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
   }
 
   ngOnDestroy() {
+    this.destroyed = true;
     this.broadcasterService.unsubscribe(BroadcasterSubscriptionId);
     this.destroy$.next();
     this.destroy$.complete();
@@ -978,12 +997,19 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
     formConfig: CipherFormConfig,
     activeCollectionId?: CollectionId,
   ) {
-    this.vaultItemDialogRef = VaultItemDialogComponent.open(this.dialogService, {
-      mode,
-      formConfig,
-      activeCollectionId,
-      restore: this.restore,
-    });
+    const params = { mode, formConfig, activeCollectionId, restore: this.restore };
+    // Keykeeper: an item opens to view in the side panel beside the list
+    // (DESIGN.md, "The look"), and picking another row shows that one there.
+    if (mode === "view") {
+      return this.openItemPanel(params);
+    }
+    // A new item, or one opened to edit, opens in a dialog, as before. The
+    // panel closes first, unless its item has unsaved edits: those stay in
+    // the panel under the dialog, each with a form of its own.
+    if (this.panelRef != null && !this.panelRef.componentInstance?.keykeeperHasUnsavedEdits) {
+      await this.panelRef.close();
+    }
+    this.vaultItemDialogRef = VaultItemDialogComponent.open(this.dialogService, params);
 
     const result = await lastValueFrom(this.vaultItemDialogRef.closed);
     this.vaultItemDialogRef = undefined;
@@ -999,11 +1025,101 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
       this.refresh();
     }
 
+    // Keykeeper: with the panel still open beside it, the address names the
+    // panel's item again.
+    if (this.panelRef != null && this.panelItemId != null) {
+      await this.showPanelInAddress();
+      return;
+    }
+
     // Clear the query params when the dialog closes
     await this.go(
       { cipherId: null, itemId: null, action: null },
       this.configureRouterFocusToCipher(formConfig.originalCipher?.id),
     );
+  }
+
+  /**
+   * Keykeeper: opens an item to view in the side panel, in place of the one
+   * it shows. If that one has unsaved edits, the panel asks first (its close
+   * guard); going back to editing leaves it as it was.
+   */
+  private async openItemPanel(params: VaultItemDialogParams) {
+    const shownId = params.formConfig.originalCipher?.id;
+    const ref = await VaultItemDialogComponent.openDrawer(this.dialogService, params, {
+      closeOnNavigation: true,
+    });
+    if (ref == null) {
+      await this.showPanelInAddress();
+      return;
+    }
+    this.panelRef = ref as DialogRef<VaultItemDialogResult, VaultItemDialogComponent>;
+    this.panelItemId = shownId;
+    if (this.panelOpeningId === shownId) {
+      this.panelOpeningId = undefined;
+    }
+
+    const result = await lastValueFrom(ref.closed);
+    if (this.panelRef === ref) {
+      this.panelRef = undefined;
+      this.panelItemId = undefined;
+    }
+
+    if (result === VaultItemDialogResult.PremiumUpgrade) {
+      return;
+    }
+    if (result === VaultItemDialogResult.Deleted || result === VaultItemDialogResult.Saved) {
+      this.refresh();
+    }
+
+    // The panel closed because another page opened, or another row's item
+    // took its place, or a dialog that took its place names its own item.
+    if (this.destroyed || this.vaultItemDialogRef != null) {
+      return;
+    }
+    const inAddress = getCipherIdFromParams(this.route.snapshot?.queryParams ?? {});
+    if (inAddress != null && inAddress !== shownId) {
+      return;
+    }
+
+    await this.go(
+      { cipherId: null, itemId: null, action: null },
+      this.configureRouterFocusToCipher(shownId),
+    );
+  }
+
+  /** Keykeeper: puts the panel's item, to view or to edit, back in the address. */
+  private async showPanelInAddress() {
+    if (this.destroyed || this.panelRef == null || this.panelItemId == null) {
+      return;
+    }
+    await this.go({
+      cipherId: null,
+      itemId: this.panelItemId,
+      action: this.panelRef.componentInstance?.keykeeperEditing ? "edit" : "view",
+    });
+  }
+
+  /**
+   * Keykeeper: whether the address may open the item it names: when nothing
+   * is open, as upstream has it, or when the side panel shows another item.
+   * A dialog is modal, as upstream has it. The panel's own address (its item,
+   * to view or to edit) opens nothing; another item takes the panel's place,
+   * and the panel asks first if its item has unsaved edits.
+   */
+  private canOpenFromAddress(params: Params): boolean {
+    if (this.vaultItemDialogRef != null) {
+      return false;
+    }
+    const id = getCipherIdFromParams(params);
+    // On its way into the panel already (a link opens it as the page starts).
+    if (id != null && id === this.panelOpeningId) {
+      return false;
+    }
+    if (this.panelRef == null) {
+      return true;
+    }
+    return id != null && id !== this.panelItemId;
   }
 
   /**
@@ -1183,6 +1299,18 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
    * @returns Promise<void>
    */
   async viewCipherById(id: string) {
+    // Keykeeper: on its way into the side panel until it's there or isn't coming.
+    this.panelOpeningId = id;
+    try {
+      await this.viewCipherByIdInPanel(id);
+    } finally {
+      if (this.panelOpeningId === id) {
+        this.panelOpeningId = undefined;
+      }
+    }
+  }
+
+  private async viewCipherByIdInPanel(id: string) {
     const activeUserId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
     const cipher = await this.cipherService.get(id, activeUserId);
     if (!cipher) {
@@ -1197,6 +1325,11 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
       !(await this.passwordRepromptService.showPasswordPrompt())
     ) {
       // Didn't pass password prompt, so don't open add / edit modal.
+      // Keykeeper: the panel's item, if it shows one, is the address's again.
+      if (this.panelRef != null) {
+        await this.showPanelInAddress();
+        return;
+      }
       await this.go(
         { cipherId: null, itemId: null, action: null },
         this.configureRouterFocusToCipher(cipher.id),

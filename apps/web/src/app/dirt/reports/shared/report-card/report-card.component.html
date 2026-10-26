@@ -3,14 +3,25 @@
   [routerLink]="route"
 >
   <bit-base-card class="tw-relative tw-overflow-hidden tw-h-full">
-    <div
-      class="tw-flex tw-h-28 tw-bg-background-alt2 tw-text-center tw-text-primary-300"
-      [ngClass]="{ 'tw-grayscale': disabled }"
-    >
-      <div class="tw-m-auto tw-size-20 tw-content-center">
-        <bit-svg [content]="icon" aria-hidden="true" class="tw-h-full"></bit-svg>
+    <!-- Keykeeper: the report's jewel tile, as in the menu and the list (DESIGN.md, "The look") -->
+    @if (keykeeperTile; as tile) {
+      <div
+        class="tw-px-4 tw-pt-5"
+        data-keykeeper="report-tile"
+        [ngClass]="{ 'tw-grayscale': disabled }"
+      >
+        <vault-keykeeper-category-tile [look]="tile" [size]="44" />
       </div>
-    </div>
+    } @else {
+      <div
+        class="tw-flex tw-h-28 tw-bg-background-alt2 tw-text-center tw-text-primary-300"
+        [ngClass]="{ 'tw-grayscale': disabled }"
+      >
+        <div class="tw-m-auto tw-size-20 tw-content-center">
+          <bit-svg [content]="icon" aria-hidden="true" class="tw-h-full"></bit-svg>
+        </div>
+      </div>
+    }
     <bit-card-content [ngClass]="{ 'tw-grayscale': disabled }">
       <h3 class="tw-mb-4 tw-text-xl tw-font-medium">{{ title }}</h3>
       <p class="tw-mb-0">{{ description }}</p>

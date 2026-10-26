@@ -45,6 +45,7 @@
   @if (keykeeperHero()) {
     <vault-keykeeper-item-hero
       [cipher]="cipher()"
+      [headingLevel]="keykeeperHeroHeading()"
       [organization]="organization()"
       [collections]="resolvedCollections()"
       [folder]="folder()"

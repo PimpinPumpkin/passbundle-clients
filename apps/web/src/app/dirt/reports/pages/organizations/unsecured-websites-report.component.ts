@@ -16,6 +16,7 @@ import { CipherViewLikeUtils } from "@bitwarden/common/vault/utils/cipher-view-l
 import { BerryComponent, ChipFilterComponent, DialogService } from "@bitwarden/components";
 import {
   CipherFormConfigService,
+  KeykeeperItemTileComponent,
   PasswordRepromptService,
   RoutedVaultFilterBridgeService,
   RoutedVaultFilterService,
@@ -44,6 +45,7 @@ import { UnsecuredWebsitesReportComponent as BaseUnsecuredWebsitesReportComponen
     RoutedVaultFilterBridgeService,
   ],
   imports: [
+    KeykeeperItemTileComponent,
     SharedModule,
     HeaderModule,
     OrganizationBadgeModule,

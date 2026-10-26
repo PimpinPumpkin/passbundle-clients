@@ -455,9 +455,9 @@ ${scale}
   );
   // 8b. The typeface, Google Sans Flex, goes into the shared theme.css, which
   //     tw-theme.css imports and what the extension draws inside websites
-  //     imports alone, so every surface has it. Then the look: green-tinted
-  //     darks, the brand's illustration colors, and the translucent Glass
-  //     theme (DESIGN.md, "The look").
+  //     imports alone, so every surface has it. Then the look: the design
+  //     language for the web vault and the extension's popup, light and dark,
+  //     and the brand's illustration colors (DESIGN.md, "The look").
   const fontDir = path.join(ROOT, "brand/assets/fonts");
   for (const font of fs.readdirSync(fontDir).filter((f) => f.endsWith(".woff2"))) {
     addFile(path.join(fontDir, font), `libs/components/src/webfonts/${font}`);

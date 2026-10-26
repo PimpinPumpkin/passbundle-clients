@@ -128,6 +128,8 @@ export class CipherViewComponent {
    * look, DESIGN.md "The look").
    */
   readonly keykeeperHero = input(false, { transform: booleanAttribute });
+  /** Keykeeper: the hero's heading level: the popup's page heading, or a level under the web vault's. */
+  readonly keykeeperHeroHeading = input<1 | 2>(1);
 
   readonly activeUserId$ = getUserId(this.accountService.activeAccount$);
 

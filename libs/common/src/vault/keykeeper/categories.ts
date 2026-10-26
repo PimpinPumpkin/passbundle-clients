@@ -25,7 +25,10 @@ export type KeykeeperCategory =
   | "apiKey"
   | "domain"
   | "email"
-  | "certificate";
+  | "certificate"
+  // Not kinds of items: the web vault's menu entries for them (DESIGN.md, "The left menu").
+  | "favorites"
+  | "health";
 
 export type KeykeeperCategoryLook = {
   /** The tile's color on light backgrounds. */
@@ -52,6 +55,8 @@ const glyphs = {
     "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z M3 12h18 M12 3c2.4 2.5 3.6 5.5 3.6 9s-1.2 6.5-3.6 9c-2.4-2.5-3.6-5.5-3.6-9S9.6 5.5 12 3Z",
   envelope: "M3 6h18v12H3Z M3 7l9 6 9-6",
   badge: "M12 14a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z M8.6 12.6 7 21l5-2.6 5 2.6-1.6-8.4",
+  star: "M12 4l2.5 5 5.5.8-4 3.9.9 5.5L12 16.6 7.1 19.2l.9-5.5-4-3.9 5.5-.8Z",
+  shield: "M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6Z M8.5 12l2.5 2.5 4.5-5",
 };
 
 export const KEYKEEPER_CATEGORY_LOOKS: Readonly<Record<KeykeeperCategory, KeykeeperCategoryLook>> =
@@ -80,6 +85,10 @@ export const KEYKEEPER_CATEGORY_LOOKS: Readonly<Record<KeykeeperCategory, Keykee
     domain: { light: "#1C7FB8", dark: "#1F86C2", glyph: glyphs.globe },
     email: { light: "#2448B8", dark: "#2E55C9", glyph: glyphs.envelope },
     certificate: { light: "#B01E54", dark: "#C0275F", glyph: glyphs.badge },
+    // The menu's Favorites, in gold, and Health, in a bank's emerald. Gold
+    // can't go a step lighter and keep a white glyph at 3:1, so it stays.
+    favorites: { light: "#B98310", dark: "#B98310", glyph: glyphs.star },
+    health: { light: "#0E7A47", dark: "#128752", glyph: glyphs.shield },
   };
 
 /** A login without a site icon shows its first letter on a tint of the login color. */

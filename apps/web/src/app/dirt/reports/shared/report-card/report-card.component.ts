@@ -4,6 +4,7 @@ import { Component, Input } from "@angular/core";
 
 import { BitSvg } from "@bitwarden/assets/svg";
 
+import { KEYKEEPER_REPORT_TILES } from "../../../../keykeeper/health/report-tiles";
 import { ReportVariant } from "../models/report-variant";
 
 // FIXME(https://bitwarden.atlassian.net/browse/CL-764): Migrate to OnPush
@@ -29,6 +30,11 @@ export class ReportCardComponent {
   // FIXME(https://bitwarden.atlassian.net/browse/CL-903): Migrate to Signals
   // eslint-disable-next-line @angular-eslint/prefer-signals
   @Input() variant: ReportVariant;
+
+  /** Keykeeper: the report's jewel tile, by its route, in place of the illustration. */
+  protected get keykeeperTile() {
+    return KEYKEEPER_REPORT_TILES[this.route];
+  }
 
   protected get disabled() {
     return this.variant != ReportVariant.Enabled;
