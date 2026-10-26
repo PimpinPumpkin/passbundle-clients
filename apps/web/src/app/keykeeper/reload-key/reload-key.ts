@@ -398,18 +398,20 @@ export class KeykeeperReloadKey {
     await this.forgetting;
   }
 
-  /** Clears the record and asks the server to forget R, without waiting long. */
+  /**
+   * Asks the server to forget R, first, while signing out hasn't cleared the
+   * access token yet, and clears the record, without waiting long.
+   */
   private async drop(userId: UserId, tabId: string) {
+    const forgotten = withTimeout(this.sendForget(userId, tabId), FORGET_TIMEOUT_MS).catch(() => {
+      // The server forgets it on its own when the tab stops checking in.
+    });
     try {
       await this.deps.stateProvider.getUser(userId, RELOAD_KEY).update(() => null);
     } catch {
       // Signed out already: nothing kept.
     }
-    try {
-      await withTimeout(this.sendForget(userId, tabId), FORGET_TIMEOUT_MS);
-    } catch {
-      // The server forgets it on its own when the tab stops checking in.
-    }
+    await forgotten;
   }
 
   /**
