@@ -109,7 +109,8 @@ export abstract class BaseEventsComponent implements OnDestroy {
     await this.loadEvents(true);
   };
 
-  exportEvents = async () => {
+  // Keykeeper: CSV, as upstream exports, or JSON.
+  exportEvents = async (format: "csv" | "json" = "csv") => {
     if (this.dirtyDates) {
       return;
     }
@@ -123,7 +124,7 @@ export abstract class BaseEventsComponent implements OnDestroy {
 
     let promise: Promise<any>;
     try {
-      promise = this.export(dates[0], dates[1]);
+      promise = this.export(dates[0], dates[1], format);
       await promise;
     } catch (e) {
       this.logService.error(`Handled exception: ${e}`);
@@ -258,7 +259,9 @@ export abstract class BaseEventsComponent implements OnDestroy {
     return dates;
   }
 
-  private async export(start: string, end: string) {
+  exportEventsJson = () => this.exportEvents("json");
+
+  private async export(start: string, end: string, format: "csv" | "json" = "csv") {
     let continuationToken = this.continuationToken;
     let events = [].concat(this.events());
 
@@ -268,12 +271,15 @@ export abstract class BaseEventsComponent implements OnDestroy {
       events = events.concat(result.events);
     }
 
-    const data = await this.exportService.getEventExport(events);
-    const fileName = this.exportService.getFileName(this.exportFileName, "csv");
+    const data =
+      format === "json"
+        ? this.exportService.getEventExportJson(events)
+        : await this.exportService.getEventExport(events);
+    const fileName = this.exportService.getFileName(this.exportFileName, format);
     this.fileDownloadService.download({
       fileName,
       blobData: data,
-      blobOptions: { type: "text/plain" },
+      blobOptions: { type: format === "json" ? "application/json" : "text/plain" },
     });
   }
 }
