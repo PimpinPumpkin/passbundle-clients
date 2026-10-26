@@ -16972,6 +16972,6 @@
     "message": "Vault lock"
   },
   "vaultLockPolicyDesc": {
-    "message": "Choose how long members' vaults can stay unlocked, and whether they lock or sign out then."
+    "message": "Choose how long members' vaults can stay unlocked, in the apps and the web vault, and whether they lock or sign out then."
   }
 }
