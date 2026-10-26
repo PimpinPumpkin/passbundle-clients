@@ -189,6 +189,24 @@
       }
     }
   },
+  "keykeeperExportJson": {
+    "message": "Export JSON"
+  },
+  "keykeeperEventStreaming": {
+    "message": "Event streaming"
+  },
+  "keykeeperEventStreamAdded": {
+    "message": "Started sending the organization's events to a new place."
+  },
+  "keykeeperEventStreamChanged": {
+    "message": "Changed a place the organization's events are sent."
+  },
+  "keykeeperEventStreamRemoved": {
+    "message": "Stopped sending the organization's events to a place."
+  },
+  "keykeeperEventStreamStopped": {
+    "message": "The server turned off a place the organization's events are sent: sending there kept failing."
+  },
   "keykeeperDeletedVersionItemId": {
     "message": "Deleted an earlier version of item $ID$.",
     "placeholders": {

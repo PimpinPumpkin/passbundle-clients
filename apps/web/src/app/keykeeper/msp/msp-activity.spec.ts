@@ -15,6 +15,18 @@ const event = (fields: Partial<MspEvent>): MspEvent => ({
 
 describe("MSP activity sentences", () => {
   it.each([
+    [
+      { event: "event_stream_added", detail: "SOC (webhook: https://siem.example/…)" },
+      "ana@northwind.test started sending the MSP's events to SOC (webhook: https://siem.example/…)",
+    ],
+    [
+      { event: "event_stream_removed", detail: "SOC (syslog: siem.example:6514)" },
+      "ana@northwind.test stopped sending the MSP's events to SOC (syslog: siem.example:6514)",
+    ],
+    [
+      { event: "event_stream_paused", actorEmail: null, detail: "SOC: It answered 410 Gone" },
+      "The server stopped sending the MSP's events to SOC: It answered 410 Gone",
+    ],
     [{ event: "msp_created", detail: "Northwind IT" }, "ana@northwind.test set up Northwind IT"],
     [
       { event: "client_created", detail: "Default policies" },

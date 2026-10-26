@@ -16,6 +16,15 @@ export class EventExportService {
     return papa.unparse(events.map((e) => new EventExport(e)));
   }
 
+  /** Keykeeper: the same fields as JSON, for tools that read JSON. */
+  getEventExportJson(events: EventView[]): string {
+    return JSON.stringify(
+      events.map((e) => new EventExport(e)),
+      null,
+      2,
+    );
+  }
+
   getFileName(prefix: string = null, extension = "csv"): string {
     return ExportHelper.getFileName(prefix ?? "", extension);
   }

@@ -599,6 +599,19 @@ export class EventService {
       case EventType.Organization_ClientExportedVault:
         msg = humanReadableMsg = this.i18nService.t("exportedOrganizationVault");
         break;
+      // Keykeeper: where the organization's events are sent.
+      case EventType.Keykeeper_EventStreamAdded:
+        msg = humanReadableMsg = this.i18nService.t("keykeeperEventStreamAdded");
+        break;
+      case EventType.Keykeeper_EventStreamChanged:
+        msg = humanReadableMsg = this.i18nService.t("keykeeperEventStreamChanged");
+        break;
+      case EventType.Keykeeper_EventStreamRemoved:
+        msg = humanReadableMsg = this.i18nService.t("keykeeperEventStreamRemoved");
+        break;
+      case EventType.Keykeeper_EventStreamStopped:
+        msg = humanReadableMsg = this.i18nService.t("keykeeperEventStreamStopped");
+        break;
       case EventType.Organization_VaultAccessed:
         msg = humanReadableMsg = this.i18nService.t("vaultAccessedByProvider");
         break;

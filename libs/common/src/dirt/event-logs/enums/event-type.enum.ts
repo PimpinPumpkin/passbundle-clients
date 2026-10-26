@@ -125,6 +125,13 @@ export enum EventType {
   Organization_InviteLinkRefreshed = 1628,
   Organization_InviteLinkConfirmEnabled = 1629,
   Organization_InviteLinkConfirmDisabled = 1630,
+  // Keykeeper: a place the organization's events are sent was added,
+  // changed, or removed (event streaming), or the server stopped sending
+  // there.
+  Keykeeper_EventStreamAdded = 1690,
+  Keykeeper_EventStreamChanged = 1691,
+  Keykeeper_EventStreamRemoved = 1692,
+  Keykeeper_EventStreamStopped = 1693,
   // Keykeeper: the organization's single sign-on settings changed (what, in keykeeperDetail).
   Keykeeper_SsoSettingsChanged = 1694,
 
