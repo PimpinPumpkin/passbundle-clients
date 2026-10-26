@@ -185,6 +185,42 @@ describe("SessionTimeoutSettingsComponentService", () => {
       );
     });
 
+    // Keykeeper: the web vault can't see the computer lock, so there "when
+    // the computer locks" offers the waits up to the policy's webMinutes.
+    describe('Keykeeper: policy type "onSystemLock" in the web vault', () => {
+      it.each([
+        [30, ["oneMinute", "fiveMinutes", "fifteenMinutes", "thirtyMinutes", "custom"]],
+        [undefined, ["oneMinute", "fiveMinutes", "fifteenMinutes", "custom"]],
+        [1, ["oneMinute", "custom"]],
+      ])(
+        "with webMinutes %s offers %j",
+        fakeAsync(async (webMinutes: number | undefined, expected: string[]) => {
+          (mockSessionTimeoutTypeService as any).keykeeperSystemLockIsWait = true;
+          // What the web vault has.
+          mockSessionTimeoutTypeService.isAvailable.mockImplementation(
+            async (value: VaultTimeout) =>
+              typeof value === "number"
+                ? value !== VaultTimeoutNumberType.Immediately
+                : value === VaultTimeoutStringType.OnRestart ||
+                  value === VaultTimeoutStringType.Custom,
+          );
+          const policy = {
+            id: "policy-id",
+            organizationId: "org-id",
+            type: PolicyType.MaximumVaultTimeout,
+            data: { type: "onSystemLock", minutes: null, webMinutes },
+            enabled: true,
+          } as unknown as Policy;
+          mockPolicyService.policiesByType$.mockReturnValue(of([policy]));
+          flush();
+
+          const options = await firstValueFrom(service.policyFilteredTimeoutOptions$(mockUserId));
+
+          expect(options.map((o) => o.name)).toEqual(expected);
+        }),
+      );
+    });
+
     describe('policy type "onAppRestart"', () => {
       it("should allow immediately, numeric, custom, and onRestart", fakeAsync(async () => {
         const policyData: MaximumSessionTimeoutPolicyData = {

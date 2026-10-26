@@ -31,7 +31,11 @@ import { getUserId } from "../../../auth/services/account.service";
 import { LogService } from "../../../platform/abstractions/log.service";
 import { StateProvider } from "../../../platform/state";
 import { UserId } from "../../../types/guid";
-import { MaximumSessionTimeoutPolicyData, SessionTimeoutTypeService } from "../../session-timeout";
+import {
+  keykeeperPolicyForClient,
+  MaximumSessionTimeoutPolicyData,
+  SessionTimeoutTypeService,
+} from "../../session-timeout";
 import {
   PIN_PROTECTED_USER_KEY_ENVELOPE_EPHEMERAL,
   PIN_PROTECTED_USER_KEY_ENVELOPE_PERSISTENT,
@@ -400,6 +404,27 @@ export class VaultTimeoutSettingsService implements VaultTimeoutSettingsServiceA
     return this.policyService.policiesByType$(PolicyType.MaximumVaultTimeout, userId).pipe(
       getFirstPolicy,
       map((policy) => (policy?.data ?? null) as MaximumSessionTimeoutPolicyData | null),
+      // Keykeeper: in the web vault, "when the computer locks" is a longest
+      // wait (keykeeper-system-lock.ts).
+      map((data) => keykeeperPolicyForClient(data, this.sessionTimeoutTypeService)),
+    );
+  }
+
+  // Keykeeper: whether a "when the computer locks" policy applies to this
+  // person on a client that can see the computer lock (the browser
+  // extension in Chrome and Edge). Upstream turns that policy into "on system
+  // lock" only for a timeout that isn't a number of minutes, and a person's
+  // timeout is one choice, so someone who picked minutes kept them and never
+  // locked with the computer. The extension's idle listener locks them too.
+  keykeeperLocksOnSystemLock$(userId: UserId): Observable<boolean> {
+    return this.policyService.policiesByType$(PolicyType.MaximumVaultTimeout, userId).pipe(
+      getFirstPolicy,
+      map((policy) => (policy?.data ?? null) as MaximumSessionTimeoutPolicyData | null),
+      concatMap(
+        async (data) =>
+          data?.type === "onSystemLock" &&
+          (await this.sessionTimeoutTypeService.isAvailable(VaultTimeoutStringType.OnLocked)),
+      ),
     );
   }
 

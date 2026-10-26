@@ -8,6 +8,10 @@ import {
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 
 export class WebSessionTimeoutTypeService implements SessionTimeoutTypeService {
+  // Keykeeper: a web page can't see the computer lock, so "when the computer
+  // locks" is a longest wait here (keykeeper-system-lock.ts).
+  readonly keykeeperSystemLockIsWait = true;
+
   constructor(private readonly platformUtilsService: PlatformUtilsService) {}
 
   async isAvailable(type: VaultTimeout): Promise<boolean> {

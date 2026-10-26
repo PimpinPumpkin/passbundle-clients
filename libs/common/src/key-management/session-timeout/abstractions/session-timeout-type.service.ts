@@ -2,6 +2,13 @@ import { VaultTimeout } from "../../vault-timeout";
 
 export abstract class SessionTimeoutTypeService {
   /**
+   * Keykeeper: whether this client reads a "when the computer locks" policy as
+   * a longest wait (the policy's `webMinutes`), because it can't see the
+   * computer lock: the web vault. See keykeeper-system-lock.ts.
+   */
+  readonly keykeeperSystemLockIsWait?: boolean;
+
+  /**
    * Is provided timeout type available on this client type, OS ?
    * @param timeout the timeout type
    */

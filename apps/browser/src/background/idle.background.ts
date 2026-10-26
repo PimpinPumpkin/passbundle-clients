@@ -66,7 +66,14 @@ export default class IdleBackground {
               const timeout = await firstValueFrom(
                 this.vaultTimeoutSettingsService.getVaultTimeoutByUserId$(userId),
               );
-              if (timeout === VaultTimeoutStringType.OnLocked) {
+              // Keykeeper: a "when the computer locks" policy locks with the
+              // computer whatever timeout the person picked, minutes too. Only
+              // where upstream trusts the browser to say it locked (not
+              // Firefox, Safari, or Opera on a Mac).
+              const keykeeperPolicyLocks = await firstValueFrom(
+                this.vaultTimeoutSettingsService.keykeeperLocksOnSystemLock$(userId as UserId),
+              );
+              if (timeout === VaultTimeoutStringType.OnLocked || keykeeperPolicyLocks) {
                 // On System Lock vault timeout option
                 const action = await firstValueFrom(
                   this.vaultTimeoutSettingsService.getVaultTimeoutActionByUserId$(userId),

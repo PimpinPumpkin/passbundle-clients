@@ -4,6 +4,7 @@ import { PolicyService } from "@bitwarden/common/admin-console/abstractions/poli
 import { PolicyType } from "@bitwarden/common/admin-console/enums";
 import { getFirstPolicy } from "@bitwarden/common/admin-console/services/policy/default-policy.service";
 import {
+  keykeeperPolicyForClient,
   MaximumSessionTimeoutPolicyData,
   SessionTimeoutTypeService,
 } from "@bitwarden/common/key-management/session-timeout";
@@ -50,6 +51,9 @@ export class SessionTimeoutSettingsComponentService {
       .pipe(
         getFirstPolicy,
         map((policy) => (policy?.data ?? null) as MaximumSessionTimeoutPolicyData | null),
+        // Keykeeper: in the web vault, "when the computer locks" is a longest
+        // wait, so it offers the waits up to it (keykeeper-system-lock.ts).
+        map((data) => keykeeperPolicyForClient(data, this.sessionTimeoutTypeService)),
       );
 
     return combineLatest([

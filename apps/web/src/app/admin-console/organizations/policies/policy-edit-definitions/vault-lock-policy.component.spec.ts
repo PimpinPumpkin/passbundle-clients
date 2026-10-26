@@ -93,7 +93,7 @@ describe("VaultLockPolicyComponent", () => {
 
   it("starts at 15 minutes, locking, when nothing is set", () => {
     open(false, null);
-    expect(shown()).toEqual({ when: "custom", minutes: 15, action: "lock" });
+    expect(shown()).toEqual({ when: "custom", minutes: 15, webMinutes: 15, action: "lock" });
     expect(saved()).toEqual({ type: "custom", minutes: 15, action: "lock" });
   });
 
@@ -101,8 +101,9 @@ describe("VaultLockPolicyComponent", () => {
     for (const data of [
       { type: "custom", minutes: 240, action: "lock" },
       { type: "immediately", minutes: null, action: "logOut" },
-      { type: "onSystemLock", minutes: null, action: "lock" },
-    ]) {
+      { type: "onSystemLock", minutes: null, webMinutes: 15, action: "lock" },
+      { type: "onSystemLock", minutes: null, webMinutes: 1, action: "logOut" },
+    ] as Array<Record<string, unknown>>) {
       open(true, data);
       expect(saved()).toEqual(data);
     }
@@ -111,19 +112,53 @@ describe("VaultLockPolicyComponent", () => {
   it("drops the minutes when the type doesn't use them", () => {
     open(true, { type: "custom", minutes: 30, action: "lock" });
     component.data.controls.when.setValue("onSystemLock");
-    expect(saved()).toEqual({ type: "onSystemLock", minutes: null, action: "lock" });
+    expect(saved()).toEqual({
+      type: "onSystemLock",
+      minutes: null,
+      webMinutes: 15,
+      action: "lock",
+    });
+  });
+
+  it("sends the web vault's wait only with when the computer locks", () => {
+    open(true, { type: "onSystemLock", minutes: null, webMinutes: 60, action: "lock" });
+    expect(shown().webMinutes).toBe(60);
+    component.data.controls.when.setValue("custom");
+    expect(saved()).toEqual({ type: "custom", minutes: 15, action: "lock" });
+    component.data.controls.when.setValue("immediately");
+    expect(saved()).toEqual({ type: "immediately", minutes: null, action: "lock" });
+  });
+
+  it("starts the web vault's wait at 15 minutes when the policy doesn't say", () => {
+    open(true, { type: "onSystemLock", minutes: null, action: "lock" });
+    expect(shown().webMinutes).toBe(15);
+    expect(saved()).toEqual({
+      type: "onSystemLock",
+      minutes: null,
+      webMinutes: 15,
+      action: "lock",
+    });
+  });
+
+  it("offers a web vault wait set elsewhere, and reads an unreadable one as 15 minutes", () => {
+    open(true, { type: "onSystemLock", webMinutes: 90 });
+    expect(shown().webMinutes).toBe(90);
+    expect(component["webWaits"]()).toContain(90);
+    open(true, { type: "onSystemLock", webMinutes: 5000 });
+    expect(shown().webMinutes).toBe(15);
+    expect(component["webWaits"]()).toEqual(VAULT_LOCK_WAITS);
   });
 
   it("reads data set elsewhere: no type is a longest wait, and a wait not offered is added", () => {
     open(true, { minutes: 90 });
-    expect(shown()).toEqual({ when: "custom", minutes: 90, action: "lock" });
+    expect(shown()).toEqual({ when: "custom", minutes: 90, webMinutes: 15, action: "lock" });
     expect(waits()).toContain(90);
     expect(saved()).toEqual({ type: "custom", minutes: 90, action: "lock" });
   });
 
   it("shows upstream's types that limit nothing here as a longest wait, to choose again", () => {
     open(true, { type: "never", minutes: 0, action: "logOut" });
-    expect(shown()).toEqual({ when: "custom", minutes: 15, action: "logOut" });
+    expect(shown()).toEqual({ when: "custom", minutes: 15, webMinutes: 15, action: "logOut" });
     expect(waits()).toEqual(VAULT_LOCK_WAITS);
   });
 });

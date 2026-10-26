@@ -292,3 +292,10 @@ export const KEYKEEPER_SITE_FIXES_DISK = new StateDefinition("keykeeperSiteFixes
 export const KEYKEEPER_HEALTH_DISK = new StateDefinition("keykeeperHealth", "disk", {
   web: "disk-local",
 });
+/**
+ * A web vault tab's wrapped user key and tab id, so a reload stays unlocked
+ * while the server keeps the key that opens it. "disk" is the tab's own
+ * sessionStorage in the web vault: never move it to "disk-local", which
+ * every tab shares and which outlives the browser.
+ */
+export const KEYKEEPER_RELOAD_KEY_DISK = new StateDefinition("keykeeperReloadKey", "disk");

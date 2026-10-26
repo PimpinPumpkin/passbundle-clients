@@ -318,6 +318,38 @@ describe("SessionTimeoutInputComponent", () => {
         expect(message).toBe("sessionTimeoutSettingsPolicySetDefaultTimeoutToOnRestart-used-i18n");
       }));
 
+      // Keykeeper: the web vault says what "when the computer locks" does
+      // there, and checks a custom timeout against the policy's webMinutes.
+      it("Keykeeper: in the web vault, says the computer lock is a wait there", fakeAsync(() => {
+        (mockSessionTimeoutTypeService as any).keykeeperSystemLockIsWait = true;
+        const policyData = {
+          type: "onSystemLock",
+          minutes: null,
+          webMinutes: 30,
+        } as unknown as MaximumSessionTimeoutPolicyData;
+
+        policies$.next([{ id: "1", enabled: true, data: policyData } as Policy]);
+
+        fixture.detectChanges();
+        flush();
+
+        let message: string | null = null;
+        component["policyTimeoutMessage$"].subscribe((msg) => (message = msg));
+        flush();
+
+        expect(message).toBe(
+          "Your organization locks vaults when the computer locks. A web page can't tell when " +
+            "that happens, so the web vault locks after 30 minutes without use, and 2 minutes " +
+            "after the browser closes.",
+        );
+        expect(component["maxSessionTimeoutPolicyData"]).toEqual({
+          type: "custom",
+          minutes: 30,
+          action: undefined,
+        });
+        expect(component.maxSessionTimeoutPolicyMinutes).toBe(30);
+      }));
+
       it("should emit onRestart message when never is promoted to OnRestart", fakeAsync(() => {
         const policyData: MaximumSessionTimeoutPolicyData = {
           type: "never",
