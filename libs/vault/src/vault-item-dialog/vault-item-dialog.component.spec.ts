@@ -544,6 +544,23 @@ describe("VaultItemDialogComponent", () => {
     });
   });
 
+  // Keykeeper: the web vault can show the panel and a dialog at once, so each
+  // one's Save submits its own form, by an id of its own.
+  describe("its form", () => {
+    it("has an id of its own, which the footer's Save submits", () => {
+      const submit = (f: ComponentFixture<TestVaultItemDialogComponent>) =>
+        (f.nativeElement as HTMLElement).querySelector<HTMLButtonElement>("button[type=submit]")!;
+      const first = submit(fixture).getAttribute("form");
+      expect(first).toMatch(/^cipherForm-\d+$/);
+      expect(first).toBe((component as any).formId);
+
+      const other = TestBed.createComponent(TestVaultItemDialogComponent);
+      other.detectChanges();
+      expect(submit(other).getAttribute("form")).toMatch(/^cipherForm-\d+$/);
+      expect(submit(other).getAttribute("form")).not.toBe(first);
+    });
+  });
+
   // Keykeeper: in the web vault, an item opens to view in a side panel (a
   // drawer), still a dialog to assistive technology, named by its title.
   describe("as the web vault's side panel", () => {
@@ -557,6 +574,47 @@ describe("VaultItemDialogComponent", () => {
       expect(host.getAttribute("role")).toBe("dialog");
       expect(title.id).toMatch(/^keykeeper-item-panel-title-/);
       expect(host.getAttribute("aria-labelledby")).toBe(title.id);
+    });
+
+    it("asks before closing over unsaved edits, and never when it closes with a result or nothing changed", async () => {
+      const ref = TestBed.inject(DialogRef) as {
+        isDrawer?: boolean;
+        componentInstance?: unknown;
+        closePredicate?: (result?: VaultItemDialogResult) => Promise<boolean>;
+      };
+      ref.isDrawer = true;
+      (component as any).guardPanelEdits();
+      // The page reads the panel's own state through its ref.
+      expect(ref.componentInstance).toBe(component);
+
+      const unsaved = jest.spyOn(component, "keykeeperHasUnsavedEdits", "get");
+      unsaved.mockReturnValue(false);
+      expect(await ref.closePredicate!()).toBe(true);
+      expect(mockDialogService.openSimpleDialog).not.toHaveBeenCalled();
+
+      unsaved.mockReturnValue(true);
+      expect(await ref.closePredicate!(VaultItemDialogResult.Saved)).toBe(true);
+      expect(mockDialogService.openSimpleDialog).not.toHaveBeenCalled();
+
+      mockDialogService.openSimpleDialog.mockResolvedValueOnce(false);
+      expect(await ref.closePredicate!()).toBe(false);
+      expect(mockDialogService.openSimpleDialog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: { key: "discardEditsTitle" },
+          acceptButtonText: { key: "discardEdits" },
+          cancelButtonText: { key: "backToEditing" },
+        }),
+      );
+      mockDialogService.openSimpleDialog.mockResolvedValueOnce(true);
+      expect(await ref.closePredicate!()).toBe(true);
+    });
+
+    it("has unsaved edits only while editing with something changed", () => {
+      component.setTestParams({ mode: "view" });
+      expect(component.keykeeperEditing).toBe(false);
+      expect(component.keykeeperHasUnsavedEdits).toBe(false);
+      component.setTestParams({ mode: "form" });
+      expect(component.keykeeperEditing).toBe(true);
     });
 
     it("leaves a dialog as upstream has it", () => {

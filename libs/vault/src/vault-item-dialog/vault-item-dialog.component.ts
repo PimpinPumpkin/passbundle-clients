@@ -124,8 +124,9 @@ export const VaultItemDialogResult = {
 
 export type VaultItemDialogResult = UnionOfValues<typeof VaultItemDialogResult>;
 
-/** Keykeeper: for each side panel's title's id. */
+/** Keykeeper: for each side panel's title's id, and each dialog's form's. */
 let nextPanelId = 0;
+let nextFormId = 0;
 
 // FIXME(https://bitwarden.atlassian.net/browse/CL-764): Migrate to OnPush
 // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
@@ -285,6 +286,54 @@ export class VaultItemDialogComponent implements OnInit, OnDestroy {
   /** Keykeeper: the panel's name is its title ("View Login"), as the dialog's was. */
   protected readonly panelTitleId = `keykeeper-item-panel-title-${nextPanelId++}`;
 
+  /**
+   * Keykeeper: the form's id, its own, since the web vault can show the panel
+   * and a dialog at once and the footer's Save submits the form by id.
+   */
+  protected readonly formId = `cipherForm-${nextFormId++}`;
+
+  /** Keykeeper: whether the panel's item is open to edit, for the vault page's address. */
+  get keykeeperEditing(): boolean {
+    return this.params.mode === "form";
+  }
+
+  /**
+   * Keykeeper: whether the panel's item is being edited with changes not yet
+   * saved. The vault page reads it before closing the panel for a dialog.
+   */
+  get keykeeperHasUnsavedEdits(): boolean {
+    return (
+      this.params.mode === "form" && this.loadForm && this.cipherFormComponent().keykeeperChanged
+    );
+  }
+
+  /**
+   * Keykeeper: in the panel, closing it (Close, Escape, another row, New)
+   * while its item has unsaved edits asks first, as upstream's policy drawer
+   * does. A result (saved, deleted) always closes.
+   */
+  private guardPanelEdits() {
+    if (!this.inPanel) {
+      return;
+    }
+    // A drawer's ref leaves its component empty; the panel's fills it in, so
+    // the vault page can read the panel's own state.
+    this.dialogRef.componentInstance = this;
+    this.dialogRef.closePredicate = async (result?: VaultItemDialogResult) => {
+      if (result != null || !this.keykeeperHasUnsavedEdits) {
+        return true;
+      }
+      return this.dialogService.openSimpleDialog({
+        title: { key: "discardEditsTitle" },
+        content: { key: "discardEditsConfirmation" },
+        type: "danger",
+        hideIcon: true,
+        acceptButtonText: { key: "discardEdits" },
+        cancelButtonText: { key: "backToEditing" },
+      });
+    };
+  }
+
   protected get showCipherView() {
     return this.cipher != undefined && (this.params.mode === "view" || this.loadingForm);
   }
@@ -376,6 +425,7 @@ export class VaultItemDialogComponent implements OnInit, OnDestroy {
   }
 
   async ngOnInit() {
+    this.guardPanelEdits();
     this.cipher = await this.getDecryptedCipherView(this.formConfig);
     if (this.cipher) {
       if (this.cipher.decryptionFailure) {

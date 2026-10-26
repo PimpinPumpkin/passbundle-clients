@@ -362,6 +362,14 @@ export class CipherFormComponent implements AfterViewInit, OnInit, OnChanges, Ci
    * @param formGroup - The form group to count the invalid fields in.
    * @returns The number of invalid fields in the form group.
    */
+  /**
+   * Keykeeper: whether the person has changed anything in the form, so the web
+   * vault's item panel can ask before throwing the changes away.
+   */
+  get keykeeperChanged(): boolean {
+    return this.cipherForm.dirty;
+  }
+
   private countInvalidFields(formGroup: FormGroup): number {
     return Object.values(formGroup.controls).reduce((count, control) => {
       if (control instanceof FormGroup) {

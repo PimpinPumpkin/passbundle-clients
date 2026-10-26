@@ -62,8 +62,10 @@
     }
 
     @if (loadForm) {
+      <!-- Keykeeper: a form id of its own, so a dialog's Save never submits the
+           panel's form beside it (or the other way around) -->
       <vault-cipher-form
-        formId="cipherForm"
+        [formId]="formId"
         [config]="formConfig"
         [submitBtn]="submitBtn"
         (formReady)="onFormReady()"
@@ -109,7 +111,7 @@
     <button
       bitButton
       type="submit"
-      form="cipherForm"
+      [attr.form]="formId"
       buttonType="primary"
       #submitBtn
       [hidden]="showCipherView || showRestore"

@@ -633,23 +633,43 @@ describe("VaultComponent", () => {
       expect(openVaultItemDialogSpy).not.toHaveBeenCalled();
     });
 
-    it("lets the address open another item while the panel shows one, but not the same one, or while it's being edited", () => {
+    it("lets the address open another item while the panel shows one, but not the panel's own, and nothing under a dialog", () => {
       const c = component as any;
-      c.vaultItemDialogRef = { isDrawer: true };
+      c.panelRef = { isDrawer: true };
       c.panelItemId = "a";
 
       expect(c.canOpenFromAddress({ itemId: "b", action: "view" })).toBe(true);
-      // The panel's own changes to the address: to edit and back.
-      expect(c.canOpenFromAddress({ itemId: "a", action: "edit" })).toBe(false);
-      expect(c.canOpenFromAddress({ itemId: "b", action: "view" })).toBe(false);
-      expect(c.canOpenFromAddress({ itemId: "a", action: "view" })).toBe(false);
       expect(c.canOpenFromAddress({ cipherId: "b" })).toBe(true);
+      // The panel's own changes to the address (to edit and back) open nothing,
+      // and another item can always ask to take its place: the panel itself
+      // asks before it throws away unsaved edits.
+      expect(c.canOpenFromAddress({ itemId: "a", action: "edit" })).toBe(false);
+      expect(c.canOpenFromAddress({ itemId: "b", action: "view" })).toBe(true);
+      expect(c.canOpenFromAddress({ itemId: "a", action: "view" })).toBe(false);
 
-      // A dialog is modal, as upstream has it; with nothing open, anything goes.
+      // A dialog is modal, as upstream has it, panel or not.
       c.vaultItemDialogRef = { isDrawer: false };
       expect(c.canOpenFromAddress({ itemId: "b" })).toBe(false);
       c.vaultItemDialogRef = undefined;
+      c.panelRef = undefined;
       expect(c.canOpenFromAddress({ itemId: "b" })).toBe(true);
+    });
+
+    it("doesn't open an item twice while it's on its way into the panel", () => {
+      const c = component as any;
+      c.panelOpeningId = "a";
+      expect(c.canOpenFromAddress({ itemId: "a", action: "view" })).toBe(false);
+      expect(c.canOpenFromAddress({ itemId: "b", action: "view" })).toBe(true);
+    });
+
+    it("forgets an item that never made it into the panel", async () => {
+      (TestBed.inject(CipherService).get as jest.Mock).mockResolvedValueOnce(null);
+      jest.spyOn(component as any, "handleUnknownCipher").mockResolvedValue(undefined);
+
+      await component.viewCipherById("gone");
+
+      expect((component as any).panelOpeningId).toBeUndefined();
+      expect(openVaultItemPanelSpy).not.toHaveBeenCalled();
     });
 
     it("clears the address when the panel closes, but not when another item took its place or the page is gone", async () => {
@@ -696,9 +716,27 @@ describe("VaultComponent", () => {
       expect(go).not.toHaveBeenCalled();
     });
 
+    it("puts the panel's item back in the address when it kept its unsaved edits instead of giving way", async () => {
+      const go = jest.spyOn(component as any, "go").mockResolvedValue(undefined);
+      const c = component as any;
+      c.panelRef = { isDrawer: true, componentInstance: { keykeeperEditing: true } };
+      c.panelItemId = "a";
+      // The person went back to editing: the drawer didn't open.
+      openVaultItemPanelSpy.mockResolvedValueOnce(undefined);
+
+      await component.openVaultItemDialog("view", view("b"));
+
+      expect(go).toHaveBeenCalledWith({ cipherId: null, itemId: "a", action: "edit" });
+      expect(c.panelRef).toBeDefined();
+    });
+
     it("closes the panel before a new item, or one opened to edit, opens in a dialog", async () => {
       const close = jest.fn().mockResolvedValue({ closed: true });
-      (component as any).vaultItemDialogRef = { isDrawer: true, close };
+      (component as any).panelRef = {
+        isDrawer: true,
+        close,
+        componentInstance: { keykeeperHasUnsavedEdits: false },
+      };
 
       void component.openVaultItemDialog("form", view("b"));
       await flush();
@@ -708,18 +746,51 @@ describe("VaultComponent", () => {
       expect(openVaultItemPanelSpy).not.toHaveBeenCalled();
     });
 
-    it("keeps the panel open, changes and all, while its item is being edited", async () => {
+    it("keeps a panel with unsaved edits open under a dialog, and names its item again once the dialog closes", async () => {
+      const go = jest.spyOn(component as any, "go").mockResolvedValue(undefined);
       const close = jest.fn().mockResolvedValue({ closed: true });
       const c = component as any;
-      c.vaultItemDialogRef = { isDrawer: true, close };
+      c.panelRef = {
+        isDrawer: true,
+        close,
+        componentInstance: { keykeeperHasUnsavedEdits: true, keykeeperEditing: true },
+      };
       c.panelItemId = "a";
-      c.canOpenFromAddress({ itemId: "a", action: "edit" });
+      const dialogClosed = new Subject<VaultItemDialogResult>();
+      openVaultItemDialogSpy.mockReturnValueOnce({ closed: dialogClosed });
 
-      void component.openVaultItemDialog("form", view("b"));
+      const done = component.openVaultItemDialog("form", view("b"));
       await flush();
-
       expect(close).not.toHaveBeenCalled();
       expect(openVaultItemDialogSpy).toHaveBeenCalled();
+      // The address opens nothing while the dialog is up.
+      expect(c.canOpenFromAddress({ itemId: "c" })).toBe(false);
+
+      dialogClosed.next(VaultItemDialogResult.Saved);
+      dialogClosed.complete();
+      await done;
+
+      expect(c.panelRef).toBeDefined();
+      expect(c.panelItemId).toBe("a");
+      expect(go).toHaveBeenCalledWith({ cipherId: null, itemId: "a", action: "edit" });
+    });
+
+    it("lets the list load beside an item opened from a link, rather than once the panel closes", async () => {
+      // The panel never closes in this test.
+      openVaultItemPanelSpy.mockResolvedValue({ closed: new Subject(), isDrawer: true });
+      const viewCipher = jest.spyOn(VaultComponent.prototype, "viewCipher");
+      queryParamsSubject.next({ action: "view", itemId: TEST_CIPHER_ID });
+      fixture = TestBed.createComponent(VaultComponent);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(viewCipher).toHaveBeenCalled();
+      // Once: the address naming the item it's opening doesn't open it again.
+      expect(openVaultItemPanelSpy).toHaveBeenCalledTimes(1);
+      expect((component as any).panelItemId).toBe(TEST_CIPHER_ID);
+      expect((component as any).performingInitialLoad).toBe(false);
+      viewCipher.mockRestore();
     });
   });
 });
