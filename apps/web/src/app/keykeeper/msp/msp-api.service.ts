@@ -466,6 +466,17 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     );
   }
 
+  /** With Require single sign-on on, replaces the API keys of the members it covers. */
+  async rotateSsoApiKeys(orgId: string): Promise<SsoView> {
+    return this.apiService.send(
+      "POST",
+      `/keykeeper/organizations/${orgId}/sso/rotate-api-keys`,
+      null,
+      true,
+      true,
+    );
+  }
+
   /** Unlinks an account: its person's next sign-in links again, under the rules. */
   async unlinkSso(orgId: string, userId: string): Promise<SsoView> {
     return this.apiService.send(

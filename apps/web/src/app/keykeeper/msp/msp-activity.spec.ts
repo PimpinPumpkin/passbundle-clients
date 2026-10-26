@@ -143,6 +143,10 @@ describe("MSP activity sentences", () => {
       "ana@northwind.test removed the domain acmedental.com from Acme Dental's single sign-on",
     ],
     [
+      { event: "sso_api_keys_replaced", detail: "3" },
+      "ana@northwind.test replaced the API keys of 3 members who must use Acme Dental's single sign-on",
+    ],
+    [
       { event: "sso_unlinked", targetEmail: "ben@acmedental.com" },
       "ana@northwind.test unlinked ben@acmedental.com's single sign-on in Acme Dental",
     ],

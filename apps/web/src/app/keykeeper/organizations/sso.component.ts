@@ -40,6 +40,12 @@ import { KeykeeperMspApiService } from "../msp/msp-api.service";
             Microsoft confirms who they are; their master password still unlocks their items, so
             nobody, PassBundle included, can open them without it.
           </p>
+          <p bitTypography="body2" data-testid="sso-how-people-link">
+            People you invite who don't have an account yet just sign in with Microsoft and choose a
+            master password. People who already have an account sign in with their master password
+            once, open this organization's menu in their vault, and choose Link SSO; after that,
+            Microsoft signs them in. Each link is emailed to the account.
+          </p>
           <p bitTypography="body2" data-testid="sso-status">
             @if (v.enabled) {
               Single sign-on is on.
@@ -210,8 +216,9 @@ import { KeykeeperMspApiService } from "../msp/msp-api.service";
           @if (v.links.length > 0) {
             <h2 bitTypography="h3" class="tw-mt-8">Linked accounts</h2>
             <p bitTypography="body2">
-              Each account signs in with the Microsoft account it was first linked to. Unlink one if
-              its person's Microsoft account was replaced; their next sign-in links it again.
+              Each account signs in with the Microsoft account it was linked to. Unlink one if its
+              person's Microsoft account was replaced; it's signed out everywhere, and links again
+              the same way it did the first time.
             </p>
             <ul class="tw-list-none tw-p-0" data-testid="sso-links">
               @for (l of v.links; track l.userId) {
@@ -237,6 +244,16 @@ import { KeykeeperMspApiService } from "../msp/msp-api.service";
               >Policies</a
             >
           </p>
+          @if (v.requireSso) {
+            <p bitTypography="body2" data-testid="sso-api-keys">
+              An API key (the command-line tool's) still signs in without single sign-on. To make
+              members' API keys stop working, replace them; members get a new one from their account
+              settings after signing in with single sign-on.
+            </p>
+            <button bitButton buttonType="secondary" type="button" [bitAction]="replaceApiKeys">
+              Replace members' API keys
+            </button>
+          }
 
           <h2 bitTypography="h3" class="tw-mt-8">Setting up Entra</h2>
           <ol class="tw-list-decimal tw-pl-6" data-testid="sso-steps">
@@ -398,6 +415,28 @@ export class KeykeeperSsoComponent implements OnInit {
       );
     };
   }
+
+  protected readonly replaceApiKeys = async () => {
+    const confirmed = await this.dialogService.openSimpleDialog({
+      title: "Replace members' API keys?",
+      content:
+        "Members who must sign in with single sign-on get new API keys, and their old ones stop working. Owners and your IT provider's staff keep theirs.",
+      acceptButtonText: "Replace API keys",
+      type: "warning",
+    });
+    if (!confirmed) {
+      return;
+    }
+    await this.attempt(async () => {
+      const view = await this.api.rotateSsoApiKeys(this.organizationId());
+      this.show(view);
+      const n = view.apiKeysReplaced ?? 0;
+      this.toastService.showToast({
+        variant: "success",
+        message: n === 1 ? "Replaced 1 member's API key" : `Replaced ${n} members' API keys`,
+      });
+    });
+  };
 
   protected async unlink(userId: string, email: string) {
     const confirmed = await this.dialogService.openSimpleDialog({

@@ -121,6 +121,8 @@ export function describeEvent(
       return `${actor} verified the domain ${detail} for ${org}`;
     case "sso_domain_removed":
       return `${actor} removed the domain ${detail} from ${org}'s single sign-on`;
+    case "sso_api_keys_replaced":
+      return `${actor} replaced the API keys of ${detail === "1" ? "1 member" : `${detail || "the"} members`} who must use ${org}'s single sign-on`;
     case "sso_unlinked":
       return `${actor} unlinked ${target}'s single sign-on in ${org}`;
     default:

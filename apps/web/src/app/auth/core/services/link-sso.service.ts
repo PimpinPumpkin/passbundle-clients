@@ -36,7 +36,9 @@ export class LinkSsoService {
 
     const redirectUri = window.location.origin + "/sso-connector.html";
     const clientId = "web";
-    const returnUri = "/settings/organizations";
+    // Keykeeper: back to the vault, whose organization menu offers Unlink SSO
+    // once the link is made; the web vault has no Settings, Organizations page.
+    const returnUri = "/vault";
 
     const response = await this.apiService.preValidateSso(identifier);
 

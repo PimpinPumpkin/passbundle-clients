@@ -122,7 +122,7 @@ describe("LinkSsoService", () => {
       await sut.linkSso("org123");
 
       const expectedState =
-        "mockGeneratedPassword_returnUri='/settings/organizations'_identifier=org123";
+        "mockGeneratedPassword_returnUri='/vault'_identifier=org123";
       expect(mockSsoLoginService.setSsoState).toHaveBeenCalledWith(expectedState);
     });
 

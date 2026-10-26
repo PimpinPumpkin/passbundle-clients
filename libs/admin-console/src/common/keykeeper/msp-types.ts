@@ -365,6 +365,8 @@ export type SsoView = {
   }[];
   /** Only in the answer to a domain check: whether the record was there. */
   check?: { domain: string; found: boolean };
+  /** Only in the answer to replacing API keys: how many were replaced. */
+  apiKeysReplaced?: number;
 };
 
 export type SsoDomainView = {
