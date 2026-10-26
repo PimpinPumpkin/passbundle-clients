@@ -59,6 +59,12 @@ import { KeykeeperMspApiService } from "../msp/msp-api.service";
               Single sign-on is off.
             }
           </p>
+          @if (v.secretReadable === false) {
+            <p bitTypography="body2" class="tw-text-danger" data-testid="sso-secret-unreadable">
+              This server can't read the saved client secret anymore (its keys changed), so sign-ins
+              with Microsoft are refused. Paste the secret again below and save.
+            </p>
+          }
 
           <h2 bitTypography="h3" class="tw-mt-8">Redirect URI</h2>
           <p bitTypography="body2">

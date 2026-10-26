@@ -347,6 +347,8 @@ export type SsoView = {
   tenantId: string | null;
   clientId: string | null;
   secretSavedAt: string | null;
+  /** False when the server can't open the saved secret (its keys changed); null with none saved. */
+  secretReadable: boolean | null;
   updatedBy: string | null;
   updatedAt: string | null;
   /** The redirect URI to paste into the app registration in Entra. */
