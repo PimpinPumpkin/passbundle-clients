@@ -70,7 +70,7 @@ describe("KeykeeperNewItemDialogComponent", () => {
     buttons().find((b) => b.textContent?.replace(/\s+/g, " ").trim().startsWith(text));
   const mainTiles = () =>
     Array.from(el().querySelectorAll("[data-testid=new-item-main] button")).map((b) =>
-      Array.from(b.querySelectorAll("span"))
+      Array.from(b.querySelectorAll(":scope > span"))
         .map((span) => span.textContent?.trim())
         .join(" "),
     );
@@ -96,6 +96,12 @@ describe("KeykeeperNewItemDialogComponent", () => {
       "typeCard typeCardSubtitle",
       "typeIdentity typeIdentitySubtitle",
     ]);
+    // Each with its category's jewel tile, as in the menu and the list.
+    expect(
+      Array.from(el().querySelectorAll("[data-testid=new-item-main] [data-jewel]")).map((t) =>
+        t.getAttribute("data-category"),
+      ),
+    ).toEqual(["login", "note", "card", "identity"]);
     button("typeLogin")!.click();
     expect(close).toHaveBeenCalledWith({ kind: "type", cipherType: CipherType.Login });
     button("folder")!.click();
@@ -132,6 +138,10 @@ describe("KeykeeperNewItemDialogComponent", () => {
     fixture.detectChanges();
 
     expect(button("Wi-Fi network")).toBeDefined();
+    // A template with its own color shows it; the rest show their kind's.
+    expect(
+      button("Wi-Fi network")!.querySelector("[data-jewel]")!.getAttribute("data-category"),
+    ).toBe("wifi");
     expect(button("API key")).toBeUndefined();
 
     search.value = "nothing like this";

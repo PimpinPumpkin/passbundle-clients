@@ -196,6 +196,18 @@ describe("buildVaultMenu", () => {
     expect(menu.trash?.count).toBe(1);
   });
 
+  it("gives All items, Favorites, and each category its jewel tile, and Archive and Trash their icons", () => {
+    const menu = buildVaultMenu(state(), actions());
+
+    expect(menu.all.tile).toBe("all");
+    expect(menu.favorites?.tile).toBe("favorites");
+    expect(menu.categories.map((c) => c.tile)).toEqual(["login", "card"]);
+    expect(menu.archive?.tile).toBeUndefined();
+    expect(menu.archive?.icon).toBe("bwi-archive");
+    expect(menu.trash?.tile).toBeUndefined();
+    expect(menu.places.every((p) => p.tile === undefined)).toBe(true);
+  });
+
   it("keeps Favorites out of the categories, at the top", () => {
     const menu = buildVaultMenu(state(), actions());
 

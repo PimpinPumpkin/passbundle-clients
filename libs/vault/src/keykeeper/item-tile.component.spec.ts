@@ -31,10 +31,13 @@ describe("KeykeeperItemTileComponent", () => {
     return cipher;
   };
 
-  async function render(cipher: CipherView, hero = false) {
+  async function render(cipher: CipherView, hero = false, tileSize?: number) {
     fixture = TestBed.createComponent(KeykeeperItemTileComponent);
     fixture.componentRef.setInput("cipher", cipher);
     fixture.componentRef.setInput("hero", hero);
+    if (tileSize != null) {
+      fixture.componentRef.setInput("tileSize", tileSize);
+    }
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
@@ -118,5 +121,19 @@ describe("KeykeeperItemTileComponent", () => {
 
     expect(tile().style.width).toBe("52px");
     expect(tile().style.height).toBe("52px");
+  });
+
+  it("takes a size of its own, such as the web vault list's, with its corners and letter to scale", async () => {
+    await render(login("Contoso Mail"), false, 40);
+
+    expect(tile().style.width).toBe("40px");
+    expect(tile().style.borderRadius).toBe("11px");
+    expect(tile().querySelector("span")?.style.fontSize).toBe("18px");
+
+    const card = new CipherView();
+    card.type = CipherType.Card;
+    card.name = "Visa ending 4242";
+    await render(card, false, 40);
+    expect(el().querySelector<HTMLElement>("[data-jewel]")?.style.width).toBe("40px");
   });
 });

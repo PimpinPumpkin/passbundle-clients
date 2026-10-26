@@ -17,6 +17,7 @@ import { BerryComponent, ChipFilterComponent, DialogService } from "@bitwarden/c
 import { LogService } from "@bitwarden/logging";
 import {
   CipherFormConfigService,
+  KeykeeperItemTileComponent,
   PasswordRepromptService,
   RoutedVaultFilterBridgeService,
   RoutedVaultFilterService,
@@ -45,6 +46,7 @@ import { WeakPasswordsReportComponent as BaseWeakPasswordsReportComponent } from
     RoutedVaultFilterBridgeService,
   ],
   imports: [
+    KeykeeperItemTileComponent,
     SharedModule,
     HeaderModule,
     OrganizationBadgeModule,

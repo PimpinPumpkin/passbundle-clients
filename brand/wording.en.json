@@ -701,6 +701,9 @@
     "managePermissionRequired": {
       "message": "At least one member or group must have Can manage."
     },
+    "me": {
+      "message": "Personal"
+    },
     "reusedPasswordsFoundReportDesc": {
       "message": "We found $COUNT$ passwords that are being reused. You should change them to a unique value."
     },

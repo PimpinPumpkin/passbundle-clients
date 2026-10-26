@@ -21,7 +21,7 @@
   <ng-container *ngTemplateOutlet="entry; context: { $implicit: favorites, rail: true }" />
 }
 <bit-nav-item
-  icon="bwi-dashboard"
+  [icon]="open ? undefined : 'bwi-dashboard'"
   [text]="'keykeeperHealth' | i18n"
   route="/reports"
   [bitPopoverAnchorFor]="reportsCoachmark.popover()"
@@ -30,6 +30,7 @@
   [closeOnBackdropClick]="false"
   [spotlight]="true"
 >
+  <vault-keykeeper-category-tile slot="icon" category="health" [size]="28" />
   <!-- Keykeeper: items to fix (weak, reused, or exposed), once worked out,
        and a sign when the breach check couldn't be made. -->
   @if (healthPill(); as pill) {
@@ -137,17 +138,23 @@
 </div>
 <app-coachmark #collectionsCoachmark stepId="shareWithCollections" />
 
-<!-- One entry: its name, then what it holds, right-aligned. With the menu
-     closed to icons, only the entries marked for the rail stay. -->
+<!-- One entry: its tile or icon and its name, then what it holds,
+     right-aligned. With the menu closed to icons, only the entries marked for
+     the rail stay, with their icons. Personal and each organization are the
+     folders' owners. -->
 <ng-template #entry let-e let-rail="rail">
   <bit-nav-item
     [class.keykeeper-menu-scope]="e.scope"
+    [class.keykeeper-menu-owner]="!rail && e.depth === 0"
     [text]="e.label"
-    [icon]="open || rail ? e.icon : undefined"
+    [icon]="open ? (e.tile ? undefined : e.icon) : rail ? e.icon : undefined"
     [treeDepth]="e.depth"
     [forceActiveStyles]="e.active"
     (mainContentClicked)="e.select()"
   >
+    @if (open && e.tile) {
+      <vault-keykeeper-category-tile slot="icon" [category]="e.tile" [size]="28" />
+    }
     <span slot="end" class="tw-flex tw-items-center tw-gap-1">
       @if (e.organization; as organization) {
         @if (!organization.enabled) {

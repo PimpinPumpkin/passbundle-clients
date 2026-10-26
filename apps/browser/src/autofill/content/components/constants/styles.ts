@@ -4,9 +4,11 @@ import { IconProps } from "../common-types";
 
 // Keykeeper: PassBundle's palettes for what the extension draws inside
 // websites (the save bar and its messages), as the web vault and the popup
-// have them (brand/look.css): the brand green, from brand/apply.mjs's palette
-// for #1F6F5C, and grays tinted toward it, so dark is green-black, not navy.
-// Danger, warning, and success keep upstream's colors.
+// have them (brand/look.css): light is the brand green, from brand/apply.mjs's
+// palette for #1F6F5C, with grays tinted toward it; dark is the popup's
+// neutral graphite, solid since the bar floats over a website, with emerald
+// for what you act on, never green-black or navy. Danger, warning, and
+// success keep upstream's colors.
 const lightTheme = {
   transparent: {
     hover: `rgb(0 0 0 / 0.02)`,
@@ -74,17 +76,17 @@ const darkTheme = {
   },
   shadow: `rgba(0, 0, 0)`,
   primary: {
-    100: `rgba(13, 47, 39)`,
-    300: `rgba(24, 87, 72)`,
-    600: `rgba(121, 169, 157)`,
-    700: `rgba(197, 218, 213)`,
+    100: `rgba(23, 48, 41)`,
+    300: `rgba(47, 120, 98)`,
+    600: `rgba(111, 212, 180)`,
+    700: `rgba(201, 240, 227)`,
   },
   secondary: {
-    100: `rgba(38, 52, 47)`,
-    300: `rgba(58, 79, 72)`,
-    500: `rgba(108, 132, 124)`,
-    600: `rgba(142, 166, 158)`,
-    700: `rgba(160, 182, 174)`,
+    100: `rgba(42, 46, 54)`,
+    300: `rgba(62, 67, 77)`,
+    500: `rgba(122, 129, 140)`,
+    600: `rgba(143, 150, 161)`,
+    700: `rgba(162, 168, 178)`,
   },
   success: {
     100: `rgba(11, 111, 21)`,
@@ -102,27 +104,27 @@ const darkTheme = {
     700: `rgba(255, 248, 228)`,
   },
   info: {
-    100: `rgba(24, 87, 72)`,
-    600: `rgba(121, 169, 157)`,
-    700: `rgba(226, 236, 234)`,
+    100: `rgba(23, 48, 41)`,
+    600: `rgba(111, 212, 180)`,
+    700: `rgba(201, 240, 227)`,
   },
   art: {
-    primary: `rgba(232, 242, 238)`,
+    primary: `rgba(238, 240, 243)`,
     accent: `rgba(143, 217, 193)`,
   },
   text: {
-    main: `rgba(232, 242, 238)`,
-    muted: `rgba(160, 182, 174)`,
-    contrast: `rgba(12, 21, 19)`,
+    main: `rgba(238, 240, 243)`,
+    muted: `rgba(162, 168, 178)`,
+    contrast: `rgba(6, 35, 27)`,
     alt2: `rgba(255, 255, 255)`,
     code: `rgba(255, 143, 208)`,
   },
   background: {
-    DEFAULT: `rgba(20, 32, 29)`,
-    alt: `rgba(12, 21, 19)`,
-    alt2: `rgba(34, 47, 43)`,
-    alt3: `rgba(38, 52, 47)`,
-    alt4: `rgba(12, 21, 19)`,
+    DEFAULT: `rgba(28, 31, 37)`,
+    alt: `rgba(17, 19, 24)`,
+    alt2: `rgba(43, 47, 53)`,
+    alt3: `rgba(42, 46, 54)`,
+    alt4: `rgba(17, 19, 24)`,
   },
   brandLogo: `rgba(255, 255, 255)`,
   passwordSpecial: `rgba(255, 141, 133)`,

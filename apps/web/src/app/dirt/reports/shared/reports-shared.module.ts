@@ -3,6 +3,7 @@ import { NgModule } from "@angular/core";
 
 import { PremiumBadgeComponent } from "@bitwarden/angular/billing/components/premium-badge";
 import { BaseCardComponent, CardContentComponent } from "@bitwarden/components";
+import { KeykeeperCategoryTileComponent } from "@bitwarden/vault";
 
 import { SharedModule } from "../../../shared/shared.module";
 
@@ -16,6 +17,7 @@ import { ReportListComponent } from "./report-list/report-list.component";
     BaseCardComponent,
     CardContentComponent,
     PremiumBadgeComponent,
+    KeykeeperCategoryTileComponent,
   ],
   declarations: [ReportCardComponent, ReportListComponent],
   exports: [ReportCardComponent, ReportListComponent],

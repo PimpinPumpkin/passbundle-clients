@@ -18,6 +18,7 @@ import { LogService } from "@bitwarden/logging";
 import {
   PasswordRepromptService,
   CipherFormConfigService,
+  KeykeeperItemTileComponent,
   RoutedVaultFilterBridgeService,
   RoutedVaultFilterService,
   Vfo1IconPipe,
@@ -45,6 +46,7 @@ import { ExposedPasswordsReportComponent as BaseExposedPasswordsReportComponent 
     RoutedVaultFilterBridgeService,
   ],
   imports: [
+    KeykeeperItemTileComponent,
     SharedModule,
     HeaderModule,
     OrganizationBadgeModule,

@@ -305,6 +305,38 @@ describe("KeykeeperVaultMenuComponent", () => {
     ]);
   });
 
+  it("shows jewel tiles for All items, Favorites, Health, and the categories, and marks the folders' owners", async () => {
+    const tiles = () =>
+      Array.from(el().querySelectorAll<HTMLElement>("bit-nav-item")).flatMap((row) => {
+        const tile = row.querySelector("vault-keykeeper-category-tile [data-jewel]");
+        return tile
+          ? [
+              `${row.querySelector("[data-testid=nav-item-interactive]")!.textContent!.trim()}: ${tile.getAttribute("data-category")}`,
+            ]
+          : [];
+      });
+    expect(tiles()).toEqual([
+      "allItems: all",
+      "Favorites: favorites",
+      "keykeeperHealth: health",
+      "Login: login",
+      "Card: card",
+    ]);
+    // A tile takes the place of the entry's icon; folders keep theirs.
+    const allItems = el().querySelector("bit-nav-item")!;
+    expect(allItems.querySelector("bit-icon")).toBeNull();
+    const owners = Array.from(el().querySelectorAll(".keykeeper-menu-owner")).map((row) =>
+      row.querySelector("[data-testid=nav-item-interactive]")!.textContent!.trim(),
+    );
+    expect(owners).toEqual(["My vault", "Contoso"]);
+
+    // Closed to icons, the rail has the icons, not the tiles.
+    sideNav.open.set(false);
+    await settle();
+    expect(el().querySelector("vault-keykeeper-category-tile")).toBeNull();
+    expect(el().querySelector("bit-nav-item bit-icon")).not.toBeNull();
+  });
+
   /** The rows upstream's nav item shows as active. */
   function showing(): string[] {
     return Array.from(el().querySelectorAll<HTMLElement>("bit-nav-item"))

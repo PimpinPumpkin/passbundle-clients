@@ -84,6 +84,16 @@ describe("KeykeeperItemHeroComponent", () => {
     expect(el().querySelector("vault-keykeeper-category-tile")).not.toBeNull();
   });
 
+  it("names the item one level under the page's heading where the page has its own, as in the web vault's panel", () => {
+    fixture = TestBed.createComponent(KeykeeperItemHeroComponent);
+    fixture.componentRef.setInput("cipher", item(CipherType.Login, "Contoso Mail"));
+    fixture.componentRef.setInput("headingLevel", 2);
+    fixture.detectChanges();
+
+    expect(el().querySelector("h1")).toBeNull();
+    expect(el().querySelector("h2")?.textContent?.trim()).toBe("Contoso Mail");
+  });
+
   it("names the organization's vault, and the item's folder or collections", () => {
     const organization = { name: "Contoso IT" } as Organization;
     const everyone = { name: "Everyone" } as CollectionView;

@@ -24,11 +24,11 @@ const KIND_KEYS: Record<CipherType, string> = {
 };
 
 /**
- * Keykeeper: the top of an item's page in the extension (DESIGN.md, "The
- * look"): its big tile, its name, and what it is and where it lives ("Login
- * in My vault", with the category's tiny tile), then whatever the page puts
- * under it, such as Fill on this page. Takes the place of upstream's details
- * card there.
+ * Keykeeper: the top of an item's page in the extension, and of the web
+ * vault's item panel (DESIGN.md, "The look"): its big tile, its name, and what
+ * it is and where it lives ("Login in My vault", with the category's tiny
+ * tile), then whatever the page puts under it, such as Fill on this page.
+ * Takes the place of upstream's details card there.
  */
 @Component({
   selector: "vault-keykeeper-item-hero",
@@ -38,7 +38,11 @@ const KIND_KEYS: Record<CipherType, string> = {
     <div data-part="hero" data-testid="keykeeper-item-hero">
       <vault-keykeeper-item-tile [cipher]="cipher()" hero />
       <div data-part="text">
-        <h1 data-part="name" data-testid="item-name">{{ cipher().name }}</h1>
+        @if (headingLevel() === 2) {
+          <h2 data-part="name" data-testid="item-name">{{ cipher().name }}</h2>
+        } @else {
+          <h1 data-part="name" data-testid="item-name">{{ cipher().name }}</h1>
+        }
         <span data-part="where" data-testid="keykeeper-item-where">
           <vault-keykeeper-category-tile [category]="category()" [size]="16" flat />
           <span data-part="where-text">{{ where() }}</span>
@@ -102,6 +106,8 @@ export class KeykeeperItemHeroComponent {
   readonly organization = input<Organization | undefined | null>(null);
   readonly folder = input<FolderView | undefined | null>(null);
   readonly collections = input<CollectionView[] | undefined | null>(null);
+  /** The name's heading level: the popup's page heading, or one under the web vault's page title. */
+  readonly headingLevel = input<1 | 2>(1);
 
   protected readonly category = computed(() => categoryOfItem(this.cipher()));
 

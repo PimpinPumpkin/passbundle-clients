@@ -31,6 +31,7 @@ import {
   CipherFormConfig,
   CipherFormConfigService,
   GetOrgNameFromIdPipe,
+  KeykeeperItemTileComponent,
   OrganizationNameBadgeComponent,
   PasswordRepromptService,
   VaultItemDialogComponent,
@@ -54,6 +55,7 @@ import {
   templateUrl: "passkey-report.component.html",
   standalone: true,
   imports: [
+    KeykeeperItemTileComponent,
     CommonModule,
     FormsModule,
     JslibModule,
