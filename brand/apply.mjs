@@ -612,16 +612,18 @@ function brandCli() {
     fail(`branded too little of the CLI (${JSON.stringify(counts)}). Upstream changed?`);
   }
 
-  // Its data folder ("<name> CLI", from the replacement above), one next to
-  // the program ("bw-data"), and the completion's command.
+  // Its data folder is "<name> CLI" (from the replacement above), or what
+  // PASSBUNDLE_APPDATA_DIR says. Upstream's portable folder next to the
+  // program ("bw-data") is gone: a folder beside a program others can reach
+  // (a shared tools folder, say) would hold the person's tokens and API key.
   const container = "apps/cli/src/service-container/service-container.ts";
   if ((read(container).match(new RegExp(`${BRAND.name} CLI"`, "g")) ?? []).length < 4) {
     fail(`${container} no longer names the data folder "Bitwarden CLI". Update brand/apply.mjs.`);
   }
   replaceAnchored(
     container,
-    /path\.dirname\(process\.execPath\), "bw-data"\)/,
-    `path.dirname(process.execPath), ${JSON.stringify(`${command}-data`)})`,
+    /const relativeDataDir = path\.join\(path\.dirname\(process\.execPath\), "bw-data"\);\s*if \(fs\.existsSync\(relativeDataDir\)\) \{\s*p = relativeDataDir;\s*\} else if \(process\.env\.BITWARDENCLI_APPDATA_DIR\)/,
+    "if (process.env.BITWARDENCLI_APPDATA_DIR)",
   );
   replaceAnchored(
     "apps/cli/src/commands/completion.command.ts",
