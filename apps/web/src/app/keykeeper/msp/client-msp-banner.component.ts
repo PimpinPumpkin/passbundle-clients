@@ -13,6 +13,8 @@ import { ErrorResponse } from "@bitwarden/common/models/response/error.response"
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { ButtonModule, CalloutModule, DialogService, ToastService } from "@bitwarden/components";
 
+import { KeykeeperMspRemovedDialogComponent } from "../offboarding/msp-removed-dialog.component";
+
 import { ClientMsp, KeykeeperMspApiService } from "./msp-api.service";
 import { describeStaffRole } from "./technician-access";
 
@@ -20,7 +22,8 @@ import { describeStaffRole } from "./technician-access";
  * Keykeeper: on a client organization's Members page, which MSP manages it,
  * who its staff are, and what each can do there (their role, a custom role's
  * permissions, and whether they see vault items). The client's own owners can
- * remove the MSP, which takes all of its staff out of the organization at once.
+ * remove the MSP, which takes all of its staff out of the organization at once,
+ * with what they made there, and then says what went.
  */
 @Component({
   selector: "app-keykeeper-client-msp-banner",
@@ -46,6 +49,8 @@ import { describeStaffRole } from "./technician-access";
 })
 export class KeykeeperClientMspBannerComponent {
   readonly organization = input.required<Organization>();
+  /** The page's member list: a change, such as a removal, reads the MSP's people again. */
+  readonly members = input<unknown>(null);
   /** The MSP was removed, so the member list has changed. */
   readonly removed = output<void>();
 
@@ -75,6 +80,8 @@ export class KeykeeperClientMspBannerComponent {
   ) {
     effect(() => {
       const org = this.organization();
+      // Keykeeper: a change to the page's member list (someone removed) reads it again.
+      this.members();
       if (org.isOwner || org.isAdmin) {
         this.mspApi.getOrganizationMsp(org.id).then(
           (info) => this.info.set(info),
@@ -88,7 +95,7 @@ export class KeykeeperClientMspBannerComponent {
   protected async remove(name: string) {
     const confirmed = await this.dialogService.openSimpleDialog({
       title: `Remove ${name}?`,
-      content: `${name}'s staff lose access to this organization right away. To work with ${name} again, they'll need to add you as a client again.`,
+      content: `${name}'s staff lose access to this organization right away, and so does what they made here: script and provisioning tokens, event destinations, and ${name}'s install command. To work with ${name} again, they'll need to add you as a client again.`,
       acceptButtonText: `Remove ${name}`,
       type: "warning",
     });
@@ -96,10 +103,11 @@ export class KeykeeperClientMspBannerComponent {
       return;
     }
     try {
-      await this.mspApi.removeOrganizationMsp(this.organization().id);
+      const removal = await this.mspApi.removeOrganizationMsp(this.organization().id);
       this.info.set(null);
-      this.toastService.showToast({ variant: "success", message: `Removed ${name}` });
       this.removed.emit();
+      // Keykeeper: what went with it, and what to review (DESIGN.md, "Offboarding").
+      this.dialogService.open(KeykeeperMspRemovedDialogComponent, { data: removal });
     } catch (e) {
       const message = e instanceof ErrorResponse ? e.getSingleMessage() : String(e);
       this.toastService.showToast({ variant: "error", message });

@@ -90,6 +90,10 @@ import { KeykeeperMspWorkService } from "../msp/msp-work.service";
           @if (v.token; as t) {
             <p bitTypography="body2" data-testid="provisioning-token-info">
               Made {{ t.createdAt | date: "medium" }} by {{ t.createdBy }}.
+              @if (t.creatorLostAccess) {
+                It stopped working: {{ t.createdBy }} no longer manages this organization. Replace
+                the token and paste the new one into Entra.
+              }
               @if (t.lastUsedAt) {
                 Last sync {{ t.lastUsedAt | date: "medium" }} from {{ t.lastUsedIp }}.
               } @else {

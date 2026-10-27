@@ -234,6 +234,10 @@ export class KeykeeperScriptAccessComponent {
     if (new Date(t.expiresAt).getTime() <= Date.now()) {
       return { label: "Expired", variant: "danger" };
     }
+    // Keykeeper: a token works only while whoever made it manages the organization.
+    if (t.creatorLostAccess) {
+      return { label: "Stopped: its maker left", variant: "danger" };
+    }
     if (new Date(t.expiresAt).getTime() - Date.now() < 14 * 86_400_000) {
       return { label: "Expires soon", variant: "warning" };
     }
