@@ -365,6 +365,12 @@ export type SsoView = {
     linkedAt: string;
     lastUsedAt: string | null;
   }[];
+  /**
+   * Members "Require single sign-on" covers (or would) who aren't linked yet.
+   * With it on, their next password sign-in, after two-step login, asks them
+   * to link their Microsoft account before anything else.
+   */
+  unlinked: { memberId: string; userId: string; email: string; name: string | null }[];
   /** Only in the answer to a domain check: whether the record was there. */
   check?: { domain: string; found: boolean };
   /** Only in the answer to replacing API keys: how many were replaced. */

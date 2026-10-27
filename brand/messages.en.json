@@ -735,5 +735,11 @@
         "example": "vault.passbundle.com"
       }
     }
+  },
+  "keykeeperSsoLinkInWebVault": {
+    "message": "Your organization requires single sign-on, and your account isn't linked to it yet. Sign in to the web vault with your email and master password to link it, then sign in here with single sign-on."
+  },
+  "keykeeperLinkSsoVerify": {
+    "message": "Confirm it's you to link your account to this organization's single sign-on. Microsoft then asks which account to use, and you confirm it before anything is linked."
   }
 }

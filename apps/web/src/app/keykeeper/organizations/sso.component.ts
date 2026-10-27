@@ -42,9 +42,11 @@ import { KeykeeperMspApiService } from "../msp/msp-api.service";
           </p>
           <p bitTypography="body2" data-testid="sso-how-people-link">
             People you invite who don't have an account yet just sign in with Microsoft and choose a
-            master password. People who already have an account sign in with their master password
-            once, open this organization's menu in their vault, and choose Link SSO; after that,
-            Microsoft signs them in. Each link is emailed to the account.
+            master password. People who already have an account link it themselves: they open this
+            organization's menu in their vault, choose Link SSO, confirm their master password, pick
+            their Microsoft account, and confirm the link. With single sign-on required, PassBundle
+            asks them to when they next sign in with their password. After that, Microsoft signs
+            them in. Each link is emailed to the account.
           </p>
           <p bitTypography="body2" data-testid="sso-status">
             @if (v.enabled) {
@@ -243,13 +245,30 @@ import { KeykeeperMspApiService } from "../msp/msp-api.service";
           <h2 bitTypography="h3" class="tw-mt-8">Requiring it</h2>
           <p bitTypography="body2" data-testid="sso-require">
             The Require single sign-on policy makes members sign in with it. Owners and your IT
-            provider's staff can always use their passwords, so nobody is locked out, and account
-            recovery keeps working. It needs single sign-on on and the Single organization policy.
-            It's {{ v.requireSso ? "on" : "off" }}.
+            provider's staff can always use their passwords, and account recovery keeps working. It
+            needs single sign-on on and the Single organization policy, and the tenant can't change
+            while it's on. It's {{ v.requireSso ? "on" : "off" }}.
             <a bitLink [routerLink]="['/organizations', organizationId(), 'settings', 'policies']"
               >Policies</a
             >
           </p>
+          @if (v.unlinked.length > 0) {
+            <p bitTypography="body2" data-testid="sso-unlinked-note">
+              @if (v.requireSso) {
+                These members aren't linked yet.
+              } @else {
+                These members aren't linked yet, so they'd be asked to link if you require it.
+              }
+              Their open sessions end at their next refresh. When they next sign in with their email
+              and master password (and two-step login, if they use it), PassBundle asks them to link
+              their Microsoft account before anything else; then Microsoft signs them in.
+            </p>
+            <ul class="tw-list-none tw-p-0" data-testid="sso-unlinked">
+              @for (u of v.unlinked; track u.userId) {
+                <li class="tw-py-1">{{ u.name ? u.name + " (" + u.email + ")" : u.email }}</li>
+              }
+            </ul>
+          }
           @if (v.requireSso) {
             <p bitTypography="body2" data-testid="sso-api-keys">
               An API key (the command-line tool's) still signs in without single sign-on. To make
