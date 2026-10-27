@@ -1,38 +1,53 @@
+jest.mock("./keykeeper-origins", () => ({
+  EXTENSION_ORIGINS: ["chrome-extension://cenoidjoogmoieibpcokkafjnaabhokg"],
+}));
+
 import {
-  getQsParam,
+  allowedParentOrigin,
   b64Decode,
-  buildMobileDeeplinkUriFromParam,
-  isKnownCloudOrigin,
-  resolvePostMessageOrigin,
+  framedOnlyBy,
+  getQsParam,
+  isAllowedOrigin,
 } from "./common";
 
-describe("common connector utilities", () => {
-  describe("getQsParam", () => {
-    function setHref(url: string) {
-      Object.defineProperty(window, "location", {
-        value: { href: url },
-        writable: true,
-        configurable: true,
-      });
-    }
+const vault = "https://vault.example.com";
+const extension = "chrome-extension://cenoidjoogmoieibpcokkafjnaabhokg";
 
+function setLocation(href: string, ancestorOrigins?: string[]) {
+  const url = new URL(href);
+  Object.defineProperty(window, "location", {
+    value: { href, hostname: url.hostname, origin: url.origin, ancestorOrigins },
+    writable: true,
+    configurable: true,
+  });
+}
+
+function setParent(parent: Window | object) {
+  Object.defineProperty(window, "parent", { value: parent, configurable: true });
+}
+
+describe("common connector utilities", () => {
+  const ownParent = window.parent;
+  afterEach(() => setParent(ownParent));
+
+  describe("getQsParam", () => {
     it("returns the value for an existing query parameter", () => {
-      setHref("https://example.com?foo=bar");
+      setLocation("https://example.com?foo=bar");
       expect(getQsParam("foo")).toBe("bar");
     });
 
     it("returns null when the parameter does not exist", () => {
-      setHref("https://example.com?foo=bar");
+      setLocation("https://example.com?foo=bar");
       expect(getQsParam("missing")).toBeNull();
     });
 
     it("decodes URI-encoded values", () => {
-      setHref("https://example.com?msg=hello%20world");
+      setLocation("https://example.com?msg=hello%20world");
       expect(getQsParam("msg")).toBe("hello world");
     });
 
     it("returns empty string for a parameter with no value", () => {
-      setHref("https://example.com?flag&other=1");
+      setLocation("https://example.com?flag&other=1");
       expect(getQsParam("flag")).toBe("");
     });
   });
@@ -50,209 +65,84 @@ describe("common connector utilities", () => {
     });
   });
 
-  describe("buildMobileDeeplinkUriFromParam", () => {
-    function setLocation(href: string, hostname: string) {
-      Object.defineProperty(window, "location", {
-        value: { href, hostname },
-        writable: true,
-        configurable: true,
-      });
-    }
+  describe("isAllowedOrigin", () => {
+    beforeEach(() => setLocation(`${vault}/webauthn-connector.html`));
 
-    describe("when deeplinkScheme=https", () => {
-      it("returns https://bitwarden.com for .com vaults", () => {
-        setLocation(
-          "https://vault.bitwarden.com/connector?deeplinkScheme=https",
-          "vault.bitwarden.com",
-        );
-        expect(buildMobileDeeplinkUriFromParam("webauthn")).toBe(
-          "https://bitwarden.com/webauthn-callback",
-        );
-      });
-
-      it("returns https://bitwarden.eu for .eu vaults", () => {
-        setLocation(
-          "https://vault.bitwarden.eu/connector?deeplinkScheme=https",
-          "vault.bitwarden.eu",
-        );
-        expect(buildMobileDeeplinkUriFromParam("webauthn")).toBe(
-          "https://bitwarden.eu/webauthn-callback",
-        );
-      });
-
-      it("returns https://bitwarden.pw for .pw vaults", () => {
-        setLocation(
-          "https://vault.bitwarden.pw/connector?deeplinkScheme=https",
-          "vault.bitwarden.pw",
-        );
-        expect(buildMobileDeeplinkUriFromParam("webauthn")).toBe(
-          "https://bitwarden.pw/webauthn-callback",
-        );
-      });
-
-      it("returns https://bitwarden-gov.com for bitwarden-gov vaults", () => {
-        setLocation(
-          "https://vault.bitwarden-gov.com/connector?deeplinkScheme=https",
-          "vault.bitwarden-gov.com",
-        );
-        expect(buildMobileDeeplinkUriFromParam("webauthn")).toBe(
-          "https://bitwarden-gov.com/webauthn-callback",
-        );
-      });
-
-      it("defaults to bitwarden.com for unknown hostnames", () => {
-        setLocation(
-          "https://self-hosted.example.com/connector?deeplinkScheme=https",
-          "self-hosted.example.com",
-        );
-        expect(buildMobileDeeplinkUriFromParam("webauthn")).toBe(
-          "https://bitwarden.com/webauthn-callback",
-        );
-      });
+    it("allows the page's own origin and PassBundle's extension", () => {
+      expect(isAllowedOrigin(vault)).toBe(true);
+      expect(isAllowedOrigin(extension)).toBe(true);
     });
 
-    describe("when deeplinkScheme is not https", () => {
-      it("returns bitwarden:// for bitwarden scheme", () => {
-        setLocation(
-          "https://vault.bitwarden.com/connector?deeplinkScheme=bitwarden",
-          "vault.bitwarden.com",
-        );
-        expect(buildMobileDeeplinkUriFromParam("webauthn")).toBe("bitwarden://webauthn-callback");
-      });
-
-      it("returns bitwarden:// when deeplinkScheme is absent", () => {
-        setLocation("https://vault.bitwarden.com/connector", "vault.bitwarden.com");
-        expect(buildMobileDeeplinkUriFromParam("webauthn")).toBe("bitwarden://webauthn-callback");
-      });
-    });
-
-    describe("duo kind", () => {
-      it("builds correct path for duo callbacks", () => {
-        setLocation(
-          "https://vault.bitwarden.com/connector?deeplinkScheme=https",
-          "vault.bitwarden.com",
-        );
-        expect(buildMobileDeeplinkUriFromParam("duo")).toBe("https://bitwarden.com/duo-callback");
-      });
+    it.each([
+      ["another site", "https://attacker.example.net"],
+      ["a lookalike of the vault", "https://vault.example.com.attacker.example.net"],
+      ["the vault on another port", "https://vault.example.com:8443"],
+      ["the vault over http", "http://vault.example.com"],
+      ["another extension", "chrome-extension://nngceckbapebfimnlniiiahkandclblb"],
+      ["any Firefox extension", "moz-extension://4b1e6a52-0000-4000-8000-000000000000"],
+      ["an opaque origin", "null"],
+      ["nothing", ""],
+    ])("refuses %s", (_, origin) => {
+      expect(isAllowedOrigin(origin)).toBe(false);
     });
   });
 
-  describe("isKnownCloudOrigin", () => {
-    function setLocation(href: string, hostname: string) {
-      Object.defineProperty(window, "location", {
-        value: { href, hostname },
-        writable: true,
-        configurable: true,
-      });
-    }
+  describe("allowedParentOrigin", () => {
+    beforeEach(() => setLocation(`${vault}/webauthn-connector.html`));
 
-    describe("recognizes Bitwarden-managed domains", () => {
-      it.each([
-        ["vault.bitwarden.com", "production .com subdomain"],
-        ["vault.bitwarden.eu", "production .eu subdomain"],
-        ["vault.qa.bitwarden.pw", "multi-level .pw subdomain"],
-        ["vault.bitwarden-gov.com", "production -gov subdomain"],
-      ])("returns true for %s (%s)", (hostname) => {
-        setLocation(`https://${hostname}/connector`, hostname);
-        expect(isKnownCloudOrigin()).toBe(true);
-      });
+    it("gives the origin of a parent on the web vault itself", () => {
+      expect(allowedParentOrigin(`${vault}/#/2fa`)).toBe(vault);
     });
 
-    describe("rejects unmanaged domains", () => {
-      it("returns false for localhost", () => {
-        setLocation("http://localhost/connector", "localhost");
-        expect(isKnownCloudOrigin()).toBe(false);
-      });
+    it("gives the origin of a parent in PassBundle's extension", () => {
+      expect(allowedParentOrigin(`${extension}/popup/index.html#/2fa`)).toBe(extension);
+    });
 
-      it("returns false for a customer self-hosted domain", () => {
-        setLocation("https://vault.customer.com/connector", "vault.customer.com");
-        expect(isKnownCloudOrigin()).toBe(false);
-      });
-
-      it("returns false for a domain that contains but does not end with a managed TLD", () => {
-        setLocation("https://not-bitwarden.com/connector", "not-bitwarden.com");
-        expect(isKnownCloudOrigin()).toBe(false);
-      });
-
-      it("returns false for a domain that contains but does not end with the managed gov suffix", () => {
-        setLocation("https://not-bitwarden-gov.com/connector", "not-bitwarden-gov.com");
-        expect(isKnownCloudOrigin()).toBe(false);
-      });
-
-      it("returns false for the bare marketing domain", () => {
-        setLocation("https://bitwarden.com/connector", "bitwarden.com");
-        expect(isKnownCloudOrigin()).toBe(false);
-      });
-
-      it("returns false when a managed TLD appears as a non-terminal segment", () => {
-        setLocation(
-          "https://vault.bitwarden.com.not-bitwarden.com/connector",
-          "vault.bitwarden.com.not-bitwarden.com",
-        );
-        expect(isKnownCloudOrigin()).toBe(false);
-      });
-
-      it("returns false for an empty hostname", () => {
-        setLocation("", "");
-        expect(isKnownCloudOrigin()).toBe(false);
-      });
+    it.each([
+      ["another site", "https://attacker.example.net/phish.html"],
+      ["a file", "file:///Users/someone/phish.html"],
+      ["upstream's extension", "chrome-extension://nngceckbapebfimnlniiiahkandclblb/popup.html"],
+      ["a data URL", "data:text/html,<p>hi</p>"],
+      ["no URL at all", "not a url"],
+      ["nothing", null],
+    ])("gives nothing for %s", (_, parent) => {
+      expect(allowedParentOrigin(parent)).toBeNull();
     });
   });
 
-  describe("resolvePostMessageOrigin", () => {
-    function setLocation(hostname: string, origin: string) {
-      Object.defineProperty(window, "location", {
-        value: { hostname, origin, href: origin + "/connector" },
-        writable: true,
-        configurable: true,
-      });
-    }
+  describe("framedOnlyBy", () => {
+    const framedBy = { postMessage: jest.fn() };
 
-    describe("on Bitwarden-managed domains", () => {
-      it("returns window.location.origin when parent is a web URL", () => {
-        setLocation("vault.bitwarden.com", "https://vault.bitwarden.com");
-        expect(resolvePostMessageOrigin("https://vault.bitwarden.com/some-page")).toBe(
-          "https://vault.bitwarden.com",
-        );
-      });
-
-      it("returns window.location.origin regardless of the provided parent URL", () => {
-        setLocation("vault.bitwarden.com", "https://vault.bitwarden.com");
-        expect(resolvePostMessageOrigin("https://unrelated.example.com")).toBe(
-          "https://vault.bitwarden.com",
-        );
-      });
-
-      it("preserves a file:// parent URL for desktop compatibility", () => {
-        setLocation("vault.bitwarden.com", "https://vault.bitwarden.com");
-        expect(resolvePostMessageOrigin("file:///path/to/electron/index.html")).toBe(
-          "file:///path/to/electron/index.html",
-        );
-      });
-
-      it("returns window.location.origin when parent URL is null", () => {
-        setLocation("vault.bitwarden.com", "https://vault.bitwarden.com");
-        expect(resolvePostMessageOrigin(null)).toBe("https://vault.bitwarden.com");
-      });
-
-      it("returns window.location.origin when parent URL is invalid", () => {
-        setLocation("vault.bitwarden.com", "https://vault.bitwarden.com");
-        expect(resolvePostMessageOrigin("not-a-url")).toBe("https://vault.bitwarden.com");
-      });
+    it("is false for a page that isn't framed", () => {
+      setLocation(`${vault}/webauthn-connector.html`, []);
+      setParent(window);
+      expect(framedOnlyBy(vault)).toBe(false);
     });
 
-    describe("on unmanaged domains", () => {
-      it("returns the provided parent URL unchanged", () => {
-        setLocation("vault.customer.com", "https://vault.customer.com");
-        expect(resolvePostMessageOrigin("https://vault.customer.com/page")).toBe(
-          "https://vault.customer.com/page",
-        );
-      });
+    it("is true when the browser lists only allowed pages around it, nearest first", () => {
+      setParent(framedBy);
+      setLocation(`${vault}/webauthn-connector.html`, [vault]);
+      expect(framedOnlyBy(vault)).toBe(true);
+      setLocation(`${vault}/webauthn-connector.html`, [extension]);
+      expect(framedOnlyBy(extension)).toBe(true);
+    });
 
-      it("returns null when parent URL is null", () => {
-        setLocation("vault.customer.com", "https://vault.customer.com");
-        expect(resolvePostMessageOrigin(null)).toBeNull();
-      });
+    it("is false when the nearest page isn't the parent it was given", () => {
+      setParent(framedBy);
+      setLocation(`${vault}/webauthn-connector.html`, ["https://attacker.example.net"]);
+      expect(framedOnlyBy(vault)).toBe(false);
+    });
+
+    it("is false when any page further out is another site", () => {
+      setParent(framedBy);
+      setLocation(`${vault}/webauthn-connector.html`, [vault, "https://attacker.example.net"]);
+      expect(framedOnlyBy(vault)).toBe(false);
+    });
+
+    it("leaves the check to postMessage where the browser lists no ancestors", () => {
+      setParent(framedBy);
+      setLocation(`${vault}/webauthn-connector.html`);
+      expect(framedOnlyBy(vault)).toBe(true);
     });
   });
 });

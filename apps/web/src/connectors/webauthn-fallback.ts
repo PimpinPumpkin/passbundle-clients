@@ -89,8 +89,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   subtitle.innerText = localeService.t("followTheStepsBelowToFinishLoggingInWithSecurityKey");
 });
 
+// PassBundle: the extension opens this page in a tab of its own. Inside any
+// frame it asks no security key, so a page elsewhere can't frame it and steer
+// someone into answering one (DESIGN.md, "Connector pages").
+const framed = window.top !== window.self;
+
 function start() {
   if (sentSuccess) {
+    return;
+  }
+
+  if (framed) {
+    error("This page works only in a tab of its own.");
     return;
   }
 
@@ -132,7 +142,11 @@ async function initWebAuthn(obj: any) {
 
     const dataString = buildDataString(assertedCredential);
     const remember = (document.getElementById("remember") as HTMLInputElement).checked;
-    window.postMessage({ command: "webAuthnResult", data: dataString, remember: remember }, "*");
+    // To this page only: the extension's content script here passes it on.
+    window.postMessage(
+      { command: "webAuthnResult", data: dataString, remember: remember },
+      window.location.origin,
+    );
 
     sentSuccess = true;
     success(localeService.t("webAuthnSuccess"));

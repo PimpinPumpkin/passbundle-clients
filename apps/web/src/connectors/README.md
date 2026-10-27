@@ -1,74 +1,58 @@
 # Web Connectors
 
+Small pages the web vault serves for steps that run outside the app: a security key, Duo, and
+single sign-on. They read their inputs from the address, so anyone can open or frame them with
+inputs of their choosing. PassBundle's rules for them (DESIGN.md, "Connector pages"):
+
+- A connector sends what it learns only to the web vault's own origin or to PassBundle's own
+  browser extension (`isAllowedOrigin()`, `common.ts`). Upstream trusted any `parent` named in the
+  address on a self-hosted server, so a page anywhere could frame the security key connector and
+  receive the key's answer.
+- PassBundle's extension origins come from `brand/brand.json` (`extension.chromiumId`), which
+  `brand/apply.mjs` writes into `keykeeper-origins.ts` at build time. An unbranded build answers
+  the web vault only.
+- The server sends every connector page with `frame-ancestors 'self'` and PassBundle's extension
+  origins, so other sites can't frame one at all.
+- Upstream's deep links back to its mobile and desktop apps (`bitwarden://...-callback`,
+  `https://bitwarden.com/...-callback`) are gone: PassBundle's own apps don't use these pages.
+
 ## WebAuthn Flow
 
-> NOTE: This flow currently describes a transitory state that this web connector is regarding the mobile client governing the scheme for linking back to the application. This will be moving to leveraging detecting the cloud environment and using the corresponding protocols.
+Two pages:
 
-Three HTML variants are built from the same TS entry point (`webauthn.ts`):
+- `webauthn-connector.html` (`webauthn.ts`, template `webauthn.html`): a frame on the web vault's
+  two-step login page.
+- `webauthn-fallback-connector.html` (`webauthn-fallback.ts`, template `webauthn-fallback.html`): a
+  tab of its own, which the browser extension opens.
 
-- `webauthn-connector.html` — iframe embed for web vault and desktop (template: `webauthn.html`)
-- `webauthn-mobile-connector.html` — full-page mobile UI with logo and security key image (template: `webauthn-mobile.html`)
-- `webauthn-fallback-connector.html` — Firefox new-tab fallback (template: `webauthn-fallback.html`, uses separate entry point `webauthn-fallback.ts`)
+Both share `common-webauthn.ts` for credential parsing (`parseWebauthnJson()`) and assertion
+serialization (`buildDataString()`).
 
-All variants share `common-webauthn.ts` for assertion serialization (`buildDataString()`) and
-credential parsing (`parseWebauthnJson()`), and `common.ts` for query param parsing and deeplink URI
-construction.
+### Web Vault Frame
 
-The connector supports two parameter protocols selected by the `v` query param
-(`webauthn.ts`):
+The `WebAuthnIFrame` class (`libs/common/src/auth/webauthn-iframe.ts`) frames the connector.
 
-- **V1:** base64-encoded `data` + individual query params (`data`, `parent`, `btnText`,
-  `btnAwaitingInteractionText`, `v=1`). Used by iframe and fallback flows.
-- **V2:** JSON-encoded `data` object containing `{ data, headerText, btnText, btnReturnText,
-mobile? }`, plus `deeplinkScheme` query param. Used by mobile flows.
+1. `WebAuthnIFrame.init()` embeds `webauthn-connector.html` with `allow="publickey-credentials-get <origin>"`, passing `data` (base64 JSON), `parent` (the embedding page's URL), `btnText`, `btnAwaitingInteractionText`, and `v=1`
+2. The connector takes the parent's origin only when it is the web vault's own origin or PassBundle's extension (`allowedParentOrigin()`), and only when every page around it is one of those, where the browser lists them (`framedOnlyBy()`, from `location.ancestorOrigins`)
+3. Otherwise it refuses: no security key prompt, no message, and a page that says so
+4. It sends `info|ready`, then `success|<data>` or `error|<message>`, with `postMessage` to that origin only, never `*`
+5. It takes `stop` and `start` only from its parent window at that origin
+6. `WebAuthnIFrame.parseMessage()` accepts messages only from the connector's origin
 
-Core interaction: `parseWebauthnJson()` converts the base64url challenge and allowCredentials IDs to
-`Uint8Array`. On non-Safari browsers, `navigator.credentials.get({ publicKey })` is called
-automatically on load; Safari requires a user-initiated button click (`webauthn.ts`). On
-success, `buildDataString()` serializes the `PublicKeyCredential` response (id, rawId,
-authenticatorData, clientDataJSON, signature) to JSON with base64url encoding.
+### Browser Extension Tab
 
-### Mobile App Callback
+The extension never frames a connector: `ExtensionTwoFactorAuthWebAuthnComponentService` opens
+`webauthn-fallback-connector.html` in a new tab.
 
-1. Mobile app opens auth web view to `webauthn-mobile-connector.html` (or `webauthn-connector.html`), passing `deeplinkScheme` and V2 `data` query params
-2. Connector parses V2 parameters: JSON-decodes the base64 `data` param to extract the webauthn challenge object, header text, and button labels (`webauthn.ts`)
-3. Connector displays "read security key" button
-4. User interacts with security key
-5. Connector calls `navigator.credentials.get({ publicKey })` and serializes the assertion via `buildDataString()`
-6. Connector builds callback URI via `buildMobileDeeplinkUriFromParam("webauthn")` (`common.ts`): `deeplinkScheme=https` → `https://bitwarden.com/webauthn-callback` (host varies by region: `.eu`, `.pw`); otherwise → `bitwarden://webauthn-callback`
-7. Redirects via `document.location.replace(callbackUri + "?data=" + encodedData)` (`webauthn.ts`); a fallback "Return" button is rendered in case scripted navigation is blocked (`webauthn.ts`)
-8. Mobile OS intercepts the URL and returns control to the app
-9. Mobile app receives the WebAuthn assertion data
-10. **Error path:** redirects to `callbackUri + "?error=" + encodedMessage` instead (`webauthn.ts`)
+1. `webauthn-fallback.ts` asks no security key inside any frame
+2. The user clicks "Read security key", and `navigator.credentials.get({ publicKey })` runs on the vault's own origin
+3. On success it sends `window.postMessage({ command: "webAuthnResult", data, remember }, window.location.origin)` to its own window
+4. The extension's content script (`content-message-handler.ts`) forwards it to the background, which checks the referrer is a known vault (`isValidVaultReferrer()`, `runtime.background.ts`) and opens the two-step login popout with the answer
 
-### Web Vault / Iframe Callback
-
-The `WebAuthnIFrame` class (`libs/common/src/auth/webauthn-iframe.ts`) manages the iframe lifecycle
-for both web vault and desktop.
-
-1. `WebAuthnIFrame.init()` embeds `webauthn-connector.html` in an iframe with `allow="publickey-credentials-get <origin>"` (`webauthn-iframe.ts`)
-2. Passes V1 params: `data` (base64-encoded JSON), `parent` (embedding page URL), `btnText`, `btnAwaitingInteractionText`, `v=1` (`webauthn-iframe.ts`)
-3. Connector sends `parent.postMessage("info|ready", parentUrl)` on load (`webauthn.ts`)
-4. On non-Safari browsers, `navigator.credentials.get()` fires automatically; Safari waits for button click
-5. On success, connector sends `parent.postMessage("success|<data>", parentUrl)` (`webauthn.ts`); on failure, sends `parent.postMessage("error|<message>", parentUrl)` (`webauthn.ts`)
-6. `WebAuthnIFrame.parseMessage()` splits the pipe-delimited message and invokes the registered `successCallback`, `errorCallback`, or `infoCallback` (`webauthn-iframe.ts`)
-7. Parent can send `"stop"` / `"start"` messages to pause and resume the WebAuthn attempt (`webauthn.ts`, `webauthn-iframe.ts`)
-
-### Browser Extension / Firefox Fallback Callback
-
-Firefox cannot use WebAuthn inside an extension iframe, so `WebAuthnIFrame` opens
-`webauthn-fallback-connector.html` in a new tab instead (`webauthn-iframe.ts`).
-
-1. `webauthn-fallback.ts` loads, parses V1 parameters including `parent` and `locale` for i18n (`webauthn-fallback.ts`)
-2. User clicks "Read Security Key" button, triggering `navigator.credentials.get({ publicKey })` (`webauthn-fallback.ts`)
-3. On success, connector sends `window.postMessage({ command: "webAuthnResult", data: dataString, remember }, "*")` (`webauthn-fallback.ts`)
-4. The browser extension's content script (`content-message-handler.ts`) picks up the `webAuthnResult` message and forwards it via `chrome.runtime.sendMessage()` to the background service worker
-5. Background handler (`runtime.background.ts`) validates the referrer is a known vault URL via `isValidVaultReferrer()` (`runtime.background.ts`)
-6. On success, opens a 2FA popout at `popup/index.html#/2fa;webAuthnResponse=...;remember=...` via `openTwoFactorAuthWebAuthnPopout()` (`auth-popout-window.ts`)
+The server refuses an answer made in a frame on another site (clientDataJSON `crossOrigin: true`
+with a `topOrigin` that isn't the vault or PassBundle's extension), whatever page asked for it.
 
 ## Duo Flow
-
-> NOTE: This flow currently describes a transitory state that this web connector is regarding the mobile client governing the scheme for linking back to the application. This will be moving to leveraging detecting the cloud environment and using the corresponding protocols.
 
 The Duo connector is `duo-redirect-connector.html` (source: `duo-redirect.ts`, template:
 `duo-redirect.html`). It serves two purposes:
@@ -80,21 +64,11 @@ The Duo connector is `duo-redirect-connector.html` (source: `duo-redirect.ts`, t
    no custom ports, and pathname `/oauth/v1/authorize`.
 2. **Result dispatch:** When Duo's OAuth flow completes, the callback returns to
    `duo-redirect-connector.html` with `client`, `code`, and `state` query params. The connector
-   routes the result to the correct client based on the `client` param (`duo-redirect.ts`).
+   hands the result to the web vault or the extension, on its own origin only. Any other `client`
+   gets nothing.
 
-All clients ultimately construct a 2FA token as `code|state` (`Duo2faResult.token`), submitted via
+Both construct a 2FA token as `code|state` (`Duo2faResult.token`), submitted via
 `loginStrategyService.logInTwoFactor()`.
-
-### Mobile App Callback
-
-1. Mobile app attempts login with connect token, supplying a `deeplinkScheme` form value
-2. Server returns failed login response with Duo token containing `AuthUrl` whose `redirect_uri` points back to `duo-redirect-connector.html?client=mobile&deeplinkScheme=...`
-3. Mobile app navigates to the Duo authentication URL
-4. User completes Duo 2FA (push, SMS, etc.)
-5. Duo redirects to `duo-redirect-connector.html?client=mobile&code=...&state=...&deeplinkScheme=...`
-6. Connector calls `buildMobileDeeplinkUriFromParam("duo")` (`common.ts`): `deeplinkScheme=https` → `https://bitwarden.com/duo-callback` (host varies by region: `.eu`, `.pw`); otherwise → `bitwarden://duo-callback`. Redirects via `document.location.replace(uri + "?code=...&state=...")` (`duo-redirect.ts`)
-7. Mobile OS intercepts the URL and returns control to the app
-8. Mobile app receives Duo code/state and completes authentication
 
 ### Web App Callback
 
@@ -114,15 +88,6 @@ All clients ultimately construct a 2FA token as `code|state` (`Duo2faResult.toke
 5. Content script (`content-message-handler.ts`) picks up the `duoResult` message and forwards it via `chrome.runtime.sendMessage()` to the extension
 6. `ExtensionTwoFactorAuthDuoComponentService.listenForDuo2faResult$()` receives the message through the extension's messaging system and maps it to a `Duo2faResult` (`extension-two-factor-auth-duo-component.service.ts`)
 7. Connector displays a "you may close this window" handoff message (`duo-redirect.ts`)
-
-### Desktop App Callback
-
-1. Desktop navigates to `duo-redirect-connector.html?duoFramelessUrl=<encoded-duo-auth-url>&handOffMessage=<encoded-json>` (`desktop-two-factor-auth-duo-component.service.ts`)
-2. Connector validates the Duo URL and redirects to Duo (`duo-redirect.ts`)
-3. After Duo auth, callback returns to `duo-redirect-connector.html?client=desktop&code=...&state=...`
-4. Connector displays a handoff message, then redirects to `bitwarden://duo-callback?code=...&state=...` (hardcoded `mobileDesktopCallback`, `duo-redirect.ts`)
-5. `processDeepLink()` (`app.component.ts`) detects the `bitwarden://duo-callback` URI, extracts `code` and `state`, and sends a `"duoCallback"` message via `messagingService`
-6. `DesktopTwoFactorAuthDuoComponentService` listens for `DUO_2FA_RESULT_COMMAND` (`"duoCallback"`) via `messageListener.messages$()` and maps it to a `Duo2faResult` (`desktop-two-factor-auth-duo-component.service.ts`)
 
 ## SSO Flow
 
