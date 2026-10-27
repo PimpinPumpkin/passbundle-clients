@@ -9,6 +9,7 @@ import { DialogService, ToastService } from "@bitwarden/components";
 
 import { HeaderModule } from "../../layouts/header/header.module";
 import { SharedModule } from "../../shared";
+import { KeykeeperConfirmChangeService } from "../confirm-change/confirm-change.service";
 import { KeykeeperMspApiService } from "../msp/msp-api.service";
 import { KeykeeperMspWorkService } from "../msp/msp-work.service";
 
@@ -19,7 +20,9 @@ import { KeykeeperMspWorkService } from "../msp/msp-work.service";
  * made here to invite, turn off, turn on, and remove regular members, and to
  * keep the groups it makes in step. The token is shown once. People the
  * directory invited wait until someone here lets them in, which seals their
- * invitations in this browser. See DESIGN.md, "Provisioning from Entra ID".
+ * invitations in this browser. Making or replacing the token asks the
+ * person to confirm it's them first. See DESIGN.md, "Provisioning from Entra
+ * ID".
  */
 @Component({
   selector: "app-keykeeper-provisioning",
@@ -229,6 +232,7 @@ export class KeykeeperProvisioningComponent implements OnInit {
     private readonly platformUtilsService: PlatformUtilsService,
     private readonly dialogService: DialogService,
     private readonly toastService: ToastService,
+    private readonly confirmChange: KeykeeperConfirmChangeService,
   ) {}
 
   async ngOnInit() {
@@ -274,10 +278,21 @@ export class KeykeeperProvisioningComponent implements OnInit {
     this.view.set({ ...view, newToken: undefined });
   }
 
-  protected readonly create = async () => {
-    await this.attempt(async () =>
-      this.show(await this.api.makeProvisioningToken(this.organizationId())),
+  /** Makes the token once the person confirms it's them; undefined when they don't. */
+  private makeToken(): Promise<ProvisioningView | undefined> {
+    const orgId = this.organizationId();
+    return this.confirmChange.send("keykeeperConfirmProvisioningToken", (verification) =>
+      this.api.makeProvisioningToken(orgId, verification),
     );
+  }
+
+  protected readonly create = async () => {
+    await this.attempt(async () => {
+      const view = await this.makeToken();
+      if (view != null) {
+        this.show(view);
+      }
+    });
   };
 
   protected readonly replace = async () => {
@@ -292,7 +307,11 @@ export class KeykeeperProvisioningComponent implements OnInit {
       return;
     }
     await this.attempt(async () => {
-      this.show(await this.api.makeProvisioningToken(this.organizationId()));
+      const view = await this.makeToken();
+      if (view == null) {
+        return;
+      }
+      this.show(view);
       this.toastService.showToast({
         variant: "success",
         message: "Replaced the provisioning token",
