@@ -7,6 +7,7 @@ import { RouterModule } from "@angular/router";
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { ViewPasswordHistoryService } from "@bitwarden/common/vault/abstractions/view-password-history.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
+import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
   CardComponent,
@@ -53,7 +54,7 @@ export class ItemHistoryV2Component {
    * passwords (DESIGN.md, "Folders and permissions").
    */
   get showPasswordHistory(): boolean {
-    return this.cipher.hasPasswordHistory && this.cipher.viewPassword !== false;
+    return this.cipher.hasPasswordHistory && maySeeSecrets(this.cipher);
   }
 
   /**

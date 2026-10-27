@@ -8,6 +8,7 @@ import {
 } from "@angular/core";
 
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
+import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
   AsyncActionsModule,
@@ -170,7 +171,7 @@ export class KeykeeperVersionDialogComponent {
   protected readonly when = versionTime(this.data.revisionDate, inject(LOCALE_ID));
 
   /** People who can't see an item's passwords never see them in its versions either. */
-  protected readonly canSeeSecrets = this.data.current.viewPassword !== false;
+  protected readonly canSeeSecrets = maySeeSecrets(this.data.current);
   protected readonly reveal = signal(false);
 
   protected readonly rows = computed(() =>

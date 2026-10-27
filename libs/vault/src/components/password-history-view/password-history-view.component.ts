@@ -4,6 +4,7 @@ import { CommonModule } from "@angular/common";
 import { OnInit, Component, Input } from "@angular/core";
 
 import { JslibModule } from "@bitwarden/angular/jslib.module";
+import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { PasswordHistoryView } from "@bitwarden/common/vault/models/view/password-history.view";
 import { ItemModule, ColorPasswordModule, IconButtonModule } from "@bitwarden/components";
@@ -35,7 +36,7 @@ export class PasswordHistoryViewComponent implements OnInit {
     // Keykeeper: earlier passwords are passwords: nothing for someone whose
     // shared folders hide the item's passwords (DESIGN.md, "Folders and
     // permissions"), whichever way they got here.
-    if (this.cipher.viewPassword === false) {
+    if (!maySeeSecrets(this.cipher)) {
       this.history = [];
       return;
     }

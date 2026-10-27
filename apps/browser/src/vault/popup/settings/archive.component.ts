@@ -20,6 +20,7 @@ import { LogService } from "@bitwarden/common/platform/abstractions/log.service"
 import { CipherId, UserId } from "@bitwarden/common/types/guid";
 import { CipherArchiveService } from "@bitwarden/common/vault/abstractions/cipher-archive.service";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
+import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import {
   CipherViewLike,
   CipherViewLikeUtils,
@@ -160,7 +161,7 @@ export class ArchiveComponent {
   protected canShare(cipher: CipherViewLike): boolean {
     return (
       !!cipher.edit &&
-      cipher.viewPassword !== false &&
+      maySeeSecrets(cipher) &&
       itemGrid(itemLike(cipher), this.collections() ?? []).share
     );
   }

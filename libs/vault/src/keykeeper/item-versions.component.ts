@@ -15,6 +15,7 @@ import { firstValueFrom, map } from "rxjs";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
+import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
   CardComponent,
@@ -212,7 +213,7 @@ export class KeykeeperItemVersionsComponent {
     // put back secrets they can't see (DESIGN.md, "Item history").
     const canRestore =
       this.canEdit() &&
-      current.viewPassword !== false &&
+      maySeeSecrets(current) &&
       !current.isDeleted &&
       config?.originalCipher != null;
     const ref = KeykeeperVersionDialogComponent.open(this.dialogService, {

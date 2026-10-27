@@ -22,6 +22,8 @@ describe("PasswordHistoryViewComponent", () => {
     id: "122-333-444",
     type: CipherType.Login,
     organizationId: "222-444-555",
+    // Keykeeper: someone who can see its passwords (missing is hidden).
+    viewPassword: true,
   } as CipherView;
 
   const activeAccount$ = new BehaviorSubject<{ id: string }>({ id: "666-444-444" });

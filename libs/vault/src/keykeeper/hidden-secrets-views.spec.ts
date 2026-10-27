@@ -305,6 +305,25 @@ describe("an item's view, without see passwords", () => {
     expect(list.componentInstance.history).toEqual([]);
   });
 
+  it("an item that doesn't say whether passwords show: as hidden, everywhere", async () => {
+    const old = new PasswordHistoryView();
+    old.password = "old-password";
+    old.lastUsedDate = new Date();
+    const cipher = item({ passwordHistory: [old], viewPassword: undefined });
+
+    const history = await render(ItemHistoryV2Component, (c) => (c.cipher = cipher));
+    expect(history.nativeElement.textContent).not.toContain("passwordHistory");
+    TestBed.resetTestingModule();
+
+    const list = await render(PasswordHistoryViewComponent, (c) => (c.cipher = cipher));
+    expect(list.componentInstance.history).toEqual([]);
+    TestBed.resetTestingModule();
+
+    const login = await render(LoginCredentialsViewComponent, (c) => (c.cipher = cipher));
+    expectNoSecrets(login);
+    expect(buttons(login, '[data-testid="copy-password"]')).toHaveLength(0);
+  });
+
   it("password history: someone who can see passwords still gets it", async () => {
     const old = new PasswordHistoryView();
     old.password = "old-password";

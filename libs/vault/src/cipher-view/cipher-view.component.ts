@@ -28,6 +28,7 @@ import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.servi
 import { FolderService } from "@bitwarden/common/vault/abstractions/folder/folder.service.abstraction";
 import { VaultSettingsService } from "@bitwarden/common/vault/abstractions/vault-settings/vault-settings.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
+import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { SecurityTaskType, TaskService } from "@bitwarden/common/vault/tasks";
 import {
@@ -265,6 +266,9 @@ export class CipherViewComponent {
 
     return uris > 0;
   });
+
+  /** Keykeeper: only with an explicit yes (keykeeper/hidden-secrets.ts). */
+  protected readonly canSeeSecrets = computed(() => maySeeSecrets(this.cipher()));
 
   readonly hasSshKey = computed(() => {
     const cipher = this.cipher();

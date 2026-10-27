@@ -100,7 +100,7 @@
   @if (hasSshKey()) {
     <app-sshkey-view
       [sshKey]="cipher()!.sshKey"
-      [canSeeSecrets]="cipher()!.viewPassword !== false"
+      [canSeeSecrets]="canSeeSecrets()"
     ></app-sshkey-view>
   }
 
