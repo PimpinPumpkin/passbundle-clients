@@ -1132,7 +1132,7 @@ export class KeykeeperMspComponent implements OnInit {
       return;
     }
     await this.attempt(async () => {
-      await this.mspApi.setAccess(msp.id, person.userId, this.accessDraft());
+      await this.mspApi.setAccess(msp.id, person, this.accessDraft());
       this.accessFor.set(null);
       // Clients they now reach are waiting for the org key; give it now.
       await this.confirmWaiting(msp.id);
@@ -1185,7 +1185,7 @@ export class KeykeeperMspComponent implements OnInit {
       return;
     }
     await this.attempt(async () => {
-      await this.mspApi.changeRole(msp.id, person.userId, role);
+      await this.mspApi.changeRole(msp.id, person, role);
       this.accessFor.set(null);
       // A new admin joins clients they didn't reach before; give them the keys.
       await this.confirmWaiting(msp.id);

@@ -17,7 +17,7 @@ import { KeyService } from "@bitwarden/key-management";
 
 import { KeykeeperJoinSealer } from "../joining/join-sealer.service";
 
-import { KeykeeperMspApiService, UNTRUSTED_CLIENT } from "./msp-api.service";
+import { KeykeeperMspApiService, STAFF_EMAIL_CHANGED, UNTRUSTED_CLIENT } from "./msp-api.service";
 
 // Keykeeper: what an MSP admin's browser seals for the clients a server lists.
 // A hacked server could list any organization the admin belongs to as a
@@ -64,6 +64,9 @@ function setUp(msp: MspDetails, mspJoining?: MspJoining) {
     }
     if (method === "POST" && path === `/keykeeper/msp/${MSP}/staff`) {
       return { invited: false, email: body.email, role: body.role };
+    }
+    if (method === "PUT" && path.endsWith("/access")) {
+      return body;
     }
     return {};
   });
@@ -130,6 +133,41 @@ describe("Which clients an MSP admin's browser trusts", () => {
     await api.confirmClient(MSP, LAW);
     const put = sent.find((s) => s.method === "PUT" && s.path === `/keykeeper/msp/${MSP}/seals`);
     expect(put!.body.clients).toEqual([{ organizationId: LAW, seal: await clientSeal(LAW) }]);
+  });
+});
+
+describe("Sealing a staff member's place after a change in the console", () => {
+  const row = { userId: "u-tech", email: "tech@northwind.example" };
+  const access = { allClients: true, clients: [], custom: null, installCommands: true };
+  const withStaff = async (email: string) => ({
+    ...(await mspWith(client(DENTAL, await clientSeal(DENTAL)))),
+    staff: [{ userId: row.userId, email, name: null, role: "technician" as const, access }],
+  });
+  const sealsPut = (sent: { method: string; path: string; body: any }[]) =>
+    sent.filter((s) => s.method === "PUT" && s.path === `/keykeeper/msp/${MSP}/seals`);
+
+  it("seals the email in the row the admin acted on", async () => {
+    const { api, sent } = setUp(await withStaff("TECH@northwind.example"));
+    await api.setAccess(MSP, row, access);
+    await api.changeRole(MSP, row, "admin");
+    const puts = sealsPut(sent);
+    expect(puts).toHaveLength(2);
+    for (const put of puts) {
+      expect(put.body.staff.map((s: { email: string }) => s.email)).toEqual([row.email]);
+    }
+  });
+
+  it("changes and seals nothing when the server now gives that person another email", async () => {
+    const { api, sent } = setUp(await withStaff("mallory@evil.example"));
+    await expect(api.setAccess(MSP, row, access)).rejects.toThrow(STAFF_EMAIL_CHANGED(row.email));
+    await expect(api.changeRole(MSP, row, "admin")).rejects.toThrow(STAFF_EMAIL_CHANGED(row.email));
+    expect(sent.filter((s) => s.method === "PUT")).toEqual([]);
+  });
+
+  it("refuses a person the server no longer lists", async () => {
+    const { api, sent } = setUp(await mspWith(client(DENTAL, await clientSeal(DENTAL))));
+    await expect(api.setAccess(MSP, row, access)).rejects.toThrow(STAFF_EMAIL_CHANGED(row.email));
+    expect(sent.filter((s) => s.method === "PUT")).toEqual([]);
   });
 });
 
