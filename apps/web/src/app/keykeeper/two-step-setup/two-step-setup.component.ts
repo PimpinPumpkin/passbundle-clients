@@ -312,7 +312,11 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
     this.held.qrScript?.remove();
   }
 
-  /** The master password's server hash: from the sign-in, or typed here. */
+  /**
+   * The master password's server hash: from the sign-in, or typed here. A
+   * typed one is kept (and the field cleared) only once the server took it
+   * (`keepHash`), so a wrong one can be typed again.
+   */
   private async passwordHash(): Promise<string> {
     if (this.held.masterPasswordHash) {
       return this.held.masterPasswordHash;
@@ -325,18 +329,23 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
     const prelogin = await firstValueFrom(this.passwordPreloginService.getPreloginData$(email));
     this.passwordPreloginService.clearCache();
     const masterKey = await this.keyService.makeMasterKey(password, email, prelogin.kdfConfig);
-    const hash = await this.keyService.hashMasterKey(password, masterKey);
+    return this.keyService.hashMasterKey(password, masterKey);
+  }
+
+  /** The server took this hash: keep it for the next step, in memory only. */
+  private keepHash(hash: string) {
     this.held.masterPasswordHash = hash;
     this.haveHash.set(true);
     this.masterPassword.setValue("");
-    return hash;
   }
 
   protected async startAuthenticator() {
     await this.attempt(async () => {
+      const masterPasswordHash = await this.passwordHash();
       const answer = (await this.call("POST", "/two-factor/get-authenticator", {
-        masterPasswordHash: await this.passwordHash(),
+        masterPasswordHash,
       })) as { key: string };
+      this.keepHash(masterPasswordHash);
       this.key.set(answer.key);
       this.authenticatorForm.controls.code.setValue("");
       this.step.set("authenticator");
@@ -365,6 +374,7 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
       const existing = (await this.call("POST", "/two-factor/get-webauthn", {
         masterPasswordHash,
       })) as { keys?: { id: number }[] };
+      this.keepHash(masterPasswordHash);
       const used = new Set((existing.keys ?? []).map((k) => k.id));
       const id = [1, 2, 3, 4, 5].find((n) => !used.has(n));
       if (id == null) {
