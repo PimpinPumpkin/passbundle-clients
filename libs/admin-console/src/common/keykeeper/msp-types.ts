@@ -397,3 +397,50 @@ export type SsoSettings = {
   clientId: string;
   clientSecret: string | null;
 };
+
+/**
+ * The type number of the MSP default that isn't an upstream policy: two-step
+ * login for each client's admins. Never an upstream policy type: upstream's
+ * apps refuse every policy when one has a type they don't know. See DESIGN.md,
+ * "Two-step login for admins".
+ */
+export const KEYKEEPER_ADMIN_TWO_STEP_POLICY = 1000;
+
+/**
+ * The two-step login methods that count for a role that requires it, by
+ * upstream's provider type: an authenticator app (0), Duo (2), and a security
+ * key or passkey (7). Email codes (1) don't. The server decides; this is for
+ * telling someone before they take on such a role.
+ */
+export const KEYKEEPER_QUALIFYING_TWO_STEP = [0, 2, 7];
+
+/** Someone two-step login for admins covers who hasn't set up a method that counts. */
+export type TwoStepNotSetUp = {
+  /** Their membership, in an organization's list. */
+  id?: string;
+  userId: string;
+  email: string;
+  name: string | null;
+  /** "owner", "admin", or "custom" in an organization; "admin" or "technician" on an MSP's staff. */
+  role: string | null;
+  /** The membership came through the MSP. */
+  fromMsp?: boolean;
+  /** Linked to this organization's single sign-on, which covers them there. */
+  singleSignOn?: boolean;
+};
+
+/** An organization's two-step login for admins, as its Settings page shows it. */
+export type OrgAdminTwoStep = {
+  required: boolean;
+  /** The MSP that manages the organization, if one does. */
+  msp: { id: string; name: string } | null;
+  /** Who it covers (or would) without a method that counts. */
+  notSetUp: TwoStepNotSetUp[];
+};
+
+/** An MSP's two-step login: for its staff, and each client's own admins. */
+export type MspTwoStep = {
+  staffRequired: boolean;
+  staffNotSetUp: TwoStepNotSetUp[];
+  clients: { id: string; name: string; required: boolean; notSetUp: TwoStepNotSetUp[] }[];
+};

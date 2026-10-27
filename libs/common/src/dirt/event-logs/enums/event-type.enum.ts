@@ -134,6 +134,10 @@ export enum EventType {
   Keykeeper_EventStreamStopped = 1693,
   // Keykeeper: the organization's single sign-on settings changed (what, in keykeeperDetail).
   Keykeeper_SsoSettingsChanged = 1694,
+  // Keykeeper: the organization turned two-step login for its admins on or
+  // off. See DESIGN.md, "Two-step login for admins".
+  Keykeeper_AdminTwoStepOn = 1695,
+  Keykeeper_AdminTwoStepOff = 1696,
 
   Policy_Updated = 1700,
 

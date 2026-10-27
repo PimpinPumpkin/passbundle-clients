@@ -359,6 +359,17 @@ export class LoginCommand {
         return Response.error("Login failed.");
       }
 
+      // Keykeeper: the role requires two-step login (an authenticator app, a
+      // security key or passkey, or Duo), which isn't set up yet, so the
+      // server gave a setup session, not a login. It's set up in the web
+      // vault (DESIGN.md, "Two-step login for admins").
+      if (response.keykeeperTwoStepSetup) {
+        return Response.error(
+          response.keykeeperTwoStepSetup.message ||
+            "Your role requires two-step login. Set it up in the web vault, then log in again.",
+        );
+      }
+
       // If we are in the SSO flow and we got a successful login response (we are past rejection scenarios
       // and should always have a userId here), validate that SSO user in MP encryption org has MP set
       // This must be done here b/c we have 2 places we try to login with SSO above and neither has a

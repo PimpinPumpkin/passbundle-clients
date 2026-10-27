@@ -10,6 +10,7 @@ import { Injectable } from "@angular/core";
 import { firstValueFrom } from "rxjs";
 
 import {
+  KEYKEEPER_QUALIFYING_TWO_STEP,
   AddStaffResult,
   ClientEnrollment,
   ClientMsp,
@@ -21,6 +22,8 @@ import {
   KeykeeperMspRequests,
   MspJoining,
   MspPolicies,
+  MspTwoStep,
+  OrgAdminTwoStep,
   MspRole,
   MspSiteFixes,
   MspSummary,
@@ -420,6 +423,59 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
   // Single sign-on with Microsoft Entra ID (DESIGN.md, "Sign in with Microsoft Entra ID").
 
   /** The organization's Single sign-on page. Anyone but those who manage it gets "not found". */
+  /**
+   * Two-step login for an organization's admins: whether it's required, and
+   * who it covers without a method that counts. Owners and admins (and the
+   * MSP's admins) only; anyone else gets "not found".
+   */
+  async getOrgAdminTwoStep(orgId: string): Promise<OrgAdminTwoStep> {
+    return this.apiService.send(
+      "GET",
+      `/keykeeper/organizations/${orgId}/admin-two-step`,
+      null,
+      true,
+      true,
+    );
+  }
+
+  async setOrgAdminTwoStep(orgId: string, required: boolean): Promise<OrgAdminTwoStep> {
+    return this.apiService.send(
+      "PUT",
+      `/keykeeper/organizations/${orgId}/admin-two-step`,
+      { required },
+      true,
+      true,
+    );
+  }
+
+  /**
+   * Whether the person has set up a two-step login method that counts for an
+   * owner's, admin's, or MSP staff's role (not email codes), from upstream's
+   * list of their methods.
+   */
+  async hasQualifyingTwoStep(): Promise<boolean> {
+    const list = await this.apiService.send("GET", "/two-factor", null, true, true);
+    return ((list?.data ?? []) as { type: number; enabled: boolean }[]).some(
+      (p) => p.enabled && KEYKEEPER_QUALIFYING_TWO_STEP.includes(p.type),
+    );
+  }
+
+  /** The MSP's two-step login: its staff, and each client's own admins. */
+  async getMspTwoStep(mspId: string): Promise<MspTwoStep> {
+    return this.apiService.send("GET", `/keykeeper/msp/${mspId}/two-step`, null, true, true);
+  }
+
+  /** Whether everyone on the MSP's staff must use two-step login. MSP admins only. */
+  async setMspStaffTwoStep(mspId: string, staffRequired: boolean): Promise<MspTwoStep> {
+    return this.apiService.send(
+      "PUT",
+      `/keykeeper/msp/${mspId}/two-step`,
+      { staffRequired },
+      true,
+      true,
+    );
+  }
+
   async getSso(orgId: string): Promise<SsoView> {
     return this.apiService.send("GET", `/keykeeper/organizations/${orgId}/sso`, null, true, true);
   }

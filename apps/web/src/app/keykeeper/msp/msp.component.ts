@@ -46,6 +46,7 @@ import { KeykeeperBreachCheckSetting } from "../health/breach-check-setting.serv
 import { KeykeeperExposureChecks } from "../health/exposure-checks.service";
 import { KeykeeperJoinSealer } from "../joining/join-sealer.service";
 
+import { withAdminTwoStep } from "./admin-two-step-policy";
 import {
   ClientHealth,
   clientHealth,
@@ -75,6 +76,7 @@ import { KeykeeperMspJoiningComponent } from "./msp-joining.component";
 import { clientPolicySummary } from "./msp-policies";
 import { KeykeeperMspSiteFixesComponent } from "./msp-site-fixes.component";
 import { KeykeeperMspTemplatesComponent } from "./msp-templates.component";
+import { KeykeeperMspTwoStepComponent } from "./msp-two-step.component";
 import { KeykeeperMspWorkService } from "./msp-work.service";
 import { DEFAULT_ACCESS, describeAccess, reachesEveryClient } from "./technician-access";
 import { KeykeeperTechnicianAccessEditorComponent } from "./technician-access-editor.component";
@@ -110,6 +112,7 @@ const CLIENT_FEATURES = {
     KeykeeperEventStreamingComponent,
     KeykeeperMspSiteFixesComponent,
     KeykeeperMspTemplatesComponent,
+    KeykeeperMspTwoStepComponent,
     KeykeeperTechnicianAccessEditorComponent,
   ],
   template: `
@@ -573,6 +576,12 @@ const CLIENT_FEATURES = {
           />
         }
 
+        <app-keykeeper-msp-two-step
+          [mspId]="m.id"
+          [isAdmin]="m.role === 'admin'"
+          (changed)="reload(m.id)"
+        />
+
         @if (templates(); as t) {
           <app-keykeeper-msp-templates [msp]="m" [templates]="t" (changed)="reload(m.id)" />
         }
@@ -829,6 +838,14 @@ const CLIENT_FEATURES = {
           Run all of your clients from one place. You'll be an admin of your MSP, and you can add
           technicians next.
         </bit-callout>
+        @if (needsTwoStep()) {
+          <bit-callout type="warning" [title]="null" data-testid="msp-setup-two-step">
+            Your MSP's staff sign in with two-step login: an authenticator app, a security key or
+            passkey, or Duo. You haven't set it up, so once your MSP is made you'll be signed out,
+            and asked to set it up when you sign in again.
+            <a bitLink routerLink="/settings/security/two-factor">Set it up first</a>
+          </bit-callout>
+        }
         <form [formGroup]="mspForm" [bitSubmit]="createMsp" class="tw-flex tw-items-end tw-gap-2">
           <bit-form-field disableMargin class="tw-grow">
             <bit-label>Your MSP's name</bit-label>
@@ -844,6 +861,8 @@ export class KeykeeperMspComponent implements OnInit {
   protected readonly CONFIRMED = CONFIRMED;
   protected readonly loading = signal(true);
   protected readonly msp = signal<MspDetails | null>(null);
+  /** Keykeeper: no two-step login that counts for MSP staff yet (DESIGN.md, "Two-step login for admins"). */
+  protected readonly needsTwoStep = signal(false);
   protected readonly invitation = signal<{ token: string; info: InvitationInfo } | null>(null);
   protected readonly lastInvite = signal<{
     email: string;
@@ -948,6 +967,10 @@ export class KeykeeperMspComponent implements OnInit {
   ) {}
 
   async ngOnInit() {
+    this.mspApi.hasQualifyingTwoStep().then(
+      (has) => this.needsTwoStep.set(!has),
+      () => this.needsTwoStep.set(false),
+    );
     try {
       const token = this.route.snapshot.queryParamMap.get("invite");
       if (token) {
@@ -1286,7 +1309,8 @@ export class KeykeeperMspComponent implements OnInit {
           definitions.push(definition);
         }
       }
-      this.policyDefinitions.set(definitions);
+      // Keykeeper: and two-step login for each client's admins.
+      this.policyDefinitions.set(withAdminTwoStep(definitions, policies.types));
     }
     this.policies.set(policies);
   }
