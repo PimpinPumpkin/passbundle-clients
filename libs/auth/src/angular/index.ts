@@ -48,6 +48,7 @@ export * from "./sso/sso.component";
 export * from "./sso/sso-component.service";
 export * from "./sso/default-sso-component.service";
 export * from "./sso/keykeeper-sso-link";
+export * from "./two-step/keykeeper-two-step-setup";
 
 // two factor auth
 export * from "./two-factor-auth";

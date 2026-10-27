@@ -179,6 +179,25 @@ describe("MSP activity sentences", () => {
       "ana@northwind.test unlinked ben@acmedental.com's single sign-on in Acme Dental",
     ],
     [
+      {
+        event: "admin_two_step_default_set",
+        detail: "Two-step login for admins to off: 2 clients changed",
+      },
+      "ana@northwind.test set the default Two-step login for admins to off: 2 clients changed",
+    ],
+    [
+      { event: "staff_two_step_set", detail: "off" },
+      "ana@northwind.test stopped requiring two-step login of the MSP's staff",
+    ],
+    [
+      { event: "staff_two_step_set", detail: "on" },
+      "ana@northwind.test required two-step login of the MSP's staff",
+    ],
+    [
+      { event: "client_admin_two_step_set", detail: "off" },
+      "ana@northwind.test stopped requiring two-step login of Acme Dental's admins",
+    ],
+    [
       { event: "staff_invited", detail: "admin" },
       "ana@northwind.test invited ben@northwind.test to join as an admin",
     ],

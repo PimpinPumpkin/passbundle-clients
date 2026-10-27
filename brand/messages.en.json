@@ -820,6 +820,46 @@
   "keykeeperLinkSsoVerify": {
     "message": "Confirm it's you to link your account to this organization's single sign-on. Microsoft then asks which account to use, and you confirm it before anything is linked."
   },
+  "keykeeperTwoStepSetupTitle": {
+    "message": "Set up two-step login"
+  },
+  "keykeeperTwoStepSetupInWebVault": {
+    "message": "Two-step login is required for your role by $NAMES$. Sign in to the web vault at $URL$ to set it up with an authenticator app, a security key or passkey, or Duo, then sign in here again.",
+    "placeholders": {
+      "names": {
+        "content": "$1",
+        "example": "Acme Dental"
+      },
+      "url": {
+        "content": "$2",
+        "example": "https://vault.passbundle.com"
+      }
+    }
+  },
+  "keykeeperTwoStepSetupInWebVaultUnnamed": {
+    "message": "Two-step login is required for your role. Sign in to the web vault at $URL$ to set it up with an authenticator app, a security key or passkey, or Duo, then sign in here again.",
+    "placeholders": {
+      "url": {
+        "content": "$1",
+        "example": "https://vault.passbundle.com"
+      }
+    }
+  },
+  "keykeeperOpenWebVault": {
+    "message": "Open the web vault"
+  },
+  "keykeeperAdminTwoStepOn": {
+    "message": "Turned on two-step login for admins."
+  },
+  "keykeeperAdminTwoStepOff": {
+    "message": "Turned off two-step login for admins."
+  },
+  "keykeeperAdminTwoStepPolicy": {
+    "message": "Two-step login for admins"
+  },
+  "keykeeperAdminTwoStepPolicyDesc": {
+    "message": "Owners, admins, and custom roles that manage members, policies, or account recovery must use an authenticator app, a security key or passkey, or Duo. Email codes don't count. Admins who sign in with the organization's own single sign-on are covered by it there."
+  },
   "keykeeperReservedFieldName": {
     "message": "Names starting with \"keykeeper.\" are reserved."
   },

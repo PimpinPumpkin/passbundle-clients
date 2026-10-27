@@ -34,8 +34,9 @@
       {{ "save" | i18n }}
     </button>
   </form>
-  <!-- Keykeeper: how people join this organization, its install command, and script access. -->
+  <!-- Keykeeper: two-step login for admins, how people join this organization, its install command, and script access. -->
   @if (org && !loading) {
+    <app-keykeeper-admin-two-step [organizationId]="organizationId" />
     <app-keykeeper-org-joining [organizationId]="organizationId" />
     <app-keykeeper-org-install [organizationId]="organizationId" />
     <app-keykeeper-script-access [organizationId]="organizationId" />

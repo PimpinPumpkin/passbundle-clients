@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { Component, OnInit } from "@angular/core";
+import { Component, inject, OnInit } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormControl, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { ActivatedRoute, Router, RouterModule } from "@angular/router";
@@ -40,6 +40,7 @@ import {
   AsyncActionsModule,
   ButtonModule,
   CheckboxModule,
+  DialogService,
   FormFieldModule,
   IconButtonModule,
   IconModule,
@@ -47,6 +48,8 @@ import {
   ToastService,
 } from "@bitwarden/components";
 import { PasswordGenerationServiceAbstraction } from "@bitwarden/generator-legacy";
+
+import { keykeeperStartTwoStepSetup } from "../two-step/keykeeper-two-step-setup";
 
 import { SsoClientType, SsoComponentService } from "./sso-component.service";
 
@@ -88,6 +91,8 @@ export class SsoComponent implements OnInit {
 
   protected redirectUri: string | undefined;
   protected loggingIn = false;
+  /** Keykeeper: for the message that sends someone to set up two-step login. */
+  private readonly keykeeperDialogService = inject(DialogService);
   protected identifier: string | undefined;
   protected state: string | undefined;
   protected codeChallenge: string | undefined;
@@ -447,6 +452,25 @@ export class SsoComponent implements OnInit {
       const authResult = await this.formPromise;
       if (authResult.requiresTwoFactor) {
         return await this.handleTwoFactorRequired(orgSsoIdentifier);
+      }
+
+      // Keykeeper: this organization's single sign-on doesn't meet every rule
+      // that requires two-step login of this person (another organization's,
+      // an owner's, or their MSP's): set it up first (DESIGN.md, "Two-step
+      // login for admins").
+      if (
+        await keykeeperStartTwoStepSetup(authResult, {
+          router: this.router,
+          i18nService: this.i18nService,
+          dialogService: this.keykeeperDialogService,
+          platformUtilsService: this.platformUtilsService,
+          clientType: this.platformUtilsService.getClientType(),
+          webVaultUrl: async () =>
+            (await firstValueFrom(this.environmentService.environment$)).getWebVaultUrl(),
+        })
+      ) {
+        this.loggingIn = false;
+        return;
       }
 
       // Everything after the 2FA check is considered a successful login

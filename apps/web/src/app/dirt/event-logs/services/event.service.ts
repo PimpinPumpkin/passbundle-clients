@@ -621,6 +621,12 @@ export class EventService {
       case EventType.Organization_DisabledSso:
         msg = humanReadableMsg = this.i18nService.t("ssoTurnedOff");
         break;
+      case EventType.Keykeeper_AdminTwoStepOn:
+        msg = humanReadableMsg = this.i18nService.t("keykeeperAdminTwoStepOn");
+        break;
+      case EventType.Keykeeper_AdminTwoStepOff:
+        msg = humanReadableMsg = this.i18nService.t("keykeeperAdminTwoStepOff");
+        break;
       case EventType.Keykeeper_SsoSettingsChanged:
         msg = this.i18nService.t(
           "keykeeperSsoSettingsChanged",
