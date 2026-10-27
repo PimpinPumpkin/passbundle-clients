@@ -4,6 +4,11 @@
   "company": "PassBundle",
   "domain": "passbundle.com",
   "color": "#1F6F5C",
+  "extension": {
+    "chromiumKey": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuBgW693OAyweyUfEDXXa77lRH7o1jbJ1pg8uyvU6cgRZnL/gzPmsOhWeCvfu+piUKkvBN6yFI2VmVKct++rhfp4Dcp3L+FjMPTKMPdnmbYGvrC6HG7fp/5Nz9Mba6NykZpHVexgbFzu14ld9zzSQ8LvlbOgVjnrLN0setwX847GpFiCAMTVeFDgSRCtk4r5LvjRfwIevUE47OYh0r0ykZ1DQcHksUdO5GhsN5O5VmUdE/7ZiQjARrAoxjgRnyfnlSrhZfJx4Zs/6ljB7Ic/KqqA+RrVZi+X9VyOCA3Xghb0HjVGE/9uA/gEobJvfzg7oHsF5/CKLBPIk+3Og+wZvtwIDAQAB",
+    "chromiumId": "cenoidjoogmoieibpcokkafjnaabhokg",
+    "firefoxId": "extension@passbundle.com"
+  },
   "urls": {
     "website": "https://passbundle.com",
     "help": "https://passbundle.com/help",
