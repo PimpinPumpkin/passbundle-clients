@@ -93,7 +93,13 @@ describe("VaultLockPolicyComponent", () => {
 
   it("starts at 15 minutes, locking, when nothing is set", () => {
     open(false, null);
-    expect(shown()).toEqual({ when: "custom", minutes: 15, webMinutes: 15, action: "lock" });
+    expect(shown()).toEqual({
+      when: "custom",
+      minutes: 15,
+      webMinutes: 15,
+      action: "lock",
+      webReload: true,
+    });
     expect(saved()).toEqual({ type: "custom", minutes: 15, action: "lock" });
   });
 
@@ -118,6 +124,16 @@ describe("VaultLockPolicyComponent", () => {
       webMinutes: 15,
       action: "lock",
     });
+  });
+
+  it("sends webReload only when it's off, and reads it back", () => {
+    open(true, { type: "custom", minutes: 30, action: "lock", webReload: false });
+    expect(shown().webReload).toBe(false);
+    expect(saved()).toEqual({ type: "custom", minutes: 30, action: "lock", webReload: false });
+    component.data.controls.webReload.setValue(true);
+    expect(saved()).toEqual({ type: "custom", minutes: 30, action: "lock" });
+    open(true, { type: "onSystemLock", webReload: true });
+    expect(shown().webReload).toBe(true);
   });
 
   it("sends the web vault's wait only with when the computer locks", () => {
@@ -151,14 +167,26 @@ describe("VaultLockPolicyComponent", () => {
 
   it("reads data set elsewhere: no type is a longest wait, and a wait not offered is added", () => {
     open(true, { minutes: 90 });
-    expect(shown()).toEqual({ when: "custom", minutes: 90, webMinutes: 15, action: "lock" });
+    expect(shown()).toEqual({
+      when: "custom",
+      minutes: 90,
+      webMinutes: 15,
+      action: "lock",
+      webReload: true,
+    });
     expect(waits()).toContain(90);
     expect(saved()).toEqual({ type: "custom", minutes: 90, action: "lock" });
   });
 
   it("shows upstream's types that limit nothing here as a longest wait, to choose again", () => {
     open(true, { type: "never", minutes: 0, action: "logOut" });
-    expect(shown()).toEqual({ when: "custom", minutes: 15, webMinutes: 15, action: "logOut" });
+    expect(shown()).toEqual({
+      when: "custom",
+      minutes: 15,
+      webMinutes: 15,
+      action: "logOut",
+      webReload: true,
+    });
     expect(waits()).toEqual(VAULT_LOCK_WAITS);
   });
 });

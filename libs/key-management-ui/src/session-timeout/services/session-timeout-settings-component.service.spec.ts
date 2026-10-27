@@ -186,12 +186,26 @@ describe("SessionTimeoutSettingsComponentService", () => {
     });
 
     // Keykeeper: the web vault can't see the computer lock, so there "when
-    // the computer locks" offers the waits up to the policy's webMinutes.
+    // the computer locks" offers the waits up to the policy's webMinutes, and
+    // keeps "On browser refresh".
     describe('Keykeeper: policy type "onSystemLock" in the web vault', () => {
       it.each([
-        [30, ["oneMinute", "fiveMinutes", "fifteenMinutes", "thirtyMinutes", "custom"]],
-        [undefined, ["oneMinute", "fiveMinutes", "fifteenMinutes", "custom"]],
-        [1, ["oneMinute", "custom"]],
+        [
+          30,
+          [
+            "oneMinute",
+            "fiveMinutes",
+            "fifteenMinutes",
+            "thirtyMinutes",
+            "sessionTimeoutOnRestart",
+            "custom",
+          ],
+        ],
+        [
+          undefined,
+          ["oneMinute", "fiveMinutes", "fifteenMinutes", "sessionTimeoutOnRestart", "custom"],
+        ],
+        [1, ["oneMinute", "sessionTimeoutOnRestart", "custom"]],
       ])(
         "with webMinutes %s offers %j",
         fakeAsync(async (webMinutes: number | undefined, expected: string[]) => {

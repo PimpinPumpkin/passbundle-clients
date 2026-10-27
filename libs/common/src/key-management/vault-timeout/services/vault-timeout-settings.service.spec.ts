@@ -786,12 +786,13 @@ describe("VaultTimeoutSettingsService", () => {
       });
 
       it.each([
-        [VaultTimeoutStringType.OnRestart, undefined, 15],
-        [VaultTimeoutStringType.Never, undefined, 15],
+        [VaultTimeoutStringType.OnRestart, undefined, VaultTimeoutStringType.OnRestart],
+        [VaultTimeoutStringType.Never, undefined, VaultTimeoutStringType.OnRestart],
         [VaultTimeoutNumberType.EightHours, undefined, 15],
         [5, undefined, 5],
         [VaultTimeoutNumberType.EightHours, 1, 1],
-        [VaultTimeoutStringType.OnRestart, 60, 60],
+        [VaultTimeoutStringType.OnRestart, 60, VaultTimeoutStringType.OnRestart],
+        [null, 5, 5],
       ])(
         "when current timeout is %s and webMinutes is %s, returns %s",
         async (currentTimeout, webMinutes, expected) => {
@@ -810,6 +811,36 @@ describe("VaultTimeoutSettingsService", () => {
           );
         },
       );
+
+      it("keeps the person's own choice in state: the cap applies where it's read", async () => {
+        policyService.policiesByType$.mockReturnValue(
+          of([{ data: { type: "onSystemLock", webMinutes: 15 } }] as unknown as Policy[]),
+        );
+        await stateProvider.setUserState(
+          VAULT_TIMEOUT,
+          VaultTimeoutNumberType.EightHours,
+          mockUserId,
+        );
+
+        expect(
+          await firstValueFrom(vaultTimeoutSettingsService.getVaultTimeoutByUserId$(mockUserId)),
+        ).toBe(15);
+        expect(await firstValueFrom(stateProvider.getUserState$(VAULT_TIMEOUT, mockUserId))).toBe(
+          VaultTimeoutNumberType.EightHours,
+        );
+      });
+
+      it("writes a choice the web can't keep as what applies", async () => {
+        policyService.policiesByType$.mockReturnValue(
+          of([{ data: { type: "onSystemLock" } }] as unknown as Policy[]),
+        );
+        await stateProvider.setUserState(VAULT_TIMEOUT, VaultTimeoutStringType.Never, mockUserId);
+
+        await firstValueFrom(vaultTimeoutSettingsService.getVaultTimeoutByUserId$(mockUserId));
+        expect(await firstValueFrom(stateProvider.getUserState$(VAULT_TIMEOUT, mockUserId))).toBe(
+          VaultTimeoutStringType.OnRestart,
+        );
+      });
 
       it("still takes the policy's action", async () => {
         userDecryptionOptionsSubject.next(new UserDecryptionOptions({ hasMasterPassword: true }));

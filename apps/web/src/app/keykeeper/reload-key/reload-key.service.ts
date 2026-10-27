@@ -12,7 +12,7 @@ import { LogService } from "@bitwarden/common/platform/abstractions/log.service"
 import { StateProvider } from "@bitwarden/common/platform/state";
 import { KeyService } from "@bitwarden/key-management";
 
-import { KeykeeperReloadKey } from "./reload-key";
+import { browserPage, KeykeeperReloadKey } from "./reload-key";
 
 /**
  * Keykeeper: a web vault tab stays unlocked across a reload (reload-key.ts),
@@ -45,6 +45,8 @@ export class KeykeeperReloadKeyService extends KeykeeperReloadKey {
       environmentService,
       logService,
       registerOnLockAction: (action) => lockService.registerOnLockAction(action),
+      lock: (userId) => lockService.lock(userId),
+      ...browserPage,
     });
   }
 }

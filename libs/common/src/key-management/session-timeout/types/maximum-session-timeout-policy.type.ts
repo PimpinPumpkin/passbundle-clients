@@ -10,4 +10,9 @@ export interface MaximumSessionTimeoutPolicyData {
    * clients ignore it. See keykeeper-system-lock.ts.
    */
   webMinutes?: number;
+  /**
+   * Keykeeper: false keeps members' web vaults from staying unlocked across
+   * a reload. Missing or true leaves it to each person's own setting.
+   */
+  webReload?: boolean;
 }

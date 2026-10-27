@@ -1,0 +1,11 @@
+<bit-form-control>
+  <input
+    type="checkbox"
+    bitCheckbox
+    [formControl]="stay"
+    id="keykeeperStayUnlockedOnReload"
+    data-testid="keykeeper-stay-unlocked-on-reload"
+  />
+  <bit-label>Stay unlocked when I reload</bit-label>
+  <bit-hint>{{ refusal() ?? hint }}</bit-hint>
+</bit-form-control>

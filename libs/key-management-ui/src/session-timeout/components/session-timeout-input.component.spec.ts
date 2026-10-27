@@ -339,8 +339,7 @@ describe("SessionTimeoutInputComponent", () => {
 
         expect(message).toBe(
           "Your organization locks vaults when the computer locks. A web page can't tell when " +
-            "that happens, so the web vault locks after 30 minutes without use, and 2 minutes " +
-            "after the browser closes.",
+            "that happens, so here the timeout is at most 30 minutes, or On browser refresh.",
         );
         expect(component["maxSessionTimeoutPolicyData"]).toEqual({
           type: "custom",

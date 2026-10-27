@@ -62,4 +62,13 @@
       <bit-hint>The vault is removed from the device, and members sign in again.</bit-hint>
     </bit-radio-button>
   </bit-radio-group>
+
+  <bit-form-control>
+    <input type="checkbox" bitCheckbox formControlName="webReload" id="vaultLockWebReload" />
+    <bit-label>Web vaults can stay unlocked when members reload the page</bit-label>
+    <bit-hint>
+      Until the timeout, if a member leaves "Stay unlocked when I reload" on. Turn this off where
+      people share computers: every reload, and every reopened tab, asks for the master password.
+    </bit-hint>
+  </bit-form-control>
 </ng-container>

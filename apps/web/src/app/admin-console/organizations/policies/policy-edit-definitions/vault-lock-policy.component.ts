@@ -3,7 +3,9 @@
 // open-source clients read, `{ type, minutes, action }`, which the server
 // checks and the PassBundle apps keep to, plus `webMinutes` with "when the
 // computer locks": the web vault's wait, since a web page can't see the
-// computer lock. See docs/core.md, "Locking by policy", in the meta repo.
+// computer lock, and `webReload: false`, which keeps members' web vaults from
+// staying unlocked across a reload. See docs/core.md, "Locking by policy", in
+// the meta repo.
 import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
 import { FormBuilder } from "@angular/forms";
 
@@ -56,6 +58,7 @@ export class VaultLockPolicyComponent extends BasePolicyEditComponent {
     minutes: this.formBuilder.nonNullable.control(15),
     webMinutes: this.formBuilder.nonNullable.control(KEYKEEPER_WEB_MINUTES_DEFAULT),
     action: this.formBuilder.nonNullable.control<VaultLockAction>("lock"),
+    webReload: this.formBuilder.nonNullable.control(true),
   });
 
   /** The waits to choose from, with one set elsewhere that isn't among them. */
@@ -85,17 +88,20 @@ export class VaultLockPolicyComponent extends BasePolicyEditComponent {
       minutes,
       webMinutes,
       action: data.action === "logOut" ? "logOut" : "lock",
+      webReload: data.webReload !== false,
     });
   }
 
   protected override buildRequestData() {
-    const { when, minutes, webMinutes, action } = this.data.getRawValue();
+    const { when, minutes, webMinutes, action, webReload } = this.data.getRawValue();
     return {
       type: when,
       minutes: when === "custom" ? minutes : null,
       // The server takes it only with "when the computer locks".
       ...(when === "onSystemLock" ? { webMinutes } : {}),
       action,
+      // Only when it's off: on is each member's own choice.
+      ...(webReload ? {} : { webReload: false }),
     };
   }
 }

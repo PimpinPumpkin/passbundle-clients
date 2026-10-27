@@ -299,3 +299,10 @@ export const KEYKEEPER_HEALTH_DISK = new StateDefinition("keykeeperHealth", "dis
  * every tab shares and which outlives the browser.
  */
 export const KEYKEEPER_RELOAD_KEY_DISK = new StateDefinition("keykeeperReloadKey", "disk");
+/**
+ * Whether someone's web vault tabs stay unlocked across a reload, per account,
+ * kept across browser sessions in the web vault.
+ */
+export const KEYKEEPER_RELOAD_SETTING_DISK = new StateDefinition("keykeeperReloadSetting", "disk", {
+  web: "disk-local",
+});

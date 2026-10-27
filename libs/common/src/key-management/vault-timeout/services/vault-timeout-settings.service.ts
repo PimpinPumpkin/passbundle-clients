@@ -32,7 +32,9 @@ import { LogService } from "../../../platform/abstractions/log.service";
 import { StateProvider } from "../../../platform/state";
 import { UserId } from "../../../types/guid";
 import {
-  keykeeperPolicyForClient,
+  keykeeperIsWebCap,
+  keykeeperWebSystemLockMinutes,
+  keykeeperWebSystemLockTimeout,
   MaximumSessionTimeoutPolicyData,
   SessionTimeoutTypeService,
 } from "../../session-timeout";
@@ -178,7 +180,18 @@ export class VaultTimeoutSettingsService implements VaultTimeoutSettingsServiceA
             );
 
             // As a side effect, set the new value determined by determineVaultTimeout into state if it's different from the current
-            if (vaultTimeout !== currentVaultTimeout) {
+            // Keykeeper: except the web's cap under "when the computer locks",
+            // which applies where it's read, so the person's own choice stays
+            // and comes back if the policy goes (keykeeper-system-lock.ts).
+            const keykeeperCapOnly = keykeeperIsWebCap(
+              currentVaultTimeout,
+              vaultTimeout,
+              keykeeperWebSystemLockMinutes(
+                maxSessionTimeoutPolicyData,
+                this.sessionTimeoutTypeService,
+              ),
+            );
+            if (vaultTimeout !== currentVaultTimeout && !keykeeperCapOnly) {
               await this.stateProvider.setUserState(VAULT_TIMEOUT, vaultTimeout, userId);
             }
             return vaultTimeout;
@@ -218,6 +231,17 @@ export class VaultTimeoutSettingsService implements VaultTimeoutSettingsServiceA
     // If no policy applies, return the current vault timeout
     if (maxSessionTimeoutPolicyData == null) {
       return currentVaultTimeout;
+    }
+
+    // Keykeeper: in the web vault, "when the computer locks" caps a timeout
+    // in minutes at the policy's webMinutes, and keeps "On browser refresh"
+    // (keykeeper-system-lock.ts).
+    const keykeeperWebMinutes = keykeeperWebSystemLockMinutes(
+      maxSessionTimeoutPolicyData,
+      this.sessionTimeoutTypeService,
+    );
+    if (keykeeperWebMinutes != null) {
+      return keykeeperWebSystemLockTimeout(currentVaultTimeout, keykeeperWebMinutes);
     }
 
     switch (maxSessionTimeoutPolicyData.type) {
@@ -404,9 +428,6 @@ export class VaultTimeoutSettingsService implements VaultTimeoutSettingsServiceA
     return this.policyService.policiesByType$(PolicyType.MaximumVaultTimeout, userId).pipe(
       getFirstPolicy,
       map((policy) => (policy?.data ?? null) as MaximumSessionTimeoutPolicyData | null),
-      // Keykeeper: in the web vault, "when the computer locks" is a longest
-      // wait (keykeeper-system-lock.ts).
-      map((data) => keykeeperPolicyForClient(data, this.sessionTimeoutTypeService)),
     );
   }
 

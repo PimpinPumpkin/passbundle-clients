@@ -4,9 +4,13 @@ export { SessionTimeoutAction, SessionTimeoutType } from "./types/session-timeou
 // Keykeeper
 export {
   KEYKEEPER_WEB_MINUTES_DEFAULT,
+  keykeeperIsWebCap,
   keykeeperPolicyForClient,
   keykeeperSystemLockIsWait,
   keykeeperSystemLockMessage,
   keykeeperWaitLabel,
   keykeeperWebMinutes,
+  keykeeperWebSystemLockMinutes,
+  keykeeperWebSystemLockOffers,
+  keykeeperWebSystemLockTimeout,
 } from "./keykeeper-system-lock";

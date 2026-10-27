@@ -30,6 +30,7 @@ import {
   KeykeeperReloadKey,
   RELOAD_KEY,
   reloadWait,
+  STAY_UNLOCKED_ON_RELOAD,
   unwrapAfterReload,
   wrapForReload,
 } from "./reload-key";
@@ -130,6 +131,9 @@ describe("reloadWait", () => {
     expect(reloadWait(15, null, null)).toBeNull();
     expect(reloadWait(1, lock, policy("immediately"))).toBeNull();
     expect(reloadWait(15, lock, policy("onAppRestart"))).toBeNull();
+    expect(reloadWait(15, lock, { type: "custom", minutes: 30, webReload: false })).toBeNull();
+    expect(reloadWait(15, lock, null, false)).toBeNull();
+    expect(reloadWait(15, lock, { type: "custom", minutes: 30, webReload: true }, true)).toBe(15);
   });
 });
 
@@ -145,6 +149,11 @@ describe("KeykeeperReloadKey", () => {
   let lockActions: Array<(userId: UserId) => Promise<void>>;
   let server: Map<string, string>;
   let forgotten: string[];
+  let navigation: string;
+  let page: { leave: () => void; back: () => void };
+  let beacons: Array<{ url: string; json: string }>;
+  let locked: UserId[];
+  let forgetFails: number;
   let reloadKey: KeykeeperReloadKey;
 
   const userKey = new SymmetricCryptoKey(bytes(vectors.wrap.userKey)) as UserKey;
@@ -167,6 +176,10 @@ describe("KeykeeperReloadKey", () => {
     server = new Map();
     forgotten = [];
     lockActions = [];
+    navigation = "reload";
+    beacons = [];
+    locked = [];
+    forgetFails = 0;
 
     keyService = mock<KeyService>();
     keyService.userKey$.mockReturnValue(userKey$);
@@ -193,11 +206,16 @@ describe("KeykeeperReloadKey", () => {
       throw new Error(`unexpected ${path}`);
     });
     api.fetch.mockImplementation(async (request: Request) => {
+      if (forgetFails > 0) {
+        forgetFails--;
+        return { ok: false, status: 503 } as Response;
+      }
       const { tabId } = JSON.parse(await request.text());
       forgotten.push(tabId);
       server.delete(tabId);
-      return { status: 200 } as Response;
+      return { ok: true, status: 200 } as Response;
     });
+    api.getActiveBearerToken.mockResolvedValue("access-token");
 
     const tokenService = mock<TokenService>();
     tokenService.getAccessToken.mockResolvedValue("access-token");
@@ -225,6 +243,14 @@ describe("KeykeeperReloadKey", () => {
       environmentService,
       logService: mock<LogService>(),
       registerOnLockAction: (action) => lockActions.push(action),
+      lock: async (userId) => {
+        locked.push(userId);
+      },
+      navigationType: () => navigation,
+      onPageLifecycle: (leave, back) => {
+        page = { leave, back };
+      },
+      beacon: (url, json) => beacons.push({ url, json }),
     });
   });
 
@@ -383,6 +409,106 @@ describe("KeykeeperReloadKey", () => {
     await reloadKey.checkIn();
     expect(posts("/keykeeper/reload-key/check-in")).toHaveLength(1);
     expect(posts("/keykeeper/reload-key")).toHaveLength(0);
+  });
+
+  it("restores only on a reload: a reopened tab, Back, or a new load stays locked", async () => {
+    for (const how of ["back_forward", "navigate", "prerender", undefined]) {
+      reloadKey.start();
+      await unlock();
+      const tabId = (await record())!.tabId;
+      reloadKey.stop();
+      userKey$.next(null);
+      api.send.mockClear();
+
+      navigation = how as string;
+      const reopened = new KeykeeperReloadKey((reloadKey as any).deps);
+      expect(await reopened.restore(USER)).toBe(false);
+      expect(posts("/keykeeper/reload-key/release")).toHaveLength(0);
+      expect(keyService.setUserKey).not.toHaveBeenCalled();
+      // This tab won't try again; the server ends the entry on its own.
+      expect(await record()).toBeNull();
+      expect(forgotten).not.toContain(tabId);
+      navigation = "reload";
+      reloadKey = new KeykeeperReloadKey((reloadKey as any).deps);
+    }
+  });
+
+  it("tells the server as the page goes, with a beacon that carries only the tab id", async () => {
+    reloadKey.start();
+    await unlock();
+    const tabId = (await record())!.tabId;
+
+    page.leave();
+    expect(beacons).toEqual([
+      {
+        url: "https://vault.example.test/api/keykeeper/reload-key/leaving",
+        json: JSON.stringify({ tabId }),
+      },
+    ]);
+  });
+
+  it("locks a page that comes back from the back-forward cache unlocked", async () => {
+    reloadKey.start();
+    page.back();
+    await settle();
+    expect(locked).toEqual([]);
+
+    await unlock();
+    page.back();
+    await settle();
+    expect(locked).toEqual([USER]);
+  });
+
+  it("keeps none with Stay unlocked when I reload off, and forgets it when it's turned off", async () => {
+    await stateProvider.getUser(USER, STAY_UNLOCKED_ON_RELOAD).update(() => false);
+    reloadKey.start();
+    await unlock();
+    expect(posts("/keykeeper/reload-key")).toHaveLength(0);
+    reloadKey.stop();
+    userKey$.next(null);
+    await settle();
+
+    await reloadKey.setStayUnlocked(USER, true);
+    reloadKey = new KeykeeperReloadKey((reloadKey as any).deps);
+    reloadKey.start();
+    await unlock();
+    const tabId = (await record())!.tabId;
+    await reloadKey.setStayUnlocked(USER, false);
+    await settle();
+    await settle();
+    expect(forgotten).toContain(tabId);
+    expect(await record()).toBeNull();
+  });
+
+  it("keeps none when the policy turns reload keys off", async () => {
+    policies$.next([
+      {
+        type: PolicyType.MaximumVaultTimeout,
+        enabled: true,
+        data: { type: "custom", minutes: 30, webReload: false },
+      } as Policy,
+    ]);
+    reloadKey.start();
+    await unlock();
+    expect(posts("/keykeeper/reload-key")).toHaveLength(0);
+  });
+
+  it("asks with a fresh token, and tries a forget that failed once more", async () => {
+    reloadKey.start();
+    await unlock();
+    const tabId = (await record())!.tabId;
+
+    forgetFails = 1;
+    await reloadKey.forget(USER);
+    expect(api.getActiveBearerToken).toHaveBeenCalledWith(USER);
+    expect(forgotten).toEqual([]);
+    expect(await record()).toBeNull();
+    // The page's leaving says so too, meanwhile.
+    page.leave();
+    expect(beacons.map((b) => JSON.parse(b.json).tabId)).toEqual([tabId]);
+
+    await (reloadKey as any).retryForget();
+    expect(forgotten).toEqual([tabId]);
   });
 
   it("reports how long since the vault was last used", async () => {
