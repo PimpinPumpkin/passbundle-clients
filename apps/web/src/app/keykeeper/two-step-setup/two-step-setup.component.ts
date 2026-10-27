@@ -370,9 +370,12 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
       if (id == null) {
         throw new Error("This account already has five security keys.");
       }
-      const challenge = new WebAuthnChallengeResponse(
-        await this.call("POST", "/two-factor/get-webauthn-challenge", { masterPasswordHash }),
-      );
+      // The server answers with the creation options themselves; upstream's
+      // newer servers wrap them in "options".
+      const answer = (await this.call("POST", "/two-factor/get-webauthn-challenge", {
+        masterPasswordHash,
+      })) as { options?: unknown; Options?: unknown };
+      const challenge = new WebAuthnChallengeResponse(answer.options ?? answer.Options ?? answer);
       const credential = (await navigator.credentials.create({
         publicKey: challenge,
       })) as PublicKeyCredential | null;
