@@ -2,11 +2,18 @@
 // @ts-strict-ignore
 import { CommonModule } from "@angular/common";
 import { Component, Inject } from "@angular/core";
-import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
+import {
+  AbstractControl,
+  FormBuilder,
+  ReactiveFormsModule,
+  ValidationErrors,
+  Validators,
+} from "@angular/forms";
 
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { CipherType, FieldType } from "@bitwarden/common/vault/enums";
+import { isReservedFieldName } from "@bitwarden/common/vault/keykeeper/reserved-fields";
 import {
   DIALOG_DATA,
   AsyncActionsModule,
@@ -50,8 +57,16 @@ export class AddEditCustomFieldDialogComponent {
 
   customFieldForm = this.formBuilder.group({
     type: FieldType.Text,
-    label: ["", Validators.required],
+    // Keykeeper: never one of Keykeeper's own names, as a new field or a rename.
+    label: ["", [Validators.required, (control: AbstractControl) => this.reservedName(control)]],
   });
+
+  /** Keykeeper: names starting with "keykeeper." are Keykeeper's own data. */
+  private reservedName(control: AbstractControl): ValidationErrors | null {
+    return isReservedFieldName(control.value)
+      ? { keykeeperReservedName: { message: this.i18nService.t("keykeeperReservedFieldName") } }
+      : null;
+  }
 
   fieldTypeOptions = [
     { name: this.i18nService.t("cfTypeText"), value: FieldType.Text },

@@ -283,6 +283,12 @@ describe("CustomFieldsComponent", () => {
       ]);
     });
 
+    it("Keykeeper: adds no field with one of Keykeeper's own names", () => {
+      component.addField(FieldType.Text, "keykeeper.template-definition");
+
+      expect(component.fields.value).toEqual([]);
+    });
+
     it("adds hidden field", () => {
       component.addField(FieldType.Hidden, "hidden label");
 
@@ -390,6 +396,12 @@ describe("CustomFieldsComponent", () => {
 
       const updatedCipher = patchFn(new CipherView());
       expect(updatedCipher.fields).toEqual([fieldView]);
+    });
+
+    it("Keykeeper: won't rename a field to one of Keykeeper's own names", () => {
+      component.updateLabel(0, "keykeeper.template-definition");
+
+      expect(component.fields.at(0).value.name).not.toBe("keykeeper.template-definition");
     });
 
     it("updates the label", () => {

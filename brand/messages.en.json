@@ -819,5 +819,8 @@
   },
   "keykeeperLinkSsoVerify": {
     "message": "Confirm it's you to link your account to this organization's single sign-on. Microsoft then asks which account to use, and you confirm it before anything is linked."
+  },
+  "keykeeperReservedFieldName": {
+    "message": "Names starting with \"keykeeper.\" are reserved."
   }
 }

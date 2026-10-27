@@ -28,6 +28,7 @@ import {
   isSecretLinkedField,
   maySeeSecretsOrNew,
 } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
+import { isReservedFieldName } from "@bitwarden/common/vault/keykeeper/reserved-fields";
 import { CardView } from "@bitwarden/common/vault/models/view/card.view";
 import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
 import { IdentityView } from "@bitwarden/common/vault/models/view/identity.view";
@@ -280,6 +281,10 @@ export class CustomFieldsComponent implements OnInit, AfterViewInit {
 
   /** Updates label for an individual field */
   updateLabel(index: number, label: string) {
+    // Keykeeper: never one of Keykeeper's own names (the dialog says so too).
+    if (isReservedFieldName(label)) {
+      return;
+    }
     this.fields.at(index).patchValue({ name: label });
     void this.dialogRef?.close();
   }
@@ -292,6 +297,10 @@ export class CustomFieldsComponent implements OnInit, AfterViewInit {
 
   /** Adds a new field to the form */
   addField(type: FieldType, label: string) {
+    // Keykeeper: never one of Keykeeper's own names (the dialog says so too).
+    if (isReservedFieldName(label)) {
+      return;
+    }
     void this.dialogRef?.close();
 
     let value = null;

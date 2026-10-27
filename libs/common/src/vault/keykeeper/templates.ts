@@ -21,6 +21,7 @@ import { newGuid } from "@bitwarden/guid";
 import { CipherType, FieldType } from "../enums";
 import { FieldView } from "../models/view/field.view";
 
+import { isSecretField, maySeeSecrets } from "./hidden-secrets";
 import { visibleCustomFields } from "./reserved-fields";
 
 export const TEMPLATE_FIELD_NAME = "keykeeper.template";
@@ -251,14 +252,21 @@ type TemplateItem = {
   organizationId?: string | null;
   deletedDate?: Date | null;
   fields?: FieldLike[] | null;
+  viewPassword?: boolean | null;
 };
 
-/** The custom template an item defines, or null if it isn't one. */
+/**
+ * The custom template an item defines, or null if it isn't one. A hidden
+ * field's default is a secret like any other: for someone who can't see the
+ * template note's passwords (DESIGN.md, "Folders and permissions"), the field
+ * comes without it, empty, as in the apps (core/src/templates.rs, `groups`).
+ */
 export function customTemplate(item: TemplateItem): ItemTemplate | null {
   const definition = templateDefinition(item);
   if (definition == null || item.type !== CipherType.SecureNote || item.deletedDate != null) {
     return null;
   }
+  const seesSecrets = maySeeSecrets(item);
   const fields = visibleCustomFields(item.fields).flatMap((f): TemplateField[] => {
     const kind: TemplateFieldKind | null =
       f.type === FieldType.Hidden
@@ -268,7 +276,8 @@ export function customTemplate(item: TemplateItem): ItemTemplate | null {
           : f.type === FieldType.Text
             ? "text"
             : null;
-    return kind == null ? [] : [{ label: f.name ?? "", kind, value: f.value ?? undefined }];
+    const value = isSecretField(f.type) && !seesSecrets ? undefined : (f.value ?? undefined);
+    return kind == null ? [] : [{ label: f.name ?? "", kind, value }];
   });
   return {
     id: definition.id,
