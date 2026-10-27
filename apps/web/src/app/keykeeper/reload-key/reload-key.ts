@@ -6,8 +6,13 @@
 // using upstream's own key wrap (an EncString), keeps only the wrapped user
 // key and a random tab id in its own sessionStorage, and gives R and the tab
 // id to the server over the signed-in session. The server keeps R in memory
-// only. After a reload, the tab asks for R back with its tab id, unwraps the
-// user key, and puts it in memory as upstream does for a "never" timeout.
+// only, and answers with the tab's reload cookie (HttpOnly, Secure,
+// SameSite=Strict, a session cookie, sent only to the reload endpoints),
+// keeping only its hash. After a reload, the tab asks for R back with its tab
+// id, the browser sends the cookie along (the API is at the page's own
+// origin), and the tab unwraps the user key and puts it in memory as upstream
+// does for a "never" timeout. Nothing here touches the cookie: page scripts
+// can't, which is the point. A copy of sessionStorage alone opens nothing.
 //
 // - Only for a timeout in minutes with the Lock action: "On browser refresh"
 //   and Log out keep upstream's behavior, and so do "immediately" and "on app
