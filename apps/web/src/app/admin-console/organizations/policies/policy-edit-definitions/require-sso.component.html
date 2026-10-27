@@ -4,6 +4,22 @@
 <bit-callout type="warning">
   {{ "requireSsoExemption" | i18n }}
 </bit-callout>
+@if (keykeeperUnlinked(); as unlinked) {
+  @if (unlinked.length > 0) {
+    <!-- Keykeeper: who will be asked to link (DESIGN.md, "Sign in with Microsoft Entra ID"). -->
+    <bit-callout type="info" title="Not linked yet" data-testid="require-sso-unlinked">
+      These members aren't linked to single sign-on yet. With it required, their open sessions end
+      at their next refresh, and their next sign-in with their email and master password (and
+      two-step login, if they use it) asks them to link their Microsoft account before anything
+      else.
+      <ul class="tw-mb-0 tw-mt-2">
+        @for (u of unlinked; track u.userId) {
+          <li>{{ u.name ? u.name + " (" + u.email + ")" : u.email }}</li>
+        }
+      </ul>
+    </bit-callout>
+  }
+}
 
 <bit-form-control>
   <input type="checkbox" bitCheckbox [formControl]="enabled" id="enabled" />

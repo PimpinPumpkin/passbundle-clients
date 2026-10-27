@@ -116,6 +116,23 @@ export function describeEvent(
       return `${actor} stopped sending the MSP's events to ${detail || "a destination"}`;
     case "event_stream_paused":
       return `The server stopped sending the MSP's events to ${detail || "a destination"}`;
+    // Single sign-on with Microsoft Entra ID (DESIGN.md, "Sign in with Microsoft Entra ID").
+    case "sso_turned_on":
+      return `${actor} turned on single sign-on for ${org}`;
+    case "sso_turned_off":
+      return `${actor} turned off single sign-on for ${org}`;
+    case "sso_settings_changed":
+      return `${actor} changed ${org}'s single sign-on settings (${detail || "settings"})`;
+    case "sso_domain_added":
+      return `${actor} added the domain ${detail} to ${org}'s single sign-on`;
+    case "sso_domain_verified":
+      return `${actor} verified the domain ${detail} for ${org}`;
+    case "sso_domain_removed":
+      return `${actor} removed the domain ${detail} from ${org}'s single sign-on`;
+    case "sso_api_keys_replaced":
+      return `${actor} replaced the API keys of ${detail === "1" ? "1 member" : `${detail || "the"} members`} who must use ${org}'s single sign-on`;
+    case "sso_unlinked":
+      return `${actor} unlinked ${target}'s single sign-on in ${org}`;
     default:
       return `${e.event} by ${actor}`;
   }

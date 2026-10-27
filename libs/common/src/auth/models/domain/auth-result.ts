@@ -12,6 +12,8 @@ export class AuthResult {
   requiresEncryptionKeyMigration: boolean;
   requiresDeviceVerification: boolean;
   ssoOrganizationIdentifier?: string | null;
+  /** Keykeeper: a linking session, when the account must link to that single sign-on first. */
+  keykeeperSsoLinkSession?: string | null;
   // The master-password used in the authentication process
   masterPassword: string | null;
 

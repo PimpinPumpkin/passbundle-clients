@@ -335,3 +335,65 @@ export type ProvisioningView = {
   /** People the directory turned off whom provisioning never changes. */
   turnedOff: { memberId: string; email: string; role: string; at: string }[];
 };
+
+/**
+ * An organization's single sign-on with Microsoft Entra ID, as its Single
+ * sign-on page shows it. The client secret never comes back: only when it was
+ * saved. See DESIGN.md, "Sign in with Microsoft Entra ID".
+ */
+export type SsoView = {
+  enabled: boolean;
+  identifier: string | null;
+  tenantId: string | null;
+  clientId: string | null;
+  secretSavedAt: string | null;
+  /** False when the server can't open the saved secret (its keys changed); null with none saved. */
+  secretReadable: boolean | null;
+  updatedBy: string | null;
+  updatedAt: string | null;
+  /** The redirect URI to paste into the app registration in Entra. */
+  callbackUrl: string;
+  /** A link that starts the organization's sign-in. */
+  signInUrl: string | null;
+  requireSso: boolean;
+  singleOrg: boolean;
+  domains: SsoDomainView[];
+  links: {
+    userId: string;
+    memberId: string | null;
+    email: string;
+    linkedAt: string;
+    lastUsedAt: string | null;
+  }[];
+  /**
+   * Members "Require single sign-on" covers (or would) who aren't linked yet.
+   * With it on, their next password sign-in, after two-step login, asks them
+   * to link their Microsoft account before anything else.
+   */
+  unlinked: { memberId: string; userId: string; email: string; name: string | null }[];
+  /** Only in the answer to a domain check: whether the record was there. */
+  check?: { domain: string; found: boolean };
+  /** Only in the answer to replacing API keys: how many were replaced. */
+  apiKeysReplaced?: number;
+};
+
+export type SsoDomainView = {
+  id: string;
+  domain: string;
+  /** The TXT record's name: the domain itself. */
+  txtName: string;
+  txtValue: string;
+  verifiedAt: string | null;
+  lastCheckedAt: string | null;
+  /** Another organization verified it first. */
+  verifiedElsewhere: boolean;
+};
+
+/** What the Single sign-on page saves. A blank secret keeps the saved one. */
+export type SsoSettings = {
+  enabled: boolean;
+  identifier: string;
+  tenantId: string;
+  clientId: string;
+  clientSecret: string | null;
+};
