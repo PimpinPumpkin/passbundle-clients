@@ -123,11 +123,12 @@ describe("KeykeeperItemVersionsComponent", () => {
     expect(data.delete).toBeUndefined();
   });
 
-  it("never offers to restore to someone who can't see the item's passwords", async () => {
+  it("never opens a version for someone who can't see the item's passwords, whatever the server sends", async () => {
     response = history([version("v1", { name: "one" })]);
     const el = await render(login("two", { viewPassword: false }));
-    buttons(el, "view")[0].click();
-    expect((openDialog.mock.calls[0][1] as VersionDialogData).restore).toBeUndefined();
+    expect(el.querySelectorAll('[data-testid="keykeeper-item-version"]')).toHaveLength(1);
+    expect(buttons(el, "view")).toHaveLength(0);
+    expect(cipherService.decrypt).not.toHaveBeenCalled();
   });
 
   it("lists only when and by whom when the server sends no fields, with nothing to view", async () => {

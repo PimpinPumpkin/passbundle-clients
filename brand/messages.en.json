@@ -695,5 +695,71 @@
         "example": "vault.passbundle.com"
       }
     }
+  },
+  "keykeeperRestoreVersionDropsPasskey": {
+    "message": "The item goes back to how it was on $DATE$. How it is now stays in its version history, so you can come back to it. This version doesn't have its passkey for $PASSKEY$: restoring removes it, and you can't sign in with it after.",
+    "placeholders": {
+      "date": {
+        "content": "$1",
+        "example": "Oct 23, 2026, 10:04:12 AM"
+      },
+      "passkey": {
+        "content": "$2",
+        "example": "shop.example.com, ana"
+      }
+    }
+  },
+  "keykeeperRestoreVersionDropsPasskeys": {
+    "message": "The item goes back to how it was on $DATE$. How it is now stays in its version history, so you can come back to it. This version doesn't have $COUNT$ of its passkeys (for $PASSKEYS$): restoring removes them, and you can't sign in with them after.",
+    "placeholders": {
+      "date": {
+        "content": "$1",
+        "example": "Oct 23, 2026, 10:04:12 AM"
+      },
+      "count": {
+        "content": "$2",
+        "example": "2"
+      },
+      "passkeys": {
+        "content": "$3",
+        "example": "shop.example.com, ana; mail.example.com, ana"
+      }
+    }
+  },
+  "keykeeperRestoreAnyway": {
+    "message": "Restore anyway"
+  },
+  "keykeeperNoEarlierVersions": {
+    "message": "No earlier versions yet."
+  },
+  "keykeeperOneChange": {
+    "message": "1 change"
+  },
+  "keykeeperChanges": {
+    "message": "$COUNT$ changes",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "keykeeperHistoryUnavailable": {
+    "message": "This item's history isn't available."
+  },
+  "keykeeperRestoreFailed": {
+    "message": "Couldn't restore it. If the item changed since you opened it, go back and try again."
+  },
+  "keykeeperFilterByFolder": {
+    "message": "Filter by folder"
+  },
+  "keykeeperAllFolders": {
+    "message": "All folders"
+  },
+  "keykeeperShowAllFolders": {
+    "message": "Show all folders"
+  },
+  "keykeeperCantMoveItem": {
+    "message": "Your organization doesn't let you move it to another shared folder."
   }
 }

@@ -55,7 +55,7 @@
           [cipher]="cipher"
           [formConfig]="formConfig"
           [canEdit]="canEdit"
-          [canDelete]="canDelete"
+          [canDelete]="canDelete && historyCaps.clear"
           (restored)="onCipherSaved($event)"
         ></app-keykeeper-item-versions>
       }

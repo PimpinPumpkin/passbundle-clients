@@ -44,6 +44,14 @@ export class ItemHistoryV2Component {
   }
 
   /**
+   * Keykeeper: the item's earlier passwords, for someone who can see its
+   * passwords (DESIGN.md, "Folders and permissions").
+   */
+  get showPasswordHistory(): boolean {
+    return this.cipher.hasPasswordHistory && this.cipher.viewPassword !== false;
+  }
+
+  /**
    * View the password history for the cipher.
    */
   async viewPasswordHistory() {

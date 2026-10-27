@@ -48,6 +48,7 @@ import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { VaultSettingsService } from "@bitwarden/common/vault/abstractions/vault-settings/vault-settings.service";
 import { CipherRepromptType, CipherType } from "@bitwarden/common/vault/enums";
 import { buildCipherIcon } from "@bitwarden/common/vault/icon/build-cipher-icon";
+import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CardView } from "@bitwarden/common/vault/models/view/card.view";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { Fido2CredentialView } from "@bitwarden/common/vault/models/view/fido2-credential.view";
@@ -82,6 +83,7 @@ import {
   MAX_SUB_FRAME_DEPTH,
 } from "../enums/autofill-overlay.enum";
 import { choicesFor, fillFieldWith } from "../keykeeper/fill-field-menu";
+import { inlineMenuTotp } from "../keykeeper/inline-menu-totp";
 import AutofillField from "../models/autofill-field";
 import { AutofillService, PageDetail } from "../services/abstractions/autofill.service";
 import { InlineMenuFieldQualificationService } from "../services/abstractions/inline-menu-field-qualifications.service";
@@ -882,7 +884,10 @@ export class OverlayBackground implements OverlayBackgroundInterface {
       const userName = typeof fido2Cred?.userName === "string" ? fido2Cred.userName : undefined;
       inlineMenuData.login = {
         username: cipher.login.username,
-        totp: totpResponse?.code,
+        // Keykeeper: the menu shows a code it can fill; someone who can't
+        // see the item's passwords gets a mask in its place, and the fill
+        // still puts the real code in the page.
+        totp: inlineMenuTotp(cipher, totpResponse?.code),
         totpField: this.isTotpFieldForCurrentField(),
         totpCodeTimeInterval: totpResponse?.period,
         passkey:
@@ -1462,7 +1467,8 @@ export class OverlayBackground implements OverlayBackgroundInterface {
       }
       this.updateLastUsedInlineMenuCipher(inlineMenuCipherId, cipher);
 
-      if (cipher.login?.totp) {
+      // Keykeeper: not onto the clipboard for someone who can't see it.
+      if (cipher.login?.totp && maySeeSecrets(cipher)) {
         const totpResponse = await firstValueFrom(this.totpService.getCode$(cipher.login.totp));
 
         if (totpResponse?.code) {

@@ -124,3 +124,15 @@ export * from "./keykeeper/category-tile.component";
 export * from "./keykeeper/item-tile.component";
 export * from "./keykeeper/item-hero.component";
 export * from "./keykeeper/password-health-line.component";
+export * from "./keykeeper/item-history.service";
+export {
+  distinctVersions,
+  droppedPasskeys,
+  historyAccess,
+  restoreConfirmation,
+  restoredView,
+  savedByLabel,
+  versionRows,
+} from "./keykeeper/item-versions";
+export type { HistoryAccess, VersionRow } from "./keykeeper/item-versions";
+export { DefaultCipherFormService } from "./cipher-form/services/default-cipher-form.service";

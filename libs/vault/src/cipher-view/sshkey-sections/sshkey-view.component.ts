@@ -4,6 +4,7 @@ import { CommonModule } from "@angular/common";
 import { Component, Input, OnChanges, SimpleChanges } from "@angular/core";
 
 import { JslibModule } from "@bitwarden/angular/jslib.module";
+import { HIDDEN_VALUE_MASK } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { SshKeyView } from "@bitwarden/common/vault/models/view/ssh-key.view";
 import {
   SectionHeaderComponent,
@@ -33,6 +34,16 @@ export class SshKeyViewComponent implements OnChanges {
   // FIXME(https://bitwarden.atlassian.net/browse/CL-903): Migrate to Signals
   // eslint-disable-next-line @angular-eslint/prefer-signals
   @Input() sshKey: SshKeyView;
+
+  /**
+   * Keykeeper: whether the person may see the private key (the item's shared
+   * folders' see passwords). Off, it's masked, with no way to show or copy it.
+   */
+  // FIXME(https://bitwarden.atlassian.net/browse/CL-903): Migrate to Signals
+  // eslint-disable-next-line @angular-eslint/prefer-signals
+  @Input() canSeeSecrets = true;
+
+  protected readonly mask = HIDDEN_VALUE_MASK;
 
   revealSshKey = false;
 

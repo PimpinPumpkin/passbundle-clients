@@ -141,6 +141,27 @@ describe("VaultItemCopyActionsComponent", () => {
         expect(labelFor("bwi-hashtag")).toBe("translated-noNumber");
         expect(labelFor("bwi-key")).toBe("translated-noSecurityCode");
       });
+
+      it("Keykeeper: offers no copy of a card's number or code to someone who can't see them", () => {
+        (component.cipher() as CipherView).viewPassword = false;
+        (component.cipher() as any).__copyable = { cardNumber: true, securityCode: true };
+
+        fixture.detectChanges();
+
+        expect(labelFor("bwi-hashtag")).toBeUndefined();
+        expect(labelFor("bwi-key")).toBeUndefined();
+      });
+    });
+
+    it("Keykeeper: offers no copy of the password or one-time code to someone who can't see them", () => {
+      (component.cipher() as CipherView).viewPassword = false;
+      (component.cipher() as any).__copyable = { username: true, password: true, totp: true };
+
+      fixture.detectChanges();
+
+      expect(labelFor("bwi-user")).toBe("translated-copyUsername");
+      expect(labelFor("bwi-key")).toBeUndefined();
+      expect(labelFor("bwi-clock")).toBeUndefined();
     });
   });
 
@@ -273,7 +294,7 @@ describe("VaultItemCopyActionsComponent", () => {
       expect(i18nService.t).toHaveBeenCalledWith("username");
     });
 
-    it("returns null when password is hidden but multiple fields exist, ensuring username and totp are shown in the menu UI", () => {
+    it("Keykeeper: offers only the username when the password is hidden, since one-time codes are hidden too", () => {
       (component.cipher() as CipherView).viewPassword = false;
 
       (component.cipher() as any).__copyable = {
@@ -284,7 +305,7 @@ describe("VaultItemCopyActionsComponent", () => {
 
       const result = component.singleCopyableLogin;
 
-      expect(result).toBeNull();
+      expect(result).toEqual({ key: "translated-username", field: "username" });
     });
 
     it("returns null when password is hidden and password is the only populated login field", () => {

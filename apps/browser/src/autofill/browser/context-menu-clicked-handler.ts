@@ -26,6 +26,7 @@ import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.servi
 import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherRepromptType } from "@bitwarden/common/vault/enums/cipher-reprompt-type";
+import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 
 // FIXME (PM-22628): Popup imports are forbidden in background
@@ -240,7 +241,9 @@ export class ContextMenuClickedHandler {
           break;
         }
 
-        if (!cipher || !cipher.login?.password) {
+        // Keykeeper: never a password the person's shared folders hide from
+        // them, even from a menu built before their access changed.
+        if (!cipher || !cipher.login?.password || !maySeeSecrets(cipher)) {
           break;
         }
 
@@ -265,7 +268,8 @@ export class ContextMenuClickedHandler {
           break;
         }
 
-        if (!cipher || !cipher.login?.totp) {
+        // Keykeeper: nor its one-time codes.
+        if (!cipher || !cipher.login?.totp || !maySeeSecrets(cipher)) {
           break;
         }
 

@@ -59,6 +59,18 @@ describe("CopyCipherFieldDirective", () => {
       expect(copyCipherFieldDirective["hostDisabled"]).toBe(true);
     });
 
+    it("Keykeeper: should be disabled for a secret the person's shared folders hide", async () => {
+      copyCipherFieldDirective.action = "password";
+      (copyCipherFieldDirective.cipher as CipherView).login.password = "test-password";
+      (copyCipherFieldDirective.cipher as CipherView).viewPassword = false;
+
+      await copyCipherFieldDirective.ngOnChanges();
+
+      expect(copyCipherFieldDirective["hostDisabled"]).toBe(true);
+      await copyCipherFieldDirective.copy();
+      expect(copyFieldService.copy).not.toHaveBeenCalled();
+    });
+
     it("should be disabled when externally disabled even if the field is available", async () => {
       copyCipherFieldDirective.action = "username";
       (copyCipherFieldDirective.cipher as CipherView).login.username = "test-username";

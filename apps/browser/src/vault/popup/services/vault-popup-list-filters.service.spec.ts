@@ -790,6 +790,99 @@ describe("VaultPopupListFiltersService", () => {
       discardPeriodicTasks();
     }));
   });
+
+  // Keykeeper: the folder filter (DESIGN.md, "Folders and permissions").
+  describe("places$", () => {
+    const lake = { id: "o-lake", name: "Lakeside Clinic" } as Organization;
+    const everyoneId = "5f0c0f3e-6c7a-4f43-9d55-7a1f0a3c2e11";
+    const everyone = new CollectionView({
+      id: everyoneId as any,
+      organizationId: "o-lake" as any,
+      name: "Everyone",
+    });
+    const cipher = (
+      type: CipherType,
+      organizationId: string | null,
+      folderId: string | null,
+      collectionIds: string[] = [],
+    ) => ({ type, organizationId, folderId, collectionIds: collectionIds.map(asUuid) });
+    const ciphers = {
+      "1": cipher(CipherType.Login, null, "f-work"),
+      "2": cipher(CipherType.Card, null, null),
+      "3": cipher(CipherType.Login, "o-lake", null, [everyoneId]),
+      "4": cipher(CipherType.Login, "o-lake", "f-work", [everyoneId]),
+    };
+
+    beforeEach(() => {
+      _memberOrganizations$.next([lake]);
+      folderViews$.next([
+        { id: "f-work", name: "Work" },
+        { id: null, name: "No folder" },
+      ] as any);
+      decryptedCollections$.next([everyone]);
+      cipherListViews$.next(ciphers as any);
+    });
+
+    const places = async () => {
+      const { firstValueFrom } = await import("rxjs");
+      return firstValueFrom(service.places$);
+    };
+
+    it("lists Personal and its folders, then each organization and its shared folders, with counts", async () => {
+      const list = await places();
+      expect(list.map((p) => [p.key, p.label, p.depth, p.count])).toEqual([
+        ["personal", "myVault", 0, 2],
+        ["folder:f-work", "Work", 1, 2],
+        ["folder:none", "itemsWithNoFolder", 1, 1],
+        ["org:o-lake", "Lakeside Clinic", 0, 2],
+        [`shared:${everyoneId}`, "Everyone", 1, 2],
+      ]);
+      expect(list.find((p) => p.key === `shared:${everyoneId}`)?.ownerName).toBe("Lakeside Clinic");
+    });
+
+    it("counts with the kind of item picked", async () => {
+      service.filterForm.patchValue({ cipherType: CipherType.Card });
+      const list = await places();
+      expect(list.find((p) => p.key === "personal")?.count).toBe(1);
+      expect(list.find((p) => p.key === "org:o-lake")?.count).toBe(0);
+    });
+
+    it("picks a place by setting upstream's filters, and marks it", async () => {
+      let list = await places();
+      service.pickPlace(list.find((p) => p.key === `shared:${everyoneId}`)!);
+      expect(service.filterForm.value.organization?.id).toBe("o-lake");
+      expect(service.filterForm.value.collection?.id).toBe(everyoneId);
+      expect(service.filterForm.value.folder).toBeNull();
+      list = await places();
+      expect(list.filter((p) => p.picked).map((p) => p.key)).toEqual([`shared:${everyoneId}`]);
+
+      // A personal folder shows whatever its owner filed there, whoever owns the item.
+      service.pickPlace(list.find((p) => p.key === "folder:f-work")!);
+      expect(service.filterForm.value.organization).toBeNull();
+      expect(service.filterForm.value.folder?.id).toBe("f-work");
+
+      service.pickPlace(list.find((p) => p.key === "personal")!);
+      expect(service.filterForm.value.organization?.id).toBe(MY_VAULT_ID);
+
+      service.pickPlace(null);
+      expect(service.filterForm.value.organization).toBeNull();
+      list = await places();
+      expect(list.some((p) => p.picked)).toBe(false);
+    });
+
+    it("keeps Personal unpickable where an organization's policy keeps items out of it", async () => {
+      policyAppliesToUser$.next(true);
+      const list = await places();
+      expect(list.find((p) => p.key === "personal")?.disabled).toBe(true);
+    });
+
+    it("shows nothing when there's only Personal", async () => {
+      _memberOrganizations$.next([]);
+      folderViews$.next([{ id: null, name: "No folder" }] as any);
+      decryptedCollections$.next([]);
+      expect(await places()).toEqual([]);
+    });
+  });
 });
 
 function createMockSignal<T>(initialValue: T): WritableSignal<T> {

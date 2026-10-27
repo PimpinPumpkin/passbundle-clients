@@ -2171,6 +2171,46 @@ describe("OverlayBackground", () => {
       });
     });
 
+    describe("Keykeeper: one-time codes in the inline menu", () => {
+      const login = (viewPassword: boolean) => {
+        const cipher = new CipherView();
+        cipher.id = "cipher-1";
+        cipher.type = CipherType.Login;
+        cipher.name = "Front desk";
+        cipher.login = new LoginView();
+        cipher.login.username = "frontdesk";
+        cipher.login.totp = "JBSWY3DPEHPK3PXP";
+        cipher.viewPassword = viewPassword;
+        return cipher;
+      };
+
+      beforeEach(() => {
+        totpService.getCode$.mockReturnValue(of({ code: "123456", period: 30 }));
+      });
+
+      it("shows the code to someone who can see the item's passwords", async () => {
+        const data = await overlayBackground["buildCipherData"]({
+          inlineMenuCipherId: "inline-menu-cipher-0",
+          cipher: login(true),
+          showFavicons: false,
+          iconsServerUrl: "https://icons.example.test",
+        } as any);
+        expect(data.login.totp).toBe("123456");
+      });
+
+      it("shows a mask in its place to someone who can't, and still lists the item", async () => {
+        const data = await overlayBackground["buildCipherData"]({
+          inlineMenuCipherId: "inline-menu-cipher-0",
+          cipher: login(false),
+          showFavicons: false,
+          iconsServerUrl: "https://icons.example.test",
+        } as any);
+        expect(data.login.totp).toBe("●●●●●●");
+        expect(JSON.stringify(data)).not.toContain("123456");
+        expect(JSON.stringify(data)).not.toContain("JBSWY3DPEHPK3PXP");
+      });
+    });
+
     describe("updateFocusedFieldData message handler", () => {
       it("sends a message to the sender frame to unset the most recently focused field data when the currently focused field does not belong to the sender", async () => {
         const tab = createChromeTabMock({ id: 2 });

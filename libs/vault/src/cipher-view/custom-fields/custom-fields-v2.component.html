@@ -35,14 +35,18 @@
           </bit-form-field>
         }
         @if (field.type === fieldType.Hidden) {
+          <!-- Keykeeper: without see passwords, a mask (the value isn't in the
+               page) and nothing to drag -->
           <bit-form-field>
-            <bit-label [appTextDrag]="field.value">{{ field.name }}</bit-label>
+            <bit-label [appTextDrag]="canViewPassword ? field.value : ''">{{
+              field.name
+            }}</bit-label>
             @if (!revealedHiddenFields.includes(i)) {
               <input
                 readonly
                 bitInput
                 type="password"
-                [value]="field.value ?? ''"
+                [value]="canViewPassword ? (field.value ?? '') : field.value ? mask : ''"
                 aria-readonly="true"
                 [attr.aria-label]="emptyFieldAriaLabel(field)"
                 class="tw-font-mono"

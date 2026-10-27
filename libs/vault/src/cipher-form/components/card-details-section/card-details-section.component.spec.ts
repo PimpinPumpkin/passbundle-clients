@@ -3,6 +3,7 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ReactiveFormsModule } from "@angular/forms";
 import { By } from "@angular/platform-browser";
 import { mock, MockProxy } from "jest-mock-extended";
+import { Subject } from "rxjs";
 
 import { EventCollectionService } from "@bitwarden/common/dirt/event-logs";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
@@ -23,7 +24,10 @@ describe("CardDetailsSectionComponent", () => {
   const getInitialCipherView = jest.fn((): any => null);
 
   beforeEach(async () => {
-    cipherFormProvider = mock<CipherFormContainer>({ getInitialCipherView });
+    cipherFormProvider = mock<CipherFormContainer>({
+      getInitialCipherView,
+      formStatusChange$: new Subject<"enabled" | "disabled">(),
+    });
     registerChildFormSpy = jest.spyOn(cipherFormProvider, "registerChildForm");
     patchCipherSpy = jest.spyOn(cipherFormProvider, "patchCipher");
 
@@ -183,5 +187,41 @@ describe("CardDetailsSectionComponent", () => {
 
     expect(component.cardDetailsForm.value.cardholderName).toBe(initialCardholderName);
     expect(component.cardDetailsForm.value.brand).toBe(initialBrand);
+  });
+
+  it("Keykeeper: never shows or changes a card's number and code for someone who can't see them", () => {
+    const existingCard = new CardView();
+    existingCard.cardholderName = "Ana";
+    existingCard.number = "4242424242424242";
+    existingCard.code = "123";
+    const original = new CipherView();
+    original.card = existingCard;
+    original.viewPassword = false;
+    getInitialCipherView.mockReturnValue({ card: existingCard });
+    component.originalCipherView = original;
+
+    component.ngOnInit();
+    fixture.detectChanges();
+
+    expect(component.canSeeSecrets).toBe(false);
+    expect(component.cardDetailsForm.controls.number.disabled).toBe(true);
+    expect(component.cardDetailsForm.controls.code.disabled).toBe(true);
+    expect(
+      fixture.debugElement.query(By.css('[data-testid="visibility-for-card-number"]')),
+    ).toBeNull();
+    expect(
+      fixture.debugElement.query(By.css('[data-testid="visibility-for-card-code"]')),
+    ).toBeNull();
+
+    // A save keeps them as they were.
+    patchCipherSpy.mockClear();
+    component.cardDetailsForm.controls.cardholderName.setValue("Ana Example");
+    const cipher = new CipherView();
+    cipher.card = new CardView();
+    const patched = patchCipherSpy.mock.lastCall[0](cipher);
+    expect(patched.card.number).toBe("4242424242424242");
+    expect(patched.card.code).toBe("123");
+    getInitialCipherView.mockReset();
+    getInitialCipherView.mockImplementation(() => null);
   });
 });

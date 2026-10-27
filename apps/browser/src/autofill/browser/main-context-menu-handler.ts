@@ -27,6 +27,7 @@ import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.servic
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
 import { CipherType } from "@bitwarden/common/vault/enums/cipher-type";
+import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { RestrictedItemTypesService } from "@bitwarden/common/vault/services/restricted-item-types.service";
 
@@ -374,7 +375,11 @@ export class MainContextMenuHandler {
         (await firstValueFrom(
           this.billingAccountProfileStateService.hasPremiumFromAnySource$(account.id),
         ));
-      if (canAccessPremium && (!cipher || !Utils.isNullOrEmpty(cipher.login?.totp))) {
+      // Keykeeper: one-time codes are secrets, like the password (see passwords).
+      if (
+        canAccessPremium &&
+        (!cipher || (!Utils.isNullOrEmpty(cipher.login?.totp) && maySeeSecrets(cipher)))
+      ) {
         await createChildItem(COPY_VERIFICATION_CODE_ID);
       }
 

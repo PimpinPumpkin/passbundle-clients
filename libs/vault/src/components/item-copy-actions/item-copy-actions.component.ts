@@ -64,9 +64,10 @@ export class VaultItemCopyActionsComponent {
       { key: "verificationCodeTotp", field: "totp" },
     ];
 
+    // Keykeeper: the one-time code is a secret too (DESIGN.md, "Folders and permissions").
     return cipher.viewPassword
       ? loginItems
-      : loginItems.filter((item) => item.field !== "password");
+      : loginItems.filter((item) => item.field !== "password" && item.field !== "totp");
   }
 
   get singleCopyableCard() {
@@ -74,7 +75,8 @@ export class VaultItemCopyActionsComponent {
       { key: "securityCode", field: "securityCode" },
       { key: "cardNumber", field: "cardNumber" },
     ];
-    return this.findSingleCopyableItem(this.cipher(), cardItems);
+    // Keykeeper: a card's number and code need see passwords.
+    return this.findSingleCopyableItem(this.cipher(), this.cipher().viewPassword ? cardItems : []);
   }
 
   get singleCopyableIdentity() {
@@ -175,6 +177,10 @@ export class VaultItemCopyActionsComponent {
 
   /** Sets the number of populated card values for the cipher */
   private getNumberOfCardValues(cipher: CipherViewLike) {
+    // Keykeeper: nothing to copy from a card whose number and code are hidden.
+    if (!cipher.viewPassword) {
+      return 0;
+    }
     if (CipherViewLikeUtils.isCipherListView(cipher)) {
       const copyableCardFields: CopyableCipherFields[] = ["CardSecurityCode", "CardNumber"];
 
@@ -239,9 +245,12 @@ export class VaultItemCopyActionsComponent {
       return cipher.copyableFields.includes("SshKey") ? 1 : 0;
     }
 
-    return [cipher.sshKey.privateKey, cipher.sshKey.publicKey, cipher.sshKey.keyFingerprint].filter(
-      Boolean,
-    ).length;
+    // Keykeeper: the private key only for someone who can see it.
+    return [
+      cipher.viewPassword ? cipher.sshKey.privateKey : null,
+      cipher.sshKey.publicKey,
+      cipher.sshKey.keyFingerprint,
+    ].filter(Boolean).length;
   }
 
   /** Sets the number of populated bank account values for the cipher */

@@ -136,7 +136,8 @@ export class LoginCredentialsViewComponent implements OnChanges {
   }
 
   setTotpCopyCode(e: TotpCodeValues) {
-    this.totpCodeCopyObj = e;
+    // Keykeeper: no codes for someone who can't see the item's passwords.
+    this.totpCodeCopyObj = this.cipher?.viewPassword === false ? undefined : e;
   }
 
   async logCopyEvent() {

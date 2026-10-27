@@ -40,6 +40,7 @@ import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.servi
 import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { FieldType, CipherType } from "@bitwarden/common/vault/enums";
 import { CipherRepromptType } from "@bitwarden/common/vault/enums/cipher-reprompt-type";
+import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CardView } from "@bitwarden/common/vault/models/view/card.view";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
@@ -541,12 +542,15 @@ export default class AutofillService implements AutofillServiceInterface {
           { frameId: pd.frameId },
         );
 
-        // Skip getting the TOTP code for clipboard in these cases
+        // Skip getting the TOTP code for clipboard in these cases. Keykeeper:
+        // including an item whose shared folders hide its passwords: filling
+        // the code into the page is fine, but the clipboard would show it.
         if (
           options.cipher.type !== CipherType.Login ||
           totp !== null ||
           !canUseTotp ||
-          !options.cipher.login?.totp
+          !options.cipher.login?.totp ||
+          !maySeeSecrets(options.cipher)
         ) {
           return;
         }

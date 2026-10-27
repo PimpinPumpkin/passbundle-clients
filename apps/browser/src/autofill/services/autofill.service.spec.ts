@@ -1016,6 +1016,20 @@ describe("AutofillService", () => {
       expect(autofillResult).toEqual({ didAutofill: true, totp: totpCode });
     });
 
+    it("Keykeeper: fills, but returns no TOTP value to copy, for an item whose shared folders hide its passwords", async () => {
+      autofillOptions.cipher.login.totp = "totp";
+      autofillOptions.cipher.viewPassword = false;
+      jest
+        .spyOn(billingAccountProfileStateService, "hasPremiumFromAnySource$")
+        .mockImplementation(() => of(true));
+      jest.spyOn(autofillService, "getShouldAutoCopyTotp").mockResolvedValue(true);
+
+      const autofillResult = await autofillService.doAutoFill(autofillOptions);
+
+      expect(totpService.getCode$).not.toHaveBeenCalled();
+      expect(autofillResult).toEqual({ didAutofill: true });
+    });
+
     it("does not return a TOTP value if the user does not have premium features", async () => {
       autofillOptions.cipher.login.totp = "totp";
       // `mock<CipherView>` auto-stubs this to a truthy function; it is a boolean on a real cipher.

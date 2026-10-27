@@ -1,0 +1,175 @@
+<popup-page>
+  <popup-header slot="header" [pageTitle]="title()" showBackButton [backAction]="back">
+  </popup-header>
+
+  @let item = cipher();
+  @if (item) {
+    @if (open(); as version) {
+      <!-- One version beside the item now, field by field -->
+      <section data-kk="version" data-testid="keykeeper-version">
+        <h2 bitTypography="h5" class="tw-mb-1" data-testid="keykeeper-version-when">
+          {{ "keykeeperVersionFrom" | i18n: when(version) }}
+        </h2>
+        @if (savedBy(version); as who) {
+          <p data-kk="muted" data-testid="keykeeper-version-saved-by">{{ who }}</p>
+        }
+        @if (unchanged()) {
+          <p data-kk="muted" data-testid="keykeeper-version-same">
+            {{ "keykeeperVersionSameAsNow" | i18n }}
+          </p>
+        }
+        <bit-card data-kk="compare">
+          <div
+            role="table"
+            [attr.aria-label]="'keykeeperVersionFrom' | i18n: when(version)"
+            data-testid="keykeeper-version-fields"
+          >
+            <div role="row" data-kk="heading">
+              <span role="columnheader" class="tw-sr-only">{{ "keykeeperField" | i18n }}</span>
+              <span role="columnheader">{{ "keykeeperThisVersion" | i18n }}</span>
+              <span role="columnheader">{{ "keykeeperNow" | i18n }}</span>
+            </div>
+            @for (row of rows(); track row.key) {
+              <div role="row" data-kk="row" [attr.data-changed]="row.changed">
+                <div role="rowheader" data-kk="label">
+                  <span>{{ row.label }}</span>
+                  @if (row.changed) {
+                    <span bitBadge variant="warning">{{ "keykeeperChanged" | i18n }}</span>
+                  }
+                </div>
+                <div data-kk="columns">
+                  <span role="cell" [attr.data-secret]="row.secret || null">{{
+                    shown(row, row.version)
+                  }}</span>
+                  <span role="cell" [attr.data-secret]="row.secret || null">{{
+                    shown(row, row.current)
+                  }}</span>
+                </div>
+              </div>
+            }
+          </div>
+        </bit-card>
+        @if (hasSecrets() && canSeeSecrets()) {
+          <button type="button" bitLink class="tw-mt-3" (click)="toggleReveal()">
+            {{ (reveal() ? "keykeeperHideHiddenValues" : "keykeeperShowHiddenValues") | i18n }}
+          </button>
+        }
+      </section>
+    } @else {
+      <!-- The list -->
+      <div data-kk="item">
+        <vault-keykeeper-item-tile [cipher]="item" [tileSize]="40" />
+        <div data-kk="item-text">
+          <h2 bitTypography="h5" class="tw-m-0 tw-truncate">{{ item.name }}</h2>
+          <p class="tw-m-0" data-kk="muted" data-testid="keykeeper-versions-who">
+            {{
+              (hidePasswords()
+                ? "keykeeperVersionHistoryHiddenPasswords"
+                : "keykeeperVersionHistoryWhoSees"
+              ) | i18n
+            }}
+          </p>
+        </div>
+      </div>
+
+      @switch (state()) {
+        @case ("loading") {
+          <p data-kk="muted" aria-live="polite">{{ "loading" | i18n }}</p>
+        }
+        @case ("failed") {
+          <p data-kk="muted" data-testid="keykeeper-history-failed">
+            {{ "keykeeperHistoryUnavailable" | i18n }}
+          </p>
+        }
+        @case ("ready") {
+          @if (versions().length === 0) {
+            <p data-kk="muted" data-testid="keykeeper-no-versions">
+              {{ "keykeeperNoEarlierVersions" | i18n }}
+            </p>
+          } @else {
+            <bit-section>
+              <bit-card>
+                <ul data-kk="list" [attr.aria-label]="'keykeeperVersionHistory' | i18n">
+                  @for (version of versions(); track version.id) {
+                    <li>
+                      <bit-item data-testid="keykeeper-item-version">
+                        @if (version.view) {
+                          <button
+                            type="button"
+                            bit-item-content
+                            [truncate]="false"
+                            (click)="openVersion(version)"
+                            [attr.aria-label]="('view' | i18n) + ' ' + when(version)"
+                          >
+                            <i
+                              slot="start"
+                              class="bwi bwi-clock"
+                              data-kk="icon"
+                              aria-hidden="true"
+                            ></i>
+                            {{ version.revisionDate | date: "medium" }}
+                            <span slot="secondary">{{ details(version) }}</span>
+                            <i slot="end" class="bwi bwi-angle-right" aria-hidden="true"></i>
+                          </button>
+                        } @else {
+                          <div bit-item-content [truncate]="false">
+                            <i
+                              slot="start"
+                              class="bwi bwi-clock"
+                              data-kk="icon"
+                              aria-hidden="true"
+                            ></i>
+                            {{ version.revisionDate | date: "medium" }}
+                            @if (details(version)) {
+                              <span slot="secondary">{{ details(version) }}</span>
+                            }
+                          </div>
+                        }
+                      </bit-item>
+                    </li>
+                  }
+                </ul>
+              </bit-card>
+            </bit-section>
+          }
+          @if (unreadable() > 0) {
+            <p data-kk="muted">{{ "keykeeperVersionsUnreadable" | i18n: unreadable() }}</p>
+          }
+        }
+      }
+    }
+  } @else if (state() === "failed") {
+    <p data-kk="muted" data-testid="keykeeper-history-failed">
+      {{ "keykeeperHistoryUnavailable" | i18n }}
+    </p>
+  }
+
+  @if (open(); as version) {
+    @if (canRestore() || access().clear) {
+      <popup-footer slot="footer">
+        @if (canRestore() && !unchanged()) {
+          <button bitButton buttonType="primary" type="button" [bitAction]="restore">
+            {{ "keykeeperRestoreVersion" | i18n }}
+          </button>
+        }
+        <ng-container slot="end">
+          @if (access().clear) {
+            <button
+              type="button"
+              bitIconButton="bwi-trash"
+              buttonType="dangerGhost"
+              [label]="'keykeeperDeleteVersion' | i18n"
+              [bitAction]="deleteVersion"
+            ></button>
+          }
+        </ng-container>
+      </popup-footer>
+    }
+  } @else if (access().clear && state() === "ready" && versions().length > 0) {
+    <popup-footer slot="footer">
+      <button bitButton buttonType="dangerOutline" type="button" [bitAction]="clear">
+        {{ "keykeeperClearHistory" | i18n }}
+      </button>
+    </popup-footer>
+  }
+</popup-page>

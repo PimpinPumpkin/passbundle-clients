@@ -39,13 +39,18 @@
               [value]="option.value"
               [label]="option.label"
               [icon]="option.icon"
-              [disabled]="option.heading"
+              [disabled]="option.heading || option.locked"
             ></bit-option>
           }
         </bit-select>
         @if (alsoIn.length > 0) {
           <bit-hint data-testid="keykeeper-also-in">
             {{ "keykeeperAlsoIn" | i18n: alsoIn.join(", ") }}
+          </bit-hint>
+        }
+        @if (placeLockedReason) {
+          <bit-hint data-testid="keykeeper-cant-move">
+            {{ "keykeeperCantMoveItem" | i18n }}
           </bit-hint>
         }
       </bit-form-field>

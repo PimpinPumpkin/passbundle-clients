@@ -27,6 +27,13 @@ export class PasswordHistoryViewComponent implements OnInit {
   history: PasswordHistoryView[] = [];
 
   ngOnInit() {
+    // Keykeeper: earlier passwords are passwords: nothing for someone whose
+    // shared folders hide the item's passwords (DESIGN.md, "Folders and
+    // permissions"), whichever way they got here.
+    if (this.cipher.viewPassword === false) {
+      this.history = [];
+      return;
+    }
     this.history = this.cipher.passwordHistory == null ? [] : this.cipher.passwordHistory;
   }
 }

@@ -25,7 +25,7 @@ import {
 } from "@bitwarden/components";
 import { I18nPipe } from "@bitwarden/ui-common";
 
-import { VersionRow, versionRows } from "./item-versions";
+import { restoreConfirmation, VersionRow, versionRows } from "./item-versions";
 
 export type VersionDialogData = {
   /** The version, decrypted. */
@@ -190,15 +190,10 @@ export class KeykeeperVersionDialogComponent {
   }
 
   protected readonly restore = async () => {
-    const confirmed = await this.dialogService.openSimpleDialog({
-      title: { key: "keykeeperRestoreVersionTitle" },
-      content: {
-        key: "keykeeperRestoreVersionDesc",
-        placeholders: [this.when],
-      },
-      acceptButtonText: { key: "keykeeperRestoreVersion" },
-      type: "warning",
-    });
+    // Keykeeper: it says first which passkeys restoring would take away.
+    const confirmed = await this.dialogService.openSimpleDialog(
+      restoreConfirmation(this.data.version, this.data.current, this.when),
+    );
     if (!confirmed || !this.data.restore) {
       return;
     }

@@ -1188,4 +1188,54 @@ describe("ViewComponent", () => {
       });
     });
   });
+
+  describe("Keykeeper: version history", () => {
+    const folder = (grid: Record<string, boolean>) => ({
+      id: "col-1",
+      organizationId: "org-1",
+      readOnly: false,
+      hidePasswords: false,
+      manage: false,
+      keykeeper: {
+        seePasswords: false,
+        create: false,
+        edit: false,
+        delete: false,
+        export: false,
+        share: false,
+        print: false,
+        viewHistory: false,
+        manage: false,
+        ...grid,
+      },
+    });
+
+    beforeEach(() => {
+      jest.spyOn(component["organizationService"], "organizations$").mockReturnValue(of([]) as any);
+      (component as any).activeUserId = mockUserId;
+    });
+
+    it("offers a person's own item's history", async () => {
+      expect(await component["historyVisible"]({ organizationId: null } as CipherView)).toBe(true);
+    });
+
+    it("offers an organization's item's history only with view item history in one of its folders", async () => {
+      const item = { organizationId: "org-1", collectionIds: ["col-1"] } as unknown as CipherView;
+      const collections = jest.spyOn(component["collectionService"], "decryptedCollections$");
+
+      collections.mockReturnValue(of([folder({ seePasswords: true })]) as any);
+      expect(await component["historyVisible"](item)).toBe(false);
+
+      collections.mockReturnValue(of([folder({ viewHistory: true })]) as any);
+      expect(await component["historyVisible"](item)).toBe(true);
+    });
+
+    it("opens the item's history page", async () => {
+      component.cipher = mockCipher;
+      await component.openHistory();
+      expect(mockNavigate).toHaveBeenCalledWith(["/keykeeper-item-history"], {
+        queryParams: { cipherId: mockCipher.id },
+      });
+    });
+  });
 });

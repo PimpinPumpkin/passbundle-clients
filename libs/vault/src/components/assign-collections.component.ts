@@ -37,7 +37,11 @@ import {
   OrganizationService,
 } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { OrganizationUserStatusType } from "@bitwarden/common/admin-console/enums";
-import { gridOf } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
+import {
+  gridOf,
+  itemGrid,
+  itemLike,
+} from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import {
   CollectionView,
   CollectionTypes,
@@ -533,9 +537,13 @@ export class AssignCollectionsComponent implements OnInit, OnDestroy, AfterViewI
     );
     this.orgName = org.name;
 
+    // Keykeeper: and share on each, which adding an item to another shared
+    // folder or taking it out of one needs, as the server requires (DESIGN.md,
+    // "Folders and permissions").
+    const collections = await firstValueFrom(this.collectionService.decryptedCollections$(userId));
     this.editableItems = org.canEditAllCiphers
       ? this.params.ciphers
-      : this.params.ciphers.filter((c) => c.edit);
+      : this.params.ciphers.filter((c) => c.edit && itemGrid(itemLike(c), collections).share);
 
     this.editableItemCount = this.editableItems.length;
     // TODO: https://bitwarden.atlassian.net/browse/PM-9307,

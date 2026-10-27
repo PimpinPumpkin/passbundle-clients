@@ -57,6 +57,13 @@ export class SshKeySectionComponent implements OnInit {
     keyFingerprint: [""],
   });
 
+  /**
+   * Keykeeper: whether the person may see the private key (the item's shared
+   * folders' see passwords; DESIGN.md, "Folders and permissions"). A new key
+   * is theirs.
+   */
+  readonly canSeeSecrets = computed(() => this.originalCipherView()?.viewPassword !== false);
+
   readonly showImport = computed(() => {
     return (
       // Web does not support clipboard access
