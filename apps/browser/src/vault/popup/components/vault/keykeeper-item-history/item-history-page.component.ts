@@ -299,9 +299,14 @@ export class KeykeeperItemHistoryPageComponent implements OnInit {
   private async load(item: CipherView) {
     this.state.set("loading");
     const loaded = await this.historyService.load(item);
-    this.versions.set(loaded.versions);
-    this.unreadable.set(loaded.unreadable);
-    this.hidePasswords.set(loaded.hidePasswords || !this.access().contents);
+    // Contents only with view item history and see passwords in one folder,
+    // as the server decides; never more than the person's folders say.
+    const hidden = loaded.hidePasswords || !this.access().contents;
+    this.versions.set(
+      hidden ? loaded.versions.map((v) => ({ ...v, view: null })) : loaded.versions,
+    );
+    this.unreadable.set(hidden ? 0 : loaded.unreadable);
+    this.hidePasswords.set(hidden);
     this.state.set("ready");
   }
 
