@@ -22,9 +22,14 @@ export type FolderGrid = {
 
 export type FolderCapability = keyof FolderGrid;
 
-/** In the order the grid shows them, with their message keys. */
-export const FOLDER_CAPABILITIES: readonly { key: FolderCapability; label: string }[] = [
-  { key: "seePasswords", label: "keykeeperCapSeePasswords" },
+/** In the order the grid shows them, with their message keys, and a hint where one helps. */
+export const FOLDER_CAPABILITIES: readonly {
+  key: FolderCapability;
+  label: string;
+  hint?: string;
+}[] = [
+  // What see passwords covers, and its limit: filling still works.
+  { key: "seePasswords", label: "keykeeperCapSeePasswords", hint: "keykeeperCapSeePasswordsHint" },
   { key: "create", label: "keykeeperCapCreate" },
   { key: "edit", label: "keykeeperCapEdit" },
   { key: "delete", label: "keykeeperCapDelete" },

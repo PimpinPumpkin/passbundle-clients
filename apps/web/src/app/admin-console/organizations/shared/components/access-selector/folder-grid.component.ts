@@ -52,6 +52,9 @@ import { I18nPipe } from "@bitwarden/ui-common";
               (change)="toggle(cap.key, $any($event.target).checked)"
             />
             <bit-label>{{ cap.label | i18n }}</bit-label>
+            @if (cap.hint) {
+              <bit-hint [attr.data-hint]="cap.key">{{ cap.hint | i18n }}</bit-hint>
+            }
           </bit-form-control>
         }
       </div>
