@@ -4,6 +4,8 @@ import { PolicyService } from "@bitwarden/common/admin-console/abstractions/poli
 import { PolicyType } from "@bitwarden/common/admin-console/enums";
 import { getFirstPolicy } from "@bitwarden/common/admin-console/services/policy/default-policy.service";
 import {
+  keykeeperWebSystemLockMinutes,
+  keykeeperWebSystemLockOffers,
   MaximumSessionTimeoutPolicyData,
   SessionTimeoutTypeService,
 } from "@bitwarden/common/key-management/session-timeout";
@@ -79,6 +81,19 @@ export class SessionTimeoutSettingsComponentService {
         async ([availableOptions, policyData, highestAvailableEnforcedByPolicyTimeoutType]) => {
           if (policyData == null) {
             return availableOptions;
+          }
+
+          // Keykeeper: in the web vault, "when the computer locks" offers the
+          // waits up to the policy's webMinutes, Custom, and "On browser
+          // refresh" (keykeeper-system-lock.ts).
+          const keykeeperWebMinutes = keykeeperWebSystemLockMinutes(
+            policyData,
+            this.sessionTimeoutTypeService,
+          );
+          if (keykeeperWebMinutes != null) {
+            return availableOptions.filter((option) =>
+              keykeeperWebSystemLockOffers(option.value, keykeeperWebMinutes),
+            );
           }
 
           return availableOptions.filter((option) => {

@@ -33,6 +33,9 @@ import { getFirstPolicy } from "@bitwarden/common/admin-console/services/policy/
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import {
+  keykeeperPolicyForClient,
+  keykeeperSystemLockIsWait,
+  keykeeperSystemLockMessage,
   MaximumSessionTimeoutPolicyData,
   SessionTimeoutTypeService,
 } from "@bitwarden/common/key-management/session-timeout";
@@ -140,7 +143,12 @@ export class SessionTimeoutInputComponent implements ControlValueAccessor, Valid
     maximumSessionTimeoutPolicyData$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((policyData) => {
-        this.maxSessionTimeoutPolicyData = policyData;
+        // Keykeeper: in the web vault, "when the computer locks" is a longest
+        // wait, which the custom timeout is checked against.
+        this.maxSessionTimeoutPolicyData = keykeeperPolicyForClient(
+          policyData,
+          this.sessionTimeoutTypeService,
+        );
         // Re-validate custom form group with new policy data
         this.form.controls.custom.updateValueAndValidity();
         // Trigger validator change when policy data changes
@@ -304,6 +312,15 @@ export class SessionTimeoutInputComponent implements ControlValueAccessor, Valid
   private async getPolicyTimeoutMessage(
     policyData: MaximumSessionTimeoutPolicyData,
   ): Promise<string | null> {
+    // Keykeeper: say what "when the computer locks" does in the web vault,
+    // where upstream's line named "On browser refresh".
+    if (
+      policyData.type === "onSystemLock" &&
+      keykeeperSystemLockIsWait(this.sessionTimeoutTypeService)
+    ) {
+      return keykeeperSystemLockMessage(policyData);
+    }
+
     const timeout = await this.getPolicyAppliedTimeout(policyData);
 
     switch (timeout) {
