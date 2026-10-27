@@ -65,6 +65,30 @@ describe("AddEditCustomFieldDialogComponent", () => {
     expect(updateLabel).toHaveBeenCalledWith(0, "Test Label 2");
   });
 
+  it("Keykeeper: refuses Keykeeper's own names, for a new field or a rename", () => {
+    for (const label of [
+      "keykeeper.template-definition",
+      "keykeeper.fill",
+      " Keykeeper.anything ",
+    ]) {
+      component.customFieldForm.setValue({ type: FieldType.Text, label });
+      expect(component.customFieldForm.controls.label.errors).toEqual({
+        keykeeperReservedName: { message: "keykeeperReservedFieldName" },
+      });
+
+      component.variant = "add";
+      component.submit();
+      component.variant = "edit";
+      dialogData.editLabelConfig = { index: 0, label: "Test Label" };
+      component.submit();
+    }
+    expect(addField).not.toHaveBeenCalled();
+    expect(updateLabel).not.toHaveBeenCalled();
+
+    component.customFieldForm.setValue({ type: FieldType.Text, label: "Keykeeper notes" });
+    expect(component.customFieldForm.valid).toBe(true);
+  });
+
   it("calls `removeField` from DIALOG_DATA with the respective index", () => {
     dialogData.editLabelConfig = { index: 2, label: "Test Label" };
 

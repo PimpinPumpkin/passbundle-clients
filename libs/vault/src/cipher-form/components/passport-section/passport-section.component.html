@@ -46,7 +46,9 @@
         class="tw-font-mono"
         data-testid="passport-number"
       />
-      <button type="button" bitIconButton bitSuffix bitPasswordInputToggle></button>
+      @if (canSee("passport.passportNumber")) {
+        <button type="button" bitIconButton bitSuffix bitPasswordInputToggle></button>
+      }
     </bit-form-field>
 
     <bit-form-field>
@@ -63,7 +65,9 @@
         class="tw-font-mono"
         data-testid="national-identification-number"
       />
-      <button type="button" bitIconButton bitSuffix bitPasswordInputToggle></button>
+      @if (canSee("passport.nationalIdentificationNumber")) {
+        <button type="button" bitIconButton bitSuffix bitPasswordInputToggle></button>
+      }
     </bit-form-field>
 
     <bit-form-field>

@@ -62,6 +62,8 @@ describe("ContextMenuClickedHandler", () => {
       new Cipher({
         id: id ?? "1",
         type: CipherType.Login,
+        // Keykeeper: the server says on every item; missing is hidden.
+        viewPassword: true,
       } as any),
     );
 
@@ -284,6 +286,23 @@ describe("ContextMenuClickedHandler", () => {
         text: "123456",
         tab: { url: "https://test.com" },
       });
+    });
+
+    it("Keykeeper: copies neither the password nor a code of an item whose shared folders hide them", async () => {
+      const hidden = createCipher({ password: "TEST_PASSWORD", totp: "TEST_TOTP_SEED" });
+      hidden.viewPassword = false;
+      cipherService.getAllDecrypted.mockResolvedValue([hidden]);
+      jest.spyOn(totpService, "getCode$").mockReturnValue(of({ code: "123456", period: 30 }));
+
+      await sut.run(createData(`${COPY_PASSWORD_ID}_1`, COPY_PASSWORD_ID), {
+        url: "https://test.com",
+      } as any);
+      await sut.run(createData(`${COPY_VERIFICATION_CODE_ID}_1`, COPY_VERIFICATION_CODE_ID), {
+        url: "https://test.com",
+      } as any);
+
+      expect(copyToClipboard).not.toHaveBeenCalled();
+      expect(totpService.getCode$).not.toHaveBeenCalled();
     });
 
     it("attempts to find a cipher when noop but unlocked", async () => {

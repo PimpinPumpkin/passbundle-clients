@@ -33,6 +33,7 @@ import { SecurityTaskStatus, SecurityTaskType } from "@bitwarden/common/vault/ta
 import { BrowserApi } from "../../platform/browser/browser-api";
 import { NotificationType } from "../enums/notification-type.enum";
 import { Fido2Background } from "../fido2/background/abstractions/fido2.background";
+import { noteFill } from "../keykeeper/hidden-fills";
 import { FormData } from "../services/abstractions/autofill.service";
 import AutofillService from "../services/autofill.service";
 import { createAutofillPageDetailsMock, createChromeTabMock } from "../spec/autofill-mocks";
@@ -706,7 +707,10 @@ describe("NotificationBackground", () => {
         activeAccountStatusMock$.next(AuthenticationStatus.Unlocked);
         getEnableAddedLoginPromptSpy.mockReturnValueOnce(true);
         getAllDecryptedForUrlSpy.mockResolvedValueOnce([
-          mock<CipherView>({ login: { username: "test", password: "password" } }),
+          mock<CipherView>({
+            viewPassword: true,
+            login: { username: "test", password: "password" },
+          }),
         ]);
 
         await notificationBackground.triggerAddLoginNotification(data, tab);
@@ -745,7 +749,10 @@ describe("NotificationBackground", () => {
         activeAccountStatusMock$.next(AuthenticationStatus.Unlocked);
         getEnableAddedLoginPromptSpy.mockReturnValueOnce(true);
         getAllDecryptedForUrlSpy.mockResolvedValueOnce([
-          mock<CipherView>({ login: { username: "anotherTestUsername", password: "password" } }),
+          mock<CipherView>({
+            viewPassword: true,
+            login: { username: "anotherTestUsername", password: "password" },
+          }),
         ]);
 
         await notificationBackground.triggerAddLoginNotification(data, tab);
@@ -759,6 +766,85 @@ describe("NotificationBackground", () => {
           },
           sender.tab,
         );
+      });
+    });
+
+    describe("Keykeeper: a password the person can't see", () => {
+      let tab: chrome.tabs.Tab;
+      let pushAddLoginToQueueSpy: jest.SpyInstance;
+      let pushChangePasswordToQueueSpy: jest.SpyInstance;
+      const hidden = mock<CipherView>({
+        viewPassword: false,
+        id: "hidden-1",
+        login: { username: "frontdesk", password: "lakeside-guest-2026" },
+      });
+
+      beforeEach(() => {
+        tab = createChromeTabMock();
+        jest
+          .spyOn(notificationBackground as any, "getEnableAddedLoginPrompt")
+          .mockReturnValue(true);
+        jest
+          .spyOn(notificationBackground as any, "getEnableChangedPasswordPrompt")
+          .mockReturnValue(true);
+        pushAddLoginToQueueSpy = jest
+          .spyOn(notificationBackground as any, "pushAddLoginToQueue")
+          .mockResolvedValue(undefined);
+        pushChangePasswordToQueueSpy = jest
+          .spyOn(notificationBackground as any, "pushChangePasswordToQueue")
+          .mockResolvedValue(undefined);
+        jest.spyOn(cipherService, "getAllDecryptedForUrl").mockResolvedValue([hidden]);
+        activeAccountStatusMock$.next(AuthenticationStatus.Unlocked);
+        // Whatever filled the tab last in another test is forgotten.
+        noteFill(tab.id, "https://example.com", { viewPassword: true });
+      });
+
+      afterEach(() => {
+        jest.restoreAllMocks();
+      });
+
+      it("isn't offered for saving, under another username, nor for an update", async () => {
+        const data: ModifyLoginCipherFormData = {
+          username: "someone-else",
+          password: "lakeside-guest-2026",
+          uri: "https://example.com",
+          newPassword: "",
+        };
+
+        expect(await notificationBackground.triggerAddLoginNotification(data, tab)).toBe(false);
+        expect(await notificationBackground.triggerCipherNotification(data, tab)).toBe(false);
+        expect(
+          await notificationBackground.triggerChangedPasswordNotification(
+            { ...data, username: "frontdesk", newPassword: "lakeside-guest-2027" },
+            tab,
+          ),
+        ).toBe(false);
+        expect(pushAddLoginToQueueSpy).not.toHaveBeenCalled();
+        expect(pushChangePasswordToQueueSpy).not.toHaveBeenCalled();
+      });
+
+      it("isn't offered while an item that hides its passwords filled the tab last, on that site", async () => {
+        noteFill(tab.id, "https://example.com/login", hidden);
+        const data: ModifyLoginCipherFormData = {
+          username: "someone-else",
+          password: "changed-in-the-page",
+          uri: "https://example.com",
+          newPassword: "",
+        };
+
+        expect(await notificationBackground.triggerAddLoginNotification(data, tab)).toBe(false);
+        expect(await notificationBackground.triggerCipherNotification(data, tab)).toBe(false);
+        expect(pushAddLoginToQueueSpy).not.toHaveBeenCalled();
+
+        // Another site in the tab, or an item they can see filling it, and the prompt is back.
+        expect(
+          await notificationBackground.triggerAddLoginNotification(
+            { ...data, uri: "https://other.example.test" },
+            tab,
+          ),
+        ).toBe(true);
+        noteFill(tab.id, "https://example.com", { viewPassword: true });
+        expect(await notificationBackground.triggerAddLoginNotification(data, tab)).toBe(true);
       });
     });
 
@@ -803,7 +889,10 @@ describe("NotificationBackground", () => {
         activeAccountStatusMock$.next(AuthenticationStatus.Unlocked);
         getEnableChangedPasswordPromptSpy.mockReturnValueOnce(false);
         getAllDecryptedForUrlSpy.mockResolvedValueOnce([
-          mock<CipherView>({ login: { username: "test", password: "oldPassword" } }),
+          mock<CipherView>({
+            viewPassword: true,
+            login: { username: "test", password: "oldPassword" },
+          }),
         ]);
 
         await notificationBackground.triggerChangedPasswordNotification(data, tab);
@@ -842,14 +931,17 @@ describe("NotificationBackground", () => {
         activeAccountStatusMock$.next(AuthenticationStatus.Unlocked);
         getAllDecryptedForUrlSpy.mockResolvedValueOnce([
           mock<CipherView>({
+            viewPassword: true,
             id: "cipher-id-1",
             login: { username: "test", password: "currentPassword" },
           }),
           mock<CipherView>({
+            viewPassword: true,
             id: "cipher-id-2",
             login: { username: "username", password: "currentPassword" },
           }),
           mock<CipherView>({
+            viewPassword: true,
             id: "cipher-id-3",
             login: { username: "uSeRnAmE", password: "currentPassword" },
           }),
@@ -875,6 +967,7 @@ describe("NotificationBackground", () => {
         activeAccountStatusMock$.next(AuthenticationStatus.Unlocked);
         getAllDecryptedForUrlSpy.mockResolvedValueOnce([
           mock<CipherView>({
+            viewPassword: true,
             id: "cipher-id-1",
             login: { password: "currentPassword" },
           }),
@@ -899,10 +992,12 @@ describe("NotificationBackground", () => {
         activeAccountStatusMock$.next(AuthenticationStatus.Unlocked);
         getAllDecryptedForUrlSpy.mockResolvedValueOnce([
           mock<CipherView>({
+            viewPassword: true,
             id: "cipher-id-1",
             login: { password: "password1" },
           }),
           mock<CipherView>({
+            viewPassword: true,
             id: "cipher-id-4",
             login: { password: "password4" },
           }),
@@ -945,7 +1040,10 @@ describe("NotificationBackground", () => {
         };
         activeAccountStatusMock$.next(AuthenticationStatus.Unlocked);
         getAllDecryptedForUrlSpy.mockResolvedValueOnce([
-          mock<CipherView>({ login: { username: "test", password: "password" } }),
+          mock<CipherView>({
+            viewPassword: true,
+            login: { username: "test", password: "password" },
+          }),
         ]);
         await notificationBackground.triggerChangedPasswordNotification(data, tab);
 
@@ -961,6 +1059,7 @@ describe("NotificationBackground", () => {
         activeAccountStatusMock$.next(AuthenticationStatus.Unlocked);
         getAllDecryptedForUrlSpy.mockResolvedValueOnce([
           mock<CipherView>({
+            viewPassword: true,
             id: "cipher-id",
             login: { username: "test", password: "currentPassword" },
           }),
@@ -985,10 +1084,12 @@ describe("NotificationBackground", () => {
         activeAccountStatusMock$.next(AuthenticationStatus.Unlocked);
         getAllDecryptedForUrlSpy.mockResolvedValueOnce([
           mock<CipherView>({
+            viewPassword: true,
             id: "cipher-id-1",
             login: { username: "test", password: "password" },
           }),
           mock<CipherView>({
+            viewPassword: true,
             id: "cipher-id-2",
             login: { username: "test2", password: "password" },
           }),
@@ -1013,6 +1114,7 @@ describe("NotificationBackground", () => {
         activeAccountStatusMock$.next(AuthenticationStatus.Unlocked);
         getAllDecryptedForUrlSpy.mockResolvedValueOnce([
           mock<CipherView>({
+            viewPassword: true,
             id: "cipher-id",
             login: { username: "test", password: "password" },
           }),
@@ -1082,6 +1184,7 @@ describe("NotificationBackground", () => {
 
         const storedCiphersForURL = [
           mock<CipherView>({
+            viewPassword: true,
             id: "cipher-id-1",
             login: { password: "I<3VogonPoetry", username: "ADent" },
           }),
@@ -1105,6 +1208,7 @@ describe("NotificationBackground", () => {
 
         const storedCiphersForURL = [
           mock<CipherView>({
+            viewPassword: true,
             id: "cipher-id-1",
             login: { password: "I<3VogonPoetry", username: "ADent" },
           }),
@@ -1143,7 +1247,10 @@ describe("NotificationBackground", () => {
         };
 
         const storedCiphersForURL = [
-          mock<CipherView>({ login: { username: "ADent", password: "I<3VogonPoetry" } }),
+          mock<CipherView>({
+            viewPassword: true,
+            login: { username: "ADent", password: "I<3VogonPoetry" },
+          }),
         ];
 
         activeAccountStatusMock$.next(AuthenticationStatus.Unlocked);
@@ -1165,7 +1272,10 @@ describe("NotificationBackground", () => {
         };
 
         const storedCiphersForURL = [
-          mock<CipherView>({ login: { username: "ADent", password: "I<3VogonPoetry" } }),
+          mock<CipherView>({
+            viewPassword: true,
+            login: { username: "ADent", password: "I<3VogonPoetry" },
+          }),
         ];
 
         activeAccountStatusMock$.next(AuthenticationStatus.LoggedOut);
@@ -1185,7 +1295,10 @@ describe("NotificationBackground", () => {
         };
 
         const storedCiphersForURL = [
-          mock<CipherView>({ login: { username: "ADent", password: "I<3VogonPoetry" } }),
+          mock<CipherView>({
+            viewPassword: true,
+            login: { username: "ADent", password: "I<3VogonPoetry" },
+          }),
         ];
 
         accountService.activeAccount$ = new BehaviorSubject(null);
@@ -1205,7 +1318,10 @@ describe("NotificationBackground", () => {
         };
 
         const storedCiphersForURL = [
-          mock<CipherView>({ login: { username: "ADent", password: "I<3VogonPoetry" } }),
+          mock<CipherView>({
+            viewPassword: true,
+            login: { username: "ADent", password: "I<3VogonPoetry" },
+          }),
         ];
 
         getAllDecryptedForUrlSpy.mockResolvedValueOnce(storedCiphersForURL);
@@ -1224,7 +1340,10 @@ describe("NotificationBackground", () => {
         };
 
         const storedCiphersForURL = [
-          mock<CipherView>({ login: { username: "ADent", password: "I<3VogonPoetry" } }),
+          mock<CipherView>({
+            viewPassword: true,
+            login: { username: "ADent", password: "I<3VogonPoetry" },
+          }),
         ];
 
         activeAccountStatusMock$.next(AuthenticationStatus.Locked);
@@ -1246,14 +1365,17 @@ describe("NotificationBackground", () => {
         it("and the user vault is locked, trigger an unlock notification", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { password: "galadriel4Eva", username: "gandalfW" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { password: "Edro2x", username: "shadowfax" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { password: "sting123", username: "BBaggins" },
             }),
@@ -1279,14 +1401,17 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates match `newPassword` only, trigger a new cipher notification", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { password: "galadriel4Eva", username: "gandalfW" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { password: "Edro2x", username: "shadowfax" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { password: "sting123", username: "BBaggins" },
             }),
@@ -1312,14 +1437,17 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates match `newPassword` only, do not trigger a new cipher notification if the new cipher notification setting is disabled", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { password: "galadriel4Eva", username: "gandalfW" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { password: "Edro2x", username: "shadowfax" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { password: "sting123", username: "BBaggins" },
             }),
@@ -1338,14 +1466,17 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates match `password` only, trigger an update cipher notification with those candidates", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { password: "UShallKnotPassword", username: "gandalfW" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { password: "UShallKnotPassword", username: "shadowfax" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { password: "sting123", username: "BBaggins" },
             }),
@@ -1368,14 +1499,17 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates match `password` only, do not trigger an update cipher notification if the update notification setting is disabled", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { password: "UShallKnotPassword", username: "gandalfW" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { password: "UShallKnotPassword", username: "shadowfax" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { password: "sting123", username: "BBaggins" },
             }),
@@ -1394,18 +1528,22 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates match `password` only, as well as `newPassword` only, trigger a new cipher notification", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { password: "UShallKnotPassword", username: "gandalfW" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { password: "Edro2x", username: "TBombadil" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { password: "UShallKnotPassword", username: "shadowfax" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-4",
               login: { password: "sting123", username: "BBaggins" },
             }),
@@ -1431,14 +1569,17 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates match `username` only, trigger an update cipher notification with those candidates", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { password: "galadriel4Eva", username: "gandalfW" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { password: "EdroEdro", username: "gandalfG" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { password: "sting123", username: "BBaggins" },
             }),
@@ -1461,14 +1602,17 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates match `username` only, do not trigger an update cipher notification if the update notification setting is disabled", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { password: "galadriel4Eva", username: "gandalfW" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { password: "EdroEdro", username: "gandalfG" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { password: "sting123", username: "BBaggins" },
             }),
@@ -1487,14 +1631,17 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates match `username` only, as well as `password` or `newPassword` only, trigger an update cipher notification with the candidates `username`", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { password: "UShallKnotPassword", username: "gandalfW" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { password: "Edro2x", username: "BBaggins" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { password: "EdroEdro", username: "gandalfG" },
             }),
@@ -1517,14 +1664,17 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates match `username` and `newPassword`, do not trigger an update (nothing to change)", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { password: "galadriel4Eva", username: "gandalfW" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { password: "sting123", username: "BBaggins" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { password: "Edro2x", username: "gandalfG" },
             }),
@@ -1542,30 +1692,37 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates match `username` and `newPassword` as well as any other combination of `username`, `password`, and/or `newPassword`, do not trigger an update (nothing to change)", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { password: "galadriel4Eva", username: "gandalfW" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { password: "sting123", username: "BBaggins" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { password: "Edro2x", username: "gandalfG" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-4",
               login: { password: "UShallKnotPassword", username: "gandalfG" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-5",
               login: { password: "Edro2x", username: "FBaggins" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-6",
               login: { password: "UShallKnotPassword", username: "TBombadil" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-7",
               login: { password: "ShyerH1re", username: "gandalfG" },
             }),
@@ -1583,14 +1740,17 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates match `username` and `password`, trigger an update cipher notification with those candidates", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { password: "UShallKnotPassword", username: "gandalfG" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { password: "galadriel4Eva", username: "gandalfW" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { password: "sting123", username: "BBaggins" },
             }),
@@ -1613,14 +1773,17 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates match `username` and `password`, do not trigger an update cipher notification if the update notification setting is disabled", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { password: "UShallKnotPassword", username: "gandalfG" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { password: "galadriel4Eva", username: "gandalfW" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { password: "sting123", username: "BBaggins" },
             }),
@@ -1639,26 +1802,32 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates match `username` AND `password` as well as any OTHER combination of `username`, `password`, and/or `newPassword` (excluding `username` AND `newPassword`), trigger an update cipher notification with the candidates matching `username` AND `password`", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { password: "UShallKnotPassword", username: "TBombadil" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { password: "Edro2x", username: "shadowfax" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { password: "UShallKnotPassword", username: "gandalfG" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-4",
               login: { password: "flyUPh00lz", username: "gandalfG" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-5",
               login: { password: "galadriel4Eva", username: "gandalfW" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-6",
               login: { password: "sting123", username: "BBaggins" },
             }),
@@ -1681,14 +1850,17 @@ describe("NotificationBackground", () => {
         it("and no cipher update candidates match `username`, `password`, nor `newPassword`, trigger a new cipher notification", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { password: "galadriel4Eva", username: "gandalfW" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { password: "EdroEdro", username: "shadowfax" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { password: "sting123", username: "BBaggins" },
             }),
@@ -1714,14 +1886,17 @@ describe("NotificationBackground", () => {
         it("and no cipher update candidates match `username`, `password`, nor `newPassword`, do not trigger a new cipher notification if the new cipher notification setting is disabled", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { password: "galadriel4Eva", username: "gandalfW" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { password: "EdroEdro", username: "shadowfax" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { password: "sting123", username: "BBaggins" },
             }),
@@ -1766,10 +1941,12 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates match only `newPassword`, do not trigger a notification", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "Frodo", password: "oldPassword" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "Pippin", password: "2ndBreakf4st" },
             }),
@@ -1787,14 +1964,17 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates match only `username`, trigger an update cipher notification with those candidates", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "BBaggins", password: "oldPassword" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "Frodo", password: "differentPassword" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { username: "Pippin", password: "2ndBreakf4st" },
             }),
@@ -1817,14 +1997,17 @@ describe("NotificationBackground", () => {
         it("and at least one cipher update candidate matches both `username` and `newPassword`, do not trigger an update (nothing to change)", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "BBaggins", password: "oldPassword" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "BBaggins", password: "2ndBreakf4st" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { username: "Frodo", password: "differentPassword" },
             }),
@@ -1842,10 +2025,12 @@ describe("NotificationBackground", () => {
         it("and no cipher update candidates match `username` nor `newPassword`, trigger a new cipher notification", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "Frodo", password: "oldPassword" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "Pippin", password: "differentPassword" },
             }),
@@ -1871,10 +2056,12 @@ describe("NotificationBackground", () => {
         it("and no cipher update candidates match `username` nor `newPassword`, do not trigger a new cipher notification if the new cipher notification setting is disabled", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "Frodo", password: "oldPassword" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "Pippin", password: "differentPassword" },
             }),
@@ -1909,10 +2096,12 @@ describe("NotificationBackground", () => {
         it("and at least one cipher update candidate matches `username`, do not trigger a notification (nothing to change)", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "BBaggins", password: "password1" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "Frodo", password: "password2" },
             }),
@@ -1930,10 +2119,12 @@ describe("NotificationBackground", () => {
         it("and no cipher update candidates match `username`, do not trigger a notification (username alone is insufficient signal)", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "Frodo", password: "password1" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "Pippin", password: "password2" },
             }),
@@ -1951,10 +2142,12 @@ describe("NotificationBackground", () => {
         it("and no cipher update candidates match `username`, do not trigger a new cipher notification if the new cipher notification setting is disabled", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "Frodo", password: "password1" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "Pippin", password: "password2" },
             }),
@@ -1999,10 +2192,12 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates only match `newPassword`, do not trigger a notification (nothing to change)", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "GaldalfG", password: "4WzrdIzN0tLa7e" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "GaldalfW", password: "4WzrdIzN0tLa7e" },
             }),
@@ -2020,14 +2215,17 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates only match `password`, trigger an update cipher notification with those candidates", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "Frodo", password: "PutAR1ngOnIt" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "Pippin", password: "UShallKnotPassword" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { username: "Merry", password: "UShallKnotPassword" },
             }),
@@ -2050,14 +2248,17 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates only match `password`, do not trigger an update cipher notification if the update cipher notification setting is disabled", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "Frodo", password: "PutAR1ngOnIt" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "Pippin", password: "UShallKnotPassword" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { username: "Merry", password: "UShallKnotPassword" },
             }),
@@ -2076,10 +2277,12 @@ describe("NotificationBackground", () => {
         it("and no cipher update candidates match `password` or `newPassword`, trigger a new cipher notification", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "Frodo", password: "PutAR1ngOnIt" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "PTook", password: "11sies" },
             }),
@@ -2122,10 +2325,12 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates only match `password`, do not trigger a notification (nothing to change)", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "FBaggins", password: "UShallKnotPassword" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "BBaggins", password: "UShallKnotPassword" },
             }),
@@ -2143,14 +2348,17 @@ describe("NotificationBackground", () => {
         it("and no cipher update candidates match `password`, trigger an update cipher notification with ALL cipher update candidates", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "FBaggins", password: "PutAR1ngOnIt" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "BBaggins", password: "MahPr3c10us" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { username: "PTook", password: "f00lOfAT00k" },
             }),
@@ -2173,14 +2381,17 @@ describe("NotificationBackground", () => {
         it("and no cipher update candidates match `password`, do not trigger an update cipher notification if the update cipher notification setting is disabled", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "FBaggins", password: "PutAR1ngOnIt" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "BBaggins", password: "MahPr3c10us" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { username: "PTook", password: "f00lOfAT00k" },
             }),
@@ -2226,14 +2437,17 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates only match `password`, trigger an update cipher notification with those candidates", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "FBaggins", password: "ShyerH1re" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "PTook", password: "ShyerH1re" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { username: "FrodoB", password: "UShallKnotPassword" },
             }),
@@ -2256,14 +2470,17 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates only match `password`, do not trigger an update cipher notification if the update cipher notification setting is disabled", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "FBaggins", password: "ShyerH1re" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "PTook", password: "ShyerH1re" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { username: "FrodoB", password: "UShallKnotPassword" },
             }),
@@ -2282,14 +2499,17 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates only match `username`, trigger an update cipher notification with those candidates", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "BBaggins", password: "W0nWr1ng" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "BBaggins", password: "UShallKnotPassword" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { username: "BilboB", password: "UShallKnotPassword" },
             }),
@@ -2312,14 +2532,17 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates only match `username`, do not trigger an update cipher notification if the update cipher notification setting is disabled", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "BBaggins", password: "W0nWr1ng" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "BBaggins", password: "UShallKnotPassword" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { username: "BilboB", password: "UShallKnotPassword" },
             }),
@@ -2338,14 +2561,17 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates match `username` and `password`, do not trigger a notification (nothing to change)", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "BBaggins", password: "ShyerH1re" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "FBaggins", password: "W0nWr1ng" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { username: "BBaggins", password: "ShyerH1re" },
             }),
@@ -2363,18 +2589,22 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates match `username` AND `password` and additionally `username` OR `password`, do not trigger a notification (nothing to change)", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "BBaggins", password: "UShallKnotPassword" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "BBaggins", password: "ShyerH1re" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { username: "FBaggins", password: "W0nWr1ng" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-4",
               login: { username: "TBombadil", password: "ShyerH1re" },
             }),
@@ -2392,10 +2622,12 @@ describe("NotificationBackground", () => {
         it("and no cipher update candidates match `username` or `password`, trigger a new cipher notification", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "FBaggins", password: "W0nWr1ng" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "BilboB", password: "PutAR1ngOnIt" },
             }),
@@ -2421,10 +2653,12 @@ describe("NotificationBackground", () => {
         it("and no cipher update candidates match `username` or `password`, do not trigger a new cipher notification if the new cipher notification setting is disabled", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "FBaggins", password: "W0nWr1ng" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "BilboB", password: "PutAR1ngOnIt" },
             }),
@@ -2469,10 +2703,12 @@ describe("NotificationBackground", () => {
         it("and cipher update candidates only match `newPassword`, do not trigger a notification (nothing to change)", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "FBaggins", password: "ShyerH1re" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "PTook", password: "ShyerH1re" },
             }),
@@ -2490,14 +2726,17 @@ describe("NotificationBackground", () => {
         it("and no cipher update candidates match `newPassword`, trigger an update cipher notification with ALL cipher update candidates", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "FBaggins", password: "W0nWr1ng" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "PTook", password: "PutAR1ngOnIt" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { username: "SamwiseG", password: "P0t4toes" },
             }),
@@ -2520,14 +2759,17 @@ describe("NotificationBackground", () => {
         it("and no cipher update candidates match `newPassword`, do not trigger an update cipher notification if the update cipher notification setting is disabled", async () => {
           const storedCiphersForURL = [
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-1",
               login: { username: "FBaggins", password: "W0nWr1ng" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-2",
               login: { username: "PTook", password: "PutAR1ngOnIt" },
             }),
             mock<CipherView>({
+              viewPassword: true,
               id: "cipher-id-3",
               login: { username: "SamwiseG", password: "P0t4toes" },
             }),
@@ -2748,6 +2990,7 @@ describe("NotificationBackground", () => {
           });
           notificationBackground["notificationQueue"] = [queueMessage];
           const cipherView = mock<CipherView>({
+            viewPassword: true,
             id: "testId",
             name: "testItemName",
             login: { username: "testUser" },
@@ -2797,6 +3040,7 @@ describe("NotificationBackground", () => {
           });
           notificationBackground["notificationQueue"] = [queueMessage];
           const cipherView = mock<CipherView>({
+            viewPassword: true,
             id: "testId",
             name: "testItemName",
             login: { username: "testUser" },
@@ -2874,6 +3118,7 @@ describe("NotificationBackground", () => {
           });
           notificationBackground["notificationQueue"] = [queueMessage];
           const cipherView = mock<CipherView>({
+            viewPassword: true,
             id: mockCipherId,
             organizationId: mockOrgId,
             name: "Test Item",
@@ -2930,6 +3175,7 @@ describe("NotificationBackground", () => {
           });
           notificationBackground["notificationQueue"] = [queueMessage];
           const cipherView = mock<CipherView>({
+            viewPassword: true,
             login: { username: "test", password: "old-password" },
           });
           getAllDecryptedForUrlSpy.mockResolvedValueOnce([cipherView]);
@@ -3022,6 +3268,7 @@ describe("NotificationBackground", () => {
           });
           notificationBackground["notificationQueue"] = [queueMessage];
           const cipherView = mock<CipherView>({
+            viewPassword: true,
             login: { username: "test", password: "password" },
           });
           folderExistsSpy.mockResolvedValueOnce(true);
@@ -3066,6 +3313,7 @@ describe("NotificationBackground", () => {
           });
           notificationBackground["notificationQueue"] = [queueMessage];
           const cipherView = mock<CipherView>({
+            viewPassword: true,
             id: "testId",
             name: "testName",
             login: { username: "test", password: "password" },
@@ -3117,6 +3365,7 @@ describe("NotificationBackground", () => {
           });
           notificationBackground["notificationQueue"] = [queueMessage];
           const cipherView = mock<CipherView>({
+            viewPassword: true,
             login: { username: "test", password: "password" },
           });
           folderExistsSpy.mockResolvedValueOnce(true);
@@ -3158,7 +3407,10 @@ describe("NotificationBackground", () => {
             data: { newPassword: "newPassword" },
           });
           notificationBackground["notificationQueue"] = [queueMessage];
-          const cipherView = mock<CipherView>({ reprompt: CipherRepromptType.None });
+          const cipherView = mock<CipherView>({
+            viewPassword: true,
+            reprompt: CipherRepromptType.None,
+          });
           getDecryptedCipherByIdSpy.mockResolvedValueOnce(cipherView);
           const errorMessage = "fetch error";
           updateWithServerSpy.mockImplementation(() => {

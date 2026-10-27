@@ -56,28 +56,30 @@
         <input
           readonly
           bitInput
-          [value]="bankAccount().accountNumber"
+          [value]="canSee('bankAccount.accountNumber') ? bankAccount().accountNumber : mask"
           aria-readonly="true"
           type="password"
           data-testid="account-number"
         />
-        <button
-          bitSuffix
-          type="button"
-          bitIconButton
-          bitPasswordInputToggle
-          data-testid="toggle-account-number"
-          [toggled]="revealAccountNumber()"
-          (toggledChange)="toggleAccountNumberVisible($event)"
-        ></button>
-        <button
-          bitIconButton="bwi-clone"
-          bitSuffix
-          type="button"
-          [label]="'copyAccountNumber' | i18n"
-          appCopyField="accountNumber"
-          [cipher]="cipher()"
-        ></button>
+        @if (canSee("bankAccount.accountNumber")) {
+          <button
+            bitSuffix
+            type="button"
+            bitIconButton
+            bitPasswordInputToggle
+            data-testid="toggle-account-number"
+            [toggled]="revealAccountNumber()"
+            (toggledChange)="toggleAccountNumberVisible($event)"
+          ></button>
+          <button
+            bitIconButton="bwi-clone"
+            bitSuffix
+            type="button"
+            [label]="'copyAccountNumber' | i18n"
+            appCopyField="accountNumber"
+            [cipher]="cipher()"
+          ></button>
+        }
       </bit-form-field>
     }
 
@@ -129,28 +131,30 @@
         <input
           readonly
           bitInput
-          [value]="bankAccount().pin"
+          [value]="canSee('bankAccount.pin') ? bankAccount().pin : mask"
           aria-readonly="true"
           type="password"
           data-testid="pin"
         />
-        <button
-          bitSuffix
-          type="button"
-          bitIconButton
-          bitPasswordInputToggle
-          data-testid="toggle-pin"
-          [toggled]="revealPin()"
-          (toggledChange)="togglePinVisible($event)"
-        ></button>
-        <button
-          bitIconButton="bwi-clone"
-          bitSuffix
-          type="button"
-          [label]="'copyPin' | i18n"
-          appCopyField="pin"
-          [cipher]="cipher()"
-        ></button>
+        @if (canSee("bankAccount.pin")) {
+          <button
+            bitSuffix
+            type="button"
+            bitIconButton
+            bitPasswordInputToggle
+            data-testid="toggle-pin"
+            [toggled]="revealPin()"
+            (toggledChange)="togglePinVisible($event)"
+          ></button>
+          <button
+            bitIconButton="bwi-clone"
+            bitSuffix
+            type="button"
+            [label]="'copyPin' | i18n"
+            appCopyField="pin"
+            [cipher]="cipher()"
+          ></button>
+        }
       </bit-form-field>
     }
 
@@ -160,28 +164,30 @@
         <input
           readonly
           bitInput
-          [value]="bankAccount().swiftCode"
+          [value]="canSee('bankAccount.swiftCode') ? bankAccount().swiftCode : mask"
           aria-readonly="true"
           data-testid="swift-code"
           type="password"
         />
-        <button
-          bitSuffix
-          type="button"
-          bitIconButton
-          bitPasswordInputToggle
-          data-testid="toggle-swift-code"
-          [toggled]="revealSwiftCode()"
-          (toggledChange)="toggleSwiftCodeVisible($event)"
-        ></button>
-        <button
-          bitIconButton="bwi-clone"
-          bitSuffix
-          type="button"
-          [label]="'copySwiftCode' | i18n"
-          appCopyField="swiftCode"
-          [cipher]="cipher()"
-        ></button>
+        @if (canSee("bankAccount.swiftCode")) {
+          <button
+            bitSuffix
+            type="button"
+            bitIconButton
+            bitPasswordInputToggle
+            data-testid="toggle-swift-code"
+            [toggled]="revealSwiftCode()"
+            (toggledChange)="toggleSwiftCodeVisible($event)"
+          ></button>
+          <button
+            bitIconButton="bwi-clone"
+            bitSuffix
+            type="button"
+            [label]="'copySwiftCode' | i18n"
+            appCopyField="swiftCode"
+            [cipher]="cipher()"
+          ></button>
+        }
       </bit-form-field>
     }
 
@@ -191,28 +197,30 @@
         <input
           readonly
           bitInput
-          [value]="bankAccount().iban"
+          [value]="canSee('bankAccount.iban') ? bankAccount().iban : mask"
           aria-readonly="true"
           data-testid="iban"
           type="password"
         />
-        <button
-          bitSuffix
-          type="button"
-          bitIconButton
-          bitPasswordInputToggle
-          data-testid="toggle-iban"
-          [toggled]="revealIban()"
-          (toggledChange)="toggleIbanVisible($event)"
-        ></button>
-        <button
-          bitIconButton="bwi-clone"
-          bitSuffix
-          type="button"
-          [label]="'copyIban' | i18n"
-          appCopyField="iban"
-          [cipher]="cipher()"
-        ></button>
+        @if (canSee("bankAccount.iban")) {
+          <button
+            bitSuffix
+            type="button"
+            bitIconButton
+            bitPasswordInputToggle
+            data-testid="toggle-iban"
+            [toggled]="revealIban()"
+            (toggledChange)="toggleIbanVisible($event)"
+          ></button>
+          <button
+            bitIconButton="bwi-clone"
+            bitSuffix
+            type="button"
+            [label]="'copyIban' | i18n"
+            appCopyField="iban"
+            [cipher]="cipher()"
+          ></button>
+        }
       </bit-form-field>
     }
 

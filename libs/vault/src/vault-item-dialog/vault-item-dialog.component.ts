@@ -15,6 +15,7 @@ import {
   GRID_ALL,
   GRID_NONE,
   itemGrid,
+  itemLike,
 } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { CollectionView } from "@bitwarden/common/admin-console/models/collections";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
@@ -66,6 +67,7 @@ import {
 } from "../cipher-view/attachments/attachments-v2.component";
 import { CipherViewComponent } from "../cipher-view/cipher-view.component";
 import { DecryptionFailureDialogComponent } from "../components/decryption-failure-dialog/decryption-failure-dialog.component";
+import { historyAccess, HistoryAccess } from "../keykeeper/item-versions";
 import { KeykeeperItemVersionsComponent } from "../keykeeper/item-versions.component";
 import { printItem } from "../keykeeper/print-item";
 
@@ -385,6 +387,13 @@ export class VaultItemDialogComponent implements OnInit, OnDestroy {
    */
   protected itemCaps: FolderGrid = { ...GRID_NONE };
 
+  /**
+   * Keykeeper: what the person may do with the item's history: clearing it
+   * needs view item history and delete in the same shared folder, as the
+   * server decides (DESIGN.md, "Item history").
+   */
+  protected historyCaps: HistoryAccess = { view: false, contents: false, clear: false };
+
   protected canEdit = false;
 
   protected attachmentsButtonDisabled = false;
@@ -458,6 +467,7 @@ export class VaultItemDialogComponent implements OnInit, OnDestroy {
         ),
       );
       this.itemCaps = this.capabilitiesOf(this.cipher);
+      this.historyCaps = this.historyAccessOf(this.cipher);
 
       // If user cannot edit and dialog opened in form mode, force to view mode
       if (!this.canEdit && this.formConfig.mode !== "partial-edit" && this.params.mode === "form") {
@@ -515,8 +525,9 @@ export class VaultItemDialogComponent implements OnInit, OnDestroy {
     // When the form config is used within the Admin Console, retrieve the cipher from the admin endpoint (if not found in local state)
     if (this.formConfig.isAdminConsole && (cipher == null || this.formConfig.admin)) {
       const cipherResponse = await this.apiService.getCipherAdmin(cipherView.id);
+      // Keykeeper: viewPassword stays as the server says, from the person's
+      // grid (DESIGN.md, "Folders and permissions").
       cipherResponse.edit = true;
-      cipherResponse.viewPassword = true;
 
       const cipherData = new CipherData(cipherResponse);
       cipher = new Cipher(cipherData);
@@ -541,6 +552,7 @@ export class VaultItemDialogComponent implements OnInit, OnDestroy {
       ),
     );
     this.itemCaps = this.capabilitiesOf(this.cipher);
+    this.historyCaps = this.historyAccessOf(this.cipher);
 
     await this.changeMode("view");
   }
@@ -557,6 +569,12 @@ export class VaultItemDialogComponent implements OnInit, OnDestroy {
       this.formConfig.collections,
       org?.canEditAllCiphers ? GRID_ALL : GRID_NONE,
     );
+  }
+
+  /** Keykeeper: the item's history access, with an admin's reach to every item. */
+  private historyAccessOf(cipher: CipherView): HistoryAccess {
+    const org = this.formConfig.organizations.find((o) => o.id === cipher.organizationId);
+    return historyAccess(itemLike(cipher), this.formConfig.collections, !!org?.canEditAllCiphers);
   }
 
   /** Keykeeper: prints the item, where its shared folders allow it. */

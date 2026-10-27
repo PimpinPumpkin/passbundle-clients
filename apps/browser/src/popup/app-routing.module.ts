@@ -90,6 +90,7 @@ import { AddEditComponent } from "../vault/popup/components/vault/add-edit/add-e
 import { AssignCollections } from "../vault/popup/components/vault/assign-collections/assign-collections.component";
 import { AttachmentsComponent } from "../vault/popup/components/vault/attachments/attachments.component";
 import { IntroCarouselComponent } from "../vault/popup/components/vault/intro-carousel/intro-carousel.component";
+import { KeykeeperItemHistoryPageComponent } from "../vault/popup/components/vault/keykeeper-item-history/item-history-page.component";
 import { KeykeeperTemplatesPageComponent } from "../vault/popup/components/vault/keykeeper-templates-page/keykeeper-templates-page.component";
 import { NewItemPageComponent } from "../vault/popup/components/vault/new-item-page/new-item-page.component";
 import { PasswordHistoryComponent } from "../vault/popup/components/vault/vault-password-history/vault-password-history.component";
@@ -234,6 +235,13 @@ const routes: Routes = [
   {
     path: "cipher-password-history",
     component: PasswordHistoryComponent,
+    canActivate: [authGuard],
+    data: { elevation: 4 } satisfies RouteDataProperties,
+  },
+  // Keykeeper: an item's version history (DESIGN.md, "Item history").
+  {
+    path: "keykeeper-item-history",
+    component: KeykeeperItemHistoryPageComponent,
     canActivate: [authGuard],
     data: { elevation: 4 } satisfies RouteDataProperties,
   },

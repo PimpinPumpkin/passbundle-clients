@@ -13,6 +13,7 @@ import { AccountService } from "@bitwarden/common/auth/abstractions/account.serv
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { uuidAsString } from "@bitwarden/common/platform/abstractions/sdk/sdk.service";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
+import { mayCopy } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
   CipherViewLike,
@@ -103,6 +104,8 @@ export class CopyCipherFieldDirective implements OnChanges {
     const unavailable =
       !this.cipher ||
       !this.hasValueToCopy() ||
+      // Keykeeper: a secret the person can't see isn't theirs to copy.
+      !mayCopy(this.cipher, this.action) ||
       (this.action === "totp" && !(await this.copyCipherFieldService.totpAllowed(this.cipher)));
 
     this.hostDisabled = this.disabled || unavailable ? true : null;

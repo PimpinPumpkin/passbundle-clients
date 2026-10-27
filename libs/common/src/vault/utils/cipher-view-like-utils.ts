@@ -12,6 +12,7 @@ import { UriMatchStrategy, UriMatchStrategySetting } from "../../models/domain/d
 import { I18nService } from "../../platform/abstractions/i18n.service";
 import { Utils } from "../../platform/misc/utils";
 import { BankAccountType, BankAccountTypeI18nKeys, CipherType } from "../enums";
+import { maySeeSecrets } from "../keykeeper/hidden-secrets";
 import { Cipher } from "../models/domain/cipher";
 import { BankAccountView } from "../models/view/bank-account.view";
 import { CardView } from "../models/view/card.view";
@@ -158,13 +159,26 @@ export class CipherViewLikeUtils {
    * unnecessary or unavailable.
    */
   static subtitle = (cipher: CipherViewLike, i18nService?: I18nService): string | undefined => {
+    const type = this.getType(cipher);
+    // Keykeeper: for someone who can't see the item's secrets, a card's or
+    // bank account's subtitle is built from its plain parts only, never from
+    // its number (DESIGN.md, "Folders and permissions").
+    if (!maySeeSecrets(cipher)) {
+      if (type === CipherType.Card) {
+        return this.plainCardSubtitle(cipher);
+      }
+      if (type === CipherType.BankAccount) {
+        return this.plainBankAccountSubtitle(cipher, i18nService);
+      }
+    }
+
     const baseSubtitle = this.isCipherListView(cipher) ? cipher.subtitle : cipher.subTitle;
 
     if (!i18nService) {
       return baseSubtitle;
     }
 
-    switch (this.getType(cipher)) {
+    switch (type) {
       case CipherType.BankAccount: {
         const bankAccountSubtitle = this.bankAccountSubtitle(cipher, i18nService);
         return bankAccountSubtitle ?? baseSubtitle;
@@ -172,6 +186,34 @@ export class CipherViewLikeUtils {
       default:
         return baseSubtitle;
     }
+  };
+
+  /** Keykeeper: a hidden card's subtitle: its brand, or nothing. */
+  private static plainCardSubtitle = (cipher: CipherViewLike): string | undefined => {
+    if (this.isCipherListView(cipher)) {
+      const listType = cipher.type;
+      const brand = typeof listType === "object" && "card" in listType ? listType.card.brand : null;
+      return brand || undefined;
+    }
+    return cipher.card?.brand || undefined;
+  };
+
+  /**
+   * Keykeeper: a hidden bank account's subtitle: its account type (translated
+   * when it can be), else the bank's name, or nothing.
+   */
+  private static plainBankAccountSubtitle = (
+    cipher: CipherViewLike,
+    i18nService?: I18nService,
+  ): string | undefined => {
+    const bankAccount = this.getBankAccount(cipher);
+    const accountType = bankAccount?.accountType;
+    if (accountType) {
+      const key = BankAccountTypeI18nKeys[accountType as BankAccountType];
+      return key && i18nService ? i18nService.t(key) : accountType;
+    }
+    const bankName = bankAccount && "bankName" in bankAccount ? bankAccount.bankName : undefined;
+    return bankName || undefined;
   };
 
   /** @returns The bank account object from the input cipher. If the cipher is not of type BankAccount, returns null. */

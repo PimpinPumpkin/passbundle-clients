@@ -10,6 +10,7 @@ import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { AuditService } from "@bitwarden/common/abstractions/audit.service";
 import { EventCollectionService, EventType } from "@bitwarden/common/dirt/event-logs";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
+import { maySeeSecretsOrNew } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { Fido2CredentialView } from "@bitwarden/common/vault/models/view/fido2-credential.view";
 import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
 import {
@@ -103,10 +104,8 @@ export class LoginDetailsSectionComponent implements OnInit {
   }
 
   get viewHiddenFields() {
-    if (this.cipherFormContainer.originalCipherView) {
-      return this.cipherFormContainer.originalCipherView.viewPassword;
-    }
-    return true;
+    // Keykeeper: only with an explicit yes; a new item is theirs.
+    return maySeeSecretsOrNew(this.cipherFormContainer.originalCipherView);
   }
 
   get initialValues() {

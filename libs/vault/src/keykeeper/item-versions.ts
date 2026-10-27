@@ -3,10 +3,20 @@
 // who can open the item; apps decrypt them like the item, compare them field
 // by field, and restore one by saving it as a normal edit.
 
+import { formatDate } from "@angular/common";
+
+import {
+  FolderLike,
+  gridOf,
+  ItemLike,
+} from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { CipherRepromptType, CipherType, FieldType } from "@bitwarden/common/vault/enums";
 import { EXPIRES_FIELD_NAME } from "@bitwarden/common/vault/keykeeper/expiration";
+import { isSecretField, isSecretValue } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { visibleCustomFields } from "@bitwarden/common/vault/keykeeper/reserved-fields";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
+import { Fido2CredentialView } from "@bitwarden/common/vault/models/view/fido2-credential.view";
+import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
 
 /** Who saved a version, as the server lets the caller see them. */
 export type VersionEditor = { id: string | null; name: string | null; email: string | null };
@@ -33,9 +43,60 @@ export type ItemHistoryResponse = {
   }[];
 };
 
+/**
+ * A version's time as history shows it, "Oct 27, 2026, 1:15 AM", as in the
+ * apps. Angular's "medium" adds the seconds, and draws the narrow space it puts
+ * before AM as none at all in our font.
+ */
+export const VERSION_TIME_FORMAT = "MMM d, y, h:mm a";
+
+/** A version's time, in `VERSION_TIME_FORMAT`. */
+export function versionTime(date: Date | string | number, locale: string): string {
+  return formatDate(date, VERSION_TIME_FORMAT, locale);
+}
+
 export const historyPath = (cipherId: string) => `/keykeeper/ciphers/${cipherId}/history`;
 export const versionPath = (cipherId: string, versionId: string) =>
   `${historyPath(cipherId)}/${versionId}`;
+
+/**
+ * What someone may do with an item's history, as the server decides
+ * (passbundle-server, keykeeper_cipher_history.rs): see it at all (view item
+ * history in one of the item's shared folders), read its versions' contents
+ * (view item history and see passwords in the same one), and clear it or
+ * delete a version (view item history and delete in the same one). Each pair
+ * needs both in one way to the item, never one from each of two folders.
+ */
+export type HistoryAccess = { view: boolean; contents: boolean; clear: boolean };
+
+/**
+ * The person's history access to an item: everything with their own item;
+ * with an organization's, from their capabilities in each of its shared
+ * folders they reach (from sync, where each folder's grid already includes
+ * access to every folder). `fullAccess` is for someone who reaches every
+ * item of the organization (an owner or admin): the server gives them a way
+ * to every item with every capability these need, whatever their own
+ * folders say.
+ */
+export function historyAccess(
+  item: ItemLike,
+  folders: FolderLike[],
+  fullAccess = false,
+): HistoryAccess {
+  if (item.organizationId == null || fullAccess) {
+    return { view: true, contents: true, clear: true };
+  }
+  const ids = new Set(item.collectionIds ?? []);
+  const ways = folders
+    .filter((f) => f.organizationId === item.organizationId && ids.has(f.id))
+    .map((f) => gridOf(f))
+    .filter((g) => g.viewHistory);
+  return {
+    view: ways.length > 0,
+    contents: ways.some((g) => g.seePasswords),
+    clear: ways.some((g) => g.delete),
+  };
+}
 
 /** A translator, like I18nService.t. */
 export type Translate = (key: string, ...args: (string | number)[]) => string;
@@ -96,8 +157,11 @@ function typeLabel(type: CipherType, t: Translate): string {
   }
 }
 
-/** Plain fields of a type's part of an item: [property, label key, secret]. */
-type Spec = [string, string, boolean?];
+/**
+ * A type's part of an item: [property, label key]. Which are secrets is the
+ * shared rule's (hidden-secrets.ts), as everywhere else.
+ */
+type Spec = [string, string];
 
 const IDENTITY: Spec[] = [
   ["title", "title"],
@@ -106,9 +170,9 @@ const IDENTITY: Spec[] = [
   ["lastName", "lastName"],
   ["username", "username"],
   ["company", "company"],
-  ["ssn", "ssn", true],
-  ["passportNumber", "passportNumber", true],
-  ["licenseNumber", "licenseNumber", true],
+  ["ssn", "ssn"],
+  ["passportNumber", "passportNumber"],
+  ["licenseNumber", "licenseNumber"],
   ["email", "email"],
   ["phone", "phone"],
   ["address1", "address1"],
@@ -120,7 +184,7 @@ const IDENTITY: Spec[] = [
   ["country", "country"],
 ];
 const SSH_KEY: Spec[] = [
-  ["privateKey", "sshPrivateKey", true],
+  ["privateKey", "sshPrivateKey"],
   ["publicKey", "sshPublicKey"],
   ["keyFingerprint", "sshFingerprint"],
 ];
@@ -128,12 +192,12 @@ const BANK_ACCOUNT: Spec[] = [
   ["bankName", "bankName"],
   ["nameOnAccount", "nameOnAccount"],
   ["accountType", "bankAccountType"],
-  ["accountNumber", "accountNumber", true],
+  ["accountNumber", "accountNumber"],
   ["routingNumber", "bankRoutingNumber"],
   ["branchNumber", "branchNumber"],
-  ["pin", "pin", true],
-  ["swiftCode", "swiftCode", true],
-  ["iban", "iban", true],
+  ["pin", "pin"],
+  ["swiftCode", "swiftCode"],
+  ["iban", "iban"],
   ["bankContactPhone", "bankContactPhone"],
 ];
 const DRIVERS_LICENSE: Spec[] = [
@@ -141,7 +205,7 @@ const DRIVERS_LICENSE: Spec[] = [
   ["middleName", "middleName"],
   ["lastName", "lastName"],
   ["dateOfBirth", "dateOfBirth"],
-  ["licenseNumber", "licenseNumber", true],
+  ["licenseNumber", "licenseNumber"],
   ["issuingCountry", "issuingCountry"],
   ["issuingState", "issuingState"],
   ["issueDate", "issueDate"],
@@ -157,9 +221,9 @@ const PASSPORT: Spec[] = [
   ["birthPlace", "birthPlace"],
   ["nationality", "nationality"],
   ["issuingCountry", "issuingCountry"],
-  ["passportNumber", "passportNumber", true],
+  ["passportNumber", "passportNumber"],
   ["passportType", "passportType"],
-  ["nationalIdentificationNumber", "nationalIdentificationNumber", true],
+  ["nationalIdentificationNumber", "nationalIdentificationNumber"],
   ["issuingAuthority", "issuingAuthority"],
   ["issueDate", "issueDate"],
   ["expirationDate", "expirationDate"],
@@ -167,11 +231,11 @@ const PASSPORT: Spec[] = [
 
 function plain(prefix: string, part: unknown, specs: Spec[], t: Translate): Entry[] {
   const values = (part ?? {}) as Record<string, unknown>;
-  return specs.map(([property, label, secret]) => ({
+  return specs.map(([property, label]) => ({
     key: `${prefix}.${property}`,
     label: t(label),
     value: text(values[property]),
-    secret: !!secret,
+    secret: isSecretValue(`${prefix}.${property}`),
   }));
 }
 
@@ -186,13 +250,23 @@ export function itemEntries(item: CipherView, t: Translate): Entry[] {
     case CipherType.Login: {
       const login = item.login;
       entries.push(
-        { key: "login.username", label: t("username"), value: text(login?.username) },
-        { key: "login.password", label: t("password"), value: text(login?.password), secret: true },
+        {
+          key: "login.username",
+          label: t("username"),
+          value: text(login?.username),
+          secret: isSecretValue("login.username"),
+        },
+        {
+          key: "login.password",
+          label: t("password"),
+          value: text(login?.password),
+          secret: isSecretValue("login.password"),
+        },
         {
           key: "login.totp",
           label: t("verificationCodeTotp"),
           value: text(login?.totp),
-          secret: true,
+          secret: isSecretValue("login.totp"),
         },
       );
       (login?.uris ?? []).forEach((uri, i) =>
@@ -216,11 +290,32 @@ export function itemEntries(item: CipherView, t: Translate): Entry[] {
           key: "card.cardholderName",
           label: t("cardholderName"),
           value: text(card?.cardholderName),
+          secret: isSecretValue("card.cardholderName"),
         },
-        { key: "card.brand", label: t("brand"), value: text(card?.brand) },
-        { key: "card.number", label: t("number"), value: text(card?.number), secret: true },
-        { key: "card.expiration", label: t("expiration"), value: expiration },
-        { key: "card.code", label: t("securityCode"), value: text(card?.code), secret: true },
+        {
+          key: "card.brand",
+          label: t("brand"),
+          value: text(card?.brand),
+          secret: isSecretValue("card.brand"),
+        },
+        {
+          key: "card.number",
+          label: t("number"),
+          value: text(card?.number),
+          secret: isSecretValue("card.number"),
+        },
+        {
+          key: "card.expiration",
+          label: t("expiration"),
+          value: expiration,
+          secret: isSecretValue("card.expiration"),
+        },
+        {
+          key: "card.code",
+          label: t("securityCode"),
+          value: text(card?.code),
+          secret: isSecretValue("card.code"),
+        },
       );
       break;
     }
@@ -261,14 +356,17 @@ export function itemEntries(item: CipherView, t: Translate): Entry[] {
       key: `field.${name}.${n}`,
       label: name,
       value,
-      secret: field.type === FieldType.Hidden,
+      secret: isSecretField(field.type),
     });
   }
 
+  // Whether it changed comes from the setting itself, not its words.
+  const asks = item.reprompt === CipherRepromptType.Password;
   entries.push({
     key: "reprompt",
     label: t("passwordPrompt"),
-    value: item.reprompt === CipherRepromptType.Password ? t("on") : t("off"),
+    value: asks ? t("keykeeperOn") : t("keykeeperOff"),
+    compare: asks ? "on" : "off",
   });
   return entries;
 }
@@ -337,11 +435,52 @@ export function distinctVersions<T extends { view: CipherView }>(
   });
 }
 
+/** Who a passkey is for, as the apps say it: "shop.example.test, ana". */
+function passkeyLabel(passkey: Fido2CredentialView): string {
+  return [passkey.rpName || passkey.rpId, passkey.userName].filter(Boolean).join(", ");
+}
+
+/**
+ * The passkeys restoring a version would take from the item: ones it has now
+ * that the version doesn't, by credential id, as the apps decide
+ * (passbundle-apps, vault.rs, `restore_drops`). Who each is for, to warn
+ * before restoring.
+ */
+export function droppedPasskeys(version: CipherView, current: CipherView): string[] {
+  const then = new Set(
+    (version.login?.fido2Credentials ?? []).map((p) => p.credentialId).filter(Boolean),
+  );
+  return (current.login?.fido2Credentials ?? [])
+    .filter((p) => !then.has(p.credentialId))
+    .map(passkeyLabel);
+}
+
+/**
+ * The version's passkeys as restoring saves them: each one the item still has
+ * stays as it is now, so a raised sign-in counter never goes back (a site
+ * refuses a passkey whose counter does), unless the version's counter is
+ * somehow higher. One the item no longer has comes back from the version.
+ */
+function restoredPasskeys(
+  version: Fido2CredentialView[],
+  current: Fido2CredentialView[] | null | undefined,
+): Fido2CredentialView[] {
+  return version.map((then) => {
+    const now = (current ?? []).find(
+      (p) => p.credentialId === then.credentialId && (p.counter ?? 0) >= (then.counter ?? 0),
+    );
+    return now ?? then;
+  });
+}
+
 /**
  * The item as this version had it, to save as a normal edit: the version's
  * contents, with what isn't part of versions kept as it is now (its id,
- * organization, folder, favorite, collections, attachments, and item key).
- * Saving it puts the replaced password in password history, as any edit does.
+ * organization, folder, favorite, collections, attachments, item key, and
+ * revision date, which the save sends as the last one it knows of, so it
+ * can't overwrite a newer edit). A passkey the item still has stays as it is
+ * now (`restoredPasskeys`). Saving it puts the replaced password in password
+ * history, as any edit does.
  */
 export function restoredView(version: CipherView, current: CipherView): CipherView {
   const restored = Object.assign(new CipherView(), current);
@@ -350,7 +489,18 @@ export function restoredView(version: CipherView, current: CipherView): CipherVi
   restored.notes = version.notes;
   restored.fields = version.fields;
   restored.reprompt = version.reprompt;
-  restored.login = version.login;
+  if (version.login != null) {
+    const login = Object.assign(new LoginView(), version.login);
+    if (version.login.fido2Credentials != null) {
+      login.fido2Credentials = restoredPasskeys(
+        version.login.fido2Credentials,
+        current.login?.fido2Credentials,
+      );
+    }
+    restored.login = login;
+  } else {
+    restored.login = version.login;
+  }
   restored.card = version.card;
   restored.identity = version.identity;
   restored.secureNote = version.secureNote;
@@ -359,4 +509,30 @@ export function restoredView(version: CipherView, current: CipherView): CipherVi
   restored.driversLicense = version.driversLicense;
   restored.passport = version.passport;
   return restored;
+}
+
+/**
+ * The question before restoring a version, for the simple dialog: what goes
+ * back and what stays, and, when the version lacks passkeys the item has now,
+ * that restoring removes them (as the apps say it), with "Restore anyway".
+ */
+export function restoreConfirmation(version: CipherView, current: CipherView, when: string) {
+  const drops = droppedPasskeys(version, current);
+  const content =
+    drops.length === 0
+      ? { key: "keykeeperRestoreVersionDesc", placeholders: [when] }
+      : drops.length === 1
+        ? { key: "keykeeperRestoreVersionDropsPasskey", placeholders: [when, drops[0]] }
+        : {
+            key: "keykeeperRestoreVersionDropsPasskeys",
+            placeholders: [when, String(drops.length), drops.join("; ")],
+          };
+  return {
+    title: { key: "keykeeperRestoreVersionTitle" },
+    content,
+    acceptButtonText: {
+      key: drops.length === 0 ? "keykeeperRestoreVersion" : "keykeeperRestoreAnyway",
+    },
+    type: "warning" as const,
+  };
 }

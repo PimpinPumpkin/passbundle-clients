@@ -7,6 +7,7 @@ import { RouterModule } from "@angular/router";
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { ViewPasswordHistoryService } from "@bitwarden/common/vault/abstractions/view-password-history.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
+import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
   CardComponent,
@@ -15,6 +16,8 @@ import {
   SectionHeaderComponent,
   TypographyModule,
 } from "@bitwarden/components";
+
+import { VERSION_TIME_FORMAT } from "../../keykeeper/item-versions";
 
 // FIXME(https://bitwarden.atlassian.net/browse/CL-764): Migrate to OnPush
 // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
@@ -33,6 +36,9 @@ import {
   ],
 })
 export class ItemHistoryV2Component {
+  /** Keykeeper: times as history shows them, "Oct 27, 2026, 1:15 AM". */
+  protected readonly timeFormat = VERSION_TIME_FORMAT;
+
   // FIXME(https://bitwarden.atlassian.net/browse/CL-903): Migrate to Signals
   // eslint-disable-next-line @angular-eslint/prefer-signals
   @Input() cipher: CipherView;
@@ -41,6 +47,14 @@ export class ItemHistoryV2Component {
 
   get isLogin() {
     return this.cipher.type === CipherType.Login;
+  }
+
+  /**
+   * Keykeeper: the item's earlier passwords, for someone who can see its
+   * passwords (DESIGN.md, "Folders and permissions").
+   */
+  get showPasswordHistory(): boolean {
+    return this.cipher.hasPasswordHistory && maySeeSecrets(this.cipher);
   }
 
   /**

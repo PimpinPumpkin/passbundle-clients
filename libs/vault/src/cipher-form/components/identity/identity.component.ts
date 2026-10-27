@@ -1,12 +1,13 @@
 // FIXME: Update this file to be type safe and remove this and next line
 // @ts-strict-ignore
 import { CommonModule } from "@angular/common";
-import { Component, Input, OnInit } from "@angular/core";
+import { Component, DestroyRef, inject, Input, OnInit } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormBuilder, ReactiveFormsModule } from "@angular/forms";
 
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
+import { mayShowOrNew } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { IdentityView } from "@bitwarden/common/vault/models/view/identity.view";
 import {
@@ -19,6 +20,7 @@ import {
   TypographyModule,
 } from "@bitwarden/components";
 
+import { lockHiddenControls } from "../../../keykeeper/hidden-controls";
 import { CipherFormContainer } from "../../cipher-form-container";
 
 // FIXME(https://bitwarden.atlassian.net/browse/CL-764): Migrate to OnPush
@@ -80,13 +82,18 @@ export class IdentitySectionComponent implements OnInit {
     return this.cipherFormContainer.config.initialValues;
   }
 
+  private readonly destroyRef = inject(DestroyRef);
+
   constructor(
     private cipherFormContainer: CipherFormContainer,
     private formBuilder: FormBuilder,
     private i18nService: I18nService,
   ) {
     this.cipherFormContainer.registerChildForm("identityDetails", this.identityForm);
-    this.identityForm.valueChanges.pipe(takeUntilDestroyed()).subscribe((value) => {
+    this.identityForm.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
+      // Keykeeper: getRawValue(), as the values the person can't see are
+      // disabled, and a save keeps them as they are.
+      const value = this.identityForm.getRawValue();
       const data = new IdentityView();
       data.title = value.title;
       data.firstName = value.firstName;
@@ -114,6 +121,16 @@ export class IdentitySectionComponent implements OnInit {
     });
   }
 
+  /**
+   * Keykeeper: whether the person may see one of the item's values
+   * (`part.property`): every value but the plain ones is hidden from someone
+   * who can't see the item's passwords, so its reveal toggle doesn't show
+   * (DESIGN.md, "Folders and permissions"). A new item is theirs.
+   */
+  protected canSee(key: string): boolean {
+    return mayShowOrNew(this.originalCipherView, key);
+  }
+
   ngOnInit() {
     // If true will disable all inputs
     if (this.disabled) {
@@ -131,6 +148,18 @@ export class IdentitySectionComponent implements OnInit {
         username: this.cipherFormContainer.config.initialValues?.username || "",
       });
     }
+
+    // Keykeeper: the SSN and passport and license numbers can't be shown,
+    // overwritten, or cleared by someone who can't see them, and again
+    // whenever the form is enabled.
+    lockHiddenControls(this.identityForm.controls, "identity", this.originalCipherView);
+    this.cipherFormContainer.formStatusChange$
+      ?.pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((status) => {
+        if (status === "enabled") {
+          lockHiddenControls(this.identityForm.controls, "identity", this.originalCipherView);
+        }
+      });
   }
 
   private initFromExistingCipher(existingIdentity: IdentityView) {

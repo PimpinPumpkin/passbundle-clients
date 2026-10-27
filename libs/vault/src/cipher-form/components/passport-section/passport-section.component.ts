@@ -11,6 +11,7 @@ import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormBuilder, FormGroup, ReactiveFormsModule } from "@angular/forms";
 
 import { JslibModule } from "@bitwarden/angular/jslib.module";
+import { mayShowOrNew } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { PassportView } from "@bitwarden/common/vault/models/view/passport.view";
 import {
@@ -22,6 +23,7 @@ import {
 } from "@bitwarden/components";
 import { I18nPipe } from "@bitwarden/ui-common";
 
+import { lockHiddenControls } from "../../../keykeeper/hidden-controls";
 import { CipherFormContainer } from "../../cipher-form-container";
 import { DateFieldGroupComponent } from "../date-field-group/date-field-group.component";
 
@@ -71,9 +73,21 @@ export class PassportSectionComponent implements OnInit {
 
     this.cipherFormContainer.registerChildForm("passportDetails", this.passportForm);
 
+    // Keykeeper: getRawValue(), as the values the person can't see are
+    // disabled, and a save keeps them as they are.
     this.passportForm.valueChanges
       .pipe(takeUntilDestroyed())
-      .subscribe((value) => this.updateCipherFromFormValue(value));
+      .subscribe(() => this.updateCipherFromFormValue(this.passportForm.getRawValue()));
+  }
+
+  /**
+   * Keykeeper: whether the person may see one of the item's values
+   * (`part.property`): every value but the plain ones is hidden from someone
+   * who can't see the item's passwords, so its reveal toggle doesn't show
+   * (DESIGN.md, "Folders and permissions"). A new item is theirs.
+   */
+  protected canSee(key: string): boolean {
+    return mayShowOrNew(this.originalCipherView(), key);
   }
 
   ngOnInit() {
@@ -101,6 +115,9 @@ export class PassportSectionComponent implements OnInit {
     if (this.disabled()) {
       this.passportForm.disable();
     }
+    // Keykeeper: the passport and national ID numbers can't be shown,
+    // overwritten, or cleared by someone who can't see them.
+    lockHiddenControls(this.passportForm.controls, "passport", this.originalCipherView());
 
     this.cipherFormContainer.formStatusChange$
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -109,6 +126,7 @@ export class PassportSectionComponent implements OnInit {
           this.passportForm.disable();
         } else {
           this.passportForm.enable();
+          lockHiddenControls(this.passportForm.controls, "passport", this.originalCipherView());
         }
       });
   }

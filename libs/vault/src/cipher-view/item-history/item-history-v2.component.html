@@ -5,31 +5,34 @@
   <bit-card>
     <p class="tw-mb-1 tw-text-xs tw-text-muted tw-select-all">
       <span class="tw-font-medium">{{ "lastEdited" | i18n }}:</span>
-      {{ cipher.revisionDate | date: "medium" }}
+      {{ cipher.revisionDate | date: timeFormat }}
     </p>
     <p
       class="tw-text-xs tw-text-muted tw-select-all"
       [ngClass]="{
-        'tw-mb-1 ': cipher.hasPasswordHistory,
-        'tw-mb-0': !cipher.hasPasswordHistory,
+        'tw-mb-1 ': showPasswordHistory,
+        'tw-mb-0': !showPasswordHistory,
       }"
     >
       <span class="tw-font-medium">{{ "dateCreated" | i18n }}:</span>
-      {{ cipher.creationDate | date: "medium" }}
+      {{ cipher.creationDate | date: timeFormat }}
     </p>
     @if (cipher.passwordRevisionDisplayDate) {
       <p
         class="tw-text-xs tw-text-muted tw-select-all"
-        [ngClass]="{ 'tw-mb-3': cipher.hasPasswordHistory }"
+        [ngClass]="{ 'tw-mb-3': showPasswordHistory }"
       >
         <span class="tw-font-medium">{{ "datePasswordUpdated" | i18n }}:</span>
-        {{ cipher.passwordRevisionDisplayDate | date: "medium" }}
+        {{ cipher.passwordRevisionDisplayDate | date: timeFormat }}
       </p>
     }
-    @if (cipher.hasPasswordHistory) {
+    <!-- Keykeeper: earlier passwords only for someone who can see the item's passwords -->
+    @if (showPasswordHistory) {
       <button (click)="viewPasswordHistory()" bitTypography="body2" bitLink type="button">
         {{ "passwordHistory" | i18n }}
       </button>
     }
+    <!-- Keykeeper: the extension's way to the item's version history -->
+    <ng-content></ng-content>
   </bit-card>
 </bit-section>

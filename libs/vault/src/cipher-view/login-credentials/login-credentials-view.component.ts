@@ -23,6 +23,7 @@ import { EventCollectionService, EventType } from "@bitwarden/common/dirt/event-
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { UserId } from "@bitwarden/common/types/guid";
 import { PremiumUpgradePromptService } from "@bitwarden/common/vault/abstractions/premium-upgrade-prompt.service";
+import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
   FormFieldModule,
@@ -136,7 +137,8 @@ export class LoginCredentialsViewComponent implements OnChanges {
   }
 
   setTotpCopyCode(e: TotpCodeValues) {
-    this.totpCodeCopyObj = e;
+    // Keykeeper: no codes for someone who can't see the item's passwords.
+    this.totpCodeCopyObj = maySeeSecrets(this.cipher) ? e : undefined;
   }
 
   async logCopyEvent() {

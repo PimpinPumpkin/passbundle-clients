@@ -16,6 +16,11 @@ import {
   readFillRules,
   sameField,
 } from "@bitwarden/common/vault/keykeeper/fill-rules";
+import {
+  isSecretCustomField,
+  isSecretValue,
+  maySeeSecrets,
+} from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
 
@@ -80,18 +85,22 @@ export function fieldMatches(fingerprint: FieldFingerprint, field: AutofillField
 }
 
 /**
- * Whether a source is something the item can hide: the password, a
- * verification code, or a hidden custom field.
+ * Whether a source is something the item can hide, by the shared allowlist
+ * (hidden-secrets.ts): the password, a verification code, a hidden custom
+ * field, or a linked one that fills a secret.
  */
 export function isSecretSource(cipher: CipherView, source: FillSource): boolean {
   switch (source.from) {
+    case "username":
+      return isSecretValue("login.username");
     case "password":
+      return isSecretValue("login.password");
     case "totp":
-      return true;
-    // A rule names a field by its name; if a hidden field shares it, it counts as one.
+      return isSecretValue("login.totp");
+    // A rule names a field by its name; if a secret field shares it, it counts as one.
     case "field":
       return visibleCustomFields(cipher).some(
-        (f) => f.name === source.name && f.type === FieldType.Hidden,
+        (f) => f.name === source.name && isSecretCustomField(cipher, f),
       );
     default:
       return false;
@@ -99,17 +108,30 @@ export function isSecretSource(cipher: CipherView, source: FillSource): boolean 
 }
 
 /**
- * Whether a rule may fill this field. Never into a field the person can't
- * see, and for someone who can't see the item's passwords, a password or
- * hidden field only into a password field, where they can't read it either.
+ * Whether a value may go into this field, as far as seeing it goes: for
+ * someone who can't see the item's passwords, a secret only into a password
+ * field, where they can't read it either. One-time codes are the exception:
+ * they last seconds, and the fields they go in are text fields. Rules and the
+ * item's custom fields (autofill.service.ts) both ask this.
  */
-function mayFill(cipher: CipherView, source: FillSource, field: AutofillField): boolean {
+export function mayFillValue(
+  cipher: CipherView,
+  source: FillSource,
+  field: AutofillField,
+): boolean {
+  const hidden = source.from !== "totp" && isSecretSource(cipher, source);
+  return !hidden || maySeeSecrets(cipher) || field.type === "password";
+}
+
+/**
+ * Whether a rule may fill this field. Never into a field the person can't
+ * see, and a secret as `mayFillValue` allows.
+ */
+export function mayFill(cipher: CipherView, source: FillSource, field: AutofillField): boolean {
   if (!field.viewable || field.type === "hidden") {
     return false;
   }
-  const hidden =
-    source.from === "password" || (source.from === "field" && isSecretSource(cipher, source));
-  return !hidden || cipher.viewPassword || field.type === "password";
+  return mayFillValue(cipher, source, field);
 }
 
 /**

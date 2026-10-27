@@ -3,33 +3,37 @@
     <h2 bitTypography="h6">{{ "typeSshKey" | i18n }}</h2>
   </bit-section-header>
   <read-only-cipher-card>
+    <!-- Keykeeper: the private key needs see passwords: without it, a mask (the
+         key isn't in the page), and no way to show or copy it -->
     <bit-form-field>
       <bit-label>{{ "sshPrivateKey" | i18n }}</bit-label>
       <input
         readonly
         bitInput
-        [value]="sshKey.privateKey"
+        [value]="canSeeSecrets ? sshKey.privateKey : mask"
         aria-readonly="true"
         type="password"
         data-testid="private-key"
       />
-      <button
-        bitSuffix
-        type="button"
-        bitIconButton
-        bitPasswordInputToggle
-        data-testid="toggle-privateKey"
-        [(toggled)]="revealSshKey"
-      ></button>
-      <button
-        bitIconButton="bwi-clone"
-        bitSuffix
-        type="button"
-        [label]="'copyPrivateKey' | i18n"
-        [appCopyClick]="sshKey.privateKey"
-        showToast
-        [valueLabel]="'sshPrivateKey' | i18n"
-      ></button>
+      @if (canSeeSecrets) {
+        <button
+          bitSuffix
+          type="button"
+          bitIconButton
+          bitPasswordInputToggle
+          data-testid="toggle-privateKey"
+          [(toggled)]="revealSshKey"
+        ></button>
+        <button
+          bitIconButton="bwi-clone"
+          bitSuffix
+          type="button"
+          [label]="'copyPrivateKey' | i18n"
+          [appCopyClick]="sshKey.privateKey"
+          showToast
+          [valueLabel]="'sshPrivateKey' | i18n"
+        ></button>
+      }
     </bit-form-field>
     <bit-form-field>
       <bit-label>{{ "sshPublicKey" | i18n }}</bit-label>

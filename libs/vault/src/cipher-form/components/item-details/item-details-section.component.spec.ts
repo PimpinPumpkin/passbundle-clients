@@ -938,7 +938,7 @@ describe("ItemDetailsSectionComponent", () => {
   });
   // Keykeeper: the web vault's one Folder picker, grouped by owner
   // (DESIGN.md, "Folders and permissions").
-  describe("Folder picker (web vault)", () => {
+  describe("Folder picker (web vault and extension)", () => {
     const acme = Object.assign(new Organization(), { id: "org1", name: "Acme" });
 
     beforeEach(() => {
@@ -972,16 +972,25 @@ describe("ItemDetailsSectionComponent", () => {
       ] as any;
     });
 
-    it("lists Personal's folders, then each organization's shared folders the person can add to", async () => {
+    it("lists Personal's folders, then each organization's shared folders, those the person can't add to locked", async () => {
       await component.ngOnInit();
       const options = (component as any).placeOptions;
-      expect(options.map((o: any) => [o.value, o.label, !!o.heading])).toEqual([
-        ["heading:personal", "myVault", true],
-        ["personal:", "No folder", false],
-        ["personal:f1", "Bank", false],
-        ["heading:org1", "Acme", true],
-        ["org:org1:c1", "Drop box", false],
+      expect(options.map((o: any) => [o.value, o.label, !!o.heading, !!o.locked])).toEqual([
+        ["heading:personal", "myVault", true, false],
+        ["personal:", "No folder", false, false],
+        ["personal:f1", "Bank", false, false],
+        ["heading:org1", "Acme", true, false],
+        ["org:org1:c1", "Drop box", false, false],
+        ["org:org1:c2", "Reference", false, true],
       ]);
+      expect(options.find((o: any) => o.value === "org:org1:c2").icon).toBe("bwi-lock");
+    });
+
+    it("never puts the item in a locked shared folder", async () => {
+      await component.ngOnInit();
+      await (component as any).pickPlace("org:org1:c2");
+      expect(component.itemDetailsForm.controls.organizationId.value).toBeNull();
+      expect((component as any).place).toBe("personal:");
     });
 
     it("puts the item where the picker says", async () => {
@@ -1000,9 +1009,60 @@ describe("ItemDetailsSectionComponent", () => {
       expect(component.itemDetailsForm.controls.folderId.value).toBe("f1");
     });
 
-    it("keeps the extension on upstream's fields", async () => {
+    it("shows the same picker in the extension, and keeps the desktop app on upstream's fields", async () => {
       mockPlatformUtilsService.getClientType.mockReturnValue(ClientType.Browser);
+      expect((component as any).folderPicker).toBe(true);
+      mockPlatformUtilsService.getClientType.mockReturnValue(ClientType.Desktop);
       expect((component as any).folderPicker).toBe(false);
+    });
+
+    it("keeps an item in a shared folder where the person can edit but not create", async () => {
+      const editOnly = createMockCollection(
+        "c3",
+        "Front desk",
+        "org1",
+        false,
+        true,
+        CollectionTypes.SharedCollection,
+      );
+      editOnly.keykeeper = { ...GRID_NONE, seePasswords: true, edit: true, viewHistory: true };
+      component.config.collections = [...component.config.collections, editOnly];
+      const item = new CipherView();
+      item.id = "item1";
+      item.name = "Front desk PC";
+      item.organizationId = "org1";
+      item.collectionIds = ["c3"] as CollectionId[];
+      item.edit = true;
+      item.viewPassword = true;
+      fixture.componentRef.setInput("originalCipherView", item);
+      getInitialCipherView.mockReturnValue(item);
+      component.config.mode = "edit";
+      await component.ngOnInit();
+
+      expect(component.itemDetailsForm.controls.collectionIds.value.map((c: any) => c.id)).toEqual([
+        "c3",
+      ]);
+      expect(component.itemDetailsForm.controls.collectionIds.valid).toBe(true);
+    });
+
+    it("locks the picker, and says why, for an organization's item its folder doesn't let the person move", async () => {
+      const item = new CipherView();
+      item.id = "item1";
+      item.organizationId = "org1";
+      item.collectionIds = ["c2"] as CollectionId[];
+      item.edit = true;
+      item.viewPassword = true;
+      fixture.componentRef.setInput("originalCipherView", item);
+      getInitialCipherView.mockReturnValue(item);
+      component.config.mode = "edit";
+      await component.ngOnInit();
+
+      expect((component as any).placeLocked).toBe(true);
+      expect((component as any).placeLockedReason).toBe(true);
+      fixture.detectChanges();
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="keykeeper-cant-move"]')?.textContent,
+      ).toContain("keykeeperCantMoveItem");
     });
   });
 });

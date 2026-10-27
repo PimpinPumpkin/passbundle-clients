@@ -3,7 +3,7 @@ import { ElementRef, NO_ERRORS_SCHEMA, signal } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
 import { ActivatedRoute, convertToParamMap, Params, provideRouter, Router } from "@angular/router";
-import { mock } from "jest-mock-extended";
+import { mock, MockProxy } from "jest-mock-extended";
 import { BehaviorSubject, EMPTY, of, Subject } from "rxjs";
 import { map } from "rxjs/operators";
 
@@ -102,6 +102,7 @@ describe("VaultComponent", () => {
   let queryParamsSubject: BehaviorSubject<Params>;
 
   let mockCipher: Cipher;
+  let cipherAuthorizationServiceMock: MockProxy<CipherAuthorizationService>;
   let openVaultItemDialogSpy: jest.SpyInstance;
   // Keykeeper: an item opens to view in the side panel, a drawer.
   let openVaultItemPanelSpy: jest.SpyInstance;
@@ -124,7 +125,11 @@ describe("VaultComponent", () => {
       reprompt: 0,
       type: CipherType.Login,
       edit: true,
+      viewPassword: true,
     } as Cipher;
+
+    cipherAuthorizationServiceMock = mock<CipherAuthorizationService>();
+    cipherAuthorizationServiceMock.canCloneCipher$.mockReturnValue(of(true));
 
     const cipherServiceMock = mock<CipherService>();
     cipherServiceMock.get.mockResolvedValue(mockCipher);
@@ -205,7 +210,7 @@ describe("VaultComponent", () => {
         { provide: WelcomeDialogService, useValue: mock<WelcomeDialogService>() },
         { provide: OrganizationUserApiService, useValue: mock<OrganizationUserApiService>() },
         { provide: CollectionAdminService, useValue: mock<CollectionAdminService>() },
-        { provide: CipherAuthorizationService, useValue: mock<CipherAuthorizationService>() },
+        { provide: CipherAuthorizationService, useValue: cipherAuthorizationServiceMock },
         { provide: ProviderService, useValue: mock<ProviderService>() },
         { provide: LogoutService, useValue: mock<LogoutService>() },
         { provide: LockService, useValue: mock<LockService>() },
@@ -376,6 +381,42 @@ describe("VaultComponent", () => {
 
   it("creates", () => {
     expect(component).toBeTruthy();
+  });
+
+  describe("Keykeeper: a copy by its address", () => {
+    it("opens for someone with see passwords and share", async () => {
+      await openByAddress();
+      expect(copyFormOpened()).toBe(true);
+    });
+
+    async function openByAddress() {
+      queryParamsSubject.next({ action: "clone", itemId: TEST_CIPHER_ID });
+      fixture = TestBed.createComponent(VaultComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
+    }
+
+    /** Whether any form opened to copy the item (the address also opens it to edit, as upstream does). */
+    const copyFormOpened = () =>
+      openVaultItemDialogSpy.mock.calls.some(([, params]) => params?.formConfig?.mode === "clone");
+
+    it("is refused without see passwords on the item", async () => {
+      mockCipher.viewPassword = false;
+      await openByAddress();
+      expect(copyFormOpened()).toBe(false);
+    });
+
+    it("is refused for an item that doesn't say whether passwords show", async () => {
+      delete mockCipher.viewPassword;
+      await openByAddress();
+      expect(copyFormOpened()).toBe(false);
+    });
+
+    it("is refused without share, as canCloneCipher$ decides", async () => {
+      cipherAuthorizationServiceMock.canCloneCipher$.mockReturnValue(of(false));
+      await openByAddress();
+      expect(copyFormOpened()).toBe(false);
+    });
   });
 
   [

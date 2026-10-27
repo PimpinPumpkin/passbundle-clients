@@ -1,4 +1,3 @@
-import { formatDate } from "@angular/common";
 import {
   ChangeDetectionStrategy,
   Component,
@@ -9,6 +8,7 @@ import {
 } from "@angular/core";
 
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
+import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
   AsyncActionsModule,
@@ -25,7 +25,7 @@ import {
 } from "@bitwarden/components";
 import { I18nPipe } from "@bitwarden/ui-common";
 
-import { VersionRow, versionRows } from "./item-versions";
+import { restoreConfirmation, VersionRow, versionRows, versionTime } from "./item-versions";
 
 export type VersionDialogData = {
   /** The version, decrypted. */
@@ -168,10 +168,10 @@ export class KeykeeperVersionDialogComponent {
   private readonly toastService = inject(ToastService);
 
   /** When the version was saved, as the item view shows dates. */
-  protected readonly when = formatDate(this.data.revisionDate, "medium", inject(LOCALE_ID));
+  protected readonly when = versionTime(this.data.revisionDate, inject(LOCALE_ID));
 
   /** People who can't see an item's passwords never see them in its versions either. */
-  protected readonly canSeeSecrets = this.data.current.viewPassword !== false;
+  protected readonly canSeeSecrets = maySeeSecrets(this.data.current);
   protected readonly reveal = signal(false);
 
   protected readonly rows = computed(() =>
@@ -190,15 +190,10 @@ export class KeykeeperVersionDialogComponent {
   }
 
   protected readonly restore = async () => {
-    const confirmed = await this.dialogService.openSimpleDialog({
-      title: { key: "keykeeperRestoreVersionTitle" },
-      content: {
-        key: "keykeeperRestoreVersionDesc",
-        placeholders: [this.when],
-      },
-      acceptButtonText: { key: "keykeeperRestoreVersion" },
-      type: "warning",
-    });
+    // Keykeeper: it says first which passkeys restoring would take away.
+    const confirmed = await this.dialogService.openSimpleDialog(
+      restoreConfirmation(this.data.version, this.data.current, this.when),
+    );
     if (!confirmed || !this.data.restore) {
       return;
     }

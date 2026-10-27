@@ -5,6 +5,7 @@ import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { EventCollectionService, EventType } from "@bitwarden/common/dirt/event-logs";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { CipherType, FieldType, LinkedIdType } from "@bitwarden/common/vault/enums";
+import { HIDDEN_VALUE_MASK } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { LinkedMetadata } from "@bitwarden/common/vault/linked-field-option.decorator";
 import { CardView } from "@bitwarden/common/vault/models/view/card.view";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
@@ -90,6 +91,9 @@ export class CustomFieldV2Component implements OnInit, OnChanges {
     return this.cipher.viewPassword;
   }
 
+  /** Keykeeper: shown in place of a hidden field's value the person can't see. */
+  protected readonly mask = HIDDEN_VALUE_MASK;
+
   emptyFieldAriaLabel(field: FieldView): string | null {
     if (field.value) {
       return null;
@@ -107,6 +111,10 @@ export class CustomFieldV2Component implements OnInit, OnChanges {
   }
 
   async toggleHiddenField(hiddenFieldVisible: boolean, index: number) {
+    // Keykeeper: never shown to someone who can't see the item's passwords.
+    if (hiddenFieldVisible && !this.canViewPassword) {
+      return;
+    }
     if (hiddenFieldVisible) {
       this.revealedHiddenFields.push(index);
     } else {

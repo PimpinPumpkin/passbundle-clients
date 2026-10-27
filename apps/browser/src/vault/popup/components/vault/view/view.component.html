@@ -47,6 +47,20 @@
           {{ "keykeeperFillOnThisPage" | i18n }}
         </button>
       }
+      <!-- Keykeeper: its version history, for people whose shared folders let them see it -->
+      @if (canViewHistory) {
+        <button
+          slot="history"
+          type="button"
+          bitLink
+          bitTypography="body2"
+          class="tw-mt-2 tw-block"
+          data-testid="keykeeper-version-history"
+          (click)="openHistory()"
+        >
+          {{ "keykeeperVersionHistory" | i18n }}
+        </button>
+      }
     </app-cipher-view>
   }
 

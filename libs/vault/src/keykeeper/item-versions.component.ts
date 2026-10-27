@@ -12,15 +12,10 @@ import {
 import { toSignal } from "@angular/core/rxjs-interop";
 import { firstValueFrom, map } from "rxjs";
 
-import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
-import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
-import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
-import { CipherData } from "@bitwarden/common/vault/models/data/cipher.data";
-import { Cipher } from "@bitwarden/common/vault/models/domain/cipher";
-import { CipherResponse } from "@bitwarden/common/vault/models/response/cipher.response";
+import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
   CardComponent,
@@ -36,27 +31,11 @@ import { I18nPipe } from "@bitwarden/ui-common";
 import { CipherFormConfig } from "../cipher-form/abstractions/cipher-form-config.service";
 import { DefaultCipherFormService } from "../cipher-form/services/default-cipher-form.service";
 
-import {
-  distinctVersions,
-  historyPath,
-  ItemHistoryResponse,
-  restoredView,
-  savedByLabel,
-  VersionEditor,
-  versionPath,
-} from "./item-versions";
+import { ItemVersion, KeykeeperItemHistoryService } from "./item-history.service";
+import { savedByLabel, VERSION_TIME_FORMAT } from "./item-versions";
 import { KeykeeperVersionDialogComponent, VersionDialogResult } from "./version-dialog.component";
 
-/**
- * A version as the item view lists it: decrypted, or, for someone who can't
- * see the item's passwords, only when and by whom (`view` null).
- */
-export type ItemVersion = {
-  id: string;
-  revisionDate: Date;
-  savedBy: VersionEditor | null;
-  view: CipherView | null;
-};
+export type { ItemVersion } from "./item-history.service";
 
 /** How many versions show before "Show all". */
 const FIRST_VERSIONS = 5;
@@ -80,7 +59,7 @@ const FIRST_VERSIONS = 5;
     SectionHeaderComponent,
     TypographyModule,
   ],
-  providers: [DefaultCipherFormService],
+  providers: [DefaultCipherFormService, KeykeeperItemHistoryService],
   template: `
     @if (versions().length > 0) {
       <bit-section
@@ -117,7 +96,7 @@ const FIRST_VERSIONS = 5;
                 data-testid="keykeeper-item-version"
               >
                 <div class="tw-min-w-0">
-                  <div bitTypography="body2">{{ version.revisionDate | date: "medium" }}</div>
+                  <div bitTypography="body2">{{ version.revisionDate | date: timeFormat }}</div>
                   @if (savedBy(version); as who) {
                     <div bitTypography="helper" class="tw-text-muted">{{ who }}</div>
                   }
@@ -129,7 +108,7 @@ const FIRST_VERSIONS = 5;
                     linkType="primary"
                     (click)="open(version)"
                     [attr.aria-label]="
-                      ('view' | i18n) + ' ' + (version.revisionDate | date: 'medium')
+                      ('view' | i18n) + ' ' + (version.revisionDate | date: timeFormat)
                     "
                   >
                     {{ "view" | i18n }}
@@ -167,13 +146,16 @@ export class KeykeeperItemVersionsComponent {
   readonly formConfig = input<CipherFormConfig | undefined>(undefined);
   /** Whether the person can edit the item, and so restore a version. */
   readonly canEdit = input(false);
-  /** Whether the person can delete the item, and so clear its history. */
+  /**
+   * Whether the person may clear the item's history and delete its versions:
+   * view item history and delete in the same shared folder, as the server
+   * decides (`historyAccess`).
+   */
   readonly canDelete = input(false);
   /** A version was restored: the item as saved. */
   readonly restored = output<CipherView>();
 
-  private readonly apiService = inject(ApiService);
-  private readonly cipherService = inject(CipherService);
+  private readonly historyService = inject(KeykeeperItemHistoryService);
   private readonly accountService = inject(AccountService);
   private readonly dialogService = inject(DialogService);
   private readonly i18nService = inject(I18nService);
@@ -182,6 +164,7 @@ export class KeykeeperItemVersionsComponent {
   private readonly cipherFormService = inject(DefaultCipherFormService);
 
   protected readonly first = FIRST_VERSIONS;
+  protected readonly timeFormat = VERSION_TIME_FORMAT;
   protected readonly showAll = signal(false);
   private readonly me = toSignal(this.accountService.activeAccount$.pipe(map((a) => a?.id)));
 
@@ -216,43 +199,7 @@ export class KeykeeperItemVersionsComponent {
   }
 
   private async load(current: CipherView) {
-    const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
-    const response: ItemHistoryResponse = await this.apiService.send(
-      "GET",
-      historyPath(current.id),
-      null,
-      true,
-      true,
-    );
-    const hidePasswords = !!response?.hidePasswords;
-    const versions: ItemVersion[] = [];
-    let unreadable = 0;
-    for (const version of response?.data ?? []) {
-      const listed = {
-        id: version.id,
-        revisionDate: new Date(version.revisionDate),
-        savedBy: version.savedBy,
-      };
-      if (hidePasswords || version.cipher == null) {
-        // Without the item's passwords, the server sends when and by whom only.
-        versions.push({ ...listed, view: null });
-        continue;
-      }
-      // Decrypted as the vault decrypts any item from the server.
-      const cipher = new Cipher(new CipherData(new CipherResponse(version.cipher)));
-      const view = await this.cipherService
-        .decrypt(cipher, userId)
-        .catch((): CipherView | null => null);
-      if (view == null || view.decryptionFailure) {
-        unreadable++;
-        continue;
-      }
-      versions.push({ ...listed, view });
-    }
-    const listed = hidePasswords
-      ? versions
-      : distinctVersions(versions as (ItemVersion & { view: CipherView })[], current);
-    return { versions: listed, unreadable, hidePasswords };
+    return await this.historyService.load(current);
   }
 
   protected async open(version: ItemVersion) {
@@ -266,7 +213,7 @@ export class KeykeeperItemVersionsComponent {
     // put back secrets they can't see (DESIGN.md, "Item history").
     const canRestore =
       this.canEdit() &&
-      current.viewPassword !== false &&
+      maySeeSecrets(current) &&
       !current.isDeleted &&
       config?.originalCipher != null;
     const ref = KeykeeperVersionDialogComponent.open(this.dialogService, {
@@ -287,18 +234,16 @@ export class KeykeeperItemVersionsComponent {
 
   /** Saves the version as a normal edit of the item, as its editor would. */
   private async restore(version: CipherView): Promise<CipherView> {
-    const config = this.formConfig()!;
-    return await this.cipherFormService.saveCipher(restoredView(version, this.cipher()), config);
+    return await this.historyService.restore(
+      this.cipherFormService,
+      version,
+      this.cipher(),
+      this.formConfig()!,
+    );
   }
 
   private async deleteVersion(version: ItemVersion) {
-    await this.apiService.send(
-      "DELETE",
-      versionPath(this.cipher().id, version.id),
-      null,
-      true,
-      false,
-    );
+    await this.historyService.deleteVersion(this.cipher().id, version.id);
   }
 
   /** Clears the item's history for everyone, once the person confirms. */
@@ -313,7 +258,7 @@ export class KeykeeperItemVersionsComponent {
       return;
     }
     try {
-      await this.apiService.send("DELETE", historyPath(this.cipher().id), null, true, false);
+      await this.historyService.clear(this.cipher().id);
       this.toastService.showToast({
         variant: "success",
         message: this.i18nService.t("keykeeperHistoryCleared"),

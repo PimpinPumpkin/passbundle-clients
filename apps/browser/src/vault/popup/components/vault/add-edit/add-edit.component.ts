@@ -36,6 +36,7 @@ import {
 } from "@bitwarden/components";
 import {
   BUILT_IN_TEMPLATES,
+  CANT_COPY_ITEM_KEY,
   CipherFormComponent,
   CipherFormConfig,
   CipherFormConfigService,
@@ -45,6 +46,7 @@ import {
   customTemplate,
   DefaultCipherFormConfigService,
   ItemTemplate,
+  mayCloneItem,
   newTemplateDefinitionField,
   templateFieldsFromItem,
   OptionalInitialValues,
@@ -464,6 +466,21 @@ export class AddEditComponent implements OnInit, OnDestroy {
             params.type,
           );
 
+          // Keykeeper: a copy needs see passwords and share, however it was
+          // asked for, the address included (DESIGN.md, "Folders and
+          // permissions"). The form never opens.
+          if (
+            config.mode === "clone" &&
+            !(await mayCloneItem(this.cipherAuthorizationService, config.originalCipher))
+          ) {
+            this.toastService.showToast({
+              variant: "error",
+              message: this.i18nService.t(CANT_COPY_ITEM_KEY),
+            });
+            await this.popupRouterCacheService.back();
+            return null;
+          }
+
           if (config.mode === "edit" && !config.originalCipher.edit) {
             config.mode = "partial-edit";
           }
@@ -511,6 +528,9 @@ export class AddEditComponent implements OnInit, OnDestroy {
         }),
       )
       .subscribe((config) => {
+        if (config == null) {
+          return;
+        }
         this.config = config;
         this.headerText = this.setHeader(config.mode, config.cipherType);
       });

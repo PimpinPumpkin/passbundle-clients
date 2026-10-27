@@ -8,13 +8,16 @@
     <bit-form-field>
       <bit-label>{{ "sshPrivateKey" | i18n }}</bit-label>
       <input id="privateKey" bitInput formControlName="privateKey" type="password" readonly />
-      <button
-        type="button"
-        bitIconButton
-        bitSuffix
-        data-testid="toggle-privateKey-visibility"
-        bitPasswordInputToggle
-      ></button>
+      <!-- Keykeeper: shown only to someone who can see the private key -->
+      @if (canSeeSecrets()) {
+        <button
+          type="button"
+          bitIconButton
+          bitSuffix
+          data-testid="toggle-privateKey-visibility"
+          bitPasswordInputToggle
+        ></button>
+      }
       @if (showImport()) {
         <button
           type="button"

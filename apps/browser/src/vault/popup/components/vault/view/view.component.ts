@@ -7,8 +7,11 @@ import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { firstValueFrom, Observable, switchMap, of, map } from "rxjs";
 
+import { CollectionService } from "@bitwarden/admin-console/common";
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { BrowserPremiumUpgradePromptService } from "@bitwarden/browser/billing/popup/services/browser-premium-upgrade-prompt.service";
+import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
+import { itemLike } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { CollectionView } from "@bitwarden/common/admin-console/models/collections";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
@@ -44,13 +47,16 @@ import {
   ChipActionComponent,
   DialogService,
   IconButtonModule,
+  LinkModule,
   SearchModule,
   ToastService,
+  TypographyModule,
 } from "@bitwarden/components";
 import {
   ArchiveCipherUtilitiesService,
   CipherViewComponent,
   CopyCipherFieldService,
+  historyAccess,
   PasswordRepromptService,
 } from "@bitwarden/vault";
 
@@ -106,6 +112,8 @@ type LoadAction =
     PopOutComponent,
     CalloutModule,
     ChipActionComponent,
+    LinkModule,
+    TypographyModule,
   ],
   providers: [
     { provide: ViewPasswordHistoryService, useClass: BrowserViewPasswordHistoryService },
@@ -128,6 +136,8 @@ export class ViewComponent {
   collections$: Observable<CollectionView[]>;
   loadAction: LoadAction;
   senderTabId?: number;
+  /** Keykeeper: whether the item's shared folders let the person see its version history. */
+  protected canViewHistory = false;
   routeAfterDeletion?: ROUTES_AFTER_EDIT_DELETION;
 
   private readonly autofillAllowed = toSignal(this.vaultPopupAutofillService.autofillAllowed$);
@@ -159,6 +169,8 @@ export class ViewComponent {
     private archiveCipherUtilsService: ArchiveCipherUtilitiesService,
     private domainSettingsService: DomainSettingsService,
     private afterDeletionNavigationService: VaultPopupAfterDeletionNavigationService,
+    private collectionService: CollectionService,
+    private organizationService: OrganizationService,
   ) {
     this.subscribeToParams();
   }
@@ -207,6 +219,7 @@ export class ViewComponent {
           this.cipher = cipher;
 
           this.canDeleteCipher$ = this.cipherAuthorizationService.canDeleteCipher$(cipher);
+          this.canViewHistory = await this.historyVisible(cipher);
 
           this.showFooter$ = of(
             cipher &&
@@ -224,6 +237,35 @@ export class ViewComponent {
         takeUntilDestroyed(),
       )
       .subscribe();
+  }
+
+  /**
+   * Keykeeper: the item's version history shows to people with view item
+   * history in one of its shared folders, as the server decides (and always
+   * for one's own items).
+   */
+  private async historyVisible(cipher: CipherView): Promise<boolean> {
+    if (cipher.organizationId == null) {
+      return true;
+    }
+    try {
+      const [collections, organizations] = await Promise.all([
+        firstValueFrom(this.collectionService.decryptedCollections$(this.activeUserId)),
+        firstValueFrom(this.organizationService.organizations$(this.activeUserId)),
+      ]);
+      const org = organizations.find((o) => o.id === cipher.organizationId);
+      return historyAccess(itemLike(cipher), collections, !!org?.canEditAllCiphers).view;
+    } catch (e) {
+      this.logService.error(e);
+      return false;
+    }
+  }
+
+  /** Keykeeper: the item's version history, which asks for the master password first if the item does. */
+  async openHistory() {
+    await this.router.navigate(["/keykeeper-item-history"], {
+      queryParams: { cipherId: this.cipher.id },
+    });
   }
 
   setHeader(type: CipherType) {
