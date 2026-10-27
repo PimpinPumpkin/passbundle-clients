@@ -461,9 +461,17 @@ export class LoginViaAuthRequestComponent implements OnInit, OnDestroy {
       this.authRequestKeyPair.publicKey,
     );
 
+    // Keykeeper: letters and digits only (about 149 bits). The access code
+    // goes into the answer's address unencoded (`?code=`), whose check
+    // refuses "#" and "/" and can't read "%", and PassBundle's generator
+    // adds symbols by default, so most requests couldn't read their answer.
     this.accessCode = await this.passwordGenerationService.generatePassword({
       type: "password",
       length: 25,
+      uppercase: true,
+      lowercase: true,
+      number: true,
+      special: false,
     });
 
     const b64PublicKey = Utils.fromBufferToB64(this.authRequestKeyPair.publicKey);
