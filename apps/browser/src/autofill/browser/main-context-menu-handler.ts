@@ -357,7 +357,7 @@ export class MainContextMenuHandler {
         !cipher ||
         (cipher.type === CipherType.Login && !Utils.isNullOrEmpty(cipher.login?.password))
       ) {
-        if (cipher?.viewPassword ?? true) {
+        if (!cipher || maySeeSecrets(cipher)) {
           await createChildItem(COPY_PASSWORD_ID);
         }
       }

@@ -34,6 +34,7 @@ import {
   upsertFillRule,
   visibleCustomFields,
 } from "./fill-rules";
+import { noteFill } from "./hidden-fills";
 
 // No underscores: menu ids are split on "_".
 export const FILL_FIELD_ID = "kkfill";
@@ -267,6 +268,7 @@ export async function fillFieldWith(
         { frameId },
       );
       filled = true;
+      noteFill(tab.id, tab.url, cipher);
     }
   }
 

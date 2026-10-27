@@ -1783,6 +1783,27 @@ describe("AutofillService", () => {
           expect(masked["secret-password"]).toBe("hunter2");
         });
 
+        it("fills the login's password only into password fields, not one that looks like a password", async () => {
+          const login = (seesPasswords: boolean) => {
+            const cipher = new CipherView();
+            cipher.type = CipherType.Login;
+            cipher.viewPassword = seesPasswords;
+            cipher.login.username = "frontdesk";
+            cipher.login.password = "hunter2";
+            return cipher;
+          };
+          const page = () => [pageField("password", "text")];
+
+          const hidden = await filled(login(false), page());
+          expect(JSON.stringify(hidden)).not.toContain("hunter2");
+
+          const seen = await filled(login(true), page());
+          expect(seen["password-text"]).toBe("hunter2");
+
+          const masked = await filled(login(false), [pageField("password", "password")]);
+          expect(masked["password-password"]).toBe("hunter2");
+        });
+
         it("someone who can see them gets them filled anywhere", async () => {
           const values = await filled(item(true), [
             pageField("pin", "text"),
@@ -2444,6 +2465,7 @@ describe("AutofillService", () => {
           options.onlyEmptyFields,
           options.fillNewPassword,
           options.inlineMenuFillType,
+          false,
         );
       });
 
@@ -3174,6 +3196,7 @@ describe("AutofillService", () => {
           options.onlyEmptyFields,
           options.fillNewPassword,
           options.inlineMenuFillType,
+          false,
         );
         expect(autofillService["findUsernameField"]).toHaveBeenCalledWith(
           pageDetails,

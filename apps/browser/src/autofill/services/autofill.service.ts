@@ -61,6 +61,7 @@ import {
   staticValueFor,
   visibleCustomFields,
 } from "../keykeeper/fill-rules";
+import { noteFill } from "../keykeeper/hidden-fills";
 import AutofillField from "../models/autofill-field";
 import AutofillPageDetails from "../models/autofill-page-details";
 import AutofillScript from "../models/autofill-script";
@@ -524,6 +525,8 @@ export default class AutofillService implements AutofillServiceInterface {
         fillScript.properties.delay_between_operations = 20;
 
         didAutofill = true;
+        // Keykeeper: so the save prompt doesn't offer a password the person can't see.
+        noteFill(tab.id, tab.url, options.cipher);
         if (!options.skipLastUsed && activeAccount?.id) {
           await this.cipherService.updateLastUsedDate(options.cipher.id, activeAccount.id);
         }
@@ -1179,6 +1182,9 @@ export default class AutofillService implements AutofillServiceInterface {
       options.onlyEmptyFields,
       options.fillNewPassword,
       options.inlineMenuFillType,
+      // Keykeeper: a password the person can't see goes only into password
+      // fields, which the page shows masked, as with custom fields (mayFillValue).
+      !maySeeSecrets(options.cipher),
     );
 
     const loginPasswordFields: AutofillField[] = [];
@@ -1428,6 +1434,10 @@ export default class AutofillService implements AutofillServiceInterface {
         return;
       }
 
+      // Keykeeper: and never into a field the page shows as text.
+      if (!maySeeSecrets(options.cipher) && p.type !== "password") {
+        return;
+      }
       filledFields[pOpid] = p;
       if (login.password != null) {
         AutofillService.fillByOpid(fillScript, p, login.password);
@@ -2725,6 +2735,7 @@ export default class AutofillService implements AutofillServiceInterface {
     mustBeEmpty: boolean,
     fillNewPassword: boolean,
     inlineMenuFillType?: InlineMenuFillType,
+    passwordInputsOnly = false,
   ) {
     const arr: AutofillField[] = [];
 
@@ -2753,7 +2764,8 @@ export default class AutofillService implements AutofillServiceInterface {
       }
 
       const isLikePassword = () => {
-        if (f.type !== "text") {
+        // Keykeeper: not for a password the person can't see (see above).
+        if (f.type !== "text" || passwordInputsOnly) {
           return false;
         }
 
