@@ -127,11 +127,6 @@ module.exports.buildConfig = function buildConfig(params) {
       chunks: ["connectors/webauthn", "styles"],
     }),
     new HtmlWebpackPlugin({
-      template: path.resolve(__dirname, "src/connectors/webauthn-mobile.html"),
-      filename: "webauthn-mobile-connector.html",
-      chunks: ["connectors/webauthn", "styles"],
-    }),
-    new HtmlWebpackPlugin({
       template: path.resolve(__dirname, "src/connectors/webauthn-fallback.html"),
       filename: "webauthn-fallback-connector.html",
       chunks: ["connectors/webauthn-fallback", "styles"],

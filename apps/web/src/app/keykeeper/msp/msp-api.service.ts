@@ -21,6 +21,7 @@ import {
   KeykeeperMspRequests,
   MspJoining,
   MspPolicies,
+  MspRemoval,
   MspRole,
   MspSiteFixes,
   MspSummary,
@@ -82,6 +83,7 @@ export type {
   ClientMsp,
   MspPolicy,
   MspPolicies,
+  MspRemoval,
   DefaultPolicyResult,
   MspTemplates,
   TemplateCopy,
@@ -113,14 +115,20 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     await this.apiService.send("PUT", `/keykeeper/msp/${mspId}/seals`, seals, true, false);
   }
 
-  /** Seals a staff member's place in the clients they reach. */
+  /**
+   * Seals a staff member's place in the clients they reach, where this person
+   * has a confirmed place as an owner or admin: the server refuses the rest,
+   * such as a client that revoked them.
+   */
   private async sealStaff(
     mspId: string,
     email: string,
     role: MspRole,
     access: TechnicianAccess | null | undefined,
   ): Promise<void> {
-    const clients = (await this.get(mspId)).clients.map((c) => c.id);
+    const clients = (await this.get(mspId)).clients
+      .filter((c) => c.you?.status === 2 && c.you.type <= 1)
+      .map((c) => c.id);
     const reached =
       role === "admin" || reachesEveryClient(access ?? undefined)
         ? clients
@@ -310,7 +318,9 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
    * A company's own organization's install command, or for an MSP's client,
    * which IT provider manages it. Anyone but its owners and admins gets "not found".
    */
-  async getOrgEnrollment(orgId: string): Promise<ClientEnrollment | { provider: string }> {
+  async getOrgEnrollment(
+    orgId: string,
+  ): Promise<ClientEnrollment | { provider: string; removedSinceToken?: number }> {
     return this.apiService.send(
       "GET",
       `/keykeeper/organizations/${orgId}/enrollment`,
@@ -628,14 +638,17 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     }
   }
 
-  /** For a client's own owners: removes the MSP and all of its staff from the organization. */
-  async removeOrganizationMsp(orgId: string): Promise<void> {
-    await this.apiService.send(
+  /**
+   * For a client's own owners: removes the MSP and all of its staff from the
+   * organization, and what they made there. Says what went.
+   */
+  async removeOrganizationMsp(orgId: string): Promise<MspRemoval> {
+    return this.apiService.send(
       "DELETE",
       `/keykeeper/organizations/${orgId}/msp`,
       null,
       true,
-      false,
+      true,
     );
   }
 

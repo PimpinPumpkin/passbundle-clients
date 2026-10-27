@@ -1,39 +1,65 @@
+import { EXTENSION_ORIGINS } from "./keykeeper-origins";
+
 /**
- * Returns true when the connector page is served from a Bitwarden-managed domain.
- * Determined by window.location.hostname, which reflects the actual serving domain.
+ * PassBundle: the only origins a connector page answers. A connector is
+ * framed or opened by the web vault itself, or by PassBundle's own browser
+ * extension, and it sends what it learns (a security key's signature, for
+ * one) only to them. Upstream trusted any `parent` named in the address on a
+ * self-hosted server, so a page anywhere could frame a connector and receive
+ * a security key's answer (DESIGN.md, "Connector pages").
  */
-export function isKnownCloudOrigin(): boolean {
-  // https://bitwarden.atlassian.net/browse/PM-32091
-  const managedSuffixes = [
-    ".bitwarden.com",
-    ".bitwarden.eu",
-    ".bitwarden.pw",
-    ".bitwarden-gov.com",
-  ];
-  const hostname = window.location.hostname || "";
-  return managedSuffixes.some((suffix) => hostname.endsWith(suffix));
+export function isAllowedOrigin(origin: string | null | undefined): boolean {
+  if (!origin || origin === "null") {
+    return false;
+  }
+  return origin === window.location.origin || EXTENSION_ORIGINS.includes(origin);
 }
 
 /**
- * Determines the targetOrigin for postMessage calls from the connector.
- *
- * Desktop (file:// parent): preserves the provided parentUrl for Electron compatibility.
+ * The origin of the `parent` a connector was given, when it is one the
+ * connector may answer; otherwise null, and the connector answers no one.
  */
-export function resolvePostMessageOrigin(parentUrl: string | null): string | null {
-  if (parentUrl) {
-    try {
-      if (new URL(parentUrl).protocol === "file:") {
-        return parentUrl;
-      }
-    } catch {
-      // Invalid URL — fall through
-    }
-  }
+export function allowedParentOrigin(parentUrl: string | null): string | null {
+  const origin = originOf(parentUrl);
+  return isAllowedOrigin(origin) ? origin : null;
+}
 
-  if (isKnownCloudOrigin()) {
-    return window.location.origin;
+/** The origin of an address, or null for none or one that isn't a URL. */
+function originOf(address: string | null | undefined): string | null {
+  if (!address) {
+    return null;
   }
-  return parentUrl;
+  try {
+    const url = new URL(address);
+    // Extension addresses aren't "special" URLs, so URL.origin can be "null"
+    // for them outside Chromium; their origin is the scheme and the ID.
+    return url.protocol === "chrome-extension:" ? `chrome-extension://${url.host}` : url.origin;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether every page around this one is one a connector may answer, where
+ * the browser says (Chromium and Safari list them in
+ * location.ancestorOrigins). The nearest must be the expected parent.
+ * Firefox doesn't list them: there the page that loaded this frame (its
+ * referrer) must be on the parent's origin, and a frame with no referrer
+ * gets nothing. postMessage's target origin and the server's
+ * frame-ancestors guard too.
+ */
+export function framedOnlyBy(parentOrigin: string): boolean {
+  if (window.parent === window) {
+    return false;
+  }
+  const ancestors = window.location.ancestorOrigins;
+  if (ancestors == null) {
+    return originOf(document.referrer) === parentOrigin;
+  }
+  if (ancestors.length === 0 || ancestors[0] !== parentOrigin) {
+    return false;
+  }
+  return Array.from(ancestors).every((origin) => isAllowedOrigin(origin));
 }
 
 export function getQsParam(name: string) {
@@ -65,32 +91,4 @@ export function b64Decode(str: string, spaceAsPlus = false) {
       })
       .join(""),
   );
-}
-
-/** Thin wrapper around document.location.replace for testability (jsdom cannot mock it). */
-export function navigateToUrl(uri: string) {
-  document.location.replace(uri);
-}
-
-function appLinkHost(): string {
-  const hostName = window.location.hostname || "";
-  if (hostName.endsWith("bitwarden.eu")) {
-    return "bitwarden.eu";
-  }
-  if (hostName.endsWith("bitwarden-gov.com")) {
-    return "bitwarden-gov.com";
-  }
-  if (hostName.endsWith("bitwarden.pw")) {
-    return "bitwarden.pw";
-  }
-  return "bitwarden.com";
-}
-
-export function buildMobileDeeplinkUriFromParam(kind: "duo" | "webauthn"): string {
-  const scheme = (getQsParam("deeplinkScheme") || "").toLowerCase();
-  const path = `${kind}-callback`;
-  if (scheme === "https") {
-    return `https://${appLinkHost()}/${path}`;
-  }
-  return `bitwarden://${path}`;
 }

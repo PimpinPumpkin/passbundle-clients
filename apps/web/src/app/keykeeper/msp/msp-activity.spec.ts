@@ -100,6 +100,22 @@ describe("MSP activity sentences", () => {
       "Acme Dental removed this MSP (owner@acme.test)",
     ],
     [
+      { event: "client_removed_staff", actorEmail: "owner@acme.test" },
+      "Acme Dental removed ben@northwind.test (owner@acme.test); they stay out until Acme Dental invites them again",
+    ],
+    [
+      { event: "client_removed_staff", actorEmail: null },
+      "Acme Dental removed ben@northwind.test (its directory); they stay out until Acme Dental invites them again",
+    ],
+    [
+      { event: "client_revoked_staff", actorEmail: "owner@acme.test" },
+      "Acme Dental revoked ben@northwind.test (owner@acme.test); they stay out until Acme Dental restores them",
+    ],
+    [
+      { event: "templates_collection_gone", actorEmail: null, targetEmail: null },
+      "Acme Dental deleted its Templates collection; the next template sent there makes a new one",
+    ],
+    [
       { event: "script_token_created", detail: "Join domain: 2 items" },
       'ana@northwind.test made the script token "Join domain" for Acme Dental (2 items)',
     ],

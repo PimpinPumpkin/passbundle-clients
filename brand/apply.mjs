@@ -10,6 +10,7 @@
 // revert restores files from git. It fails loudly when an upstream file no
 // longer looks the way this script expects.
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -87,12 +88,85 @@ function brandPalette(baseHex) {
 
 // GPLv3 section 5(d) requires keeping the original copyright notice in the UI.
 const COPYRIGHT_TOKEN = "\u0000COPYRIGHT\u0000";
+const vaultHost = new URL(BRAND.urls.webVault).host;
+// An address on upstream's domains, replaced whole, so nothing of ours is
+// glued onto what's left of upstream's (a subdomain once turned
+// "https://docs.bitwarden.com" into "https://docs.https://passbundle.com").
+// Its vault becomes ours, its site and other subdomains (docs, help) our
+// website and help, and a bare domain in a sentence our domain.
+function brandAddress(scheme, subdomains) {
+  const sub = subdomains.toLowerCase();
+  if (sub === "vault.") return `${scheme}${vaultHost}`;
+  if (!scheme) return BRAND.domain;
+  return sub === "" || sub === "www." ? BRAND.urls.website : BRAND.urls.help;
+}
 function brandText(text) {
-  return text
-    .replaceAll("Bitwarden Inc.", COPYRIGHT_TOKEN)
-    .replace(/(https?:\/\/)?(www\.)?bitwarden\.(com|eu)/g, BRAND.urls.website)
-    .replace(/\bBitwarden\b/g, BRAND.name)
-    .replaceAll(COPYRIGHT_TOKEN, `Bitwarden Inc. and ${BRAND.name} contributors`);
+  return (
+    text
+      .replaceAll("Bitwarden Inc.", COPYRIGHT_TOKEN)
+      // Example email addresses, such as user@bitwarden.com, in any script.
+      .replace(/@bitwarden\.(com|eu)\b/g, `@${BRAND.domain}`)
+      .replace(
+        /(?<![\w.@-])(https?:\/\/)?((?:[\w-]+\.)*)bitwarden\.(?:com|eu)\b/g,
+        (_, scheme, subdomains) => brandAddress(scheme ?? "", subdomains),
+      )
+      // Example hosts named after upstream, such as https://bitwarden.company.com.
+      .replace(/(?<=:\/\/)bitwarden(?=\.[a-z])/g, BRAND.name.toLowerCase())
+      .replace(/\bBitwarden\b/g, BRAND.name)
+      .replaceAll(COPYRIGHT_TOKEN, `Bitwarden Inc. and ${BRAND.name} contributors`)
+  );
+}
+
+// Translations also name upstream in lower case ("the emails bitwarden
+// sends", and one language's app name); in prose only, never in an address.
+function brandMessage(text) {
+  return brandText(text).replace(/(?<![\w@./:-])bitwarden(?![\w@/-])/g, BRAND.name);
+}
+
+// The extension's identity (brand.json "extension"). Chromium derives an
+// extension's ID from the public key in its manifest, so every build loaded
+// unpacked (CI's, the e2e tests', the test Mac's) gets the same ID on Chrome
+// and Edge; the private half (kept outside the repos) packs a .crx with that
+// ID. The web vault's connector pages answer that extension, and the server
+// lets it frame them (DESIGN.md, "Connector pages").
+function extensionIdentity() {
+  const ext = BRAND.extension;
+  if (
+    typeof ext?.chromiumKey !== "string" ||
+    typeof ext?.chromiumId !== "string" ||
+    typeof ext?.firefoxId !== "string"
+  ) {
+    fail('brand.json needs "extension": { "chromiumKey", "chromiumId", "firefoxId" }.');
+  }
+  const derived = createHash("sha256")
+    .update(Buffer.from(ext.chromiumKey, "base64"))
+    .digest("hex")
+    .slice(0, 32)
+    .replace(/[0-9a-f]/g, (c) => "abcdefghijklmnop"[parseInt(c, 16)]);
+  if (derived !== ext.chromiumId) {
+    fail(`brand.json: extension.chromiumKey gives the ID ${derived}, not ${ext.chromiumId}.`);
+  }
+  if (!/^[a-z0-9][a-z0-9.-]*@[a-z0-9][a-z0-9.-]*\.[a-z]+$/.test(ext.firefoxId)) {
+    fail('brand.json: extension.firefoxId should look like "extension@example.com".');
+  }
+  return ext;
+}
+
+// After branding, no web address may sit glued to the end of a word, a dot,
+// or an "@": that's a rewrite gone wrong, like the one above.
+function checkAddresses() {
+  const glued = /[\w.@-]https?:\/\//g;
+  const found = [];
+  for (const rel of touched) {
+    if (!/\.(json|html|ejs|ts|css|scss)$/.test(rel)) continue;
+    const text = read(rel);
+    for (const m of text.matchAll(glued)) {
+      found.push(`${rel}: ...${text.slice(Math.max(0, m.index - 30), m.index + 40)}...`);
+    }
+  }
+  if (found.length) {
+    fail(`a web address was glued onto other text:\n${found.slice(0, 20).join("\n")}`);
+  }
 }
 
 function trackedFiles(...pathspecs) {
@@ -147,7 +221,7 @@ function apply() {
   for (const rel of locales) {
     const data = JSON.parse(read(rel).replace(/^﻿/, ""));
     for (const entry of Object.values(data)) {
-      if (typeof entry?.message === "string") entry.message = brandText(entry.message);
+      if (typeof entry?.message === "string") entry.message = brandMessage(entry.message);
     }
     write(rel, JSON.stringify(data, null, 2) + "\n");
   }
@@ -322,7 +396,10 @@ function apply() {
   // 5. Browser extension manifests and icons. Native messaging, which talks
   //    to the desktop agent, is a required permission rather than upstream's
   //    optional one, so biometric unlock needs no extra prompt or reload
-  //    (DESIGN.md, "Biometric unlock").
+  //    (DESIGN.md, "Biometric unlock"). The extension's IDs are ours: the
+  //    Chromium key fixes its ID on Chrome and Edge, and Firefox gets our
+  //    add-on ID instead of upstream's.
+  const extension = extensionIdentity();
   for (const rel of ["apps/browser/src/manifest.json", "apps/browser/src/manifest.v3.json"]) {
     const manifest = JSON.parse(read(rel));
     if (manifest.author !== "Bitwarden Inc.") fail(`unexpected author in ${rel}`);
@@ -336,7 +413,13 @@ function apply() {
         if (!manifest[target].includes("nativeMessaging")) manifest[target].push("nativeMessaging");
       }
     }
-    write(rel, brandText(JSON.stringify(manifest, null, 2)) + "\n");
+    const branded = JSON.parse(brandText(JSON.stringify(manifest, null, 2)));
+    const gecko = branded.__firefox__browser_specific_settings?.gecko;
+    if (typeof gecko?.id !== "string") fail(`${rel} has no Firefox add-on ID anymore.`);
+    gecko.id = extension.firefoxId;
+    branded.__chrome__key = extension.chromiumKey;
+    branded.__edge__key = extension.chromiumKey;
+    write(rel, JSON.stringify(branded, null, 2) + "\n");
   }
 
   // 5b. The desktop agent's native-messaging host. Upstream's name would
@@ -370,6 +453,15 @@ function apply() {
       null,
       2,
     ) + "\n",
+  );
+  // The connector pages answer the web vault and PassBundle's own extension
+  // (apps/web/src/connectors/keykeeper-origins.ts).
+  replaceAnchored(
+    "apps/web/src/connectors/keykeeper-origins.ts",
+    /export const EXTENSION_ORIGINS: readonly string\[\] = \[\];/,
+    `export const EXTENSION_ORIGINS: readonly string[] = ${JSON.stringify([
+      `chrome-extension://${extension.chromiumId}`,
+    ])};`,
   );
   replaceAnchored("apps/web/src/index.html", /color="#175DDC"/, `color="${BRAND.color}"`);
   replaceAnchored(
@@ -417,6 +509,7 @@ function apply() {
   }
   if (codeFiles < 10)
     fail(`rewrote website links in only ${codeFiles} code files. Upstream changed?`);
+  checkAddresses();
 
   // 8. Theme colors: a brand scale generated from brand.json's color replaces
   //    upstream's blue, in light and dark themes. Appended, so upstream's

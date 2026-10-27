@@ -15,6 +15,7 @@ import { OrganizationFreeTrialWarningComponent } from "@bitwarden/web-vault/app/
 
 import { KeykeeperMembersJoiningComponent } from "../../../keykeeper/joining/members-joining.component";
 import { KeykeeperClientMspBannerComponent } from "../../../keykeeper/msp/client-msp-banner.component";
+import { KeykeeperInstallTokenPromptComponent } from "../../../keykeeper/offboarding/install-token-prompt.component";
 import { HeaderModule } from "../../../layouts/header/header.module";
 import { SharedOrganizationModule } from "../shared";
 
@@ -51,6 +52,7 @@ import {
     ScrollLayoutDirective,
     OrganizationFreeTrialWarningComponent,
     KeykeeperClientMspBannerComponent,
+    KeykeeperInstallTokenPromptComponent,
     KeykeeperMembersJoiningComponent,
     IconModule,
     BerryComponent,
