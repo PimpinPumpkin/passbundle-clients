@@ -127,8 +127,12 @@ export class KeykeeperMspJoiningComponent {
   }
 
   protected readonly save = async () => {
+    const seen = this.joining();
+    if (seen == null) {
+      return;
+    }
     try {
-      this.show(await this.api.setMspJoining(this.mspId(), this.form.getRawValue()));
+      this.show(await this.api.saveMspJoining(this.mspId(), this.form.getRawValue(), seen.default));
       this.toastService.showToast({ variant: "success", message: "Saved the joining default" });
       this.changed.emit();
     } catch (e) {
@@ -139,7 +143,11 @@ export class KeykeeperMspJoiningComponent {
 
   protected useDefaultFor(organizationId: string, name: string) {
     return async () => {
-      await this.api.resetOrgJoining(organizationId);
+      const seen = this.joining();
+      if (seen == null) {
+        return;
+      }
+      await this.api.useDefaultJoining(organizationId, seen.default.autoConfirm, this.mspId());
       await this.load(this.mspId());
       this.toastService.showToast({ variant: "success", message: `${name} uses the default` });
       this.changed.emit();

@@ -271,41 +271,91 @@ describe("Keykeeper custom templates", () => {
     ]);
   });
 
-  it("from an MSP are offered once under the MSP's name, however many clients send them", () => {
+  describe("copied into several organizations", () => {
     const copy = (
       cipherId: string,
       organizationId: string | null,
       id: string,
       name: string,
       from?: string,
+      fieldLabel = "Management URL",
     ) => ({
       ...laptopTemplate,
       id: cipherId,
       name,
       organizationId,
-      fields: [newTemplateDefinitionField("note", id, from)],
+      fields: [
+        Object.assign(new FieldView(), { name: fieldLabel, type: FieldType.Text, value: "" }),
+        newTemplateDefinitionField("note", id, from),
+      ],
     });
-    const groups = templateGroups(
-      [
-        copy("c1", "org-a", "fw", "Firewall", "Northwind IT"),
-        copy("c2", "org-z", "fw", "Firewall", "Northwind IT"),
-        copy("c3", "org-z", "m365", "Microsoft 365", "Northwind IT"),
-        copy("c4", "org-a", "own", "Front desk PC"),
-        // A "from" in someone's own vault isn't a copy an MSP sent.
-        copy("c5", null, "mine", "My server", "Northwind IT"),
-      ],
-      [
-        { id: "org-z", name: "Zeta Dental" },
-        { id: "org-a", name: "Acme Law" },
-      ],
-    );
+    const organizations = [
+      { id: "org-z", name: "Zeta Dental" },
+      { id: "org-a", name: "Acme Law" },
+      { id: "org-n", name: "Northwind Team" },
+    ];
+    const shown = (groups: ReturnType<typeof templateGroups>) =>
+      groups
+        .filter((g) => g.name !== "Built-in")
+        .map((g) => [g.name, g.templates.map((t) => `${t.name} (${t.source?.cipherId})`)]);
 
-    expect(groups.map((g) => [g.name, g.templates.map((t) => t.name)])).toEqual([
-      ["From Northwind IT", ["Firewall", "Microsoft 365"]],
-      ["Acme Law", ["Front desk PC"]],
-      ["My templates", ["My server"]],
-      ["Built-in", BUILT_IN_TEMPLATES.map((t) => t.name)],
-    ]);
+    it("are offered once, where the original is when the person sees it", () => {
+      const groups = templateGroups(
+        [
+          copy("c1", "org-a", "fw", "Firewall", "Northwind IT"),
+          copy("c2", "org-z", "fw", "Firewall", "Northwind IT"),
+          copy("src", "org-n", "fw", "Firewall"),
+          copy("c3", "org-z", "m365", "Microsoft 365", "Northwind IT"),
+          copy("c4", "org-a", "m365", "Microsoft 365", "Northwind IT"),
+          copy("c5", "org-a", "own", "Front desk PC"),
+        ],
+        organizations,
+      );
+
+      expect(shown(groups)).toEqual([
+        ["Acme Law", ["Front desk PC (c5)", "Microsoft 365 (c4)"]],
+        ["Northwind Team", ["Firewall (src)"]],
+      ]);
+    });
+
+    it("never say who they're from, whatever the item claims", () => {
+      // A member of Zeta Dental writes a template that says it's the MSP's.
+      const groups = templateGroups(
+        [copy("forged", "org-z", "fw", "Firewall", "Northwind IT", "Send passwords to")],
+        organizations,
+      );
+
+      expect(groups.map((g) => g.name)).toEqual(["Zeta Dental", "Built-in"]);
+      expect(groups[0].templates[0]).not.toHaveProperty("from");
+    });
+
+    it("are offered where they are when they differ, so a changed copy can't hide behind the original", () => {
+      const groups = templateGroups(
+        [
+          copy("src", "org-n", "fw", "Firewall"),
+          copy("c1", "org-a", "fw", "Firewall", "Northwind IT"),
+          copy("forged", "org-z", "fw", "Firewall", "Northwind IT", "Send passwords to"),
+        ],
+        organizations,
+      );
+
+      expect(shown(groups)).toEqual([
+        ["Northwind Team", ["Firewall (src)"]],
+        ["Zeta Dental", ["Firewall (forged)"]],
+      ]);
+    });
+
+    it("in the same organization are each offered", () => {
+      const groups = templateGroups(
+        [
+          copy("c1", "org-a", "fw", "Firewall", "Northwind IT"),
+          copy("c2", "org-a", "fw", "Firewall", "Northwind IT"),
+        ],
+        organizations,
+      );
+
+      expect(shown(groups)).toEqual([["Acme Law", ["Firewall (c1)", "Firewall (c2)"]]]);
+    });
   });
 
   it("read the MSP a copy came from, and ignore a blank or overlong one", () => {

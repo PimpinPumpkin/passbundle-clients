@@ -6,6 +6,7 @@ import {
   KeykeeperScriptCopies,
   KeykeeperScriptKeys,
   revisionText,
+  scriptUsage,
   ScriptReadView,
   ScriptTokenView,
 } from "@bitwarden/admin-console/common";
@@ -19,6 +20,7 @@ import { SymmetricCryptoKey } from "@bitwarden/common/platform/models/domain/sym
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { OrganizationId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
+import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { DialogService, ToastService } from "@bitwarden/components";
 import { KeyService } from "@bitwarden/key-management";
@@ -29,7 +31,7 @@ import { KeykeeperMspApiService } from "../msp/msp-api.service";
 import { KeykeeperScriptTokenDialogComponent } from "./script-token-dialog.component";
 
 /** A token just made, shown once. */
-type Made = { name: string; tokenString: string; firstItem: string };
+type Made = { name: string; tokenString: string; firstItem: { id: string; name: string } };
 
 /**
  * Keykeeper: script access on an organization's Settings page, for its owners
@@ -249,11 +251,7 @@ export class KeykeeperScriptAccessComponent {
   }
 
   protected usage(m: Made): string {
-    return [
-      `Invoke-WebRequest "${this.serverUrl()}/api/keykeeper/script/PassBundle.psm1" -OutFile PassBundle.psm1`,
-      "Import-Module .\\PassBundle.psm1",
-      `$credential = Get-PassBundleCredential -Item "${m.firstItem}"`,
-    ].join("\n");
+    return scriptUsage(this.serverUrl(), m.firstItem);
   }
 
   /**
@@ -274,8 +272,11 @@ export class KeykeeperScriptAccessComponent {
   protected async newToken() {
     const orgId = this.organizationId();
     this.items.set(await this.organizationItems(orgId));
+    // Only items whose passwords the person may see: the token's copy would show them.
     const choice = await firstValueFrom(
-      KeykeeperScriptTokenDialogComponent.open(this.dialogService, { items: this.items() }).closed,
+      KeykeeperScriptTokenDialogComponent.open(this.dialogService, {
+        items: this.items().filter((c) => maySeeSecrets(c)),
+      }).closed,
     );
     if (choice == null) {
       return;
@@ -295,7 +296,7 @@ export class KeykeeperScriptAccessComponent {
           itemId: item.id,
           copy: await this.copies.encryptCopy(copyOf(id, item, spec), tokenKey),
           revision: revisionText(item.revisionDate),
-          sealedSpec: await this.copies.sealSpec(spec, orgKey),
+          sealedSpec: await this.copies.sealSpec(id, item.id, spec, orgKey),
         });
       }
       await this.api.createScriptToken(orgId, {
@@ -304,13 +305,14 @@ export class KeykeeperScriptAccessComponent {
         expiresAt: choice.expiresAt,
         networks: choice.networks,
         authHash: await this.keys.authHash(seed),
-        sealedKey: await this.copies.sealTokenKey(await this.keys.tokenKey(seed), orgKey),
+        sealedKey: await this.copies.sealTokenKey(id, await this.keys.tokenKey(seed), orgKey),
         grants,
       });
+      const first = choice.grants[0].item;
       this.made.set({
         name: choice.name,
         tokenString: this.keys.tokenString(id, seed),
-        firstItem: choice.grants[0].item.name,
+        firstItem: { id: first.id, name: first.name },
       });
       await this.load(orgId);
     });

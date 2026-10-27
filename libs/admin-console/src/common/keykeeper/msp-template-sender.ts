@@ -42,9 +42,10 @@ type NamedClient = { id: string; name: string };
 /**
  * Why an item can't be the source of an MSP's template, or null when it can.
  * The server names the source, so every device checks it before copying: it
- * must be a custom template of the MSP's own, never a copy from an MSP, and
- * never in one of the MSP's clients, whose template would then reach the
- * others.
+ * must be a custom template in an organization the MSP's admins share, never
+ * someone's own (a server could otherwise copy anyone's "My templates" out
+ * of their vault), never a copy from an MSP, and never in one of the MSP's
+ * clients, whose template would then reach the others.
  */
 export function templateSourceProblem(
   source: CipherView,
@@ -57,7 +58,10 @@ export function templateSourceProblem(
   if (definition.from != null) {
     return "That template is a copy from an MSP, so it can't be sent on.";
   }
-  if (source.organizationId != null && new Set(clientIds).has(source.organizationId)) {
+  if (source.organizationId == null) {
+    return "That template is in your own vault. Move it to an organization your MSP's admins share to send it to clients.";
+  }
+  if (new Set(clientIds).has(source.organizationId)) {
     return "That template is one of your clients' own, so it can't go to the others.";
   }
   return null;
@@ -191,17 +195,22 @@ export class KeykeeperTemplateSender {
 
   /**
    * Moves copies to the trash in each client, for when the MSP stops sending a
-   * template. Items that aren't copies from an MSP are left alone, whatever
-   * the server listed.
+   * template. Items that aren't copies from an MSP, or aren't in one of the
+   * `clients` this device trusts, are left alone, whatever the server listed.
    */
-  async removeCopies(copyIds: string[]): Promise<void> {
+  async removeCopies(copyIds: string[], clients: ReadonlySet<string>): Promise<void> {
     const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
     const items = new Map(
       (await this.cipherService.getAllDecrypted(userId)).map((c) => [c.id, c] as const),
     );
     for (const id of copyIds) {
       const item = items.get(id);
-      if (item != null && item.organizationId != null && templateDefinition(item)?.from != null) {
+      if (
+        item != null &&
+        item.organizationId != null &&
+        clients.has(item.organizationId) &&
+        templateDefinition(item)?.from != null
+      ) {
         await this.cipherService.softDeleteWithServer(id, userId, true);
       }
     }

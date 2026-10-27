@@ -226,6 +226,33 @@ describe("distinctVersions", () => {
 });
 
 describe("restoredView", () => {
+  it("keeps PassBundle's own fields as they are now, never the version's", () => {
+    const rule = (host: string) =>
+      field(
+        "keykeeper.fill",
+        JSON.stringify({ v: 1, host, field: { id: "pw" }, fill: { from: "password" } }),
+        FieldType.Hidden,
+      );
+    const current = login("now", {
+      fields: [field("Hostname", "db2.example.test"), field("keykeeper.expires", "2027-01-01")],
+    });
+    // An older version had a fill rule since removed, a template marker, and another expiry.
+    const version = login("then", {
+      fields: [
+        field("Hostname", "db1.example.test"),
+        rule("old.example.test"),
+        field("keykeeper.template-definition", '{"id":"t1","base":"note","v":1,"from":"X"}'),
+        field("keykeeper.expires", "2026-01-01"),
+      ],
+    });
+
+    const restored = restoredView(version, current);
+    expect(restored.fields.map((f) => [f.name, f.value])).toEqual([
+      ["Hostname", "db1.example.test"],
+      ["keykeeper.expires", "2027-01-01"],
+    ]);
+  });
+
   it("takes the version's contents and keeps what versions don't carry", () => {
     const attachment = new AttachmentView();
     attachment.id = "file-1";
