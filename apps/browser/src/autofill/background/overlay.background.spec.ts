@@ -932,6 +932,8 @@ describe("OverlayBackground", () => {
       name: "name-2",
       type: CipherType.Card,
       card: { subTitle: "subtitle-2" },
+      // Keykeeper: someone who can see its number (missing is hidden).
+      viewPassword: true,
     });
     const loginCipher2 = mock<CipherView>({
       id: "id-3",

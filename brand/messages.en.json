@@ -336,6 +336,9 @@
   "keykeeperCapSeePasswords": {
     "message": "See passwords"
   },
+  "keykeeperCapSeePasswordsHint": {
+    "message": "Passwords, codes, card numbers, and ID numbers. Without it, people can still fill these into web pages, and a page can read what's filled."
+  },
   "keykeeperCapCreate": {
     "message": "Create items"
   },
@@ -767,5 +770,8 @@
   },
   "keykeeperOff": {
     "message": "Off"
+  },
+  "keykeeperCantCopyItem": {
+    "message": "Your organization doesn't let you copy this item."
   }
 }

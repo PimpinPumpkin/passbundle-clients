@@ -62,6 +62,8 @@ describe("ContextMenuClickedHandler", () => {
       new Cipher({
         id: id ?? "1",
         type: CipherType.Login,
+        // Keykeeper: the server says on every item; missing is hidden.
+        viewPassword: true,
       } as any),
     );
 

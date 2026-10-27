@@ -243,10 +243,23 @@ describe("CustomFieldsComponent", () => {
       ]);
     });
 
+    it("Keykeeper: auto-selects the first linked field option the person may link to", () => {
+      component.linkedFieldOptions = [
+        { value: LoginLinkedId.Password, name: "one", secret: true },
+        { value: LoginLinkedId.Username, name: "two", secret: false },
+      ];
+
+      component.addField(FieldType.Linked, "linked label");
+
+      expect(component.fields.value[component.fields.length - 1].linkedId).toBe(
+        LoginLinkedId.Username,
+      );
+    });
+
     it("auto-selects the first linked field option", () => {
       component.linkedFieldOptions = [
-        { value: LoginLinkedId.Password, name: "one" },
-        { value: LoginLinkedId.Username, name: "two" },
+        { value: LoginLinkedId.Password, name: "one", secret: false },
+        { value: LoginLinkedId.Username, name: "two", secret: false },
       ];
 
       component.addField(FieldType.Linked, "linked label");

@@ -128,7 +128,8 @@ export class CipherView implements View, InitializerMetadata {
   get subTitle(): string | undefined {
     // Keykeeper: a card's last digits are part of its number, which someone
     // without see passwords doesn't get (DESIGN.md, "Folders and permissions").
-    if (this.type === CipherType.Card && this.viewPassword === false) {
+    // Only an explicit yes shows them, as in keykeeper/hidden-secrets.ts.
+    if (this.type === CipherType.Card && this.viewPassword !== true) {
       return this.card?.brand || undefined;
     }
     return this.item?.subTitle;
@@ -237,7 +238,8 @@ export class CipherView implements View, InitializerMetadata {
     view.name = obj.name ?? "";
     view.notes = obj.notes;
     view.edit = obj.edit ?? false;
-    view.viewPassword = obj.viewPassword ?? true;
+    // Keykeeper: missing is hidden, as from the server (cipher.response.ts).
+    view.viewPassword = obj.viewPassword ?? false;
     view.favorite = obj.favorite ?? false;
     view.organizationUseTotp = obj.organizationUseTotp ?? false;
     view.localData = obj.localData ? obj.localData : undefined;
@@ -545,7 +547,7 @@ export class CipherView implements View, InitializerMetadata {
       organizationUseTotp: this.organizationUseTotp ?? false,
       permissions: this.permissions?.toSdkCipherPermissions(),
       edit: this.edit ?? true,
-      viewPassword: this.viewPassword ?? true,
+      viewPassword: this.viewPassword ?? false,
       localData: toSdkLocalData(this.localData),
       attachments: this.attachments?.map((a) => a.toSdkAttachmentView()),
       fields: this.fields?.map((f) => f.toSdkFieldView()),

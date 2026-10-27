@@ -751,6 +751,7 @@ describe("AutofillService", () => {
         cipher: mock<CipherView>({
           id: "cipherId",
           type: CipherType.Login,
+          viewPassword: true,
         }),
         pageDetails: [
           {
@@ -1708,6 +1709,88 @@ describe("AutofillService", () => {
           defaultPasswordField,
           defaultPasswordField.value,
         );
+      });
+
+      describe("Keykeeper: for someone who can't see the item's passwords", () => {
+        const pageField = (name: string, type: string) =>
+          createAutofillFieldMock({
+            opid: `${name}-${type}`,
+            htmlID: name,
+            htmlName: name,
+            type,
+            "label-tag": name,
+            "label-aria": name,
+            placeholder: name,
+            "label-left": "",
+            "label-right": "",
+            "label-top": "",
+            title: "",
+          });
+
+        function item(seesPasswords: boolean): CipherView {
+          const cipher = new CipherView();
+          cipher.type = CipherType.Login;
+          cipher.viewPassword = seesPasswords;
+          cipher.login.username = "frontdesk";
+          cipher.login.password = "hunter2";
+          cipher.fields = [
+            Object.assign(new FieldView(), { name: "pin", value: "4421", type: FieldType.Hidden }),
+            Object.assign(new FieldView(), {
+              name: "secret",
+              type: FieldType.Linked,
+              linkedId: LoginLinkedId.Password,
+            }),
+            Object.assign(new FieldView(), {
+              name: "account",
+              type: FieldType.Linked,
+              linkedId: LoginLinkedId.Username,
+            }),
+            Object.assign(new FieldView(), { name: "site", value: "HQ", type: FieldType.Text }),
+          ];
+          return cipher;
+        }
+
+        async function filled(cipher: CipherView, fields: AutofillField[]) {
+          const script = await autofillService["generateFillScript"](
+            createAutofillPageDetailsMock({ fields }),
+            createGenerateFillScriptOptionsMock({ cipher }),
+          );
+          return Object.fromEntries(
+            script.script
+              .filter(([action]) => action === "fill_by_opid")
+              .map(([, opid, value]) => [opid, value]),
+          );
+        }
+
+        it("fills a hidden field, or a link to the password, only into a password field", async () => {
+          const values = await filled(item(false), [
+            pageField("pin", "text"),
+            pageField("secret", "text"),
+            pageField("account", "text"),
+            pageField("site", "text"),
+          ]);
+          expect(values["pin-text"]).toBeUndefined();
+          expect(values["secret-text"]).toBeUndefined();
+          expect(values["account-text"]).toBe("frontdesk");
+          expect(values["site-text"]).toBe("HQ");
+          expect(JSON.stringify(values)).not.toMatch(/4421|hunter2/);
+
+          const masked = await filled(item(false), [
+            pageField("pin", "password"),
+            pageField("secret", "password"),
+          ]);
+          expect(masked["pin-password"]).toBe("4421");
+          expect(masked["secret-password"]).toBe("hunter2");
+        });
+
+        it("someone who can see them gets them filled anywhere", async () => {
+          const values = await filled(item(true), [
+            pageField("pin", "text"),
+            pageField("secret", "text"),
+          ]);
+          expect(values["pin-text"]).toBe("4421");
+          expect(values["secret-text"]).toBe("hunter2");
+        });
       });
 
       it("will fill by opid fields of type Boolean", async () => {

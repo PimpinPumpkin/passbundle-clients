@@ -20,6 +20,7 @@ import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherRepromptType } from "@bitwarden/common/vault/enums/cipher-reprompt-type";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
+import { CipherAuthorizationService } from "@bitwarden/common/vault/services/cipher-authorization.service";
 import { DialogRef, DialogService, ToastService } from "@bitwarden/components";
 import {
   AttachmentDialogResult,
@@ -92,6 +93,7 @@ describe("VaultCipherActionsService", () => {
   let eventCollectionService: MockProxy<EventCollectionService>;
   let dialogService: MockProxy<DialogService>;
   let toastService: MockProxy<ToastService>;
+  let cipherAuthorizationService: MockProxy<CipherAuthorizationService>;
   let logService: MockProxy<LogService>;
   let messagingService: MockProxy<MessagingService>;
   let platformUtilsService: MockProxy<PlatformUtilsService>;
@@ -145,6 +147,9 @@ describe("VaultCipherActionsService", () => {
       collectionId: "col-1" as CollectionId,
     } as unknown as VaultFilter);
 
+    cipherAuthorizationService = mock<CipherAuthorizationService>();
+    cipherAuthorizationService.canCloneCipher$.mockReturnValue(of(true));
+
     TestBed.configureTestingModule({
       providers: [
         { provide: CipherService, useValue: cipherService },
@@ -178,6 +183,7 @@ describe("VaultCipherActionsService", () => {
           provide: VaultCollectionService,
           useValue: { editableCollections$: of([] as CollectionAdminView[]) },
         },
+        { provide: CipherAuthorizationService, useValue: cipherAuthorizationService },
       ],
     });
 
@@ -455,6 +461,35 @@ describe("VaultCipherActionsService", () => {
       await service.cloneCipher(cipher);
 
       expect(cipherFormConfigService.buildConfig).toHaveBeenCalledWith("clone", cipher.id);
+    });
+
+    it("Keykeeper: refuses a copy without see passwords, however it was asked for", async () => {
+      const cipher = buildCipher({ viewPassword: false });
+
+      await service.editCipher(cipher, true);
+
+      expect(cipherFormConfigService.buildConfig).not.toHaveBeenCalled();
+      expect(toastService.showToast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error" }),
+      );
+    });
+
+    it("Keykeeper: refuses a copy without share, as canCloneCipher$ decides", async () => {
+      cipherAuthorizationService.canCloneCipher$.mockReturnValue(of(false));
+      const cipher = buildCipher();
+
+      await service.editCipher(cipher, true);
+
+      expect(cipherFormConfigService.buildConfig).not.toHaveBeenCalled();
+      expect(cipherAuthorizationService.canCloneCipher$).toHaveBeenCalledWith(cipher, true);
+    });
+
+    it("Keykeeper: an item that doesn't say whether passwords show is refused too", async () => {
+      const cipher = buildCipher({ viewPassword: undefined });
+
+      await service.editCipher(cipher, true);
+
+      expect(cipherFormConfigService.buildConfig).not.toHaveBeenCalled();
     });
 
     it("clones without fido2 dialog when cipher has no passkeys", async () => {

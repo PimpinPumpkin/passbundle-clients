@@ -10,7 +10,7 @@ import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { normalizeExpiryYearFormat } from "@bitwarden/common/autofill/utils";
 import { EventCollectionService, EventType } from "@bitwarden/common/dirt/event-logs";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
-import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
+import { maySeeSecretsOrNew } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CardView } from "@bitwarden/common/vault/models/view/card.view";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
@@ -178,7 +178,9 @@ export class CardDetailsSectionComponent implements OnInit {
    * new card is theirs.
    */
   get canSeeSecrets(): boolean {
-    return maySeeSecrets(this.originalCipherView ?? this.cipherFormContainer.originalCipherView);
+    return maySeeSecretsOrNew(
+      this.originalCipherView ?? this.cipherFormContainer.originalCipherView,
+    );
   }
 
   /** Keykeeper: the number and code can't be shown or changed by someone who can't see them. */

@@ -27,6 +27,8 @@ describe("CardDetailsSectionComponent", () => {
     cipherFormProvider = mock<CipherFormContainer>({
       getInitialCipherView,
       formStatusChange$: new Subject<"enabled" | "disabled">(),
+      // A new card: no original item, so it's the person's own.
+      originalCipherView: null,
     });
     registerChildFormSpy = jest.spyOn(cipherFormProvider, "registerChildForm");
     patchCipherSpy = jest.spyOn(cipherFormProvider, "patchCipher");

@@ -235,7 +235,8 @@ describe("CipherFormComponent", () => {
       const copy = component["updatedCipherView"]!;
       expect(copy.login.password).toBeUndefined();
       expect(copy.login.totp).toBeUndefined();
-      expect(copy.fields.map((f) => f.value)).toEqual([undefined, "Main office"]);
+      // Built up from the plain values: the hidden field isn't there at all.
+      expect(copy.fields.map((f) => f.name)).toEqual(["Site"]);
       expect(copy.passwordHistory).toEqual([]);
       decryptCipher.mockResolvedValue(cipherView);
     });

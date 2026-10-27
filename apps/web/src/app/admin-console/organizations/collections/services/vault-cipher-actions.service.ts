@@ -20,6 +20,7 @@ import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherRepromptType } from "@bitwarden/common/vault/enums/cipher-reprompt-type";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
+import { CipherAuthorizationService } from "@bitwarden/common/vault/services/cipher-authorization.service";
 import {
   CipherViewLike,
   CipherViewLikeUtils,
@@ -29,9 +30,11 @@ import {
   AttachmentDialogResult,
   AttachmentsV2Component,
   BulkDeleteDialogResult,
+  CANT_COPY_ITEM_KEY,
   CipherFormConfig,
   CipherFormConfigService,
   CollectionAssignmentResult,
+  mayCloneItem,
   PasswordRepromptService,
   RoutedVaultFilterBridgeService,
   RoutedVaultFilterService,
@@ -67,6 +70,7 @@ export class VaultCipherActionsService {
   private readonly routedVaultFilterService = inject(RoutedVaultFilterService);
   private readonly routedVaultFilterBridgeService = inject(RoutedVaultFilterBridgeService);
   private readonly vaultCollectionService = inject(VaultCollectionService);
+  private readonly cipherAuthorizationService = inject(CipherAuthorizationService);
 
   private readonly userId$: Observable<UserId> = this.accountService.activeAccount$.pipe(getUserId);
 
@@ -169,6 +173,17 @@ export class VaultCipherActionsService {
    * @param cloneCipher - `true` when the cipher should be cloned.
    */
   async editCipher(cipher: CipherView | undefined, cloneCipher?: boolean): Promise<void> {
+    // Keykeeper: a copy needs see passwords and, unless the person may edit
+    // any shared folder here, share (DESIGN.md, "Folders and permissions").
+    if (cloneCipher && !(await mayCloneItem(this.cipherAuthorizationService, cipher, true))) {
+      this.toastService.showToast({
+        variant: "error",
+        message: this.i18nService.t(CANT_COPY_ITEM_KEY),
+      });
+      this.go({ cipherId: null, itemId: null, action: null });
+      return;
+    }
+
     if (
       cipher &&
       cipher.reprompt !== 0 &&

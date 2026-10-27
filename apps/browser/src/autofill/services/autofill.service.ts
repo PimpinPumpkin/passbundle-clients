@@ -57,6 +57,7 @@ import { InlineMenuFillTypes, type InlineMenuFillType } from "../enums/autofill-
 import {
   applyFillRules,
   FillSource,
+  mayFillValue,
   staticValueFor,
   visibleCustomFields,
 } from "../keykeeper/fill-rules";
@@ -870,6 +871,13 @@ export default class AutofillService implements AutofillServiceInterface {
         const matchingIndex = this.findMatchingFieldIndex(field, fieldNames);
         if (matchingIndex > -1) {
           const matchingField: FieldView = fields[matchingIndex];
+          // Keykeeper: for someone who can't see the item's passwords, a hidden
+          // field, or a linked one that fills a secret, goes only into a
+          // password field, where the page shows it masked (DESIGN.md,
+          // "Folders and permissions").
+          if (!mayFillValue(options.cipher, { from: "field", name: matchingField.name }, field)) {
+            return;
+          }
           let val: string;
           if (matchingField.type === FieldType.Linked) {
             if (matchingField.linkedId == null) {

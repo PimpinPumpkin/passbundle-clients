@@ -73,7 +73,11 @@
                 <bit-label>{{ field.value.name }}</bit-label>
                 <bit-select formControlName="linkedId" data-testid="custom-linked-field">
                   @for (option of linkedFieldOptions; track $index) {
-                    <bit-option [value]="option.value" [label]="option.name"></bit-option>
+                    <bit-option
+                      [value]="option.value"
+                      [label]="option.name"
+                      [disabled]="option.secret"
+                    ></bit-option>
                   }
                 </bit-select>
               </bit-form-field>

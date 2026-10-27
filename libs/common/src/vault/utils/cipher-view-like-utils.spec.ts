@@ -306,16 +306,23 @@ describe("CipherViewLikeUtils", () => {
         expect(cipherView.subTitle).toBe("Visa");
       });
 
-      it("leaves the last digits out of a CipherListView's subtitle", () => {
+      it("builds a CipherListView's subtitle from its brand alone", () => {
         const visible = {
           subtitle: "Visa, *4242",
-          type: { card: {} },
+          type: { card: { brand: "Visa" } },
+          viewPassword: true,
         } as unknown as CipherListView;
         expect(CipherViewLikeUtils.subtitle(visible)).toBe("Visa, *4242");
         const hidden = { ...visible, viewPassword: false } as CipherListView;
         expect(CipherViewLikeUtils.subtitle(hidden)).toBe("Visa");
-        const noBrand = { ...hidden, subtitle: "*4242" } as CipherListView;
+        // Whatever the SDK's subtitle says.
+        const odd = { ...hidden, subtitle: "4242 4242 4242 4242" } as CipherListView;
+        expect(CipherViewLikeUtils.subtitle(odd)).toBe("Visa");
+        const noBrand = { ...hidden, type: { card: { brand: undefined } } } as CipherListView;
         expect(CipherViewLikeUtils.subtitle(noBrand)).toBeUndefined();
+        // An item that doesn't say is hidden.
+        const unsaid = { ...visible, viewPassword: undefined } as unknown as CipherListView;
+        expect(CipherViewLikeUtils.subtitle(unsaid)).toBe("Visa");
       });
 
       it("leaves a bank account's last digits out too", () => {
@@ -341,6 +348,17 @@ describe("CipherViewLikeUtils", () => {
         } as unknown as CipherListView;
         expect(CipherViewLikeUtils.subtitle(listView, i18nService)).toBeUndefined();
         expect(CipherViewLikeUtils.subtitle(listView)).toBeUndefined();
+
+        // Built from the account type, whatever the SDK's subtitle says.
+        const typed = {
+          type: { bankAccount: { accountNumber: "987651234", accountType: "checking" } },
+          subtitle: "Checking, *1234",
+          viewPassword: false,
+        } as unknown as CipherListView;
+        expect(CipherViewLikeUtils.subtitle(typed, i18nService)).toBe(
+          "translated:bankAccountTypeChecking",
+        );
+        expect(CipherViewLikeUtils.subtitle(typed)).toBe("checking");
       });
     });
 
@@ -417,6 +435,7 @@ describe("CipherViewLikeUtils", () => {
         const cipherListView = {
           type: { bankAccount: { accountNumber: undefined, accountType: undefined } },
           subtitle: "SDK-provided fallback",
+          viewPassword: true,
         } as CipherListView;
 
         expect(CipherViewLikeUtils.subtitle(cipherListView, i18nService)).toBe(
@@ -430,6 +449,7 @@ describe("CipherViewLikeUtils", () => {
             bankAccount: { accountNumber: "987651234", accountType: BankAccountType.Checking },
           },
           subtitle: "SDK-provided fallback",
+          viewPassword: true,
         } as CipherListView;
 
         expect(CipherViewLikeUtils.subtitle(cipherListView, i18nService)).toBe(

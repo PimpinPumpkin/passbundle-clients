@@ -23,10 +23,7 @@ import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { CipherArchiveService } from "@bitwarden/common/vault/abstractions/cipher-archive.service";
 import { CipherType, SecureNoteType } from "@bitwarden/common/vault/enums";
-import {
-  clearHiddenSecrets,
-  maySeeSecrets,
-} from "@bitwarden/common/vault/keykeeper/hidden-secrets";
+import { maySeeSecrets, plainItem } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
   AsyncActionsModule,
@@ -153,6 +150,12 @@ export class CipherFormComponent implements AfterViewInit, OnInit, OnChanges, Ci
    * The original cipher being edited or cloned. Null for add mode.
    */
   originalCipherView: CipherView | null;
+
+  /**
+   * Keykeeper: a copy of an item whose secrets the person can't see. The form
+   * starts from, and saves, the item's plain values only (`plainItem`).
+   */
+  private copyingHiddenItem = false;
 
   /**
    * The form group for the cipher. Starts empty and is populated by child components via the `registerChildForm` method.
@@ -289,6 +292,20 @@ export class CipherFormComponent implements AfterViewInit, OnInit, OnChanges, Ci
         this.config.originalCipher,
       );
 
+      // Keykeeper: a copy never carries secrets its source hides from the
+      // person, however the copy was started (DESIGN.md, "Folders and
+      // permissions"). Every page refuses such a copy, which needs share and
+      // see passwords; this is the backstop. The form, every section of which
+      // starts from the original, gets one built up from the plain values
+      // only, and so does the copy saved.
+      this.copyingHiddenItem =
+        this.config.mode === "clone" &&
+        !(maySeeSecrets(this.config.originalCipher) && maySeeSecrets(this.originalCipherView));
+      if (this.copyingHiddenItem) {
+        this.originalCipherView = plainItem(this.originalCipherView);
+        this.updatedCipherView = plainItem(this.updatedCipherView);
+      }
+
       if (this.config.mode === "clone") {
         this.updatedCipherView.id = null;
         // Ensure the cloned cipher generates a new cipher key
@@ -298,13 +315,6 @@ export class CipherFormComponent implements AfterViewInit, OnInit, OnChanges, Ci
 
         if (this.updatedCipherView.login) {
           this.updatedCipherView.login.fido2Credentials = null;
-        }
-        // Keykeeper: a copy never carries secrets its source hides from the
-        // person, however the copy was started (DESIGN.md, "Folders and
-        // permissions"); the pages that offer Clone need share, which needs
-        // see passwords, and this is the backstop.
-        if (!maySeeSecrets(this.originalCipherView)) {
-          clearHiddenSecrets(this.updatedCipherView);
         }
       }
     } else {
@@ -439,6 +449,12 @@ export class CipherFormComponent implements AfterViewInit, OnInit, OnChanges, Ci
     if (!userCanArchive && this.updatedCipherView.archivedDate) {
       this.updatedCipherView.archivedDate = null;
       successToast = "itemRestored";
+    }
+
+    // Keykeeper: and again as it's saved, whatever the sections wrote.
+    if (this.copyingHiddenItem) {
+      this.updatedCipherView = plainItem(this.updatedCipherView);
+      this.updatedCipherView.id = null;
     }
 
     const savedCipher = await this.addEditFormService.saveCipher(
