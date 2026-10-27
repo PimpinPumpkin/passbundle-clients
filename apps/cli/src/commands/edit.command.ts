@@ -27,6 +27,7 @@ import { KeyService } from "@bitwarden/key-management";
 import { OrganizationCollectionRequest } from "../admin-console/models/request/organization-collection.request";
 import { OrganizationCollectionResponse } from "../admin-console/models/response/organization-collection.response";
 import { SelectionReadOnly, selectionRequest } from "../admin-console/models/selection-read-only";
+import { fillHiddenSshKey, hiddenSecretsOf, keepHiddenSecrets } from "../keykeeper/hidden-items";
 import { Response } from "../models/response";
 import { CliUtils } from "../utils";
 import { CipherResponse } from "../vault/models/cipher.response";
@@ -117,6 +118,10 @@ export class EditCommand {
     if (cipherView.isDeleted) {
       return Response.badRequest("You may not edit a deleted item. Use the restore command first.");
     }
+    // Keykeeper: the secrets the person can't see, before the edit below
+    // changes cipherView in place, to keep them (keykeeper/hidden-items.ts).
+    const hiddenSecrets = hiddenSecretsOf(cipherView);
+    fillHiddenSshKey(cipherView, req);
 
     // Users without permission to view passwords never receive the real login password/TOTP or
     // hidden field values from `bw get`/`bw list` (they're redacted to `null`, matching how the
@@ -159,6 +164,11 @@ export class EditCommand {
           field.value = values.shift();
         }
       });
+    }
+
+    const refused = keepHiddenSecrets(hiddenSecrets, cipherView);
+    if (refused != null) {
+      return Response.badRequest(refused);
     }
 
     // When a user is editing an archived cipher and does not have premium, automatically unarchive it

@@ -46,9 +46,10 @@ import { NodeUtils } from "@bitwarden/node/node-utils";
 import { PureCrypto } from "@bitwarden/sdk-internal";
 
 import { ConfirmKeyConnectorDomainCommand } from "../../key-management/confirm-key-connector-domain.command";
+import { ssoPromptMessage, ssoRequiredRefusal } from "../../keykeeper/sign-in";
 import { Response } from "../../models/response";
 import { MessageResponse } from "../../models/response/message.response";
-import { firstValueFromOrNull } from "../../utils";
+import { CliUtils, firstValueFromOrNull } from "../../utils";
 
 export class LoginCommand {
   protected canInteract: boolean;
@@ -228,6 +229,16 @@ export class LoginCommand {
 
       if (response.requiresEncryptionKeyMigration) {
         return Response.error(this.i18nService.t("legacyEncryptionUnsupported"));
+      }
+
+      // Keykeeper: an organization requires single sign-on (DESIGN.md, "Require
+      // single sign-on"), and this account isn't linked to it yet, which only
+      // the web vault does; or the tool can't open a browser for it.
+      if (response.requiresSso) {
+        const refused = ssoRequiredRefusal(response, this.canInteract);
+        if (refused != null) {
+          return Response.error(refused);
+        }
       }
 
       // Opting for not checking feature flag since the server will not respond with
@@ -610,6 +621,11 @@ export class LoginCommand {
               null,
               orgSsoIdentifier,
             );
+            // Keykeeper: the address too, for when no browser opens (a
+            // server's shell, say), on stderr so scripts' output stays clean.
+            if (process.env.BW_QUIET !== "true") {
+              CliUtils.writeLn(ssoPromptMessage(webAppSsoUrl), false, true);
+            }
             this.platformUtilsService.launchUri(webAppSsoUrl);
           });
           foundPort = true;

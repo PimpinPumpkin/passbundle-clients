@@ -238,7 +238,11 @@ describe("EditCommand", () => {
       expect(savedView.fields[1].value).toBe("value-a");
     });
 
-    it("does not restore password, totp, or hidden field values the user explicitly set", async () => {
+    // Keykeeper: upstream lets someone who can't see an item's passwords
+    // overwrite them blind; PassBundle's editors lock them (DESIGN.md, "Folders
+    // and permissions"), so the tool refuses the edit and saves nothing
+    // (keykeeper/hidden-items.ts).
+    it("refuses password, totp, or hidden field values the user explicitly set", async () => {
       const cipher = { id: cipherId, edit: true } as Cipher;
 
       const cipherView = new CipherView();
@@ -265,21 +269,40 @@ describe("EditCommand", () => {
       billingAccountProfileStateService.hasPremiumFromAnySource$.mockReturnValue(of(true));
       cipherService.updateWithServer.mockImplementation(async (view: any) => view);
 
-      const req: any = {
-        type: CipherType.Login,
-        name: "Renamed item",
-        login: { password: "rotated-password", totp: "rotated-totp" },
-        fields: [{ type: FieldType.Hidden, name: "secret", value: "user-supplied-value" }],
-      };
-      const encoded = Buffer.from(JSON.stringify(req)).toString("base64");
+      const requests: any[] = [
+        {
+          type: CipherType.Login,
+          name: "Renamed item",
+          login: { password: "rotated-password", totp: null },
+          fields: [{ type: FieldType.Hidden, name: "secret", value: null }],
+        },
+        {
+          type: CipherType.Login,
+          name: "Renamed item",
+          login: { password: null, totp: "rotated-totp" },
+          fields: [{ type: FieldType.Hidden, name: "secret", value: null }],
+        },
+        {
+          type: CipherType.Login,
+          name: "Renamed item",
+          login: { password: null, totp: null },
+          fields: [{ type: FieldType.Hidden, name: "secret", value: "user-supplied-value" }],
+        },
+      ];
+      for (const req of requests) {
+        cipherView.login = Object.assign(new LoginView(), {
+          password: "real-password",
+          totp: "real-totp",
+        });
+        cipherView.fields[0].value = "real-hidden-value";
+        const encoded = Buffer.from(JSON.stringify(req)).toString("base64");
 
-      const result = await command.run("item", cipherId, encoded, {});
+        const result = await command.run("item", cipherId, encoded, {});
 
-      expect(result.success).toBe(true);
-      const savedView = cipherService.updateWithServer.mock.calls[0][0] as CipherView;
-      expect(savedView.login.password).toBe("rotated-password");
-      expect(savedView.login.totp).toBe("rotated-totp");
-      expect(savedView.fields[0].value).toBe("user-supplied-value");
+        expect(result.success).toBe(false);
+        expect(result.message).toContain("You can't see this item's passwords");
+      }
+      expect(cipherService.updateWithServer).not.toHaveBeenCalled();
     });
   });
 

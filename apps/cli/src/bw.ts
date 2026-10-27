@@ -2,12 +2,19 @@ import "core-js/proposals/explicit-resource-management";
 
 import { program } from "commander";
 
+import { CLI_BRAND } from "./keykeeper/brand";
+import { applyBrandEnvironment } from "./keykeeper/env";
 import { OssServeConfigurator } from "./oss-serve-configurator";
 import { registerOssPrograms } from "./register-oss-programs";
 import { ServeProgram } from "./serve.program";
 import { ServiceContainer } from "./service-container/service-container";
 
 async function main() {
+  // Keykeeper: the brand's environment variables and command name
+  // (keykeeper/env.ts), before anything reads either.
+  applyBrandEnvironment();
+  program.name(CLI_BRAND.command);
+
   const serviceContainer = new ServiceContainer();
   await serviceContainer.init();
 

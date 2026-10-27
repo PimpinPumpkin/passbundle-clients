@@ -17,5 +17,10 @@
     "send": "https://vault.passbundle.com/#/send/"
   },
   "installScript": "Install-PassBundle.ps1",
-  "nativeMessagingHost": "com.passbundle.agent"
+  "nativeMessagingHost": "com.passbundle.agent",
+  "cli": {
+    "command": "passbundle",
+    "envPrefix": "PASSBUNDLE_",
+    "releases": "https://github.com/PimpinPumpkin/Passbundle/releases?q=cli-v&expanded=true"
+  }
 }
