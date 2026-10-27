@@ -629,9 +629,148 @@ ${scale}
     `viewBox="-3 0 32 32" data-brand="${BRAND.name}"$1fill-rule="evenodd"\n        d="${markPath}"`,
   );
 
+  // 11. The command-line tool: its command, its environment variables, its
+  //     data folder, its own version, and its help and messages. Upstream's
+  //     code reads upstream's variable names; apps/cli/src/keykeeper/env.ts
+  //     copies ours to them at startup. See docs/cli.md in the meta repo.
+  brandCli();
+
   console.log(
     `brand: applied "${BRAND.name}" to ${touched.size} files ` +
       `(${locales.length} locale files, ${templates} templates)`,
+  );
+}
+
+function brandCli() {
+  const cli = BRAND.cli;
+  if (
+    cli == null ||
+    !/^[a-z][a-z0-9-]*$/.test(cli.command ?? "") ||
+    !/^[A-Z][A-Z0-9]*_$/.test(cli.envPrefix ?? "") ||
+    cli.envPrefix === "BW_" ||
+    !/^https:\/\//.test(cli.releases ?? "")
+  ) {
+    fail(
+      'brand.json needs "cli": {"command", "envPrefix" (such as "EXAMPLE_"), "releases" (an https address)}.',
+    );
+  }
+  // The tool's own version: the release's, or a development build's.
+  const version = process.env.BRAND_CLI_VERSION || "0.0.0-dev";
+  if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/.test(version)) {
+    fail(`BRAND_CLI_VERSION "${version}" isn't a version such as 0.1.2.`);
+  }
+  const command = cli.command;
+  const prefix = cli.envPrefix;
+
+  write(
+    "apps/cli/src/keykeeper/brand.ts",
+    read("apps/cli/src/keykeeper/brand.ts").replace(
+      /export const CLI_BRAND: CliBrand = \{[\s\S]*?\n\};/,
+      `export const CLI_BRAND: CliBrand = ${JSON.stringify(
+        { name: BRAND.name, command, envPrefix: prefix, version, releases: cli.releases },
+        null,
+        2,
+      )};`,
+    ),
+  );
+  if (!read("apps/cli/src/keykeeper/brand.ts").includes(JSON.stringify(cli.releases))) {
+    fail("apps/cli/src/keykeeper/brand.ts no longer has CLI_BRAND. Update brand/apply.mjs.");
+  }
+
+  // Help, examples, and messages everywhere in the tool: the command, the
+  // product's name, and the session variable people are told to export.
+  // Comments change too, which is harmless.
+  const counts = { command: 0, name: 0, session: 0 };
+  // "*" matches across folders in a git pathspec.
+  for (const rel of trackedFiles("apps/cli/src/*.ts")) {
+    // Our own files say what they mean already.
+    if (/\.spec\.ts$|\/keykeeper\//.test(rel)) continue;
+    const source = read(rel);
+    const branded = source
+      // "bw login", "| bw encode", "$ bw unlock", "\`bw send template\`", '"bw move"'.
+      .replace(/\bbw(?= [a-z"-])/g, () => (counts.command++, command))
+      // Not "Bitwarden_CLI/" (the user agent) nor "Bitwarden-licensed" (a comment).
+      .replace(/\bBitwarden\b(?![_-])/g, () => (counts.name++, BRAND.name))
+      // Saved files' names when they have none: "BitwardenAttachment-<time>".
+      .replace(/\bBitwarden(?=Attachment-|SendFile-)/g, BRAND.name)
+      // Example file names: "--output ./exp/bw.csv".
+      .replace(/\bbw(?=\.(csv|json)\b)/g, command)
+      .replace(/(export |\$env:|`)BW_SESSION\b/g, (_, before) => {
+        counts.session++;
+        return `${before}${prefix}SESSION`;
+      });
+    if (branded !== source) write(rel, branded);
+  }
+  if (counts.command < 100 || counts.name < 8 || counts.session < 6) {
+    fail(`branded too little of the CLI (${JSON.stringify(counts)}). Upstream changed?`);
+  }
+
+  // Its data folder is "<name> CLI" (from the replacement above), or what
+  // PASSBUNDLE_APPDATA_DIR says. Upstream's portable folder next to the
+  // program ("bw-data") is gone: a folder beside a program others can reach
+  // (a shared tools folder, say) would hold the person's tokens and API key.
+  const container = "apps/cli/src/service-container/service-container.ts";
+  if ((read(container).match(new RegExp(`${BRAND.name} CLI"`, "g")) ?? []).length < 4) {
+    fail(`${container} no longer names the data folder "Bitwarden CLI". Update brand/apply.mjs.`);
+  }
+  replaceAnchored(
+    container,
+    /const relativeDataDir = path\.join\(path\.dirname\(process\.execPath\), "bw-data"\);\s*if \(fs\.existsSync\(relativeDataDir\)\) \{\s*p = relativeDataDir;\s*\} else if \(process\.env\.BITWARDENCLI_APPDATA_DIR\)/,
+    "if (process.env.BITWARDENCLI_APPDATA_DIR)",
+  );
+  replaceAnchored(
+    "apps/cli/src/commands/completion.command.ts",
+    /this\.zshCompletion\("bw", program\)/,
+    `this.zshCompletion(${JSON.stringify(command)}, program)`,
+  );
+
+  // The server: the brand's by default; "config server" with no address
+  // shows it, and setting it to the brand's own address goes back to it.
+  const u = BRAND.urls;
+  const host = new URL(u.webVault).host;
+  replaceAnchored(
+    "apps/cli/src/platform/commands/config.command.ts",
+    /env\.hasBaseUrl\(\) \? env\.getUrls\(\)\.base : "https:\/\/bitwarden\.com"/,
+    `env.hasBaseUrl() ? env.getUrls().base : ${JSON.stringify(u.webVault)}`,
+  );
+  replaceAnchored(
+    "apps/cli/src/platform/commands/config.command.ts",
+    /url === "null" \|\| url === "bitwarden\.com" \|\| url === "https:\/\/bitwarden\.com"/,
+    ["null", BRAND.domain, `https://${BRAND.domain}`, host, u.webVault, `${u.webVault}/`]
+      .map((value) => `url === ${JSON.stringify(value)}`)
+      .join(" || "),
+  );
+
+  // Examples and links in help and messages.
+  const examples = [
+    ["apps/cli/src/program.ts", /https:\/\/bitwarden\.example\.com/g, "https://vault.example.com"],
+    ["apps/cli/src/program.ts", /https:\/\/bw\.company\.com/, "https://vault.company.com"],
+    ["apps/cli/src/program.ts", /config server bitwarden\.com/, `config server ${BRAND.domain}`],
+    [
+      "apps/cli/src/program.ts",
+      /https:\/\/vault\.bitwarden\.com\/#\/send\//,
+      `${u.webVault}/#/send/`,
+    ],
+    [
+      "apps/cli/src/tools/send/models/send.response.ts",
+      /"https:\/\/send\.bitwarden\.com\/#"/,
+      JSON.stringify(u.send),
+    ],
+    [
+      "apps/cli/src/vault/create.command.ts",
+      /https:\/\/help\.bitwarden\.com\/article\/update-encryption-key\//,
+      u.help,
+    ],
+  ];
+  for (const [rel, pattern, replacement] of examples) {
+    replaceAnchored(rel, pattern, replacement);
+  }
+
+  // Export files are named after the product.
+  replaceAnchored(
+    "libs/tools/export-vault-core/src/services/export-helper.ts",
+    /return "bitwarden" \+ \(prefix/,
+    `return ${JSON.stringify(BRAND.name.toLowerCase())} + (prefix`,
   );
 }
 

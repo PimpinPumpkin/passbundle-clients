@@ -15,6 +15,8 @@ import { EncodeCommand } from "./commands/encode.command";
 import { StatusCommand } from "./commands/status.command";
 import { UpdateCommand } from "./commands/update.command";
 import { UnlockCommand } from "./key-management/commands/unlock.command";
+import { passwordOnCommandLine, sessionOnCommandLine, warn } from "./keykeeper/command-line";
+import { cliVersion } from "./keykeeper/version";
 import { Response } from "./models/response";
 import { MessageResponse } from "./models/response/message.response";
 import { ConfigCommand } from "./platform/commands/config.command";
@@ -35,7 +37,8 @@ export class Program extends BaseProgram {
       .option("--nointeraction", "Do not prompt for interactive user input.")
       .option("--session <session>", "Pass session key instead of reading from env.")
       .version(
-        await this.serviceContainer.platformUtilsService.getApplicationVersion(),
+        // Keykeeper: the tool's own version, when it has one (keykeeper/version.ts).
+        cliVersion(await this.serviceContainer.platformUtilsService.getApplicationVersion()),
         "-v, --version",
       );
 
@@ -64,6 +67,8 @@ export class Program extends BaseProgram {
     });
 
     program.on("option:session", (key) => {
+      // Keykeeper: say where it belongs (keykeeper/command-line.ts).
+      warn(sessionOnCommandLine());
       process.env.BW_SESSION = key;
     });
 
@@ -74,11 +79,7 @@ export class Program extends BaseProgram {
     });
 
     program.on("--help", () => {
-      writeLn(
-        chalk.yellowBright(
-          "\n  Tip: Managing and retrieving secrets for dev environments is easier with Bitwarden Secrets Manager. Learn more under https://bitwarden.com/products/secrets-manager/",
-        ),
-      );
+      // Keykeeper: no advertisement for upstream's Secrets Manager here.
       writeLn("\n  Examples:");
       writeLn("");
       writeLn("    bw login");
@@ -163,6 +164,10 @@ export class Program extends BaseProgram {
         writeLn("", true);
       })
       .action(async (email: string, password: string, options: OptionValues) => {
+        if (password) {
+          // Keykeeper: say where it belongs (keykeeper/command-line.ts).
+          warn(passwordOnCommandLine());
+        }
         if (!options.check) {
           await this.exitIfAuthed();
           const command = new LoginCommand(
@@ -285,6 +290,10 @@ export class Program extends BaseProgram {
         "Path to a file containing your password as its first line",
       )
       .action(async (password, cmd) => {
+        if (password) {
+          // Keykeeper: say where it belongs (keykeeper/command-line.ts).
+          warn(passwordOnCommandLine());
+        }
         if (!cmd.check) {
           await this.exitIfNotAuthed();
           const command = new UnlockCommand(

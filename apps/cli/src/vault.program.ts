@@ -61,6 +61,8 @@ export class VaultProgram extends BaseProgram {
       "org-collections",
       "org-members",
       "organizations",
+      // Keykeeper: item templates (keykeeper/templates.ts).
+      "templates",
     ];
 
     const command = new Command("list")
@@ -99,6 +101,7 @@ export class VaultProgram extends BaseProgram {
         writeLn("    bw list items --archived");
         writeLn("    bw list folders --search email");
         writeLn("    bw list org-members --organizationid 60556c31-e649-4b5d-8daf-fc1c391a1bf2");
+        writeLn("    bw list templates");
         writeLn("", true);
       })
       .action(async (object, cmd) => {
@@ -148,6 +151,8 @@ export class VaultProgram extends BaseProgram {
       "template",
       "fingerprint",
       "send",
+      // Keykeeper: an item's earlier versions (keykeeper/item-history.ts).
+      "history",
     ];
     return new Command("get")
       .argument("<object>", "Valid objects are: " + getObjects.join(", "))
@@ -159,6 +164,13 @@ export class VaultProgram extends BaseProgram {
       .on("--help", () => {
         writeLn("\n  If raw output is specified and no output filename or directory is given for");
         writeLn("  an attachment query, the attachment content is written to stdout.");
+        writeLn("");
+        writeLn("  An item in a shared folder that lets you use its passwords but not see them");
+        writeLn("  shows its plain values only, and `get password` and `get totp` refuse it.");
+        writeLn("");
+        writeLn(
+          "  `get template` also takes an item template's id or name (see `list templates`).",
+        );
         writeLn("");
         writeLn("  Examples:");
         writeLn("");
@@ -176,6 +188,8 @@ export class VaultProgram extends BaseProgram {
         );
         writeLn("    bw get folder email");
         writeLn("    bw get template folder");
+        writeLn("    bw get template wifi");
+        writeLn("    bw get history 99ee88d2-6046-4ea7-92c2-acac464b1412");
         writeLn("", true);
       })
       .action(async (object, id, cmd) => {

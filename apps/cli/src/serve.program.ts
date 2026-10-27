@@ -2,6 +2,8 @@ import { program } from "commander";
 
 import { BaseProgram } from "./base-program";
 import { ServeCommand } from "./commands/serve.command";
+import { serveAddressRefusal } from "./keykeeper/serve-address";
+import { Response } from "./models/response";
 import { OssServeConfigurator } from "./oss-serve-configurator";
 import { ServiceContainer } from "./service-container/service-container";
 import { CliUtils } from "./utils";
@@ -22,6 +24,11 @@ export class ServeProgram extends BaseProgram {
       .description("Start a RESTful API webserver.")
       .option("--hostname <hostname>", "The hostname to bind your API webserver to.")
       .option("--port <port>", "The port to run your API webserver on.")
+      // Keykeeper: only loopback without it (keykeeper/serve-address.ts).
+      .option(
+        "--unsafe-network",
+        "Listen on an address other computers can reach. Anything that reaches it can read and change your vault while it's unlocked.",
+      )
       .option(
         "--disable-origin-protection",
         "If set, allows requests with origin header. Warning, this option exists for backwards compatibility reasons and exposes your environment to known CSRF attacks.",
@@ -33,15 +40,23 @@ export class ServeProgram extends BaseProgram {
         writeLn("    Use hostname `all` for no hostname binding.");
         writeLn("    Default port is `8087`.");
         writeLn("");
+        // Keykeeper: no example of listening where other computers can reach it.
+        writeLn("    Only this computer can reach it, unless you add `--unsafe-network`:");
+        writeLn("    then anything that reaches it can read and change your vault.");
+        writeLn("");
         writeLn("  Examples:");
         writeLn("");
         writeLn("    bw serve");
         writeLn("    bw serve --port 8080");
-        writeLn("    bw serve --hostname bwapi.mydomain.com --port 80");
         writeLn("", true);
       })
       .action(async (cmd) => {
         await this.exitIfNotAuthed();
+        const refused = serveAddressRefusal(cmd.hostname, !!cmd.unsafeNetwork);
+        if (refused != null) {
+          this.processResponse(Response.badRequest(refused), true);
+          return;
+        }
         const command = new ServeCommand(this.serviceContainer, this.configurator);
         await command.run(cmd);
       });

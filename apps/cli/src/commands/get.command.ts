@@ -38,6 +38,7 @@ import { FolderService } from "@bitwarden/common/vault/abstractions/folder/folde
 import { SearchService } from "@bitwarden/common/vault/abstractions/search.service";
 import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
+import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { FolderView } from "@bitwarden/common/vault/models/view/folder.view";
 import { KeyService } from "@bitwarden/key-management";
@@ -47,7 +48,11 @@ import { CollectionResponse } from "../admin-console/models/response/collection.
 import { OrganizationCollectionResponse } from "../admin-console/models/response/organization-collection.response";
 import { OrganizationResponse } from "../admin-console/models/response/organization.response";
 import { SelectionReadOnly } from "../admin-console/models/selection-read-only";
+import { HIDDEN_SECRETS_MESSAGE } from "../keykeeper/hidden-items";
+import { itemHistory } from "../keykeeper/item-history";
+import { findTemplate, itemFromTemplate, templatesFor } from "../keykeeper/templates";
 import { Response } from "../models/response";
+import { ListResponse } from "../models/response/list.response";
 import { StringResponse } from "../models/response/string.response";
 import { TemplateResponse } from "../models/response/template.response";
 import { CliUtils } from "../utils";
@@ -113,6 +118,9 @@ export class GetCommand extends DownloadCommand {
         return await this.getTemplate(id);
       case "fingerprint":
         return await this.getFingerprint(id);
+      // Keykeeper: an item's earlier versions (keykeeper/item-history.ts).
+      case "history":
+        return await this.getHistory(id);
       default:
         return Response.badRequest("Unknown object.");
     }
@@ -141,7 +149,13 @@ export class GetCommand extends DownloadCommand {
     return decCipher;
   }
 
-  private async getCipher(id: string, filter?: (c: CipherView) => boolean) {
+  /**
+   * Keykeeper: `secret` is for a command that prints one of the item's
+   * secrets (its password or one-time code), which is refused for an item
+   * whose secrets the person can't see (keykeeper/hidden-items.ts), rather
+   * than answered as if the item had none.
+   */
+  private async getCipher(id: string, filter?: (c: CipherView) => boolean, secret = false) {
     const activeUserId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
 
     let decCipher = await this.getCipherView(id, activeUserId);
@@ -183,6 +197,10 @@ export class GetCommand extends DownloadCommand {
       }
     }
 
+    if (secret && !maySeeSecrets(decCipher)) {
+      return Response.error(HIDDEN_SECRETS_MESSAGE);
+    }
+
     await this.eventCollectionService.collect(
       EventType.Cipher_ClientViewed,
       decCipher.id,
@@ -220,6 +238,7 @@ export class GetCommand extends DownloadCommand {
     const cipherResponse = await this.getCipher(
       id,
       (c) => c.type === CipherType.Login && !Utils.isNullOrWhitespace(c.login.password),
+      true,
     );
     if (!cipherResponse.success) {
       return cipherResponse;
@@ -272,6 +291,7 @@ export class GetCommand extends DownloadCommand {
     const cipherResponse = await this.getCipher(
       id,
       (c) => c.type === CipherType.Login && !Utils.isNullOrWhitespace(c.login.totp),
+      true,
     );
     if (!cipherResponse.success) {
       return cipherResponse;
@@ -638,11 +658,60 @@ export class GetCommand extends DownloadCommand {
         );
         break;
       default:
-        return Response.badRequest("Unknown template object.");
+        // Keykeeper: one of the item templates (keykeeper/templates.ts), by id or name.
+        return await this.getItemTemplate(id);
     }
 
     const res = new TemplateResponse(template);
     return Response.success(res);
+  }
+
+  /** Keykeeper: a new item from one of the templates `list templates` shows. */
+  private async getItemTemplate(id: string) {
+    const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
+    const items = await this.cipherService.getAllDecrypted(userId);
+    const organizations = await firstValueFrom(
+      this.organizationService.memberOrganizations$(userId),
+    );
+    const found = findTemplate(templatesFor(items, organizations), id ?? "");
+    if (found == null) {
+      return Response.badRequest(
+        "Unknown template object. Use `list templates` for the item templates.",
+      );
+    }
+    if (Array.isArray(found)) {
+      return Response.multipleResults(found);
+    }
+    return Response.success(new TemplateResponse(itemFromTemplate(found.template)));
+  }
+
+  /**
+   * Keykeeper: an item's earlier versions, newest first. The server answers
+   * 404 to someone who can't view the item's history, as for no item.
+   */
+  private async getHistory(id: string) {
+    const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
+    const found = await this.getCipherView(id ?? "", userId);
+    if (found == null) {
+      return Response.notFound();
+    }
+    if (Array.isArray(found)) {
+      return Response.multipleResults(found.map((c) => c.id));
+    }
+    if (await this.cliRestrictedItemTypesService.isCipherRestricted(found)) {
+      return Response.error("Access to this item type is restricted by organizational policy.");
+    }
+    try {
+      const versions = await itemHistory(this.apiService, found, (cipher) =>
+        this.cipherService.decrypt(cipher, userId),
+      );
+      return Response.success(new ListResponse(versions));
+    } catch (e) {
+      if (e instanceof ErrorResponse && e.statusCode === 404) {
+        return Response.error("You can't see this item's history.");
+      }
+      return Response.error(e);
+    }
   }
 
   private async getFingerprint(id: string) {
