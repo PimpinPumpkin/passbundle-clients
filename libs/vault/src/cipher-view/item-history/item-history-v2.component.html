@@ -5,7 +5,7 @@
   <bit-card>
     <p class="tw-mb-1 tw-text-xs tw-text-muted tw-select-all">
       <span class="tw-font-medium">{{ "lastEdited" | i18n }}:</span>
-      {{ cipher.revisionDate | date: "medium" }}
+      {{ cipher.revisionDate | date: timeFormat }}
     </p>
     <p
       class="tw-text-xs tw-text-muted tw-select-all"
@@ -15,7 +15,7 @@
       }"
     >
       <span class="tw-font-medium">{{ "dateCreated" | i18n }}:</span>
-      {{ cipher.creationDate | date: "medium" }}
+      {{ cipher.creationDate | date: timeFormat }}
     </p>
     @if (cipher.passwordRevisionDisplayDate) {
       <p
@@ -23,7 +23,7 @@
         [ngClass]="{ 'tw-mb-3': showPasswordHistory }"
       >
         <span class="tw-font-medium">{{ "datePasswordUpdated" | i18n }}:</span>
-        {{ cipher.passwordRevisionDisplayDate | date: "medium" }}
+        {{ cipher.passwordRevisionDisplayDate | date: timeFormat }}
       </p>
     }
     <!-- Keykeeper: earlier passwords only for someone who can see the item's passwords -->

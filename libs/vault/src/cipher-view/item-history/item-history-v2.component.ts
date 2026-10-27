@@ -16,6 +16,8 @@ import {
   TypographyModule,
 } from "@bitwarden/components";
 
+import { VERSION_TIME_FORMAT } from "../../keykeeper/item-versions";
+
 // FIXME(https://bitwarden.atlassian.net/browse/CL-764): Migrate to OnPush
 // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
 @Component({
@@ -33,6 +35,9 @@ import {
   ],
 })
 export class ItemHistoryV2Component {
+  /** Keykeeper: times as history shows them, "Oct 27, 2026, 1:15 AM". */
+  protected readonly timeFormat = VERSION_TIME_FORMAT;
+
   // FIXME(https://bitwarden.atlassian.net/browse/CL-903): Migrate to Signals
   // eslint-disable-next-line @angular-eslint/prefer-signals
   @Input() cipher: CipherView;
