@@ -822,5 +822,8 @@
   },
   "keykeeperReservedFieldName": {
     "message": "Names starting with \"keykeeper.\" are reserved."
+  },
+  "keykeeperSsoForCommandLine": {
+    "message": "This signs in the command-line tool on this computer. Continue only if you started that sign-in yourself, just now."
   }
 }

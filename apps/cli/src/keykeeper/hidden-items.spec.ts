@@ -16,6 +16,7 @@ import {
   hiddenSecretsOf,
   itemWithoutSecrets,
   keepHiddenSecrets,
+  refuseSentSecrets,
 } from "./hidden-items";
 
 const field = (name: string, type: FieldType, value: string | null, linkedId?: number) =>
@@ -147,11 +148,15 @@ describe("CipherResponse for someone who can't see an item's passwords", () => {
 });
 
 describe("keepHiddenSecrets", () => {
-  /** The edit as `edit item` makes it: the request read onto the item, in place. */
-  function edit(item: CipherView, change: (request: any) => void) {
-    const kept = hiddenSecretsOf(item);
-    const request = JSON.parse(JSON.stringify(new CipherResponse(item)));
+  /** The edit as `edit item` makes it: the request checked, then read onto the item, in place. */
+  function edit(item: CipherView, change: (request: any) => void, from?: any) {
+    const request = from ?? JSON.parse(JSON.stringify(new CipherResponse(item)));
     change(request);
+    const sent = refuseSentSecrets(item, request);
+    if (sent != null) {
+      return { refused: sent, edited: item };
+    }
+    const kept = hiddenSecretsOf(item);
     fillHiddenSshKey(item, request);
     const edited = CipherExport.toView(request, item);
     return { refused: keepHiddenSecrets(kept, edited), edited };
@@ -206,6 +211,11 @@ describe("keepHiddenSecrets", () => {
       'add a hidden field ("PIN")',
     ],
     [
+      "a new hidden field, sent empty",
+      (r: any) => r.fields.push({ name: "PIN", type: FieldType.Hidden, value: null }),
+      'add a hidden field ("PIN")',
+    ],
+    [
       "a new field linked to the password",
       (r: any) =>
         r.fields.push({ name: "Copy", type: FieldType.Linked, linkedId: LoginLinkedId.Password }),
@@ -224,6 +234,48 @@ describe("keepHiddenSecrets", () => {
   ])("refuses changing %s", (_, change, why) => {
     const { refused } = edit(login(false), change);
     expect(refused).toContain(`so you can't ${why}`);
+  });
+
+  // Otherwise a right guess would save and a wrong one be refused: an oracle.
+  it.each([
+    ["the password", (r: any) => (r.login.password = "real-password"), "change its password"],
+    ["the one-time code", (r: any) => (r.login.totp = "JBSWY3DPEHPK3PXP"), "change its totp"],
+    [
+      "a hidden field",
+      (r: any) => (r.fields[0].value = "k-123"),
+      'change the hidden field "API key"',
+    ],
+  ])(
+    "refuses %s sent with its right value too, so an edit can't check guesses",
+    (_, change, why) => {
+      const { refused } = edit(login(false), change);
+      expect(refused).toContain(`so you can't ${why}`);
+    },
+  );
+
+  it("takes a request with only some of the item, keeping its passkeys and key", () => {
+    const item = login(false);
+    item.key = { encryptedString: "2.item-key" } as any;
+    const { refused, edited } = edit(item, () => {}, { type: CipherType.Login, name: "Renamed" });
+    expect(refused).toBeNull();
+    expect(edited.name).toBe("Renamed");
+    expect(edited.login.password).toBe("real-password");
+    expect(edited.login.fido2Credentials.map((p) => p.keyValue)).toEqual(["pk-private"]);
+    expect(edited.key).toEqual({ encryptedString: "2.item-key" });
+    expect(edited.fields.find((f) => f.name === "API key").value).toBe("k-123");
+  });
+
+  it("gives the item's own key, wrapped, so an edit sends it back", () => {
+    const item = login(false);
+    item.key = { encryptedString: "2.item-key" } as any;
+    expect(new CipherResponse(item).key).toBe("2.item-key");
+  });
+
+  it("refuses an SSH key that isn't one, without throwing", () => {
+    const key = new CipherView();
+    key.type = CipherType.SshKey;
+    key.viewPassword = false;
+    expect(() => fillHiddenSshKey(key, { sshKey: "x" })).not.toThrow();
   });
 
   it("keeps a card's number and code, and refuses changing them", () => {

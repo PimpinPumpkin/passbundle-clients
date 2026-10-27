@@ -4,9 +4,11 @@
 // names (BW_SESSION, BITWARDENCLI_APPDATA_DIR, ...), so at startup each
 // branded variable is copied to the name upstream's code reads.
 //
-// Upstream's names inherited from the environment are dropped first: they
-// belong to the other product's tool, and a Bitwarden API key or session left
-// in a shell must never be sent to, or used with, another server.
+// Upstream's names inherited from the environment are dropped first, every one
+// upstream's code reads, in any case (Windows' variables ignore it): they belong
+// to the other product's tool, and a Bitwarden API key or session left in a
+// shell must never be sent to, or used with, another server. Other `BW_`
+// variables stay, such as one a script names with `--passwordenv`.
 
 import { CLI_BRAND } from "./brand";
 
@@ -29,7 +31,12 @@ export const UPSTREAM_SETTINGS: Readonly<Record<string, string>> = {
   DEBUG: "BITWARDENCLI_DEBUG",
 };
 
-const UPSTREAM_PREFIXES = ["BW_", "BITWARDENCLI_"];
+/** Every upstream name the tool reads, `BW_SERVE` (which `serve` sets for itself) included. */
+const UPSTREAM_NAMES: ReadonlySet<string> = new Set([
+  ...SCRIPT_VARIABLES.map((part) => "BW_" + part),
+  "BW_SERVE",
+  ...Object.values(UPSTREAM_SETTINGS),
+]);
 
 /**
  * Copies the brand's variables to upstream's names, after dropping any of
@@ -44,7 +51,7 @@ export function applyBrandEnvironment(
     return;
   }
   for (const key of Object.keys(env)) {
-    if (UPSTREAM_PREFIXES.some((p) => key.startsWith(p))) {
+    if (UPSTREAM_NAMES.has(key.toUpperCase())) {
       delete env[key];
     }
   }

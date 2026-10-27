@@ -155,6 +155,12 @@ describe("GetCommand with PassBundle's rules", () => {
     expect(history.success).toBe(true);
     expect((history.data as ListResponse).data).toEqual([]);
 
+    // An item type the organization's policy restricts shows no history either.
+    restricted.isCipherRestricted.mockResolvedValueOnce(true);
+    const restrictedHistory = await command.run("history", ID, {});
+    expect(restrictedHistory.success).toBe(false);
+    expect(restrictedHistory.message).toContain("restricted by organizational policy");
+
     apiService.send.mockRejectedValue(new ErrorResponse({}, 404));
     const refused = await command.run("history", ID, {});
     expect(refused.success).toBe(false);

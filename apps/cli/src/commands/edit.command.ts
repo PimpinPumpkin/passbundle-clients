@@ -27,7 +27,12 @@ import { KeyService } from "@bitwarden/key-management";
 import { OrganizationCollectionRequest } from "../admin-console/models/request/organization-collection.request";
 import { OrganizationCollectionResponse } from "../admin-console/models/response/organization-collection.response";
 import { SelectionReadOnly, selectionRequest } from "../admin-console/models/selection-read-only";
-import { fillHiddenSshKey, hiddenSecretsOf, keepHiddenSecrets } from "../keykeeper/hidden-items";
+import {
+  fillHiddenSshKey,
+  hiddenSecretsOf,
+  keepHiddenSecrets,
+  refuseSentSecrets,
+} from "../keykeeper/hidden-items";
 import { Response } from "../models/response";
 import { CliUtils } from "../utils";
 import { CipherResponse } from "../vault/models/cipher.response";
@@ -118,8 +123,13 @@ export class EditCommand {
     if (cipherView.isDeleted) {
       return Response.badRequest("You may not edit a deleted item. Use the restore command first.");
     }
-    // Keykeeper: the secrets the person can't see, before the edit below
-    // changes cipherView in place, to keep them (keykeeper/hidden-items.ts).
+    // Keykeeper: an edit can't carry a value for a secret the person can't
+    // see; and those secrets, before the edit below changes cipherView in
+    // place, to keep them (keykeeper/hidden-items.ts).
+    const sentSecret = refuseSentSecrets(cipherView, req as any);
+    if (sentSecret != null) {
+      return Response.badRequest(sentSecret);
+    }
     const hiddenSecrets = hiddenSecretsOf(cipherView);
     fillHiddenSshKey(cipherView, req);
 

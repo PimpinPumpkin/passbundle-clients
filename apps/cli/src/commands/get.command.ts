@@ -698,6 +698,9 @@ export class GetCommand extends DownloadCommand {
     if (Array.isArray(found)) {
       return Response.multipleResults(found.map((c) => c.id));
     }
+    if (await this.cliRestrictedItemTypesService.isCipherRestricted(found)) {
+      return Response.error("Access to this item type is restricted by organizational policy.");
+    }
     try {
       const versions = await itemHistory(this.apiService, found, (cipher) =>
         this.cipherService.decrypt(cipher, userId),

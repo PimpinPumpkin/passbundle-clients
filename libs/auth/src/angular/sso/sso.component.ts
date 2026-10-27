@@ -171,6 +171,13 @@ export class SsoComponent implements OnInit {
     // directly to their IdP to simulate IdP-initiated SSO, so we submit automatically.
     if (qParams.identifier != null) {
       this.identifierFormControl.setValue(qParams.identifier);
+      // Keykeeper: for the command-line tool, whose answer goes to a listener
+      // on this computer, the person presses Continue. A link alone, which
+      // anyone can send, never starts a sign-in for it (DESIGN.md, "Sign in
+      // with Microsoft Entra ID", "Threat model").
+      if (this.clientId === ClientType.Cli) {
+        return;
+      }
       this.loggingIn = true;
       await this.submit();
       return;
@@ -290,7 +297,10 @@ export class SsoComponent implements OnInit {
       return;
     }
 
-    const autoSubmit = (await firstValueFrom(this.route.queryParams)).identifier != null;
+    // Keykeeper: the command-line tool's sign-in waits for Continue (above).
+    const autoSubmit =
+      (await firstValueFrom(this.route.queryParams)).identifier != null &&
+      this.clientId !== ClientType.Cli;
 
     this.identifier = this.identifierFormControl.value ?? "";
     await this.ssoLoginService.setOrganizationSsoIdentifier(this.identifier);

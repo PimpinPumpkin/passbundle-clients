@@ -35,6 +35,17 @@ describe("applyBrandEnvironment", () => {
     expect(env).toEqual({});
   });
 
+  it("drops upstream's names in any case, and leaves other variables alone", () => {
+    const env: NodeJS.ProcessEnv = {
+      bw_session: "theirs",
+      Bw_ClientSecret: "theirs",
+      BW_SERVE: "true",
+      BW_PASSWORD: "a script's own name, for --passwordenv",
+    };
+    applyBrandEnvironment(env, "PASSBUNDLE_");
+    expect(env).toEqual({ BW_PASSWORD: "a script's own name, for --passwordenv" });
+  });
+
   it("takes the brand's value over upstream's", () => {
     const env: NodeJS.ProcessEnv = { BW_SESSION: "theirs", PASSBUNDLE_SESSION: "ours" };
     applyBrandEnvironment(env, "PASSBUNDLE_");
