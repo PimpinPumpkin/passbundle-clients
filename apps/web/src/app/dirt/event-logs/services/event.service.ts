@@ -406,6 +406,34 @@ export class EventService {
           this.getShortId(ev.organizationUserId),
         );
         break;
+      // Keykeeper: single sign-on with Microsoft Entra ID.
+      case EventType.Keykeeper_SsoSignedIn:
+        msg = this.i18nService.t("keykeeperSsoSignedIn", this.formatOrgUserId(ev));
+        humanReadableMsg = this.i18nService.t(
+          "keykeeperSsoSignedIn",
+          this.getShortId(ev.organizationUserId),
+        );
+        break;
+      case EventType.Keykeeper_SsoRefused:
+        if (ev.organizationUserId) {
+          msg = this.i18nService.t(
+            "keykeeperSsoRefusedFor",
+            this.formatOrgUserId(ev),
+            this.escapeHtml(ev.keykeeperDetail ?? ""),
+          );
+          humanReadableMsg = this.i18nService.t(
+            "keykeeperSsoRefusedFor",
+            this.getShortId(ev.organizationUserId),
+            ev.keykeeperDetail ?? "",
+          );
+        } else {
+          msg = this.i18nService.t(
+            "keykeeperSsoRefused",
+            this.escapeHtml(ev.keykeeperDetail ?? ""),
+          );
+          humanReadableMsg = this.i18nService.t("keykeeperSsoRefused", ev.keykeeperDetail ?? "");
+        }
+        break;
       case EventType.OrganizationUser_UnlinkedSso:
         msg = this.i18nService.t("unlinkedSsoUser", this.formatOrgUserId(ev));
         humanReadableMsg = this.i18nService.t(
@@ -592,6 +620,16 @@ export class EventService {
         break;
       case EventType.Organization_DisabledSso:
         msg = humanReadableMsg = this.i18nService.t("ssoTurnedOff");
+        break;
+      case EventType.Keykeeper_SsoSettingsChanged:
+        msg = this.i18nService.t(
+          "keykeeperSsoSettingsChanged",
+          this.escapeHtml(ev.keykeeperDetail ?? ""),
+        );
+        humanReadableMsg = this.i18nService.t(
+          "keykeeperSsoSettingsChanged",
+          ev.keykeeperDetail ?? "",
+        );
         break;
       case EventType.Organization_EnabledKeyConnector:
         msg = humanReadableMsg = this.i18nService.t("enabledKeyConnector");

@@ -59,6 +59,8 @@ import {
   IconModule,
 } from "@bitwarden/components";
 
+import { keykeeperStartSsoLink } from "../sso/keykeeper-sso-link";
+
 import { TwoFactorAuthAuthenticatorComponent } from "./child-components/two-factor-auth-authenticator/two-factor-auth-authenticator.component";
 import { TwoFactorAuthDuoComponent } from "./child-components/two-factor-auth-duo/two-factor-auth-duo.component";
 import { TwoFactorAuthEmailComponent } from "./child-components/two-factor-auth-email/two-factor-auth-email.component";
@@ -446,6 +448,20 @@ export class TwoFactorAuthComponent implements OnInit, OnDestroy {
 
     if (await this.handleMigrateEncryptionKey(authResult)) {
       return; // stop login process
+    }
+
+    // Keykeeper: an organization requires single sign-on and this account
+    // isn't linked to it yet: its password and two-step login got a linking
+    // session, not a login. Link first.
+    if (
+      await keykeeperStartSsoLink(authResult, {
+        router: this.router,
+        toastService: this.toastService,
+        i18nService: this.i18nService,
+        clientType: this.platformUtilsService.getClientType(),
+      })
+    ) {
+      return;
     }
 
     // User is fully logged in so handle any post login logic before executing navigation

@@ -724,6 +724,24 @@
     },
     "weakPasswordsFoundReportDesc": {
       "message": "We found $COUNT$ items with passwords that are not strong. You should update them to use stronger passwords."
+    },
+    "requireSsoPolicyDesc": {
+      "message": "Require members to sign in with the organization's single sign-on (Microsoft Entra ID). Owners and your IT provider's staff can still use their passwords."
+    },
+    "requireSsoPolicyDescV2": {
+      "message": "Require members to sign in with single sign-on. Owners and your IT provider's staff can still use their passwords, so nobody is locked out."
+    },
+    "requireSsoPolicyReq": {
+      "message": "Turn on single sign-on (Settings, Single sign-on) and the Single organization policy before turning this on."
+    },
+    "requireSsoPolicyReqV2": {
+      "message": "Turn on single sign-on and the Single organization policy first."
+    },
+    "requireSsoExemption": {
+      "message": "Owners and your IT provider's staff are exempt, so they can always sign in with their passwords. Account recovery keeps working."
+    },
+    "firstSsoLogin": {
+      "message": "$ID$ linked their Microsoft account and signed in with single sign-on for the first time."
     }
   },
   "browser": {
