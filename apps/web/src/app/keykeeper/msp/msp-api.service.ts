@@ -25,6 +25,8 @@ import {
   MspJoining,
   MspPolicies,
   MspRemoval,
+  MspTwoStep,
+  OrgAdminTwoStep,
   MspRole,
   MspSiteFixes,
   MspSummary,
@@ -34,6 +36,7 @@ import {
   SsoSettings,
   SsoView,
   TechnicianAccess,
+  UnacceptedRole,
 } from "@bitwarden/admin-console/common";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
@@ -521,6 +524,86 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
   // Single sign-on with Microsoft Entra ID (DESIGN.md, "Sign in with Microsoft Entra ID").
 
   /** The organization's Single sign-on page. Anyone but those who manage it gets "not found". */
+  /**
+   * Two-step login for an organization's admins: whether it's required, and
+   * who it covers without a method that counts. Owners and admins (and the
+   * MSP's admins) only; anyone else gets "not found".
+   */
+  async getOrgAdminTwoStep(orgId: string): Promise<OrgAdminTwoStep> {
+    return this.apiService.send(
+      "GET",
+      `/keykeeper/organizations/${orgId}/admin-two-step`,
+      null,
+      true,
+      true,
+    );
+  }
+
+  async setOrgAdminTwoStep(orgId: string, required: boolean): Promise<OrgAdminTwoStep> {
+    return this.apiService.send(
+      "PUT",
+      `/keykeeper/organizations/${orgId}/admin-two-step`,
+      { required },
+      true,
+      true,
+    );
+  }
+
+  /**
+   * Whether the person has set up a two-step login method that counts for an
+   * owner's, admin's, or MSP staff's role, as the server decides it: an
+   * authenticator app, a security key or passkey, or Duo with the server's
+   * own Duo account (not email codes, nor Duo with their own Duo application).
+   */
+  async hasQualifyingTwoStep(): Promise<boolean> {
+    const info = await this.apiService.send("GET", "/keykeeper/two-step-setup", null, true, true);
+    return info?.qualifying === true;
+  }
+
+  /**
+   * The caller's roles that the server joined them to without asking (a
+   * server that sends no email), where the organization requires two-step
+   * login for them. Two-step login for admins doesn't count one until they
+   * accept it.
+   */
+  async unacceptedRoles(): Promise<UnacceptedRole[]> {
+    const listed = await this.apiService.send(
+      "GET",
+      "/keykeeper/organizations/unaccepted",
+      null,
+      true,
+      true,
+    );
+    return (listed?.data ?? []) as UnacceptedRole[];
+  }
+
+  /** Accepts a role the server joined the caller to without asking. */
+  async acceptRole(orgId: string): Promise<void> {
+    await this.apiService.send(
+      "POST",
+      `/keykeeper/organizations/${orgId}/accept`,
+      null,
+      true,
+      true,
+    );
+  }
+
+  /** The MSP's two-step login: its staff, and each client's own admins. */
+  async getMspTwoStep(mspId: string): Promise<MspTwoStep> {
+    return this.apiService.send("GET", `/keykeeper/msp/${mspId}/two-step`, null, true, true);
+  }
+
+  /** Whether everyone on the MSP's staff must use two-step login. MSP admins only. */
+  async setMspStaffTwoStep(mspId: string, staffRequired: boolean): Promise<MspTwoStep> {
+    return this.apiService.send(
+      "PUT",
+      `/keykeeper/msp/${mspId}/two-step`,
+      { staffRequired },
+      true,
+      true,
+    );
+  }
+
   async getSso(orgId: string): Promise<SsoView> {
     return this.apiService.send("GET", `/keykeeper/organizations/${orgId}/sso`, null, true, true);
   }

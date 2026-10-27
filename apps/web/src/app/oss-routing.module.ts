@@ -403,6 +403,29 @@ const routes: Routes = [
         ],
       },
       {
+        // Keykeeper: "Set up two-step login to continue", with the setup
+        // session a sign-in gets when the person's role requires two-step
+        // login and it isn't set up yet (DESIGN.md, "Two-step login for
+        // admins").
+        path: "two-step-setup",
+        data: {
+          pageTitle: {
+            key: "twoStepLogin",
+          },
+          titleId: "twoStepLogin",
+          pageIcon: TwoFactorAuthSecurityKeyIcon,
+        } satisfies RouteDataProperties & AnonLayoutWrapperData,
+        children: [
+          {
+            path: "",
+            loadComponent: () =>
+              import("./keykeeper/two-step-setup/two-step-setup.component").then(
+                (mod) => mod.KeykeeperTwoStepSetupComponent,
+              ),
+          },
+        ],
+      },
+      {
         path: AuthRoute.TwoFactor,
         component: TwoFactorAuthComponent,
         canActivate: [unauthGuardFn(), TwoFactorAuthGuard],

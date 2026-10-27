@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component } from "@angular/core";
+import { ChangeDetectionStrategy, Component, OnInit, signal } from "@angular/core";
 import { FormBuilder, Validators } from "@angular/forms";
 import { Router } from "@angular/router";
 
@@ -52,6 +52,14 @@ import { ClientPreset, KeykeeperMspApiService } from "../msp/msp-api.service";
             >
           </bit-radio-button>
         </bit-radio-group>
+        @if (form.controls.preset.value === "business" && needsTwoStep()) {
+          <bit-callout type="warning" [title]="null" data-testid="create-org-two-step">
+            A business requires two-step login of its owners and admins: an authenticator app, a
+            security key or passkey, or Duo. You haven't set it up, so once the organization is made
+            you'll be signed out, and asked to set it up when you sign in again.
+            <a bitLink routerLink="/settings/security/two-factor">Set it up first</a>
+          </bit-callout>
+        }
         <button bitButton bitFormButton buttonType="primary" type="submit">
           Create organization
         </button>
@@ -59,7 +67,9 @@ import { ClientPreset, KeykeeperMspApiService } from "../msp/msp-api.service";
     </bit-container>
   `,
 })
-export class KeykeeperCreateOrganizationComponent {
+export class KeykeeperCreateOrganizationComponent implements OnInit {
+  /** Keykeeper: no two-step login that counts for an owner yet (DESIGN.md, "Two-step login for admins"). */
+  protected readonly needsTwoStep = signal(false);
   protected readonly form = this.formBuilder.nonNullable.group({
     name: ["", [Validators.required, Validators.maxLength(100)]],
     preset: this.formBuilder.nonNullable.control<ClientPreset>("business"),
@@ -71,6 +81,14 @@ export class KeykeeperCreateOrganizationComponent {
     private readonly router: Router,
     private readonly toastService: ToastService,
   ) {}
+
+  async ngOnInit() {
+    try {
+      this.needsTwoStep.set(!(await this.api.hasQualifyingTwoStep()));
+    } catch {
+      // Unknown: say nothing.
+    }
+  }
 
   protected readonly submit = async () => {
     this.form.markAllAsTouched();
