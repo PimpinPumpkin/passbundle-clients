@@ -31,7 +31,7 @@ import { CipherFormConfig } from "../cipher-form/abstractions/cipher-form-config
 import { DefaultCipherFormService } from "../cipher-form/services/default-cipher-form.service";
 
 import { ItemVersion, KeykeeperItemHistoryService } from "./item-history.service";
-import { savedByLabel } from "./item-versions";
+import { savedByLabel, VERSION_TIME_FORMAT } from "./item-versions";
 import { KeykeeperVersionDialogComponent, VersionDialogResult } from "./version-dialog.component";
 
 export type { ItemVersion } from "./item-history.service";
@@ -95,7 +95,7 @@ const FIRST_VERSIONS = 5;
                 data-testid="keykeeper-item-version"
               >
                 <div class="tw-min-w-0">
-                  <div bitTypography="body2">{{ version.revisionDate | date: "medium" }}</div>
+                  <div bitTypography="body2">{{ version.revisionDate | date: timeFormat }}</div>
                   @if (savedBy(version); as who) {
                     <div bitTypography="helper" class="tw-text-muted">{{ who }}</div>
                   }
@@ -107,7 +107,7 @@ const FIRST_VERSIONS = 5;
                     linkType="primary"
                     (click)="open(version)"
                     [attr.aria-label]="
-                      ('view' | i18n) + ' ' + (version.revisionDate | date: 'medium')
+                      ('view' | i18n) + ' ' + (version.revisionDate | date: timeFormat)
                     "
                   >
                     {{ "view" | i18n }}
@@ -163,6 +163,7 @@ export class KeykeeperItemVersionsComponent {
   private readonly cipherFormService = inject(DefaultCipherFormService);
 
   protected readonly first = FIRST_VERSIONS;
+  protected readonly timeFormat = VERSION_TIME_FORMAT;
   protected readonly showAll = signal(false);
   private readonly me = toSignal(this.accountService.activeAccount$.pipe(map((a) => a?.id)));
 

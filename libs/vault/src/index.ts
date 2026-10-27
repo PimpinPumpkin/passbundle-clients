@@ -132,7 +132,9 @@ export {
   restoreConfirmation,
   restoredView,
   savedByLabel,
+  VERSION_TIME_FORMAT,
   versionRows,
+  versionTime,
 } from "./keykeeper/item-versions";
 export type { HistoryAccess, VersionRow } from "./keykeeper/item-versions";
 export { DefaultCipherFormService } from "./cipher-form/services/default-cipher-form.service";

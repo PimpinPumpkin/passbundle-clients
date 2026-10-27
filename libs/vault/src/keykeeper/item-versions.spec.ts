@@ -16,6 +16,7 @@ import {
   sameFields,
   savedByLabel,
   versionRows,
+  versionTime,
 } from "./item-versions";
 
 /** Reads translations back as their keys and arguments, so tests see which. */
@@ -424,5 +425,12 @@ describe("historyAccess", () => {
       manage: false,
     };
     expect(historyAccess(item, [preset])).toEqual({ view: true, contents: false, clear: false });
+  });
+});
+
+describe("versionTime", () => {
+  it("shows a short date and time, without seconds, with a space before AM", () => {
+    expect(versionTime(new Date(2026, 9, 27, 1, 15, 36), "en-US")).toBe("Oct 27, 2026, 1:15 AM");
+    expect(versionTime(new Date(2026, 9, 27, 13, 5), "en-US")).toBe("Oct 27, 2026, 1:05 PM");
   });
 });

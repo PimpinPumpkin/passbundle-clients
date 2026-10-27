@@ -1,4 +1,3 @@
-import { DatePipe, formatDate } from "@angular/common";
 import {
   ChangeDetectionStrategy,
   Component,
@@ -50,6 +49,7 @@ import {
   savedByLabel,
   VersionRow,
   versionRows,
+  versionTime,
 } from "@bitwarden/vault";
 
 import { PopupFooterComponent } from "../../../../../platform/popup/layout/popup-footer.component";
@@ -166,7 +166,6 @@ type PageState = "loading" | "refused" | "ready" | "failed";
     BadgeComponent,
     ButtonModule,
     CardComponent,
-    DatePipe,
     I18nPipe,
     IconButtonModule,
     ItemModule,
@@ -311,7 +310,7 @@ export class KeykeeperItemHistoryPageComponent implements OnInit {
   }
 
   protected when(version: ItemVersion): string {
-    return formatDate(version.revisionDate, "medium", this.locale);
+    return versionTime(version.revisionDate, this.locale);
   }
 
   protected savedBy(version: ItemVersion): string | null {

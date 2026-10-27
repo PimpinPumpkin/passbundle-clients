@@ -430,7 +430,10 @@ html.pb-web {
   box-shadow: var(--pb-shadow-floating) !important;
 }
 :is(.pb-web, .pb-popup) .cdk-overlay-pane bit-dialog > section,
-:is(.pb-web, .pb-popup) .cdk-overlay-pane bit-simple-dialog > section {
+:is(.pb-web, .pb-popup) .cdk-overlay-pane bit-simple-dialog > section,
+/* A confirmation (bit-simple-dialog) is a div filled with the on-brand
+   color, a dark green in dark mode: the same solid dialog color instead. */
+:is(.pb-web, .pb-popup) .cdk-overlay-pane bit-simple-dialog > div {
   background: var(--pb-dialog) !important;
   border: 0 !important;
   border-radius: 14px !important;
@@ -1412,7 +1415,8 @@ html.pb-popup,
 
 /* Dialogs float, as in the web vault (the shared rules above). */
 .pb-popup bit-dialog > section,
-.pb-popup bit-simple-dialog > section {
+.pb-popup bit-simple-dialog > section,
+.pb-popup bit-simple-dialog > div {
   background: var(--pb-dialog) !important;
   border: 0 !important;
   border-radius: 14px !important;

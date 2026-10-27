@@ -1,4 +1,3 @@
-import { formatDate } from "@angular/common";
 import {
   ChangeDetectionStrategy,
   Component,
@@ -25,7 +24,7 @@ import {
 } from "@bitwarden/components";
 import { I18nPipe } from "@bitwarden/ui-common";
 
-import { restoreConfirmation, VersionRow, versionRows } from "./item-versions";
+import { restoreConfirmation, VersionRow, versionRows, versionTime } from "./item-versions";
 
 export type VersionDialogData = {
   /** The version, decrypted. */
@@ -168,7 +167,7 @@ export class KeykeeperVersionDialogComponent {
   private readonly toastService = inject(ToastService);
 
   /** When the version was saved, as the item view shows dates. */
-  protected readonly when = formatDate(this.data.revisionDate, "medium", inject(LOCALE_ID));
+  protected readonly when = versionTime(this.data.revisionDate, inject(LOCALE_ID));
 
   /** People who can't see an item's passwords never see them in its versions either. */
   protected readonly canSeeSecrets = this.data.current.viewPassword !== false;

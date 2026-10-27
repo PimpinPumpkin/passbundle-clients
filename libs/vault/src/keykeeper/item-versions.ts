@@ -3,6 +3,8 @@
 // who can open the item; apps decrypt them like the item, compare them field
 // by field, and restore one by saving it as a normal edit.
 
+import { formatDate } from "@angular/common";
+
 import {
   FolderLike,
   gridOf,
@@ -40,6 +42,18 @@ export type ItemHistoryResponse = {
     cipher: unknown;
   }[];
 };
+
+/**
+ * A version's time as history shows it, "Oct 27, 2026, 1:15 AM", as in the
+ * apps. Angular's "medium" adds the seconds, and draws the narrow space it puts
+ * before AM as none at all in our font.
+ */
+export const VERSION_TIME_FORMAT = "MMM d, y, h:mm a";
+
+/** A version's time, in `VERSION_TIME_FORMAT`. */
+export function versionTime(date: Date | string | number, locale: string): string {
+  return formatDate(date, VERSION_TIME_FORMAT, locale);
+}
 
 export const historyPath = (cipherId: string) => `/keykeeper/ciphers/${cipherId}/history`;
 export const versionPath = (cipherId: string, versionId: string) =>
