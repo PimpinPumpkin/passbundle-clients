@@ -3,6 +3,7 @@ import { BehaviorSubject } from "rxjs";
 
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { SsoLoginServiceAbstraction } from "@bitwarden/common/auth/abstractions/sso-login.service.abstraction";
+import { SecretVerificationRequest } from "@bitwarden/common/auth/models/request/secret-verification.request";
 import { SsoPreValidateResponse } from "@bitwarden/common/auth/models/response/sso-pre-validate.response";
 import { CryptoFunctionService } from "@bitwarden/common/key-management/crypto/abstractions/crypto-function.service";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
@@ -17,6 +18,9 @@ import { LinkSsoService } from "./link-sso.service";
 
 describe("LinkSsoService", () => {
   let sut: LinkSsoService;
+  const verification = Object.assign(new SecretVerificationRequest(), {
+    masterPasswordHash: "hash",
+  });
 
   let mockSsoLoginService: MockProxy<SsoLoginServiceAbstraction>;
   let mockApiService: MockProxy<ApiService>;
@@ -44,7 +48,7 @@ describe("LinkSsoService", () => {
     // Set up API service mocks
     const mockResponse = { Token: "mockSsoToken" };
     mockApiService.preValidateSso.mockResolvedValue(new SsoPreValidateResponse(mockResponse));
-    mockApiService.getSsoUserIdentifier.mockResolvedValue("mockUserIdentifier");
+    mockApiService.send.mockResolvedValue("mockUserIdentifier");
 
     // Set up password generation service mock
     mockPasswordGenerationService.generatePassword.mockImplementation(
@@ -84,23 +88,23 @@ describe("LinkSsoService", () => {
 
   describe("linkSso", () => {
     it("throws an error when identifier is null", async () => {
-      await expect(sut.linkSso(null as unknown as string)).rejects.toThrow(
+      await expect(sut.linkSso(null as unknown as string, verification)).rejects.toThrow(
         "SSO identifier is required",
       );
     });
 
     it("throws an error when identifier is empty", async () => {
-      await expect(sut.linkSso("")).rejects.toThrow("SSO identifier is required");
+      await expect(sut.linkSso("", verification)).rejects.toThrow("SSO identifier is required");
     });
 
     it("calls preValidateSso with the provided identifier", async () => {
-      await sut.linkSso("org123");
+      await sut.linkSso("org123", verification);
 
       expect(mockApiService.preValidateSso).toHaveBeenCalledWith("org123");
     });
 
     it("generates a password for code verifier", async () => {
-      await sut.linkSso("org123");
+      await sut.linkSso("org123", verification);
 
       expect(mockPasswordGenerationService.generatePassword).toHaveBeenCalledWith({
         type: "password",
@@ -113,27 +117,32 @@ describe("LinkSsoService", () => {
     });
 
     it("sets the code verifier in the ssoLoginService", async () => {
-      await sut.linkSso("org123");
+      await sut.linkSso("org123", verification);
 
       expect(mockSsoLoginService.setCodeVerifier).toHaveBeenCalledWith("mockGeneratedPassword");
     });
 
     it("generates a state and sets it in the ssoLoginService", async () => {
-      await sut.linkSso("org123");
+      await sut.linkSso("org123", verification);
 
-      const expectedState =
-        "mockGeneratedPassword_returnUri='/settings/organizations'_identifier=org123";
+      const expectedState = "mockGeneratedPassword_identifier=org123";
       expect(mockSsoLoginService.setSsoState).toHaveBeenCalledWith(expectedState);
     });
 
-    it("gets the SSO user identifier from the API", async () => {
-      await sut.linkSso("org123");
+    it("asks the API for a link ticket with the verification", async () => {
+      await sut.linkSso("org123", verification);
 
-      expect(mockApiService.getSsoUserIdentifier).toHaveBeenCalled();
+      expect(mockApiService.send).toHaveBeenCalledWith(
+        "POST",
+        "/accounts/sso/user-identifier",
+        verification,
+        true,
+        true,
+      );
     });
 
     it("launches the authorize URL with the correct parameters", async () => {
-      await sut.linkSso("org123");
+      await sut.linkSso("org123", verification);
 
       expect(mockPlatformUtilsService.launchUri).toHaveBeenCalledWith(
         expect.stringContaining("https://identity.bitwarden.com/connect/authorize"),

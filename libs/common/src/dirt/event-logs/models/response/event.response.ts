@@ -27,6 +27,8 @@ export class EventResponse extends BaseResponse {
   serviceAccountId: string;
   grantedServiceAccountId: string;
   sendId: string;
+  /** Keykeeper: the event's subject in words, such as why a single sign-on was refused. */
+  keykeeperDetail: string;
 
   constructor(response: any) {
     super(response);
@@ -53,5 +55,6 @@ export class EventResponse extends BaseResponse {
     this.serviceAccountId = this.getResponseProperty("ServiceAccountId");
     this.grantedServiceAccountId = this.getResponseProperty("GrantedServiceAccountId");
     this.sendId = this.getResponseProperty("SendId");
+    this.keykeeperDetail = this.getResponseProperty("KeykeeperDetail");
   }
 }

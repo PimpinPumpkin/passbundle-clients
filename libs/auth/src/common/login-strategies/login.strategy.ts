@@ -411,6 +411,7 @@ export abstract class LoginStrategy {
   ): Promise<AuthResult> {
     const result = new AuthResult();
     result.ssoOrganizationIdentifier = response.ssoOrganizationIdentifier;
+    result.keykeeperSsoLinkSession = response.keykeeperSsoLinkSession;
     return result;
   }
 }

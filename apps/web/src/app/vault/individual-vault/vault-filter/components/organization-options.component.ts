@@ -13,6 +13,7 @@ import {
   OrganizationUserApiService,
   OrganizationUserResetPasswordEnrollmentRequest,
 } from "@bitwarden/admin-console/common";
+import { UserVerificationDialogComponent } from "@bitwarden/auth/angular";
 import { UserDecryptionOptionsServiceAbstraction } from "@bitwarden/auth/common";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { OrganizationApiServiceAbstraction } from "@bitwarden/common/admin-console/abstractions/organization/organization-api.service.abstraction";
@@ -150,7 +151,22 @@ export class OrganizationOptionsComponent implements OnInit, OnDestroy {
    */
   async handleLinkSso(organization: Organization) {
     try {
-      await this.linkSsoService.linkSso(organization.identifier);
+      // Keykeeper: the server issues a ticket to link only once the person
+      // proves their master password (or a one-time code), so a stolen
+      // session alone can't link a Microsoft account to this one.
+      await UserVerificationDialogComponent.open(this.dialogService, {
+        title: "linkSso",
+        bodyText: "keykeeperLinkSsoVerify",
+        confirmButtonOptions: { text: "continue", type: "primary" },
+        verificationType: {
+          type: "custom",
+          verificationFn: async (secret) => {
+            const request = await this.userVerificationService.buildRequest(secret);
+            await this.linkSsoService.linkSso(organization.identifier, request);
+            return true;
+          },
+        },
+      });
     } catch (e) {
       this.logService.error(e);
       this.toastService.showToast({

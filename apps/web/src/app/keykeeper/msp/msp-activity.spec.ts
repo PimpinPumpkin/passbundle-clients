@@ -136,6 +136,32 @@ describe("MSP activity sentences", () => {
       { event: "provisioning_let_in", detail: "3 people" },
       "ana@northwind.test let in 3 people Microsoft Entra ID added to Acme Dental",
     ],
+    [{ event: "sso_turned_on" }, "ana@northwind.test turned on single sign-on for Acme Dental"],
+    [{ event: "sso_turned_off" }, "ana@northwind.test turned off single sign-on for Acme Dental"],
+    [
+      { event: "sso_settings_changed", detail: "tenant, client secret" },
+      "ana@northwind.test changed Acme Dental's single sign-on settings (tenant, client secret)",
+    ],
+    [
+      { event: "sso_domain_added", detail: "acmedental.com" },
+      "ana@northwind.test added the domain acmedental.com to Acme Dental's single sign-on",
+    ],
+    [
+      { event: "sso_domain_verified", detail: "acmedental.com" },
+      "ana@northwind.test verified the domain acmedental.com for Acme Dental",
+    ],
+    [
+      { event: "sso_domain_removed", detail: "acmedental.com" },
+      "ana@northwind.test removed the domain acmedental.com from Acme Dental's single sign-on",
+    ],
+    [
+      { event: "sso_api_keys_replaced", detail: "3" },
+      "ana@northwind.test replaced the API keys of 3 members who must use Acme Dental's single sign-on",
+    ],
+    [
+      { event: "sso_unlinked", targetEmail: "ben@acmedental.com" },
+      "ana@northwind.test unlinked ben@acmedental.com's single sign-on in Acme Dental",
+    ],
     [
       { event: "staff_invited", detail: "admin" },
       "ana@northwind.test invited ben@northwind.test to join as an admin",

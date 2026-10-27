@@ -60,6 +60,8 @@ import {
   TooltipDirective,
 } from "@bitwarden/components";
 
+import { keykeeperStartSsoLink } from "../sso/keykeeper-sso-link";
+
 import { LoginComponentService, PasswordPolicies } from "./login-component.service";
 
 const BroadcasterSubscriptionId = "LoginComponent";
@@ -438,6 +440,18 @@ export class LoginComponent implements OnInit, OnDestroy {
     // Redirect to device verification if this is an unknown device
     if (authResult.requiresDeviceVerification) {
       await this.router.navigate(["device-verification"]);
+      return;
+    }
+
+    // Keykeeper: required to use single sign-on and not linked yet: link first.
+    if (
+      await keykeeperStartSsoLink(authResult, {
+        router: this.router,
+        toastService: this.toastService,
+        i18nService: this.i18nService,
+        clientType: this.clientType,
+      })
+    ) {
       return;
     }
 
