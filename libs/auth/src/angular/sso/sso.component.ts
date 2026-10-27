@@ -638,6 +638,11 @@ export class SsoComponent implements OnInit {
 
         if (response.data.length > 0) {
           this.identifierFormControl.setValue(response.data[0].organizationIdentifier);
+          // Keykeeper: never by itself for the command-line tool (see ngOnInit).
+          if (this.clientId === ClientType.Cli) {
+            this.loggingIn = false;
+            return;
+          }
           await this.submit();
           return;
         }
