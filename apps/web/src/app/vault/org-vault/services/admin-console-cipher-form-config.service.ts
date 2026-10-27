@@ -123,8 +123,9 @@ export class AdminConsoleCipherFormConfigService implements CipherFormConfigServ
   private async getCipherFromAdminApi(id: CipherId): Promise<Cipher> {
     const cipherResponse = await this.apiService.getCipherAdmin(id);
     // Ensure admin response includes permissions that allow editing
+    // Keykeeper: viewPassword stays as the server says, from the person's
+    // grid (DESIGN.md, "Folders and permissions").
     cipherResponse.edit = true;
-    cipherResponse.viewPassword = true;
 
     const cipherData = new CipherData(cipherResponse);
     return new Cipher(cipherData);

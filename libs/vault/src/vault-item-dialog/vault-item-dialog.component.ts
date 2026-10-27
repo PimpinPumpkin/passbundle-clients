@@ -525,8 +525,9 @@ export class VaultItemDialogComponent implements OnInit, OnDestroy {
     // When the form config is used within the Admin Console, retrieve the cipher from the admin endpoint (if not found in local state)
     if (this.formConfig.isAdminConsole && (cipher == null || this.formConfig.admin)) {
       const cipherResponse = await this.apiService.getCipherAdmin(cipherView.id);
+      // Keykeeper: viewPassword stays as the server says, from the person's
+      // grid (DESIGN.md, "Folders and permissions").
       cipherResponse.edit = true;
-      cipherResponse.viewPassword = true;
 
       const cipherData = new CipherData(cipherResponse);
       cipher = new Cipher(cipherData);

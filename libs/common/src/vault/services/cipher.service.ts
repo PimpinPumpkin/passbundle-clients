@@ -1212,8 +1212,9 @@ export class CipherService implements CipherServiceAbstraction {
     // The response will be incomplete with several properties missing values
     // We will assign those properties values so the SDK decryption can complete
     const completedResponse = new CipherResponse(response);
+    // Keykeeper: viewPassword stays as the server says, from the person's
+    // grid (DESIGN.md, "Folders and permissions").
     completedResponse.edit = true;
-    completedResponse.viewPassword = true;
     completedResponse.favorite = false;
     const data = new CipherData(completedResponse);
     return new Cipher(data);
