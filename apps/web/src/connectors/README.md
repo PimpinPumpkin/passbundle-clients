@@ -11,8 +11,10 @@ inputs of their choosing. PassBundle's rules for them (DESIGN.md, "Connector pag
 - PassBundle's extension origins come from `brand/brand.json` (`extension.chromiumId`), which
   `brand/apply.mjs` writes into `keykeeper-origins.ts` at build time. An unbranded build answers
   the web vault only.
-- The server sends every connector page with `frame-ancestors 'self'` and PassBundle's extension
-  origins, so other sites can't frame one at all.
+- The server sends every connector page with a policy of its own: `default-src 'self'`,
+  `script-src 'self'`, `object-src 'none'`, `base-uri 'self'`, and `frame-ancestors 'self'` plus
+  PassBundle's extension origins. Other sites can't frame one at all, and it loads only its own
+  files.
 - Upstream's deep links back to its mobile and desktop apps (`bitwarden://...-callback`,
   `https://bitwarden.com/...-callback`) are gone: PassBundle's own apps don't use these pages.
 
@@ -33,7 +35,7 @@ serialization (`buildDataString()`).
 The `WebAuthnIFrame` class (`libs/common/src/auth/webauthn-iframe.ts`) frames the connector.
 
 1. `WebAuthnIFrame.init()` embeds `webauthn-connector.html` with `allow="publickey-credentials-get <origin>"`, passing `data` (base64 JSON), `parent` (the embedding page's URL), `btnText`, `btnAwaitingInteractionText`, and `v=1`
-2. The connector takes the parent's origin only when it is the web vault's own origin or PassBundle's extension (`allowedParentOrigin()`), and only when every page around it is one of those, where the browser lists them (`framedOnlyBy()`, from `location.ancestorOrigins`)
+2. The connector takes the parent's origin only when it is the web vault's own origin or PassBundle's extension (`allowedParentOrigin()`), and only when every page around it is one of those, where the browser lists them (`framedOnlyBy()`, from `location.ancestorOrigins`). Firefox doesn't list them; there the page that loaded the frame (`document.referrer`) must be on the parent's origin, and a frame without a referrer gets nothing
 3. Otherwise it refuses: no security key prompt, no message, and a page that says so
 4. It sends `info|ready`, then `success|<data>` or `error|<message>`, with `postMessage` to that origin only, never `*`
 5. It takes `stop` and `start` only from its parent window at that origin
@@ -49,8 +51,9 @@ The extension never frames a connector: `ExtensionTwoFactorAuthWebAuthnComponent
 3. On success it sends `window.postMessage({ command: "webAuthnResult", data, remember }, window.location.origin)` to its own window
 4. The extension's content script (`content-message-handler.ts`) forwards it to the background, which checks the referrer is a known vault (`isValidVaultReferrer()`, `runtime.background.ts`) and opens the two-step login popout with the answer
 
-The server refuses an answer made in a frame on another site (clientDataJSON `crossOrigin: true`
-with a `topOrigin` that isn't the vault or PassBundle's extension), whatever page asked for it.
+The server refuses every answer made in a frame that isn't on the vault's own origin
+(clientDataJSON `crossOrigin: true`, or any `topOrigin`), whatever page asked for it. No
+PassBundle flow makes one: the web vault frames its own connector, and the extension uses a tab.
 
 ## Duo Flow
 

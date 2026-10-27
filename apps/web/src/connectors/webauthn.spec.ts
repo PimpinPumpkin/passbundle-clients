@@ -67,6 +67,7 @@ describe("webauthn connector", () => {
   });
 
   afterEach(() => {
+    Object.defineProperty(document, "referrer", { value: "", configurable: true });
     for (const [type, listener] of listeners) {
       window.removeEventListener(type, listener);
     }
@@ -79,13 +80,19 @@ describe("webauthn connector", () => {
   /**
    * Opens the connector with this parent, in a frame whose surrounding pages
    * the browser lists as `ancestors` (undefined: a browser that doesn't list
-   * them, like Firefox). `framed: false` opens it on its own.
+   * them, like Firefox, where the page that loaded the frame is `referrer`).
+   * `framed: false` opens it on its own.
    */
   async function open(
     parentUrl: string,
-    { ancestors, framed = true }: { ancestors?: string[]; framed?: boolean } = {},
+    {
+      ancestors,
+      referrer = "",
+      framed = true,
+    }: { ancestors?: string[]; referrer?: string; framed?: boolean } = {},
   ) {
     const href = connectorUrl(parentUrl);
+    Object.defineProperty(document, "referrer", { value: referrer, configurable: true });
     Object.defineProperty(window, "location", {
       value: { href, hostname: new URL(vault).hostname, origin: vault, ancestorOrigins: ancestors },
       writable: true,
@@ -126,7 +133,7 @@ describe("webauthn connector", () => {
     });
 
     it("the vault in a browser that doesn't list ancestors, only at the vault's origin", async () => {
-      await open(`${vault}/#/2fa`);
+      await open(`${vault}/#/2fa`, { referrer: `${vault}/#/2fa` });
 
       expect(sent().map(([, origin]) => origin)).toEqual([vault, vault]);
     });
@@ -162,11 +169,20 @@ describe("webauthn connector", () => {
       expect(document.getElementById("webauthn-button")).toBeNull();
     });
 
-    it("for another site, in a browser that doesn't list ancestors", async () => {
-      await open(`${attacker}/phish.html`);
+    it.each([
+      [
+        "another site naming itself as the parent",
+        `${attacker}/phish.html`,
+        `${attacker}/phish.html`,
+      ],
+      ["another site naming the vault as the parent", `${vault}/#/2fa`, `${attacker}/phish.html`],
+      ["a frame whose referrer was withheld", `${vault}/#/2fa`, ""],
+    ])("in a browser that doesn't list ancestors, for %s", async (_, parentUrl, referrer) => {
+      await open(parentUrl, { referrer });
 
       expect(get).not.toHaveBeenCalled();
       expect(parent.postMessage).not.toHaveBeenCalled();
+      expect(document.body.hasAttribute("data-refused")).toBe(true);
     });
 
     it("when opened on its own, not in a frame", async () => {

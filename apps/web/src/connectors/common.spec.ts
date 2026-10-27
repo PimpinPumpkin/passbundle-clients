@@ -26,6 +26,10 @@ function setParent(parent: Window | object) {
   Object.defineProperty(window, "parent", { value: parent, configurable: true });
 }
 
+function setReferrer(referrer: string) {
+  Object.defineProperty(document, "referrer", { value: referrer, configurable: true });
+}
+
 describe("common connector utilities", () => {
   const ownParent = window.parent;
   afterEach(() => setParent(ownParent));
@@ -139,10 +143,27 @@ describe("common connector utilities", () => {
       expect(framedOnlyBy(vault)).toBe(false);
     });
 
-    it("leaves the check to postMessage where the browser lists no ancestors", () => {
-      setParent(framedBy);
-      setLocation(`${vault}/webauthn-connector.html`);
-      expect(framedOnlyBy(vault)).toBe(true);
+    describe("where the browser lists no ancestors (Firefox)", () => {
+      beforeEach(() => {
+        setParent(framedBy);
+        setLocation(`${vault}/webauthn-connector.html`);
+      });
+      afterEach(() => setReferrer(""));
+
+      it("is true when the page that loaded the frame is on the parent's origin", () => {
+        setReferrer(`${vault}/#/2fa`);
+        expect(framedOnlyBy(vault)).toBe(true);
+      });
+
+      it("is false when that page is another site", () => {
+        setReferrer("https://attacker.example.net/phish.html");
+        expect(framedOnlyBy(vault)).toBe(false);
+      });
+
+      it("is false when the referrer was withheld", () => {
+        setReferrer("");
+        expect(framedOnlyBy(vault)).toBe(false);
+      });
     });
   });
 });

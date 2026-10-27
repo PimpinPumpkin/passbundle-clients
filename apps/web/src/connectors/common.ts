@@ -20,27 +20,33 @@ export function isAllowedOrigin(origin: string | null | undefined): boolean {
  * connector may answer; otherwise null, and the connector answers no one.
  */
 export function allowedParentOrigin(parentUrl: string | null): string | null {
-  if (!parentUrl) {
+  const origin = originOf(parentUrl);
+  return isAllowedOrigin(origin) ? origin : null;
+}
+
+/** The origin of an address, or null for none or one that isn't a URL. */
+function originOf(address: string | null | undefined): string | null {
+  if (!address) {
     return null;
   }
-  let origin: string;
   try {
-    const url = new URL(parentUrl);
+    const url = new URL(address);
     // Extension addresses aren't "special" URLs, so URL.origin can be "null"
     // for them outside Chromium; their origin is the scheme and the ID.
-    origin = url.protocol === "chrome-extension:" ? `chrome-extension://${url.host}` : url.origin;
+    return url.protocol === "chrome-extension:" ? `chrome-extension://${url.host}` : url.origin;
   } catch {
     return null;
   }
-  return isAllowedOrigin(origin) ? origin : null;
 }
 
 /**
  * Whether every page around this one is one a connector may answer, where
  * the browser says (Chromium and Safari list them in
- * location.ancestorOrigins; Firefox doesn't, and there postMessage's target
- * origin and the server's frame-ancestors guard alone). The nearest must be
- * the expected parent.
+ * location.ancestorOrigins). The nearest must be the expected parent.
+ * Firefox doesn't list them: there the page that loaded this frame (its
+ * referrer) must be on the parent's origin, and a frame with no referrer
+ * gets nothing. postMessage's target origin and the server's
+ * frame-ancestors guard too.
  */
 export function framedOnlyBy(parentOrigin: string): boolean {
   if (window.parent === window) {
@@ -48,7 +54,7 @@ export function framedOnlyBy(parentOrigin: string): boolean {
   }
   const ancestors = window.location.ancestorOrigins;
   if (ancestors == null) {
-    return true;
+    return originOf(document.referrer) === parentOrigin;
   }
   if (ancestors.length === 0 || ancestors[0] !== parentOrigin) {
     return false;
