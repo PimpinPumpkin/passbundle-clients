@@ -250,6 +250,17 @@ export type MspSiteFixes = {
 /** An organization that can't confirm the person until they turn on two-step login. */
 export type TwoStepNeeded = { organizationId: string; name: string };
 
+/**
+ * A role the server joined someone to without asking them (a server that
+ * sends no email), which two-step login for admins doesn't count until they
+ * accept it. See DESIGN.md, "Two-step login for admins".
+ */
+export type UnacceptedRole = {
+  organizationId: string;
+  name: string;
+  role: "owner" | "admin" | "custom";
+};
+
 /** A script token as its organization's admins see it (docs/script-access.md). */
 export type ScriptTokenView = {
   id: string;

@@ -32,6 +32,7 @@ import {
   SsoSettings,
   SsoView,
   TechnicianAccess,
+  UnacceptedRole,
 } from "@bitwarden/admin-console/common";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
@@ -456,6 +457,34 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
   async hasQualifyingTwoStep(): Promise<boolean> {
     const info = await this.apiService.send("GET", "/keykeeper/two-step-setup", null, true, true);
     return info?.qualifying === true;
+  }
+
+  /**
+   * The caller's roles that the server joined them to without asking (a
+   * server that sends no email), where the organization requires two-step
+   * login for them. Two-step login for admins doesn't count one until they
+   * accept it.
+   */
+  async unacceptedRoles(): Promise<UnacceptedRole[]> {
+    const listed = await this.apiService.send(
+      "GET",
+      "/keykeeper/organizations/unaccepted",
+      null,
+      true,
+      true,
+    );
+    return (listed?.data ?? []) as UnacceptedRole[];
+  }
+
+  /** Accepts a role the server joined the caller to without asking. */
+  async acceptRole(orgId: string): Promise<void> {
+    await this.apiService.send(
+      "POST",
+      `/keykeeper/organizations/${orgId}/accept`,
+      null,
+      true,
+      true,
+    );
   }
 
   /** The MSP's two-step login: its staff, and each client's own admins. */
