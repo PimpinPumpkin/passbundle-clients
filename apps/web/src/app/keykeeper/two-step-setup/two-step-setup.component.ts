@@ -382,10 +382,12 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
       }
       // The server answers with the creation options themselves; upstream's
       // newer servers wrap them in "options".
-      const answer = (await this.call("POST", "/two-factor/get-webauthn-challenge", {
+      const offered = (await this.call("POST", "/two-factor/get-webauthn-challenge", {
         masterPasswordHash,
       })) as { options?: unknown; Options?: unknown };
-      const challenge = new WebAuthnChallengeResponse(answer.options ?? answer.Options ?? answer);
+      const challenge = new WebAuthnChallengeResponse(
+        offered.options ?? offered.Options ?? offered,
+      );
       const credential = (await navigator.credentials.create({
         publicKey: challenge,
       })) as PublicKeyCredential | null;
