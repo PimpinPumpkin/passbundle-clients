@@ -23,6 +23,22 @@
     </bit-radio-button>
   </bit-radio-group>
 
+  @if (data.controls.when.value === "onSystemLock") {
+    <bit-form-field>
+      <bit-label>In the web vault, at most</bit-label>
+      <bit-select formControlName="webMinutes" id="vaultLockWebMinutes">
+        @for (minutes of webWaits(); track minutes) {
+          <bit-option [value]="minutes" [label]="waitLabel(minutes)"></bit-option>
+        }
+      </bit-select>
+      <bit-hint>
+        Web pages can't see the computer lock, so the web vault locks after this long without use
+        instead, and when its tab closes. Members who want it to lock at every reload too turn off
+        "Stay unlocked when I reload".
+      </bit-hint>
+    </bit-form-field>
+  }
+
   @if (data.controls.when.value === "custom") {
     <bit-form-field>
       <bit-label>At most</bit-label>
@@ -47,4 +63,13 @@
       <bit-hint>The vault is removed from the device, and members sign in again.</bit-hint>
     </bit-radio-button>
   </bit-radio-group>
+
+  <bit-form-control>
+    <input type="checkbox" bitCheckbox formControlName="webReload" id="vaultLockWebReload" />
+    <bit-label>Web vaults can stay unlocked when members reload the page</bit-label>
+    <bit-hint>
+      Until the timeout, if a member leaves "Stay unlocked when I reload" on. Turn this off where
+      people share computers: every reload, and every reopened tab, asks for the master password.
+    </bit-hint>
+  </bit-form-control>
 </ng-container>

@@ -31,12 +31,15 @@ import { KeykeeperGeneratorSettingsSync } from "@bitwarden/generator-core";
 import { KeyService as KeyServiceAbstraction } from "@bitwarden/key-management";
 
 import { KeykeeperMspWorkService } from "../keykeeper/msp/msp-work.service";
+import { KeykeeperReloadKeyService } from "../keykeeper/reload-key/reload-key.service";
 import { VersionService } from "../platform/version.service";
 
 @Injectable()
 export class InitService {
   // Keykeeper: an MSP's background work (confirming members, keeping templates current).
   private readonly keykeeperMspWork = inject(KeykeeperMspWorkService);
+  // Keykeeper: a tab stays unlocked across a reload, within its timeout.
+  private readonly keykeeperReloadKey = inject(KeykeeperReloadKeyService);
   // Keykeeper: the generator's settings follow someone to each device.
   private readonly keykeeperGeneratorSettings = new KeykeeperGeneratorSettingsSync(
     inject(ApiService),
@@ -85,7 +88,11 @@ export class InitService {
         // If there is an active account, we must await the process of setting the user key in memory
         // if the auto user key is set to avoid race conditions of any code trying to access the user key from mem.
         await this.userAutoUnlockKeyService.setUserKeyInMemoryIfAutoUserKeySet(activeAccount.id);
+        // Keykeeper: the same, for a reload within the timeout, from this
+        // tab's reload key (KeykeeperReloadKey).
+        await this.keykeeperReloadKey.restore(activeAccount.id);
       }
+      this.keykeeperReloadKey.start();
 
       this.serverNotificationsService.startListening();
       await this.vaultTimeoutService.init(true);

@@ -20,7 +20,10 @@ import { TokenService } from "../../../auth/services/token.service";
 import { LogService } from "../../../platform/abstractions/log.service";
 import { Utils } from "../../../platform/misc/utils";
 import { UserId } from "../../../types/guid";
-import { SessionTimeoutTypeService } from "../../session-timeout";
+import {
+  KEYKEEPER_STAY_UNLOCKED_ON_RELOAD,
+  SessionTimeoutTypeService,
+} from "../../session-timeout";
 import {
   PIN_PROTECTED_USER_KEY_ENVELOPE_EPHEMERAL,
   PIN_PROTECTED_USER_KEY_ENVELOPE_PERSISTENT,
@@ -775,6 +778,184 @@ describe("VaultTimeoutSettingsService", () => {
         );
         expect(result).toBe(promotedValue);
       });
+    });
+
+    // Keykeeper: a web page can't see the computer lock, so in the web vault
+    // "when the computer locks" is a longest wait of webMinutes (15 when the
+    // policy doesn't say), as a custom policy would be.
+    describe("Keykeeper: policy type onSystemLock where the computer lock can't be seen", () => {
+      beforeEach(() => {
+        (sessionTimeoutTypeService as any).keykeeperSystemLockIsWait = true;
+      });
+
+      it.each([
+        [VaultTimeoutStringType.OnRestart, undefined, 15],
+        [VaultTimeoutStringType.Never, undefined, 15],
+        [VaultTimeoutNumberType.EightHours, undefined, 15],
+        [5, undefined, 5],
+        [VaultTimeoutNumberType.EightHours, 1, 1],
+        [VaultTimeoutStringType.OnRestart, 60, 60],
+        [null, 5, 5],
+      ])(
+        "when current timeout is %s and webMinutes is %s, returns %s",
+        async (currentTimeout, webMinutes, expected) => {
+          policyService.policiesByType$.mockReturnValue(
+            of([{ data: { type: "onSystemLock", webMinutes } }] as unknown as Policy[]),
+          );
+          await stateProvider.setUserState(VAULT_TIMEOUT, currentTimeout, mockUserId);
+
+          const result = await firstValueFrom(
+            vaultTimeoutSettingsService.getVaultTimeoutByUserId$(mockUserId),
+          );
+
+          expect(result).toBe(expected);
+          expect(sessionTimeoutTypeService.getOrPromoteToAvailable).not.toHaveBeenCalledWith(
+            VaultTimeoutStringType.OnLocked,
+          );
+        },
+      );
+
+      it("keeps the person's own choice in state: the cap applies where it's read", async () => {
+        policyService.policiesByType$.mockReturnValue(
+          of([{ data: { type: "onSystemLock", webMinutes: 15 } }] as unknown as Policy[]),
+        );
+        await stateProvider.setUserState(
+          VAULT_TIMEOUT,
+          VaultTimeoutNumberType.EightHours,
+          mockUserId,
+        );
+
+        expect(
+          await firstValueFrom(vaultTimeoutSettingsService.getVaultTimeoutByUserId$(mockUserId)),
+        ).toBe(15);
+        expect(await firstValueFrom(stateProvider.getUserState$(VAULT_TIMEOUT, mockUserId))).toBe(
+          VaultTimeoutNumberType.EightHours,
+        );
+      });
+
+      it("keeps a stored On browser refresh, and leaves the reload setting alone", async () => {
+        policyService.policiesByType$.mockReturnValue(
+          of([{ data: { type: "onSystemLock" } }] as unknown as Policy[]),
+        );
+        await stateProvider.setUserState(
+          VAULT_TIMEOUT,
+          VaultTimeoutStringType.OnRestart,
+          mockUserId,
+        );
+
+        expect(
+          await firstValueFrom(vaultTimeoutSettingsService.getVaultTimeoutByUserId$(mockUserId)),
+        ).toBe(15);
+        expect(await firstValueFrom(stateProvider.getUserState$(VAULT_TIMEOUT, mockUserId))).toBe(
+          VaultTimeoutStringType.OnRestart,
+        );
+        expect(
+          await firstValueFrom(
+            stateProvider.getUserState$(KEYKEEPER_STAY_UNLOCKED_ON_RELOAD, mockUserId),
+          ),
+        ).toBeNull();
+      });
+
+      it("writes Never as what applies", async () => {
+        policyService.policiesByType$.mockReturnValue(
+          of([{ data: { type: "onSystemLock" } }] as unknown as Policy[]),
+        );
+        await stateProvider.setUserState(VAULT_TIMEOUT, VaultTimeoutStringType.Never, mockUserId);
+
+        await firstValueFrom(vaultTimeoutSettingsService.getVaultTimeoutByUserId$(mockUserId));
+        expect(await firstValueFrom(stateProvider.getUserState$(VAULT_TIMEOUT, mockUserId))).toBe(
+          15,
+        );
+      });
+    });
+
+    // Keykeeper: a policy that writes its minutes over the web vault's "On
+    // browser refresh" turns "Stay unlocked when I reload" off, so every
+    // reload still locks.
+    describe("Keykeeper: a policy that replaces On browser refresh", () => {
+      const reloadSetting = () =>
+        firstValueFrom(stateProvider.getUserState$(KEYKEEPER_STAY_UNLOCKED_ON_RELOAD, mockUserId));
+
+      beforeEach(() => {
+        policyService.policiesByType$.mockReturnValue(
+          of([{ data: { type: "custom", minutes: 30 } }] as unknown as Policy[]),
+        );
+      });
+
+      it("turns the reload setting off in the web vault, and says why", async () => {
+        (sessionTimeoutTypeService as any).keykeeperSystemLockIsWait = true;
+        await stateProvider.setUserState(
+          VAULT_TIMEOUT,
+          VaultTimeoutStringType.OnRestart,
+          mockUserId,
+        );
+
+        expect(
+          await firstValueFrom(vaultTimeoutSettingsService.getVaultTimeoutByUserId$(mockUserId)),
+        ).toBe(30);
+        expect(await firstValueFrom(stateProvider.getUserState$(VAULT_TIMEOUT, mockUserId))).toBe(
+          30,
+        );
+        expect(await reloadSetting()).toEqual({ on: false, because: "onBrowserRefreshReplaced" });
+      });
+
+      it("leaves it alone for a timeout in minutes", async () => {
+        (sessionTimeoutTypeService as any).keykeeperSystemLockIsWait = true;
+        await stateProvider.setUserState(VAULT_TIMEOUT, 60, mockUserId);
+
+        await firstValueFrom(vaultTimeoutSettingsService.getVaultTimeoutByUserId$(mockUserId));
+        expect(await reloadSetting()).toBeNull();
+      });
+
+      it("leaves it alone outside the web vault", async () => {
+        await stateProvider.setUserState(
+          VAULT_TIMEOUT,
+          VaultTimeoutStringType.OnRestart,
+          mockUserId,
+        );
+
+        await firstValueFrom(vaultTimeoutSettingsService.getVaultTimeoutByUserId$(mockUserId));
+        expect(await reloadSetting()).toBeNull();
+      });
+
+      it("still takes the policy's action", async () => {
+        userDecryptionOptionsSubject.next(new UserDecryptionOptions({ hasMasterPassword: true }));
+        policyService.policiesByType$.mockReturnValue(
+          of([
+            { data: { type: "onSystemLock", webMinutes: 30, action: "logOut" } },
+          ] as unknown as Policy[]),
+        );
+        await stateProvider.setUserState(VAULT_TIMEOUT, 15, mockUserId);
+
+        const result = await firstValueFrom(
+          vaultTimeoutSettingsService.getVaultTimeoutActionByUserId$(mockUserId),
+        );
+
+        expect(result).toBe(VaultTimeoutAction.LogOut);
+      });
+    });
+
+    describe("Keykeeper: keykeeperLocksOnSystemLock$", () => {
+      it.each([
+        [{ type: "onSystemLock" }, true, true],
+        [{ type: "onSystemLock" }, false, false],
+        [{ type: "custom", minutes: 15 }, true, false],
+        [null, true, false],
+      ])(
+        "for policy %j where the lock can be seen: %s, says %s",
+        async (data, lockVisible, expected) => {
+          sessionTimeoutTypeService.isAvailable.mockResolvedValue(lockVisible as boolean);
+          policyService.policiesByType$.mockReturnValue(
+            of(data == null ? [] : ([{ data }] as unknown as Policy[])),
+          );
+
+          const result = await firstValueFrom(
+            vaultTimeoutSettingsService.keykeeperLocksOnSystemLock$(mockUserId),
+          );
+
+          expect(result).toBe(expected);
+        },
+      );
     });
 
     describe("policy type: onAppRestart", () => {
