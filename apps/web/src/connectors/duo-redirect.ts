@@ -1,7 +1,6 @@
-import { buildMobileDeeplinkUriFromParam, getQsParam } from "./common";
+import { getQsParam } from "./common";
 import { TranslationService } from "./translation.service";
 
-const mobileDesktopCallback = "bitwarden://duo-callback";
 let localeService: TranslationService | null = null;
 
 window.addEventListener("load", async () => {
@@ -28,6 +27,10 @@ window.addEventListener("load", async () => {
   localeService = new TranslationService(navigator.language, "locales");
   await localeService.init();
 
+  // PassBundle: the web vault and the extension, both on this page's own
+  // origin. Upstream's mobile and desktop apps got the code through deep
+  // links to upstream's apps; PassBundle's own apps don't use Duo here, so
+  // those are gone (DESIGN.md, "Connector pages").
   if (client === "web") {
     const channel = new BroadcastChannel("duoResult");
 
@@ -38,23 +41,6 @@ window.addEventListener("load", async () => {
   } else if (client === "browser") {
     window.postMessage({ command: "duoResult", code, state }, window.location.origin);
     displayHandoffMessage(client);
-  } else if (client === "mobile") {
-    document.location.replace(
-      buildMobileDeeplinkUriFromParam("duo") +
-        "?code=" +
-        encodeURIComponent(code) +
-        "&state=" +
-        encodeURIComponent(state),
-    );
-  } else if (client === "desktop") {
-    displayHandoffMessage(client);
-    document.location.replace(
-      mobileDesktopCallback +
-        "?code=" +
-        encodeURIComponent(code) +
-        "&state=" +
-        encodeURIComponent(state),
-    );
   }
 });
 
