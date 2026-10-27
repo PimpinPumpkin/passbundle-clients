@@ -184,20 +184,8 @@ const qrious = () => (window as unknown as { QRious?: QRiousConstructor }).QRiou
       @case ("duo") {
         <form [formGroup]="duoForm" [bitSubmit]="turnOnDuo">
           <p bitTypography="body1">
-            Enter your Duo application's details from the Duo Admin Panel.
+            Duo uses this server's Duo account. Each time you sign in, you approve it in Duo.
           </p>
-          <bit-form-field>
-            <bit-label>Client ID</bit-label>
-            <input bitInput type="text" formControlName="clientId" />
-          </bit-form-field>
-          <bit-form-field>
-            <bit-label>Client secret</bit-label>
-            <input bitInput type="password" formControlName="clientSecret" />
-          </bit-form-field>
-          <bit-form-field>
-            <bit-label>API hostname</bit-label>
-            <input bitInput type="text" formControlName="host" />
-          </bit-form-field>
           <div class="tw-flex tw-gap-2">
             <button bitButton bitFormButton buttonType="primary" type="submit">Turn on</button>
             <button bitButton buttonType="secondary" type="button" (click)="back()">Back</button>
@@ -263,11 +251,8 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
   protected readonly webAuthnForm = new FormGroup({
     name: new FormControl("Security key", { nonNullable: true }),
   });
-  protected readonly duoForm = new FormGroup({
-    clientId: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
-    clientSecret: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
-    host: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
-  });
+  /** Duo with this server's own Duo account, the only Duo that counts: no fields. */
+  protected readonly duoForm = new FormGroup({});
 
   /** The setup session, the master password's server hash (in memory only), and the QR script. */
   private readonly held: {
@@ -425,10 +410,11 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
 
   protected readonly turnOnDuo = async () => {
     await this.attempt(async () => {
+      // Empty keys: the server's own Duo account.
       const answer = (await this.call("PUT", "/two-factor/duo", {
-        clientId: this.duoForm.controls.clientId.value.trim(),
-        clientSecret: this.duoForm.controls.clientSecret.value.trim(),
-        host: this.duoForm.controls.host.value.trim(),
+        clientId: "",
+        clientSecret: "",
+        host: "",
         masterPasswordHash: await this.passwordHash(),
       })) as { keykeeperRecoveryCode?: string };
       this.finish(answer);

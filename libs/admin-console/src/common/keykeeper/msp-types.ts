@@ -406,14 +406,6 @@ export type SsoSettings = {
  */
 export const KEYKEEPER_ADMIN_TWO_STEP_POLICY = 1000;
 
-/**
- * The two-step login methods that count for a role that requires it, by
- * upstream's provider type: an authenticator app (0), Duo (2), and a security
- * key or passkey (7). Email codes (1) don't. The server decides; this is for
- * telling someone before they take on such a role.
- */
-export const KEYKEEPER_QUALIFYING_TWO_STEP = [0, 2, 7];
-
 /** Someone two-step login for admins covers who hasn't set up a method that counts. */
 export type TwoStepNotSetUp = {
   /** Their membership, in an organization's list. */

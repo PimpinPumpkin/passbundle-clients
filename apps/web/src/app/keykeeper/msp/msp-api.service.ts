@@ -10,7 +10,6 @@ import { Injectable } from "@angular/core";
 import { firstValueFrom } from "rxjs";
 
 import {
-  KEYKEEPER_QUALIFYING_TWO_STEP,
   AddStaffResult,
   ClientEnrollment,
   ClientMsp,
@@ -450,14 +449,13 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
 
   /**
    * Whether the person has set up a two-step login method that counts for an
-   * owner's, admin's, or MSP staff's role (not email codes), from upstream's
-   * list of their methods.
+   * owner's, admin's, or MSP staff's role, as the server decides it: an
+   * authenticator app, a security key or passkey, or Duo with the server's
+   * own Duo account (not email codes, nor Duo with their own Duo application).
    */
   async hasQualifyingTwoStep(): Promise<boolean> {
-    const list = await this.apiService.send("GET", "/two-factor", null, true, true);
-    return ((list?.data ?? []) as { type: number; enabled: boolean }[]).some(
-      (p) => p.enabled && KEYKEEPER_QUALIFYING_TWO_STEP.includes(p.type),
-    );
+    const info = await this.apiService.send("GET", "/keykeeper/two-step-setup", null, true, true);
+    return info?.qualifying === true;
   }
 
   /** The MSP's two-step login: its staff, and each client's own admins. */
