@@ -36,8 +36,11 @@
   <app-keykeeper-client-msp-banner
     class="tw-mb-4 tw-block"
     [organization]="organization"
+    [members]="dataSource.data"
     (removed)="load(organization)"
   ></app-keykeeper-client-msp-banner>
+  <!-- Keykeeper: after a removal, the offer to replace the install command's token. -->
+  <app-keykeeper-install-token-prompt [organization]="organization" [members]="dataSource.data" />
   <!-- Keykeeper: opening this page lets in anyone waiting. -->
   <app-keykeeper-members-joining [organization]="organization" (joined)="load(organization)" />
 
