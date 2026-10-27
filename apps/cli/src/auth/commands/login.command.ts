@@ -606,37 +606,44 @@ export class LoginCommand {
           callbackServer.close(() => reject());
         }
       });
-      let foundPort = false;
       const webUrl = env.getWebVaultUrl();
-      for (let port = 8065; port <= 8070; port++) {
-        try {
-          this.ssoRedirectUri = "http://localhost:" + port;
-          callbackServer.listen(port, "localhost", () => {
-            const webAppSsoUrl = this.ssoUrlService.buildSsoUrl(
-              webUrl,
-              ClientType.Cli,
-              this.ssoRedirectUri,
-              state,
-              codeChallenge,
-              null,
-              orgSsoIdentifier,
-            );
-            // Keykeeper: the address too, for when no browser opens (a
-            // server's shell, say), on stderr so scripts' output stays clean.
-            if (process.env.BW_QUIET !== "true") {
-              CliUtils.writeLn(ssoPromptMessage(webAppSsoUrl), false, true);
-            }
-            this.platformUtilsService.launchUri(webAppSsoUrl);
-          });
-          foundPort = true;
-          break;
-        } catch {
-          // Ignore error since we run the same command up to 5 times.
+      // Keykeeper: the first free port of 8065 to 8070, the ones the server
+      // takes. Upstream's loop never moved on: `listen` reports a busy port
+      // later, as an error event, not by throwing.
+      const listenOn = (port: number): void => {
+        if (port > 8070) {
+          reject();
+          return;
         }
-      }
-      if (!foundPort) {
-        reject();
-      }
+        const taken = (error: NodeJS.ErrnoException) => {
+          if (error.code === "EADDRINUSE" || error.code === "EACCES") {
+            listenOn(port + 1);
+          } else {
+            reject();
+          }
+        };
+        callbackServer.once("error", taken);
+        this.ssoRedirectUri = "http://localhost:" + port;
+        callbackServer.listen(port, "localhost", () => {
+          callbackServer.removeListener("error", taken);
+          const webAppSsoUrl = this.ssoUrlService.buildSsoUrl(
+            webUrl,
+            ClientType.Cli,
+            this.ssoRedirectUri,
+            state,
+            codeChallenge,
+            null,
+            orgSsoIdentifier,
+          );
+          // Keykeeper: the address too, for when no browser opens (a
+          // server's shell, say), on stderr so scripts' output stays clean.
+          if (process.env.BW_QUIET !== "true") {
+            CliUtils.writeLn(ssoPromptMessage(webAppSsoUrl), false, true);
+          }
+          this.platformUtilsService.launchUri(webAppSsoUrl);
+        });
+      };
+      listenOn(8065);
     });
   }
 
