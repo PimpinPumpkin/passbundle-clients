@@ -11,6 +11,9 @@ import {
 import { CheckboxModule, FormControlModule } from "@bitwarden/components";
 import { I18nPipe } from "@bitwarden/ui-common";
 
+/** Keykeeper: numbers each grid on the page, for its hints' ids. */
+let nextGridId = 0;
+
 /**
  * Keykeeper: the Custom grid for one person or group in a shared folder, one
  * checkbox per capability. "See items" is having the folder at all, so it
@@ -42,20 +45,30 @@ import { I18nPipe } from "@bitwarden/ui-common";
           <bit-label>{{ "keykeeperCapSeeItems" | i18n }}</bit-label>
         </bit-form-control>
         @for (cap of capabilities; track cap.key) {
-          <bit-form-control>
-            <input
-              type="checkbox"
-              bitCheckbox
-              [attr.data-capability]="cap.key"
-              [checked]="grid()[cap.key]"
-              [disabled]="disabled()"
-              (change)="toggle(cap.key, $any($event.target).checked)"
-            />
-            <bit-label>{{ cap.label | i18n }}</bit-label>
+          <div>
+            <bit-form-control>
+              <input
+                type="checkbox"
+                bitCheckbox
+                [attr.data-capability]="cap.key"
+                [attr.aria-describedby]="cap.hint ? hintId + cap.key : null"
+                [checked]="grid()[cap.key]"
+                [disabled]="disabled()"
+                (change)="toggle(cap.key, $any($event.target).checked)"
+              />
+              <bit-label>{{ cap.label | i18n }}</bit-label>
+            </bit-form-control>
+            <!-- Outside the label, so the checkbox's name stays the capability's. -->
             @if (cap.hint) {
-              <bit-hint [attr.data-hint]="cap.key">{{ cap.hint | i18n }}</bit-hint>
+              <p
+                class="tw-mb-2 tw-ms-6 tw-mt-[-0.5rem] tw-text-xs tw-text-muted"
+                [id]="hintId + cap.key"
+                [attr.data-hint]="cap.key"
+              >
+                {{ cap.hint | i18n }}
+              </p>
             }
-          </bit-form-control>
+          </div>
         }
       </div>
       <p class="tw-mb-0 tw-mt-1 tw-text-sm tw-text-muted">
@@ -67,6 +80,9 @@ import { I18nPipe } from "@bitwarden/ui-common";
 export class FolderGridComponent implements ControlValueAccessor {
   /** Who the grid is for, for screen readers. */
   readonly label = input<string>();
+
+  /** Keeps each grid's hint ids apart, with a grid per person on the page. */
+  protected readonly hintId = `keykeeper-grid-${nextGridId++}-hint-`;
 
   protected readonly capabilities = FOLDER_CAPABILITIES;
   protected readonly grid = signal<FolderGrid>({ ...FOLDER_PRESETS.view });
