@@ -84,4 +84,11 @@ export abstract class VaultTimeoutSettingsService {
    * Clear vault timeout suppression for the user, allowing vault timeout to occur as normal.
    */
   abstract clearVaultTimeoutSuppression(userId: UserId): Promise<void>;
+
+  /**
+   * Keykeeper: whether a "when the computer locks" policy applies to the user
+   * on a client that can see the computer lock, so the vault locks with the
+   * computer whatever timeout the user picked.
+   */
+  abstract keykeeperLocksOnSystemLock$(userId: UserId): Observable<boolean>;
 }

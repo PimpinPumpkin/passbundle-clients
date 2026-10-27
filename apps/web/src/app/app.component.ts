@@ -1,6 +1,6 @@
 // FIXME: Update this file to be type safe and remove this and next line
 // @ts-strict-ignore
-import { Component, DestroyRef, NgZone, OnDestroy, OnInit } from "@angular/core";
+import { Component, DestroyRef, NgZone, OnDestroy, OnInit, inject } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { Router } from "@angular/router";
 import { Subject, filter, firstValueFrom, map, timeout } from "rxjs";
@@ -27,6 +27,8 @@ import { InternalFolderService } from "@bitwarden/common/vault/abstractions/fold
 import { DialogService, RouterFocusManagerService, ToastService } from "@bitwarden/components";
 import { KeyService, BiometricStateService } from "@bitwarden/key-management";
 
+import { KeykeeperReloadKeyService } from "./keykeeper/reload-key/reload-key.service";
+
 const BroadcasterSubscriptionId = "AppComponent";
 const IdleTimeout = 60000 * 10; // 10 minutes
 
@@ -38,6 +40,8 @@ const IdleTimeout = 60000 * 10; // 10 minutes
   standalone: false,
 })
 export class AppComponent implements OnDestroy, OnInit {
+  // Keykeeper: signing out forgets the tab's reload key first.
+  private readonly keykeeperReloadKey = inject(KeykeeperReloadKeyService);
   private lastActivity: Date = null;
   private idleTimer: number = null;
   private isIdle = false;
@@ -235,6 +239,8 @@ export class AppComponent implements OnDestroy, OnInit {
 
     await this.eventUploadService.uploadEvents();
     const userId = await firstValueFrom(getUserId(this.accountService.activeAccount$));
+    // Keykeeper: while the session's token is still there to ask with.
+    await this.keykeeperReloadKey.forget(userId);
 
     const logoutPromise = firstValueFrom(
       this.authService.authStatusFor$(userId).pipe(

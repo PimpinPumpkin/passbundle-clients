@@ -31,7 +31,15 @@ import { getUserId } from "../../../auth/services/account.service";
 import { LogService } from "../../../platform/abstractions/log.service";
 import { StateProvider } from "../../../platform/state";
 import { UserId } from "../../../types/guid";
-import { MaximumSessionTimeoutPolicyData, SessionTimeoutTypeService } from "../../session-timeout";
+import {
+  KEYKEEPER_STAY_UNLOCKED_ON_RELOAD,
+  keykeeperIsWebCap,
+  keykeeperSystemLockIsWait,
+  keykeeperWebSystemLockMinutes,
+  keykeeperWebSystemLockTimeout,
+  MaximumSessionTimeoutPolicyData,
+  SessionTimeoutTypeService,
+} from "../../session-timeout";
 import {
   PIN_PROTECTED_USER_KEY_ENVELOPE_EPHEMERAL,
   PIN_PROTECTED_USER_KEY_ENVELOPE_PERSISTENT,
@@ -174,7 +182,34 @@ export class VaultTimeoutSettingsService implements VaultTimeoutSettingsServiceA
             );
 
             // As a side effect, set the new value determined by determineVaultTimeout into state if it's different from the current
-            if (vaultTimeout !== currentVaultTimeout) {
+            // Keykeeper: except the web's cap under "when the computer locks",
+            // which applies where it's read, so the person's own choice stays
+            // and comes back if the policy goes (keykeeper-system-lock.ts).
+            const keykeeperCapOnly = keykeeperIsWebCap(
+              currentVaultTimeout,
+              vaultTimeout,
+              keykeeperWebSystemLockMinutes(
+                maxSessionTimeoutPolicyData,
+                this.sessionTimeoutTypeService,
+              ),
+            );
+            // Keykeeper: a policy took the web vault's "On browser refresh"
+            // away (upstream writes the policy's minutes over it, below):
+            // turn "Stay unlocked when I reload" off, so every reload still
+            // locks, as the person chose (keykeeper-reload-setting.ts).
+            if (
+              keykeeperSystemLockIsWait(this.sessionTimeoutTypeService) &&
+              currentVaultTimeout === VaultTimeoutStringType.OnRestart &&
+              isVaultTimeoutTypeNumeric(vaultTimeout) &&
+              !keykeeperCapOnly
+            ) {
+              await this.stateProvider.setUserState(
+                KEYKEEPER_STAY_UNLOCKED_ON_RELOAD,
+                { on: false, because: "onBrowserRefreshReplaced" },
+                userId,
+              );
+            }
+            if (vaultTimeout !== currentVaultTimeout && !keykeeperCapOnly) {
               await this.stateProvider.setUserState(VAULT_TIMEOUT, vaultTimeout, userId);
             }
             return vaultTimeout;
@@ -214,6 +249,17 @@ export class VaultTimeoutSettingsService implements VaultTimeoutSettingsServiceA
     // If no policy applies, return the current vault timeout
     if (maxSessionTimeoutPolicyData == null) {
       return currentVaultTimeout;
+    }
+
+    // Keykeeper: in the web vault, "when the computer locks" caps a timeout
+    // in minutes at the policy's webMinutes, and anything else is webMinutes
+    // (keykeeper-system-lock.ts).
+    const keykeeperWebMinutes = keykeeperWebSystemLockMinutes(
+      maxSessionTimeoutPolicyData,
+      this.sessionTimeoutTypeService,
+    );
+    if (keykeeperWebMinutes != null) {
+      return keykeeperWebSystemLockTimeout(currentVaultTimeout, keykeeperWebMinutes);
     }
 
     switch (maxSessionTimeoutPolicyData.type) {
@@ -400,6 +446,24 @@ export class VaultTimeoutSettingsService implements VaultTimeoutSettingsServiceA
     return this.policyService.policiesByType$(PolicyType.MaximumVaultTimeout, userId).pipe(
       getFirstPolicy,
       map((policy) => (policy?.data ?? null) as MaximumSessionTimeoutPolicyData | null),
+    );
+  }
+
+  // Keykeeper: whether a "when the computer locks" policy applies to this
+  // person on a client that can see the computer lock (the browser
+  // extension in Chrome and Edge). Upstream turns that policy into "on system
+  // lock" only for a timeout that isn't a number of minutes, and a person's
+  // timeout is one choice, so someone who picked minutes kept them and never
+  // locked with the computer. The extension's idle listener locks them too.
+  keykeeperLocksOnSystemLock$(userId: UserId): Observable<boolean> {
+    return this.policyService.policiesByType$(PolicyType.MaximumVaultTimeout, userId).pipe(
+      getFirstPolicy,
+      map((policy) => (policy?.data ?? null) as MaximumSessionTimeoutPolicyData | null),
+      concatMap(
+        async (data) =>
+          data?.type === "onSystemLock" &&
+          (await this.sessionTimeoutTypeService.isAvailable(VaultTimeoutStringType.OnLocked)),
+      ),
     );
   }
 
