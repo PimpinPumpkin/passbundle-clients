@@ -429,11 +429,11 @@ html.pb-web {
   border-radius: 14px !important;
   box-shadow: var(--pb-shadow-floating) !important;
 }
-:is(.pb-web, .pb-popup) .cdk-overlay-pane bit-dialog > section,
-:is(.pb-web, .pb-popup) .cdk-overlay-pane bit-simple-dialog > section,
-/* A confirmation (bit-simple-dialog) is a div filled with the on-brand
-   color, a dark green in dark mode: the same solid dialog color instead. */
-:is(.pb-web, .pb-popup) .cdk-overlay-pane bit-simple-dialog > div {
+:is(.pb-web, .pb-popup) .cdk-overlay-pane :is(bit-dialog, [bit-dialog]) > section,
+/* A confirmation (bit-simple-dialog, often a form with the attribute) is a
+   div filled with the on-brand color, a dark green in dark mode: the same
+   solid dialog color instead. */
+:is(.pb-web, .pb-popup) .cdk-overlay-pane :is(bit-simple-dialog, [bit-simple-dialog]) > div {
   background: var(--pb-dialog) !important;
   border: 0 !important;
   border-radius: 14px !important;
@@ -1414,9 +1414,8 @@ html.pb-popup,
 }
 
 /* Dialogs float, as in the web vault (the shared rules above). */
-.pb-popup bit-dialog > section,
-.pb-popup bit-simple-dialog > section,
-.pb-popup bit-simple-dialog > div {
+.pb-popup :is(bit-dialog, [bit-dialog]) > section,
+.pb-popup :is(bit-simple-dialog, [bit-simple-dialog]) > div {
   background: var(--pb-dialog) !important;
   border: 0 !important;
   border-radius: 14px !important;
