@@ -14,3 +14,7 @@ export {
   keykeeperWebSystemLockOffers,
   keykeeperWebSystemLockTimeout,
 } from "./keykeeper-system-lock";
+export {
+  KEYKEEPER_STAY_UNLOCKED_ON_RELOAD,
+  KeykeeperReloadSetting,
+} from "./keykeeper-reload-setting";

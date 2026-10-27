@@ -339,7 +339,8 @@ describe("SessionTimeoutInputComponent", () => {
 
         expect(message).toBe(
           "Your organization locks vaults when the computer locks. A web page can't tell when " +
-            "that happens, so here the timeout is at most 30 minutes, or On browser refresh.",
+            "that happens, so here the timeout is at most 30 minutes. To lock at every reload " +
+            'too, turn off "Stay unlocked when I reload".',
         );
         expect(component["maxSessionTimeoutPolicyData"]).toEqual({
           type: "custom",

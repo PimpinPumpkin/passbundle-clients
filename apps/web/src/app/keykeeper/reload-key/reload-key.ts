@@ -18,24 +18,32 @@
 //   timeout in minutes, and the Lock action. "On browser refresh" and Log out
 //   keep upstream's behavior, and so do policies of "immediately", "on app
 //   restart", signing out, or `webReload: false`. A "when the computer
-//   locks" policy caps the minutes (keykeeper-system-lock.ts).
+//   locks" policy caps the minutes (keykeeper-system-lock.ts), and a stored
+//   "On browser refresh", which it shows as minutes, still locks at every
+//   reload. A policy that writes its minutes over "On browser refresh" turns
+//   the setting off (keykeeper-reload-setting.ts).
 // - Only a reload restores: a closed tab reopened, Back to the page, or any
-//   other load finds the vault locked, and so does a page that comes back
-//   from the browser's back-forward cache. As the page goes, it tells the
-//   server, which then keeps R only for the reload that follows.
+//   other load finds the vault locked, ends the entry on the server, and so
+//   does a page that comes back from the browser's back-forward cache. As
+//   the page goes, it tells the server, which then keeps R only for the
+//   reload that follows. Each page has its own random id, so a late word
+//   from a page that's gone can't end the entry its reload took over.
 // - The tab checks in every 30 seconds while unlocked, saying how long since
 //   it was last used. The server ends the entry when the tab hasn't been used
 //   for its timeout, or hasn't checked in for 2 minutes.
 // - Locking, signing out, or changing a setting this needs forgets it at once,
-//   here and on the server.
+//   here and on the server, in every open tab of the account.
 // - A key restored this way never makes a new R; the next real unlock does.
 //
 // See DESIGN.md, "Staying unlocked across a reload", in the meta repo.
 import {
   combineLatest,
   distinctUntilChanged,
+  filter,
   firstValueFrom,
+  fromEvent,
   map,
+  Observable,
   of,
   Subscription,
   switchMap,
@@ -49,11 +57,17 @@ import { AccountService } from "@bitwarden/common/auth/abstractions/account.serv
 import { TokenService } from "@bitwarden/common/auth/abstractions/token.service";
 import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
 import { EncString } from "@bitwarden/common/key-management/crypto/models/enc-string";
-import { MaximumSessionTimeoutPolicyData } from "@bitwarden/common/key-management/session-timeout";
 import {
+  KEYKEEPER_STAY_UNLOCKED_ON_RELOAD,
+  KeykeeperReloadSetting,
+  MaximumSessionTimeoutPolicyData,
+} from "@bitwarden/common/key-management/session-timeout";
+import {
+  VAULT_TIMEOUT,
   VaultTimeout,
   VaultTimeoutAction,
   VaultTimeoutSettingsService,
+  VaultTimeoutStringType,
 } from "@bitwarden/common/key-management/vault-timeout";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
@@ -64,12 +78,7 @@ import { UserId } from "@bitwarden/common/types/guid";
 import { UserKey } from "@bitwarden/common/types/key";
 import { KeyService } from "@bitwarden/key-management";
 import { PureCrypto } from "@bitwarden/sdk-internal";
-import {
-  KEYKEEPER_RELOAD_KEY_DISK,
-  KEYKEEPER_RELOAD_SETTING_DISK,
-  StateProvider,
-  UserKeyDefinition,
-} from "@bitwarden/state";
+import { KEYKEEPER_RELOAD_KEY_DISK, StateProvider, UserKeyDefinition } from "@bitwarden/state";
 
 /** What a tab keeps in its own sessionStorage: never R, never the user key in the clear. */
 export type ReloadKeyRecord = { tabId: string; wrappedUserKey: string };
@@ -85,17 +94,25 @@ export const RELOAD_KEY = new UserKeyDefinition<ReloadKeyRecord>(
 );
 
 /**
- * "Stay unlocked when I reload": on unless the person turns it off, per
- * account, kept in this browser across sessions and sign-outs.
+ * "Stay unlocked when I reload", as it applies, and why it's off when the
+ * person didn't turn it off: their own timeout is "On browser refresh"
+ * (which a "when the computer locks" policy shows as minutes), or a policy
+ * wrote its minutes over that.
  */
-export const STAY_UNLOCKED_ON_RELOAD = new UserKeyDefinition<boolean>(
-  KEYKEEPER_RELOAD_SETTING_DISK,
-  "stayUnlockedOnReload",
-  {
-    deserializer: (value) => value,
-    clearOn: [],
-  },
-);
+export type ReloadSetting = {
+  on: boolean;
+  because?: "onBrowserRefresh" | KeykeeperReloadSetting["because"];
+};
+
+export function reloadSetting(
+  stored: KeykeeperReloadSetting | null,
+  storedTimeout: VaultTimeout | null,
+): ReloadSetting {
+  if (storedTimeout === VaultTimeoutStringType.OnRestart) {
+    return { on: false, because: "onBrowserRefresh" };
+  }
+  return stored ?? { on: true };
+}
 
 /** How often an unlocked tab checks in. Browsers run a hidden tab's timers at
  * most once a minute, inside the server's 2 minutes. */
@@ -160,9 +177,18 @@ export async function newWrappingKey(): Promise<SymmetricCryptoKey> {
   return SymmetricCryptoKey.fromSdk(PureCrypto.make_aes256_cbc_hmac_key());
 }
 
-/** A new tab id: 16 random bytes in lowercase hex. */
+/** A new tab id, or page id: 16 random bytes in lowercase hex. */
 export function newTabId(): string {
   return Utils.fromBufferToHex(crypto.getRandomValues(new Uint8Array(16)).buffer);
+}
+
+/** What another tab stored, parsed; null for nothing or something unreadable. */
+function parseStored(value: string | null): unknown {
+  try {
+    return value == null ? null : JSON.parse(value);
+  } catch {
+    return null;
+  }
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -203,6 +229,8 @@ export type ReloadKeyDeps = {
   onPageLifecycle: (leave: () => void, back: () => void) => void;
   /** Sends a request that outlives the page, with this origin's cookies (sendBeacon). */
   beacon: (url: string, json: string) => void;
+  /** What other tabs of this origin store in localStorage, as they store it. */
+  storageEvents: () => Observable<StorageEvent>;
 };
 
 /** The browser's own pieces, for the web vault. */
@@ -229,6 +257,7 @@ export const browserPage = {
       }).catch(() => {});
     }
   },
+  storageEvents: () => fromEvent<StorageEvent>(window, "storage"),
 };
 
 export class KeykeeperReloadKey {
@@ -243,6 +272,12 @@ export class KeykeeperReloadKey {
   private subscriptions: Subscription[] = [];
   /** The last forget, which upstream's lock waits for before it reloads the page. */
   private forgetting: Promise<void> = Promise.resolve();
+  /**
+   * This page's own id, new at each load. The server takes the leaving only
+   * from the page that kept the entry or released it last, so a late word
+   * from the page before a reload doesn't end the reloaded one's.
+   */
+  private readonly pageId = newTabId();
 
   constructor(private readonly deps: ReloadKeyDeps) {}
 
@@ -260,11 +295,11 @@ export class KeykeeperReloadKey {
     if ((await firstValueFrom(keyService.userKey$(userId))) != null) {
       return false;
     }
-    // A closed tab reopened, Back to it, or a new load in it: not a reload,
-    // so the vault stays locked, and this tab won't try again. The server
-    // ends the entry on its own: the page that left said so.
+    // A closed tab reopened, Back to it, a new load in it, or a duplicate of
+    // it: not a reload, so the vault stays locked, this tab won't try again,
+    // and the server ends the entry now rather than when its time runs out.
     if (this.deps.navigationType() !== "reload") {
-      await this.clearRecord(userId);
+      await this.drop(userId, record.tabId);
       return false;
     }
     const wait = await this.wait(userId);
@@ -278,7 +313,7 @@ export class KeykeeperReloadKey {
         this.deps.api.send(
           "POST",
           "/keykeeper/reload-key/release",
-          { tabId: record.tabId },
+          { tabId: record.tabId, pageId: this.pageId },
           userId,
           true,
         ),
@@ -350,6 +385,58 @@ export class KeykeeperReloadKey {
           }
         }),
     );
+
+    // The same, changed in another tab: this page's copy follows, so the
+    // watch above forgets this tab's entry at once too.
+    this.subscriptions.push(
+      accountService.activeAccount$
+        .pipe(
+          switchMap((account) => {
+            const keys = account == null ? null : this.storageKeys(account.id);
+            return keys == null
+              ? of()
+              : this.deps.storageEvents().pipe(
+                  filter((event) => event.key === keys.setting || event.key === keys.timeout),
+                  map((event) => ({
+                    userId: account!.id,
+                    setting: event.key === keys.setting,
+                    value: parseStored(event.newValue),
+                  })),
+                );
+          }),
+        )
+        .subscribe((change) => void this.followOtherTab(change)),
+    );
+  }
+
+  /** Where another tab stores these for an account; null for an id that isn't one. */
+  private storageKeys(userId: UserId): { setting: string; timeout: string } | null {
+    try {
+      return {
+        setting: KEYKEEPER_STAY_UNLOCKED_ON_RELOAD.buildKey(userId),
+        timeout: VAULT_TIMEOUT.buildKey(userId),
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private async followOtherTab(change: { userId: UserId; setting: boolean; value: unknown }) {
+    const { stateProvider } = this.deps;
+    try {
+      if (change.setting) {
+        const value = change.value as KeykeeperReloadSetting | null;
+        await stateProvider
+          .getUser(change.userId, KEYKEEPER_STAY_UNLOCKED_ON_RELOAD)
+          .update(() => (typeof value?.on === "boolean" ? value : null));
+      } else if (change.value != null) {
+        await stateProvider
+          .getUser(change.userId, VAULT_TIMEOUT)
+          .update(() => change.value as VaultTimeout);
+      }
+    } catch {
+      // Signed out meanwhile: nothing to follow.
+    }
   }
 
   stop(): void {
@@ -358,15 +445,27 @@ export class KeykeeperReloadKey {
     this.stopCheckIns();
   }
 
-  /** "Stay unlocked when I reload", for an account: on unless turned off. */
-  stayUnlocked$(userId: UserId) {
-    return this.deps.stateProvider
-      .getUser(userId, STAY_UNLOCKED_ON_RELOAD)
-      .state$.pipe(map((value) => value !== false));
+  /** "Stay unlocked when I reload", for an account, as it applies (reloadSetting). */
+  reloadSetting$(userId: UserId): Observable<ReloadSetting> {
+    const { stateProvider } = this.deps;
+    return combineLatest([
+      stateProvider.getUser(userId, KEYKEEPER_STAY_UNLOCKED_ON_RELOAD).state$,
+      stateProvider.getUser(userId, VAULT_TIMEOUT).state$,
+    ]).pipe(map(([stored, timeout]) => reloadSetting(stored, timeout)));
   }
 
+  stayUnlocked$(userId: UserId): Observable<boolean> {
+    return this.reloadSetting$(userId).pipe(
+      map((setting) => setting.on),
+      distinctUntilChanged(),
+    );
+  }
+
+  /** The person's own choice, which ends any note about why it was off. */
   async setStayUnlocked(userId: UserId, on: boolean): Promise<void> {
-    await this.deps.stateProvider.getUser(userId, STAY_UNLOCKED_ON_RELOAD).update(() => on);
+    await this.deps.stateProvider
+      .getUser(userId, KEYKEEPER_STAY_UNLOCKED_ON_RELOAD)
+      .update(() => ({ on }));
   }
 
   /**
@@ -379,7 +478,7 @@ export class KeykeeperReloadKey {
       if (tab != null && this.apiUrl != null) {
         this.deps.beacon(
           `${this.apiUrl}/keykeeper/reload-key/leaving`,
-          JSON.stringify({ tabId: tab.tabId }),
+          JSON.stringify({ tabId: tab.tabId, pageId: this.pageId }),
         );
       }
     }
@@ -431,7 +530,7 @@ export class KeykeeperReloadKey {
       await this.deps.api.send(
         "POST",
         "/keykeeper/reload-key",
-        { tabId, key: wrappingKey.toBase64(), timeoutMinutes: wait },
+        { tabId, pageId: this.pageId, key: wrappingKey.toBase64(), timeoutMinutes: wait },
         userId,
         false,
       );

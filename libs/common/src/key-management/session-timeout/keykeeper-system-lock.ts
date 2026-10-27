@@ -4,13 +4,15 @@
 // `onSystemLock`. A web page can't tell when the computer locks, and upstream
 // turns that into "on browser refresh" there, which locks on every reload and
 // never while the page stays open. In the web vault it caps the timeout
-// instead: at most the policy's `webMinutes` (15 when it's missing), checked by
-// the server from 1 minute to a day. "On browser refresh" stays a choice, and
-// keeps meaning a lock at every reload. Nothing rewrites the person's own
-// choice to fit: the cap applies where the timeout is read, so leaving the
-// organization leaves their choice as it was. Everything else (the browser
-// extension and our apps) keeps the real computer lock and ignores
-// `webMinutes`. See docs/core.md, "Locking by policy", in the meta repo.
+// instead: a number of minutes, at most the policy's `webMinutes` (15 when
+// it's missing), checked by the server from 1 minute to a day. Someone who
+// wants a lock at every reload too turns "Stay unlocked when I reload" off;
+// a stored "On browser refresh" counts as `webMinutes` with that off. Nothing
+// rewrites the person's own choice to fit: the cap applies where the timeout
+// is read, so leaving the organization leaves their choice as it was.
+// Everything else (the browser extension and our apps) keeps the real
+// computer lock and ignores `webMinutes`. See docs/core.md, "Locking by
+// policy", in the meta repo.
 import {
   isVaultTimeoutTypeNumeric,
   VaultTimeout,
@@ -53,9 +55,10 @@ export function keykeeperWebSystemLockMinutes(
 
 /**
  * The web vault's timeout under a "when the computer locks" policy: a number
- * of minutes at most `webMinutes`, or "On browser refresh". Choices the web
- * can't keep (Never, which only development builds offer, and the computer
- * lock, idle, and sleep) lock at each reload.
+ * of minutes, at most `webMinutes`. Anything else ("On browser refresh",
+ * which would turn the idle lock off, and choices the web can't keep: Never,
+ * which only development builds offer, and the computer lock, idle, and
+ * sleep) is `webMinutes`.
  */
 export function keykeeperWebSystemLockTimeout(
   current: VaultTimeout,
@@ -67,13 +70,14 @@ export function keykeeperWebSystemLockTimeout(
   if (isVaultTimeoutTypeNumeric(current)) {
     return Math.min(current as number, webMinutes);
   }
-  return VaultTimeoutStringType.OnRestart;
+  return webMinutes;
 }
 
 /**
  * Whether a timeout read under the web's "when the computer locks" policy
- * differs from the stored one only by the cap. Then the stored choice stays
- * as it is, so it comes back if the policy goes.
+ * only applies the cap. Then the stored choice stays as it is, so it comes
+ * back if the policy goes; a stored "On browser refresh" included. Never is
+ * written over, as upstream does, since a stored Never keeps an "auto" key.
  */
 export function keykeeperIsWebCap(
   stored: VaultTimeout | null,
@@ -83,16 +87,15 @@ export function keykeeperIsWebCap(
   return (
     webMinutes != null &&
     isVaultTimeoutTypeNumeric(applied) &&
-    (stored == null || isVaultTimeoutTypeNumeric(stored))
+    stored !== VaultTimeoutStringType.Never
   );
 }
 
-/** The timeouts Settings offers under the web's "when the computer locks" policy. */
+/** The timeouts Settings offers under the web's "when the computer locks" policy: minutes, up to the cap. */
 export function keykeeperWebSystemLockOffers(timeout: VaultTimeout, webMinutes: number): boolean {
   return (
     (isVaultTimeoutTypeNumeric(timeout) && (timeout as number) <= webMinutes) ||
-    timeout === VaultTimeoutStringType.Custom ||
-    timeout === VaultTimeoutStringType.OnRestart
+    timeout === VaultTimeoutStringType.Custom
   );
 }
 
@@ -134,7 +137,7 @@ export function keykeeperWaitLabel(minutes: number): string {
 export function keykeeperSystemLockMessage(policy: MaximumSessionTimeoutPolicyData): string {
   return (
     "Your organization locks vaults when the computer locks. A web page can't tell when " +
-    `that happens, so here the timeout is at most ${keykeeperWaitLabel(keykeeperWebMinutes(policy))}, ` +
-    "or On browser refresh."
+    `that happens, so here the timeout is at most ${keykeeperWaitLabel(keykeeperWebMinutes(policy))}. ` +
+    'To lock at every reload too, turn off "Stay unlocked when I reload".'
   );
 }

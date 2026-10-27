@@ -1,5 +1,5 @@
 import { mock } from "jest-mock-extended";
-import { BehaviorSubject, firstValueFrom, of } from "rxjs";
+import { BehaviorSubject, firstValueFrom, of, Subject } from "rxjs";
 
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
@@ -9,8 +9,12 @@ import { TokenService } from "@bitwarden/common/auth/abstractions/token.service"
 import { CryptoFunctionService } from "@bitwarden/common/key-management/crypto/abstractions/crypto-function.service";
 import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
 import { EncryptServiceImplementation } from "@bitwarden/common/key-management/crypto/services/encrypt.service.implementation";
-import { MaximumSessionTimeoutPolicyData } from "@bitwarden/common/key-management/session-timeout";
 import {
+  KEYKEEPER_STAY_UNLOCKED_ON_RELOAD,
+  MaximumSessionTimeoutPolicyData,
+} from "@bitwarden/common/key-management/session-timeout";
+import {
+  VAULT_TIMEOUT,
   VaultTimeout,
   VaultTimeoutAction,
   VaultTimeoutSettingsService,
@@ -29,8 +33,8 @@ import { KeyService } from "@bitwarden/key-management";
 import {
   KeykeeperReloadKey,
   RELOAD_KEY,
+  reloadSetting,
   reloadWait,
-  STAY_UNLOCKED_ON_RELOAD,
   unwrapAfterReload,
   wrapForReload,
 } from "./reload-key";
@@ -62,7 +66,7 @@ class TestRequest {
 }
 (globalThis as any).Request ??= TestRequest;
 
-const USER = "user-1" as UserId;
+const USER = "8b0d6c1e-3f2a-4b5c-9d7e-1a2b3c4d5e6f" as UserId;
 const bytes = (b64: string) => new Uint8Array(Buffer.from(b64, "base64"));
 
 let encryptService: EncryptService;
@@ -137,6 +141,21 @@ describe("reloadWait", () => {
   });
 });
 
+describe("Stay unlocked when I reload, as it applies", () => {
+  it("is on unless turned off, and off while the stored timeout is On browser refresh", () => {
+    expect(reloadSetting(null, null)).toEqual({ on: true });
+    expect(reloadSetting({ on: false }, 15)).toEqual({ on: false });
+    expect(reloadSetting({ on: true }, VaultTimeoutStringType.OnRestart)).toEqual({
+      on: false,
+      because: "onBrowserRefresh",
+    });
+    expect(reloadSetting({ on: false, because: "onBrowserRefreshReplaced" }, 30)).toEqual({
+      on: false,
+      because: "onBrowserRefreshReplaced",
+    });
+  });
+});
+
 describe("KeykeeperReloadKey", () => {
   let accountService: FakeAccountService;
   let stateProvider: FakeStateProvider;
@@ -154,6 +173,7 @@ describe("KeykeeperReloadKey", () => {
   let beacons: Array<{ url: string; json: string }>;
   let locked: UserId[];
   let forgetFails: number;
+  let otherTabs: Subject<StorageEvent>;
   let reloadKey: KeykeeperReloadKey;
 
   const userKey = new SymmetricCryptoKey(bytes(vectors.wrap.userKey)) as UserKey;
@@ -180,6 +200,7 @@ describe("KeykeeperReloadKey", () => {
     beacons = [];
     locked = [];
     forgetFails = 0;
+    otherTabs = new Subject<StorageEvent>();
 
     keyService = mock<KeyService>();
     keyService.userKey$.mockReturnValue(userKey$);
@@ -251,6 +272,7 @@ describe("KeykeeperReloadKey", () => {
         page = { leave, back };
       },
       beacon: (url, json) => beacons.push({ url, json }),
+      storageEvents: () => otherTabs,
     });
   });
 
@@ -279,6 +301,8 @@ describe("KeykeeperReloadKey", () => {
     const [kept] = posts("/keykeeper/reload-key");
     const body = kept[2];
     expect(body.tabId).toMatch(/^[0-9a-f]{32}$/);
+    expect(body.pageId).toMatch(/^[0-9a-f]{32}$/);
+    expect(body.pageId).not.toBe(body.tabId);
     expect(bytes(body.key)).toHaveLength(64);
     expect(body.timeoutMinutes).toBe(15);
     const saved = await record();
@@ -306,11 +330,15 @@ describe("KeykeeperReloadKey", () => {
     expect(await reloaded.restore(USER)).toBe(true);
     expect(keyService.setUserKey).toHaveBeenCalledWith(expect.anything(), USER);
     expect(userKey$.value!.toEncoded()).toEqual(userKey.toEncoded());
-    expect(posts("/keykeeper/reload-key/release")[0][2]).toEqual({ tabId });
+    const released = posts("/keykeeper/reload-key/release")[0][2];
+    expect(released).toEqual({ tabId, pageId: expect.stringMatching(/^[0-9a-f]{32}$/) });
 
     reloaded.start();
     await settle();
     expect(posts("/keykeeper/reload-key")).toHaveLength(0);
+    // Its leaving names this page, not the one before the reload.
+    page.leave();
+    expect(JSON.parse(beacons.at(-1)!.json)).toEqual({ tabId, pageId: released.pageId });
     await reloaded.checkIn();
     expect(posts("/keykeeper/reload-key/check-in")[0][2]).toEqual({
       tabId,
@@ -411,7 +439,7 @@ describe("KeykeeperReloadKey", () => {
     expect(posts("/keykeeper/reload-key")).toHaveLength(0);
   });
 
-  it("restores only on a reload: a reopened tab, Back, or a new load stays locked", async () => {
+  it("restores only on a reload: a reopened tab, Back, a new load, or a copy stays locked", async () => {
     for (const how of ["back_forward", "navigate", "prerender", undefined]) {
       reloadKey.start();
       await unlock();
@@ -425,24 +453,25 @@ describe("KeykeeperReloadKey", () => {
       expect(await reopened.restore(USER)).toBe(false);
       expect(posts("/keykeeper/reload-key/release")).toHaveLength(0);
       expect(keyService.setUserKey).not.toHaveBeenCalled();
-      // This tab won't try again; the server ends the entry on its own.
+      // This tab won't try again, and the server ends the entry now.
       expect(await record()).toBeNull();
-      expect(forgotten).not.toContain(tabId);
+      expect(forgotten).toContain(tabId);
       navigation = "reload";
       reloadKey = new KeykeeperReloadKey((reloadKey as any).deps);
     }
   });
 
-  it("tells the server as the page goes, with a beacon that carries only the tab id", async () => {
+  it("tells the server as the page goes, with a beacon that carries only the tab and page ids", async () => {
     reloadKey.start();
     await unlock();
     const tabId = (await record())!.tabId;
+    const pageId = posts("/keykeeper/reload-key")[0][2].pageId;
 
     page.leave();
     expect(beacons).toEqual([
       {
         url: "https://vault.example.test/api/keykeeper/reload-key/leaving",
-        json: JSON.stringify({ tabId }),
+        json: JSON.stringify({ tabId, pageId }),
       },
     ]);
   });
@@ -460,7 +489,9 @@ describe("KeykeeperReloadKey", () => {
   });
 
   it("keeps none with Stay unlocked when I reload off, and forgets it when it's turned off", async () => {
-    await stateProvider.getUser(USER, STAY_UNLOCKED_ON_RELOAD).update(() => false);
+    await stateProvider
+      .getUser(USER, KEYKEEPER_STAY_UNLOCKED_ON_RELOAD)
+      .update(() => ({ on: false }));
     reloadKey.start();
     await unlock();
     expect(posts("/keykeeper/reload-key")).toHaveLength(0);
@@ -478,6 +509,72 @@ describe("KeykeeperReloadKey", () => {
     await settle();
     expect(forgotten).toContain(tabId);
     expect(await record()).toBeNull();
+  });
+
+  it("keeps none while the person's own timeout is On browser refresh, shown as minutes", async () => {
+    // A "when the computer locks" policy shows a stored On browser refresh as
+    // its minutes, and leaves the stored choice as it is.
+    await stateProvider.setUserState(VAULT_TIMEOUT, VaultTimeoutStringType.OnRestart, USER);
+    expect(await firstValueFrom(reloadKey.reloadSetting$(USER))).toEqual({
+      on: false,
+      because: "onBrowserRefresh",
+    });
+    reloadKey.start();
+    await unlock();
+    expect(posts("/keykeeper/reload-key")).toHaveLength(0);
+  });
+
+  it("keeps none once a policy replaced On browser refresh, until the person turns it on", async () => {
+    await stateProvider.setUserState(
+      KEYKEEPER_STAY_UNLOCKED_ON_RELOAD,
+      { on: false, because: "onBrowserRefreshReplaced" },
+      USER,
+    );
+    reloadKey.start();
+    await unlock();
+    expect(posts("/keykeeper/reload-key")).toHaveLength(0);
+
+    await reloadKey.setStayUnlocked(USER, true);
+    expect(await firstValueFrom(reloadKey.reloadSetting$(USER))).toEqual({ on: true });
+  });
+
+  it("forgets it at once when another tab turns the setting off", async () => {
+    reloadKey.start();
+    await unlock();
+    const tabId = (await record())!.tabId;
+
+    // Another account's setting, or something else, changes nothing.
+    otherTabs.next(new StorageEvent("storage", { key: "something-else", newValue: "1" }));
+    await settle();
+    expect(forgotten).toEqual([]);
+
+    otherTabs.next(
+      new StorageEvent("storage", {
+        key: KEYKEEPER_STAY_UNLOCKED_ON_RELOAD.buildKey(USER),
+        newValue: JSON.stringify({ on: false }),
+      }),
+    );
+    await settle();
+    await settle();
+    expect(forgotten).toEqual([tabId]);
+    expect(await record()).toBeNull();
+    expect(await firstValueFrom(reloadKey.reloadSetting$(USER))).toEqual({ on: false });
+  });
+
+  it("forgets it at once when another tab sets the timeout to On browser refresh", async () => {
+    reloadKey.start();
+    await unlock();
+    const tabId = (await record())!.tabId;
+
+    otherTabs.next(
+      new StorageEvent("storage", {
+        key: VAULT_TIMEOUT.buildKey(USER),
+        newValue: JSON.stringify(VaultTimeoutStringType.OnRestart),
+      }),
+    );
+    await settle();
+    await settle();
+    expect(forgotten).toEqual([tabId]);
   });
 
   it("keeps none when the policy turns reload keys off", async () => {

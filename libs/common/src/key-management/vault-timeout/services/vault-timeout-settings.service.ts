@@ -32,7 +32,9 @@ import { LogService } from "../../../platform/abstractions/log.service";
 import { StateProvider } from "../../../platform/state";
 import { UserId } from "../../../types/guid";
 import {
+  KEYKEEPER_STAY_UNLOCKED_ON_RELOAD,
   keykeeperIsWebCap,
+  keykeeperSystemLockIsWait,
   keykeeperWebSystemLockMinutes,
   keykeeperWebSystemLockTimeout,
   MaximumSessionTimeoutPolicyData,
@@ -191,6 +193,22 @@ export class VaultTimeoutSettingsService implements VaultTimeoutSettingsServiceA
                 this.sessionTimeoutTypeService,
               ),
             );
+            // Keykeeper: a policy took the web vault's "On browser refresh"
+            // away (upstream writes the policy's minutes over it, below):
+            // turn "Stay unlocked when I reload" off, so every reload still
+            // locks, as the person chose (keykeeper-reload-setting.ts).
+            if (
+              keykeeperSystemLockIsWait(this.sessionTimeoutTypeService) &&
+              currentVaultTimeout === VaultTimeoutStringType.OnRestart &&
+              isVaultTimeoutTypeNumeric(vaultTimeout) &&
+              !keykeeperCapOnly
+            ) {
+              await this.stateProvider.setUserState(
+                KEYKEEPER_STAY_UNLOCKED_ON_RELOAD,
+                { on: false, because: "onBrowserRefreshReplaced" },
+                userId,
+              );
+            }
             if (vaultTimeout !== currentVaultTimeout && !keykeeperCapOnly) {
               await this.stateProvider.setUserState(VAULT_TIMEOUT, vaultTimeout, userId);
             }
@@ -234,7 +252,7 @@ export class VaultTimeoutSettingsService implements VaultTimeoutSettingsServiceA
     }
 
     // Keykeeper: in the web vault, "when the computer locks" caps a timeout
-    // in minutes at the policy's webMinutes, and keeps "On browser refresh"
+    // in minutes at the policy's webMinutes, and anything else is webMinutes
     // (keykeeper-system-lock.ts).
     const keykeeperWebMinutes = keykeeperWebSystemLockMinutes(
       maxSessionTimeoutPolicyData,

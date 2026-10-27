@@ -70,10 +70,11 @@ describe("Keykeeper: when the computer locks, in the web vault", () => {
   it("says what it does in Settings", () => {
     expect(keykeeperSystemLockMessage(policy({ type: "onSystemLock" }))).toBe(
       "Your organization locks vaults when the computer locks. A web page can't tell when that " +
-        "happens, so here the timeout is at most 15 minutes, or On browser refresh.",
+        "happens, so here the timeout is at most 15 minutes. To lock at every reload too, turn " +
+        'off "Stay unlocked when I reload".',
     );
     expect(keykeeperSystemLockMessage(policy({ type: "onSystemLock", webMinutes: 90 }))).toContain(
-      "at most 1 hour 30 minutes,",
+      "at most 1 hour 30 minutes.",
     );
   });
 
@@ -87,40 +88,38 @@ describe("Keykeeper: when the computer locks, in the web vault", () => {
     expect(keykeeperWebSystemLockMinutes(null, web)).toBeNull();
   });
 
-  it("caps a timeout in minutes, and keeps On browser refresh as the person chose it", () => {
+  it("caps a timeout in minutes, and makes anything else the cap, so the idle lock stays", () => {
     expect(keykeeperWebSystemLockTimeout(60, 15)).toBe(15);
     expect(keykeeperWebSystemLockTimeout(5, 15)).toBe(5);
     expect(keykeeperWebSystemLockTimeout(VaultTimeoutNumberType.Immediately, 15)).toBe(0);
-    expect(keykeeperWebSystemLockTimeout(VaultTimeoutStringType.OnRestart, 15)).toBe(
-      VaultTimeoutStringType.OnRestart,
-    );
-    // What the web can't keep locks at each reload.
+    // "On browser refresh" would turn the idle lock off; the web can't keep the rest.
     for (const timeout of [
+      VaultTimeoutStringType.OnRestart,
       VaultTimeoutStringType.Never,
       VaultTimeoutStringType.OnLocked,
       VaultTimeoutStringType.OnIdle,
       VaultTimeoutStringType.OnSleep,
     ]) {
-      expect(keykeeperWebSystemLockTimeout(timeout, 15)).toBe(VaultTimeoutStringType.OnRestart);
+      expect(keykeeperWebSystemLockTimeout(timeout, 15)).toBe(15);
     }
   });
 
-  it("leaves the stored choice alone when only the cap differs", () => {
+  it("leaves the stored choice alone when only the cap applies", () => {
     expect(keykeeperIsWebCap(60, 15, 15)).toBe(true);
     expect(keykeeperIsWebCap(null, 15, 15)).toBe(true);
-    // A choice the web can't keep is written as what applies.
-    expect(
-      keykeeperIsWebCap(VaultTimeoutStringType.Never, VaultTimeoutStringType.OnRestart, 15),
-    ).toBe(false);
+    // "On browser refresh" stays, and turns reload keys off (reload-key.ts).
+    expect(keykeeperIsWebCap(VaultTimeoutStringType.OnRestart, 15, 15)).toBe(true);
+    // Never is written as what applies, as upstream does.
+    expect(keykeeperIsWebCap(VaultTimeoutStringType.Never, 15, 15)).toBe(false);
     // No such policy: upstream's own rules.
     expect(keykeeperIsWebCap(60, 15, null)).toBe(false);
   });
 
-  it("offers the waits up to the cap, Custom, and On browser refresh", () => {
+  it("offers only the waits up to the cap, and Custom", () => {
     const offered = [0, 1, 5, 15, 30, 60, 240, "onRestart", "custom", "never", "onLocked"].filter(
       (t) => keykeeperWebSystemLockOffers(t as any, 15),
     );
-    expect(offered).toEqual([0, 1, 5, 15, "onRestart", "custom"]);
+    expect(offered).toEqual([0, 1, 5, 15, "custom"]);
   });
 
   it("says each wait as a person would", () => {

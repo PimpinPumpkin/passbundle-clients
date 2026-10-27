@@ -20,7 +20,10 @@ import { TokenService } from "../../../auth/services/token.service";
 import { LogService } from "../../../platform/abstractions/log.service";
 import { Utils } from "../../../platform/misc/utils";
 import { UserId } from "../../../types/guid";
-import { SessionTimeoutTypeService } from "../../session-timeout";
+import {
+  KEYKEEPER_STAY_UNLOCKED_ON_RELOAD,
+  SessionTimeoutTypeService,
+} from "../../session-timeout";
 import {
   PIN_PROTECTED_USER_KEY_ENVELOPE_EPHEMERAL,
   PIN_PROTECTED_USER_KEY_ENVELOPE_PERSISTENT,
@@ -786,12 +789,12 @@ describe("VaultTimeoutSettingsService", () => {
       });
 
       it.each([
-        [VaultTimeoutStringType.OnRestart, undefined, VaultTimeoutStringType.OnRestart],
-        [VaultTimeoutStringType.Never, undefined, VaultTimeoutStringType.OnRestart],
+        [VaultTimeoutStringType.OnRestart, undefined, 15],
+        [VaultTimeoutStringType.Never, undefined, 15],
         [VaultTimeoutNumberType.EightHours, undefined, 15],
         [5, undefined, 5],
         [VaultTimeoutNumberType.EightHours, 1, 1],
-        [VaultTimeoutStringType.OnRestart, 60, VaultTimeoutStringType.OnRestart],
+        [VaultTimeoutStringType.OnRestart, 60, 60],
         [null, 5, 5],
       ])(
         "when current timeout is %s and webMinutes is %s, returns %s",
@@ -830,7 +833,30 @@ describe("VaultTimeoutSettingsService", () => {
         );
       });
 
-      it("writes a choice the web can't keep as what applies", async () => {
+      it("keeps a stored On browser refresh, and leaves the reload setting alone", async () => {
+        policyService.policiesByType$.mockReturnValue(
+          of([{ data: { type: "onSystemLock" } }] as unknown as Policy[]),
+        );
+        await stateProvider.setUserState(
+          VAULT_TIMEOUT,
+          VaultTimeoutStringType.OnRestart,
+          mockUserId,
+        );
+
+        expect(
+          await firstValueFrom(vaultTimeoutSettingsService.getVaultTimeoutByUserId$(mockUserId)),
+        ).toBe(15);
+        expect(await firstValueFrom(stateProvider.getUserState$(VAULT_TIMEOUT, mockUserId))).toBe(
+          VaultTimeoutStringType.OnRestart,
+        );
+        expect(
+          await firstValueFrom(
+            stateProvider.getUserState$(KEYKEEPER_STAY_UNLOCKED_ON_RELOAD, mockUserId),
+          ),
+        ).toBeNull();
+      });
+
+      it("writes Never as what applies", async () => {
         policyService.policiesByType$.mockReturnValue(
           of([{ data: { type: "onSystemLock" } }] as unknown as Policy[]),
         );
@@ -838,8 +864,58 @@ describe("VaultTimeoutSettingsService", () => {
 
         await firstValueFrom(vaultTimeoutSettingsService.getVaultTimeoutByUserId$(mockUserId));
         expect(await firstValueFrom(stateProvider.getUserState$(VAULT_TIMEOUT, mockUserId))).toBe(
-          VaultTimeoutStringType.OnRestart,
+          15,
         );
+      });
+    });
+
+    // Keykeeper: a policy that writes its minutes over the web vault's "On
+    // browser refresh" turns "Stay unlocked when I reload" off, so every
+    // reload still locks.
+    describe("Keykeeper: a policy that replaces On browser refresh", () => {
+      const reloadSetting = () =>
+        firstValueFrom(stateProvider.getUserState$(KEYKEEPER_STAY_UNLOCKED_ON_RELOAD, mockUserId));
+
+      beforeEach(() => {
+        policyService.policiesByType$.mockReturnValue(
+          of([{ data: { type: "custom", minutes: 30 } }] as unknown as Policy[]),
+        );
+      });
+
+      it("turns the reload setting off in the web vault, and says why", async () => {
+        (sessionTimeoutTypeService as any).keykeeperSystemLockIsWait = true;
+        await stateProvider.setUserState(
+          VAULT_TIMEOUT,
+          VaultTimeoutStringType.OnRestart,
+          mockUserId,
+        );
+
+        expect(
+          await firstValueFrom(vaultTimeoutSettingsService.getVaultTimeoutByUserId$(mockUserId)),
+        ).toBe(30);
+        expect(await firstValueFrom(stateProvider.getUserState$(VAULT_TIMEOUT, mockUserId))).toBe(
+          30,
+        );
+        expect(await reloadSetting()).toEqual({ on: false, because: "onBrowserRefreshReplaced" });
+      });
+
+      it("leaves it alone for a timeout in minutes", async () => {
+        (sessionTimeoutTypeService as any).keykeeperSystemLockIsWait = true;
+        await stateProvider.setUserState(VAULT_TIMEOUT, 60, mockUserId);
+
+        await firstValueFrom(vaultTimeoutSettingsService.getVaultTimeoutByUserId$(mockUserId));
+        expect(await reloadSetting()).toBeNull();
+      });
+
+      it("leaves it alone outside the web vault", async () => {
+        await stateProvider.setUserState(
+          VAULT_TIMEOUT,
+          VaultTimeoutStringType.OnRestart,
+          mockUserId,
+        );
+
+        await firstValueFrom(vaultTimeoutSettingsService.getVaultTimeoutByUserId$(mockUserId));
+        expect(await reloadSetting()).toBeNull();
       });
 
       it("still takes the policy's action", async () => {
