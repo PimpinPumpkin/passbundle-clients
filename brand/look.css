@@ -888,6 +888,14 @@ app-vault-onboarding [data-accordion-content] > div {
 .pb-web app-vault-items tbody tr[data-keykeeper-open] {
   filter: drop-shadow(0 4px 10px rgb(0 0 0 / 0.07));
 }
+/* The tile's cell. Upstream makes it a flex box, which takes it out of the
+   row's table layout: it drew its own wider block over the name's cell, and
+   the tile sat at its top. Keep it a cell, with the tile centered in it. */
+.pb-web app-vault-items tbody td:has(> vault-keykeeper-item-tile) {
+  display: table-cell !important;
+  padding-inline: 0 !important;
+  text-align: center;
+}
 /* A row's name, and its username or what it is under it. */
 .pb-web app-vault-items [id^="cipher-btn-"] {
   font-size: 0.9375rem;
@@ -953,6 +961,19 @@ app-vault-onboarding [data-accordion-content] > div {
   border-radius: 16px;
   background: var(--pb-raised) !important;
   box-shadow: var(--pb-shadow-raised);
+}
+/* When there's no room beside the list (a phone), the layout lays the panel
+   over it instead: solid, so the list doesn't show through, and edge to edge,
+   no wider than the screen, so Close and the item's actions stay in view. */
+.pb-web bit-layout > div[style*=" 0px 1fr"] > .tw-col-start-3 {
+  min-width: 0;
+}
+.pb-web bit-layout > div[style*=" 0px 1fr"] bit-dialog > section {
+  margin: 0;
+  height: 100% !important;
+  border-radius: 0;
+  background: var(--pb-dialog) !important;
+  box-shadow: none;
 }
 .pb-web bit-layout bit-dialog > section > header,
 .pb-web bit-layout bit-dialog > section > footer,
