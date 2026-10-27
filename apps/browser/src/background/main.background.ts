@@ -1909,6 +1909,8 @@ export default class MainBackground {
         ),
         this.accountService,
         this.syncService,
+        this.keyService,
+        this.encryptService,
       ),
       this.accountService,
       this.authService,
