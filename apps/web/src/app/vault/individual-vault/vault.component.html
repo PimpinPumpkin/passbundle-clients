@@ -2,6 +2,8 @@
 <app-vault-banners [organizations]="organizations$ | async"></app-vault-banners>
 <!-- Keykeeper: organizations waiting for this person to turn on two-step login -->
 <app-keykeeper-two-step-needed />
+<!-- Keykeeper: roles the server joined this person to without asking -->
+<app-keykeeper-accept-role />
 
 <app-vault-header
   [filter]="filter"

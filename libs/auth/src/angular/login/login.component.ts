@@ -4,6 +4,7 @@ import {
   computed,
   DestroyRef,
   ElementRef,
+  inject,
   NgZone,
   OnDestroy,
   OnInit,
@@ -52,6 +53,7 @@ import {
   AsyncActionsModule,
   ButtonModule,
   CheckboxModule,
+  DialogService,
   FormFieldModule,
   IconButtonModule,
   IconModule,
@@ -61,6 +63,7 @@ import {
 } from "@bitwarden/components";
 
 import { keykeeperStartSsoLink } from "../sso/keykeeper-sso-link";
+import { keykeeperStartTwoStepSetup } from "../two-step/keykeeper-two-step-setup";
 
 import { LoginComponentService, PasswordPolicies } from "./login-component.service";
 
@@ -112,6 +115,8 @@ export class LoginComponent implements OnInit, OnDestroy {
   );
   /** Keykeeper: the password step shows the default layout, whose subtitle names the server. */
   private keykeeperDefaultPasswordStep = false;
+  /** Keykeeper: for the message that sends someone to set up two-step login. */
+  private readonly keykeeperDialogService = inject(DialogService);
 
   private destroy$ = new Subject<void>();
   readonly Icons = { WaveIcon, VaultIcon };
@@ -450,6 +455,22 @@ export class LoginComponent implements OnInit, OnDestroy {
         toastService: this.toastService,
         i18nService: this.i18nService,
         clientType: this.clientType,
+      })
+    ) {
+      return;
+    }
+
+    // Keykeeper: the role requires two-step login, which isn't set up yet:
+    // set it up first (DESIGN.md, "Two-step login for admins").
+    if (
+      await keykeeperStartTwoStepSetup(authResult, {
+        router: this.router,
+        i18nService: this.i18nService,
+        dialogService: this.keykeeperDialogService,
+        platformUtilsService: this.platformUtilsService,
+        clientType: this.clientType,
+        webVaultUrl: async () =>
+          (await firstValueFrom(this.environmentService.environment$)).getWebVaultUrl(),
       })
     ) {
       return;
