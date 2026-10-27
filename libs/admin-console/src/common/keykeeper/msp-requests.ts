@@ -5,6 +5,7 @@
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 
 import {
+  ChangeVerification,
   Joining,
   MspDetails,
   MspJoining,
@@ -19,6 +20,17 @@ import {
   TemplateCopy,
   TwoStepNeeded,
 } from "./msp-types";
+
+/**
+ * Only the proof's own field for a request's body: the code when there is
+ * one, otherwise the master password hash. Upstream's request also has a
+ * field for signing in with another device, which these changes never take.
+ */
+export function verificationFields(verification: ChangeVerification): ChangeVerification {
+  return verification.otp != null
+    ? { otp: verification.otp }
+    : { masterPasswordHash: verification.masterPasswordHash };
+}
 
 export class KeykeeperMspRequests {
   constructor(protected readonly apiService: ApiService) {}
@@ -159,11 +171,16 @@ export class KeykeeperMspRequests {
     ).data;
   }
 
-  async createScriptToken(orgId: string, token: NewScriptToken): Promise<ScriptTokenView> {
+  /** Makes a token, with the person's proof (ChangeVerification). */
+  async createScriptToken(
+    orgId: string,
+    token: NewScriptToken,
+    verification: ChangeVerification,
+  ): Promise<ScriptTokenView> {
     return this.apiService.send(
       "POST",
       `/keykeeper/organizations/${orgId}/script-tokens`,
-      token,
+      { ...token, ...verificationFields(verification) },
       true,
       true,
     );
@@ -179,17 +196,23 @@ export class KeykeeperMspRequests {
     );
   }
 
-  /** Adds a grant, or refreshes its copy. */
+  /**
+   * Adds a grant, or refreshes its copy. Adding an item, or changing which of
+   * its fields the token gets (its sealed spec), needs the person's proof;
+   * refreshing a copy with the same spec, as apps do in the background,
+   * doesn't.
+   */
   async setScriptGrant(
     orgId: string,
     tokenId: string,
     itemId: string,
     grant: { copy: string; revision: string; sealedSpec: string },
+    verification?: ChangeVerification,
   ): Promise<ScriptTokenView> {
     return this.apiService.send(
       "PUT",
       `/keykeeper/organizations/${orgId}/script-tokens/${tokenId}/grants/${itemId}`,
-      grant,
+      verification == null ? grant : { ...grant, ...verificationFields(verification) },
       true,
       true,
     );
