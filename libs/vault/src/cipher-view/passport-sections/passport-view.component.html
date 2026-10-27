@@ -97,27 +97,29 @@
         <input
           readonly
           bitInput
-          [value]="passport().passportNumber"
+          [value]="canSee('passport.passportNumber') ? passport().passportNumber : mask"
           aria-readonly="true"
           type="password"
           data-testid="passport-number"
         />
-        <button
-          bitSuffix
-          type="button"
-          bitIconButton
-          bitPasswordInputToggle
-          [toggled]="revealPassportNumber()"
-          (toggledChange)="togglePassportNumberVisible($event)"
-        ></button>
-        <button
-          bitIconButton="bwi-clone"
-          bitSuffix
-          type="button"
-          [label]="'copyPassportNumber' | i18n"
-          appCopyField="passportNumber"
-          [cipher]="cipher()"
-        ></button>
+        @if (canSee("passport.passportNumber")) {
+          <button
+            bitSuffix
+            type="button"
+            bitIconButton
+            bitPasswordInputToggle
+            [toggled]="revealPassportNumber()"
+            (toggledChange)="togglePassportNumberVisible($event)"
+          ></button>
+          <button
+            bitIconButton="bwi-clone"
+            bitSuffix
+            type="button"
+            [label]="'copyPassportNumber' | i18n"
+            appCopyField="passportNumber"
+            [cipher]="cipher()"
+          ></button>
+        }
       </bit-form-field>
     }
 
@@ -140,27 +142,33 @@
         <input
           readonly
           bitInput
-          [value]="passport().nationalIdentificationNumber"
+          [value]="
+            canSee('passport.nationalIdentificationNumber')
+              ? passport().nationalIdentificationNumber
+              : mask
+          "
           aria-readonly="true"
           type="password"
           data-testid="national-identification-number"
         />
-        <button
-          bitSuffix
-          type="button"
-          bitIconButton
-          bitPasswordInputToggle
-          [toggled]="revealNationalIdentificationNumber()"
-          (toggledChange)="toggleNationalIdentificationNumberVisible($event)"
-        ></button>
-        <button
-          bitIconButton="bwi-clone"
-          bitSuffix
-          type="button"
-          [label]="'copyNationalIdentificationNumber' | i18n"
-          appCopyField="nationalIdentificationNumber"
-          [cipher]="cipher()"
-        ></button>
+        @if (canSee("passport.nationalIdentificationNumber")) {
+          <button
+            bitSuffix
+            type="button"
+            bitIconButton
+            bitPasswordInputToggle
+            [toggled]="revealNationalIdentificationNumber()"
+            (toggledChange)="toggleNationalIdentificationNumberVisible($event)"
+          ></button>
+          <button
+            bitIconButton="bwi-clone"
+            bitSuffix
+            type="button"
+            [label]="'copyNationalIdentificationNumber' | i18n"
+            appCopyField="nationalIdentificationNumber"
+            [cipher]="cipher()"
+          ></button>
+        }
       </bit-form-field>
     }
 

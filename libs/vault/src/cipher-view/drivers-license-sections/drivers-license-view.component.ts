@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, inject, input, signal } from "@angu
 
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { EventCollectionService, EventType } from "@bitwarden/common/dirt/event-logs";
+import { HIDDEN_VALUE_MASK, mayShow } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { DriversLicenseView } from "@bitwarden/common/vault/models/view/drivers-license.view";
 import {
@@ -32,6 +33,19 @@ import { ReadOnlyCipherCardComponent } from "../read-only-cipher-card/read-only-
   ],
 })
 export class DriversLicenseViewComponent {
+  /** Keykeeper: shown in place of a value the person can't see. */
+  protected readonly mask = HIDDEN_VALUE_MASK;
+
+  /**
+   * Keykeeper: whether the person may see one of the item's values
+   * (`part.property`): someone who can't see the item's passwords gets only
+   * the plain ones (DESIGN.md, "Folders and permissions"), with a mask, and
+   * nothing to show, copy, or drag, for the rest.
+   */
+  protected canSee(key: string): boolean {
+    return mayShow(this.cipher(), key);
+  }
+
   private readonly eventCollectionService = inject(EventCollectionService);
   private readonly datePipe = inject(DatePipe);
 

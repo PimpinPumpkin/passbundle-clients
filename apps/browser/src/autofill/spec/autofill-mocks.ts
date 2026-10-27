@@ -119,7 +119,8 @@ export function createGenerateFillScriptOptionsMock(customFields = {}): Generate
     fillNewPassword: false,
     allowTotpAutofill: false,
     autoSubmitLogin: false,
-    cipher: mock<CipherView>(),
+    // Keykeeper: someone who can see the item's passwords (missing is hidden).
+    cipher: mock<CipherView>({ viewPassword: true }),
     canAccessTotp: false,
     tabUrl: "https://jest-testing-website.com",
     defaultUriMatch: UriMatchStrategy.Domain,

@@ -1,14 +1,16 @@
 // FIXME: Update this file to be type safe and remove this and next line
 // @ts-strict-ignore
 import { CommonModule } from "@angular/common";
-import { Component, Input, OnInit } from "@angular/core";
+import { Component, DestroyRef, inject, Input, OnInit } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormBuilder, ReactiveFormsModule } from "@angular/forms";
+import { map } from "rxjs";
 
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { normalizeExpiryYearFormat } from "@bitwarden/common/autofill/utils";
 import { EventCollectionService, EventType } from "@bitwarden/common/dirt/event-logs";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
+import { maySeeSecretsOrNew } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CardView } from "@bitwarden/common/vault/models/view/card.view";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
@@ -103,6 +105,8 @@ export class CardDetailsSectionComponent implements OnInit {
     return this.cipherFormContainer.config.initialValues;
   }
 
+  private readonly destroyRef = inject(DestroyRef);
+
   constructor(
     private cipherFormContainer: CipherFormContainer,
     private formBuilder: FormBuilder,
@@ -112,7 +116,12 @@ export class CardDetailsSectionComponent implements OnInit {
     this.cipherFormContainer.registerChildForm("cardDetails", this.cardDetailsForm);
 
     this.cardDetailsForm.valueChanges
-      .pipe(takeUntilDestroyed())
+      // Keykeeper: getRawValue(), as the number and code are disabled when the
+      // person can't see them, and a save keeps them as they are.
+      .pipe(
+        takeUntilDestroyed(),
+        map(() => this.cardDetailsForm.getRawValue()),
+      )
       .subscribe(({ cardholderName, number, brand, expMonth, expYear, code }) => {
         this.cipherFormContainer.patchCipher((cipher) => {
           const expirationYear = normalizeExpiryYearFormat(expYear) ?? "";
@@ -150,6 +159,35 @@ export class CardDetailsSectionComponent implements OnInit {
 
     if (this.disabled) {
       this.cardDetailsForm.disable();
+    }
+    this.hideSecrets();
+
+    // Keykeeper: and again whenever the form is enabled.
+    this.cipherFormContainer.formStatusChange$
+      ?.pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((status) => {
+        if (status === "enabled") {
+          this.hideSecrets();
+        }
+      });
+  }
+
+  /**
+   * Keykeeper: whether the person may see the card's number and code (its
+   * shared folders' see passwords; DESIGN.md, "Folders and permissions"). A
+   * new card is theirs.
+   */
+  get canSeeSecrets(): boolean {
+    return maySeeSecretsOrNew(
+      this.originalCipherView ?? this.cipherFormContainer.originalCipherView,
+    );
+  }
+
+  /** Keykeeper: the number and code can't be shown or changed by someone who can't see them. */
+  private hideSecrets() {
+    if (!this.canSeeSecrets) {
+      this.cardDetailsForm.controls.number.disable({ emitEvent: false });
+      this.cardDetailsForm.controls.code.disable({ emitEvent: false });
     }
   }
 

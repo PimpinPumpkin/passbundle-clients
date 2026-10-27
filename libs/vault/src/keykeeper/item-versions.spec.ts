@@ -9,10 +9,14 @@ import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
 
 import {
   distinctVersions,
+  droppedPasskeys,
+  historyAccess,
+  restoreConfirmation,
   restoredView,
   sameFields,
   savedByLabel,
   versionRows,
+  versionTime,
 } from "./item-versions";
 
 /** Reads translations back as their keys and arguments, so tests see which. */
@@ -66,8 +70,8 @@ describe("versionRows", () => {
     const asked = login("same", { reprompt: CipherRepromptType.Password });
     expect(byKey(versionRows(login("same"), asked, t)).get("reprompt")).toMatchObject({
       label: "passwordPrompt",
-      version: "off",
-      current: "on",
+      version: "keykeeperOff",
+      current: "keykeeperOn",
       changed: true,
     });
   });
@@ -280,5 +284,153 @@ describe("savedByLabel", () => {
       "keykeeperSavedByAnotherMember",
     );
     expect(savedByLabel(null, "ben-id", t)).toBeNull();
+  });
+});
+
+function passkey(credentialId: string, counter: number, rpId = "shop.example.test") {
+  const p = new Fido2CredentialView();
+  p.credentialId = credentialId;
+  p.counter = counter;
+  p.rpId = rpId;
+  p.userName = "ana";
+  p.keyValue = `key-${credentialId}-${counter}`;
+  return p;
+}
+
+describe("restoring passkeys, as the apps do", () => {
+  it("keeps each passkey the item still has as it is now, with its raised counter", () => {
+    const version = login("old");
+    version.login.fido2Credentials = [passkey("pk-1", 3)];
+    const current = login("new", { revisionDate: new Date("2026-10-26T10:00:00Z") });
+    current.login.fido2Credentials = [passkey("pk-1", 9)];
+
+    const restored = restoredView(version, current);
+    expect(restored.login.password).toBe("old");
+    expect(restored.login.fido2Credentials.map((p) => [p.credentialId, p.counter])).toEqual([
+      ["pk-1", 9],
+    ]);
+    // The save names the revision it replaces, so it can't overwrite a newer edit.
+    expect(restored.revisionDate).toEqual(current.revisionDate);
+    // The version itself is left as it was.
+    expect(version.login.fido2Credentials[0].counter).toBe(3);
+  });
+
+  it("brings back a passkey the item no longer has, and keeps the version's when its counter is ahead", () => {
+    const version = login("old");
+    version.login.fido2Credentials = [passkey("pk-gone", 2), passkey("pk-ahead", 7)];
+    const current = login("new");
+    current.login.fido2Credentials = [passkey("pk-ahead", 5)];
+    const restored = restoredView(version, current);
+    expect(restored.login.fido2Credentials.map((p) => [p.credentialId, p.counter])).toEqual([
+      ["pk-gone", 2],
+      ["pk-ahead", 7],
+    ]);
+  });
+
+  it("names the passkeys a version would take away, by credential", () => {
+    const version = login("old");
+    version.login.fido2Credentials = [passkey("pk-1", 1)];
+    const current = login("new");
+    current.login.fido2Credentials = [passkey("pk-1", 4), passkey("pk-2", 1, "mail.example.test")];
+    expect(droppedPasskeys(version, current)).toEqual(["mail.example.test, ana"]);
+    expect(droppedPasskeys(current, version)).toEqual([]);
+  });
+
+  it("asks before restoring, and says which passkeys go", () => {
+    const version = login("old");
+    const current = login("new");
+    expect(restoreConfirmation(version, current, "then")).toMatchObject({
+      content: { key: "keykeeperRestoreVersionDesc", placeholders: ["then"] },
+      acceptButtonText: { key: "keykeeperRestoreVersion" },
+    });
+
+    current.login.fido2Credentials = [passkey("pk-1", 1)];
+    expect(restoreConfirmation(version, current, "then")).toMatchObject({
+      content: {
+        key: "keykeeperRestoreVersionDropsPasskey",
+        placeholders: ["then", "shop.example.test, ana"],
+      },
+      acceptButtonText: { key: "keykeeperRestoreAnyway" },
+    });
+
+    current.login.fido2Credentials = [passkey("pk-1", 1), passkey("pk-2", 1, "mail.example.test")];
+    expect(restoreConfirmation(version, current, "then").content).toEqual({
+      key: "keykeeperRestoreVersionDropsPasskeys",
+      placeholders: ["then", "2", "shop.example.test, ana; mail.example.test, ana"],
+    });
+  });
+});
+
+describe("historyAccess", () => {
+  const folder = (id: string, keykeeper: Record<string, boolean>) => ({
+    id,
+    organizationId: "org",
+    readOnly: false,
+    hidePasswords: false,
+    manage: false,
+    keykeeper: {
+      seePasswords: false,
+      create: false,
+      edit: false,
+      delete: false,
+      export: false,
+      share: false,
+      print: false,
+      viewHistory: false,
+      manage: false,
+      ...keykeeper,
+    },
+  });
+  const item = { organizationId: "org", collectionIds: ["a", "b"] };
+
+  it("gives the person everything with their own item, or one they reach as an admin", () => {
+    expect(historyAccess({ organizationId: null }, [])).toEqual({
+      view: true,
+      contents: true,
+      clear: true,
+    });
+    expect(historyAccess({ organizationId: "org", collectionIds: [] }, [], true).clear).toBe(true);
+  });
+
+  it("shows the history with view item history in one of the item's shared folders", () => {
+    expect(historyAccess(item, [folder("a", { seePasswords: true })]).view).toBe(false);
+    expect(historyAccess(item, [folder("a", { viewHistory: true })])).toEqual({
+      view: true,
+      contents: false,
+      clear: false,
+    });
+    // A folder the item isn't in doesn't count.
+    expect(historyAccess(item, [folder("c", { viewHistory: true, delete: true })]).view).toBe(
+      false,
+    );
+  });
+
+  it("needs both of each pair in the same folder, never one from each of two", () => {
+    const split = [
+      folder("a", { viewHistory: true }),
+      folder("b", { seePasswords: true, delete: true }),
+    ];
+    expect(historyAccess(item, split)).toEqual({ view: true, contents: false, clear: false });
+
+    const together = [folder("a", { viewHistory: true, seePasswords: true, delete: true })];
+    expect(historyAccess(item, together)).toEqual({ view: true, contents: true, clear: true });
+  });
+
+  it("reads upstream's presets for a folder the server sent no grid for", () => {
+    const preset = {
+      id: "a",
+      organizationId: "org",
+      readOnly: true,
+      hidePasswords: true,
+      manage: false,
+    };
+    expect(historyAccess(item, [preset])).toEqual({ view: true, contents: false, clear: false });
+  });
+});
+
+describe("versionTime", () => {
+  it("shows a short date and time, without seconds, with a space before AM", () => {
+    expect(versionTime(new Date(2026, 9, 27, 1, 15, 36), "en-US")).toBe("Oct 27, 2026, 1:15 AM");
+    expect(versionTime(new Date(2026, 9, 27, 13, 5), "en-US")).toBe("Oct 27, 2026, 1:05 PM");
   });
 });

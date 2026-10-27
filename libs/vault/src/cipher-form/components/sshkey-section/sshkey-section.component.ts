@@ -10,6 +10,7 @@ import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { ClientType } from "@bitwarden/common/enums";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { SdkService } from "@bitwarden/common/platform/abstractions/sdk/sdk.service";
+import { maySeeSecretsOrNew } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { SshKeyView } from "@bitwarden/common/vault/models/view/ssh-key.view";
 import {
@@ -56,6 +57,13 @@ export class SshKeySectionComponent implements OnInit {
     publicKey: [""],
     keyFingerprint: [""],
   });
+
+  /**
+   * Keykeeper: whether the person may see the private key (the item's shared
+   * folders' see passwords; DESIGN.md, "Folders and permissions"). A new key
+   * is theirs.
+   */
+  readonly canSeeSecrets = computed(() => maySeeSecretsOrNew(this.originalCipherView()));
 
   readonly showImport = computed(() => {
     return (

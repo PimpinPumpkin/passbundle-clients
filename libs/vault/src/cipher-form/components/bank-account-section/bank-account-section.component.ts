@@ -11,6 +11,7 @@ import { AbstractControl, FormBuilder, ReactiveFormsModule } from "@angular/form
 
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { BankAccountType } from "@bitwarden/common/vault/enums/bank-account-type";
+import { mayShowOrNew } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { BankAccountView } from "@bitwarden/common/vault/models/view/bank-account.view";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
@@ -23,6 +24,7 @@ import {
 } from "@bitwarden/components";
 import { I18nPipe } from "@bitwarden/ui-common";
 
+import { lockHiddenControls } from "../../../keykeeper/hidden-controls";
 import { CipherFormContainer } from "../../cipher-form-container";
 
 @Component({
@@ -92,7 +94,10 @@ export class BankAccountSectionComponent implements OnInit {
     this.setupNumericFilter(this.bankAccountForm.controls.pin);
 
     this.cipherFormContainer.registerChildForm("bankAccountDetails", this.bankAccountForm);
-    this.bankAccountForm.valueChanges.pipe(takeUntilDestroyed()).subscribe((value) => {
+    this.bankAccountForm.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
+      // Keykeeper: getRawValue(), as the values the person can't see are
+      // disabled, and a save keeps them as they are.
+      const value = this.bankAccountForm.getRawValue();
       const data = new BankAccountView();
       data.bankName = value.bankName ?? undefined;
       data.nameOnAccount = value.nameOnAccount ?? undefined;
@@ -111,6 +116,16 @@ export class BankAccountSectionComponent implements OnInit {
     });
   }
 
+  /**
+   * Keykeeper: whether the person may see one of the item's values
+   * (`part.property`): every value but the plain ones is hidden from someone
+   * who can't see the item's passwords, so its reveal toggle doesn't show
+   * (DESIGN.md, "Folders and permissions"). A new item is theirs.
+   */
+  protected canSee(key: string): boolean {
+    return mayShowOrNew(this.originalCipherView(), key);
+  }
+
   ngOnInit() {
     const prefillCipher = this.cipherFormContainer.getInitialCipherView();
     const bankAccountView = prefillCipher?.bankAccount ?? this.originalCipherView()?.bankAccount;
@@ -122,6 +137,9 @@ export class BankAccountSectionComponent implements OnInit {
     if (this.disabled()) {
       this.bankAccountForm.disable();
     }
+    // Keykeeper: the account number, PIN, SWIFT, and IBAN can't be shown,
+    // overwritten, or cleared by someone who can't see them.
+    lockHiddenControls(this.bankAccountForm.controls, "bankAccount", this.originalCipherView());
 
     this.cipherFormContainer.formStatusChange$
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -130,6 +148,11 @@ export class BankAccountSectionComponent implements OnInit {
           this.bankAccountForm.disable();
         } else {
           this.bankAccountForm.enable();
+          lockHiddenControls(
+            this.bankAccountForm.controls,
+            "bankAccount",
+            this.originalCipherView(),
+          );
         }
       });
   }

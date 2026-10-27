@@ -60,6 +60,11 @@ export type FolderPlaceOption = {
   label: string;
   icon?: BitwardenIcon;
   heading?: boolean;
+  /**
+   * A shared folder the person reaches but can't put this item in: they can't
+   * add items there (create). Shown locked, so the picker says it's there.
+   */
+  locked?: boolean;
 };
 
 // FIXME(https://bitwarden.atlassian.net/browse/CL-764): Migrate to OnPush
@@ -208,15 +213,16 @@ export class ItemDetailsSectionComponent implements OnInit {
   }
 
   /**
-   * Keykeeper: the web vault shows one Folder picker, grouped by owner, in
-   * place of Owner, Collections, and Folder: Personal with its folders, then
-   * each organization with the shared folders the person can add items to
-   * (DESIGN.md, "Folders and permissions"). The extension keeps upstream's
-   * fields while its own screens are redone.
+   * Keykeeper: the web vault and the extension show one Folder picker,
+   * grouped by owner, in place of Owner, Collections, and Folder: Personal
+   * with its folders, then each organization with its shared folders, the
+   * ones the person can't add items to locked (DESIGN.md, "Folders and
+   * permissions").
    */
   protected get folderPicker(): boolean {
+    const client = this.platformUtilsService.getClientType();
     return (
-      this.platformUtilsService.getClientType() === ClientType.Web &&
+      (client === ClientType.Web || client === ClientType.Browser) &&
       !this.config.hideIndividualVaultFields
     );
   }
@@ -259,6 +265,19 @@ export class ItemDetailsSectionComponent implements OnInit {
       .some((c) => !gridOf(c).share);
   }
 
+  /**
+   * Keykeeper: why the picker can't change: an organization's item that this
+   * person can't move to another shared folder (share in the folder it's in).
+   */
+  protected get placeLockedReason(): boolean {
+    return (
+      !this.partialEdit &&
+      this.itemDetailsForm.controls.organizationId.value != null &&
+      this.originalCipherView()?.id != null &&
+      this.placeLocked
+    );
+  }
+
   /** The other shared folders the item is in, which the picker leaves as they are. */
   protected get alsoIn(): string[] {
     const ids = (this.itemDetailsForm.getRawValue().collectionIds ?? [])
@@ -293,13 +312,12 @@ export class ItemDetailsSectionComponent implements OnInit {
       if (ownerLocked && org.id !== orgId) {
         continue;
       }
+      // The ones the person reaches; those they can't add items to are locked.
       const shared = this.collections.filter(
         (c) =>
           c.organizationId === org.id &&
           c.type !== CollectionTypes.DefaultUserCollection &&
-          (held.has(c.id) ||
-            this.config.admin ||
-            (c.assigned && gridOf({ ...c, keykeeper: c.keykeeper }).create)),
+          (held.has(c.id) || this.config.admin || c.assigned),
       );
       if (shared.length === 0) {
         continue;
@@ -311,10 +329,12 @@ export class ItemDetailsSectionComponent implements OnInit {
         heading: true,
       });
       for (const c of shared.sort(Utils.getSortFunction(this.i18nService, "name"))) {
+        const locked = !held.has(c.id) && !this.config.admin && !gridOf(c).create;
         options.push({
           value: `org:${org.id}:${c.id}`,
           label: c.name,
-          icon: "bwi-collection-shared",
+          icon: locked ? "bwi-lock" : "bwi-collection-shared",
+          locked,
         });
       }
     }
@@ -323,6 +343,10 @@ export class ItemDetailsSectionComponent implements OnInit {
 
   /** Puts the item where the picker says: an owner, and a folder or shared folder there. */
   protected async pickPlace(value: string) {
+    // Keykeeper: never a locked shared folder, however the choice came.
+    if (this.placeOptions.find((o) => o.value === value)?.locked) {
+      return;
+    }
     const [kind, first, second] = value.split(":");
     if (kind === "personal") {
       if (this.itemDetailsForm.controls.organizationId.value != null) {
@@ -601,6 +625,11 @@ export class ItemDetailsSectionComponent implements OnInit {
         (cId) =>
           this.collections.find((c) => c.id === cId)?.type === CollectionTypes.SharedCollection,
       );
+    const heldEditable = new Set<string>(
+      this.config.mode === "edit" || this.partialEdit
+        ? (this.originalCipherView()?.collectionIds ?? [])
+        : [],
+    );
     this.collectionOptions = this.collections
       .filter((c) => {
         // The collection belongs to the organization
@@ -625,8 +654,11 @@ export class ItemDetailsSectionComponent implements OnInit {
         }
 
         // Non-admins can only select assigned collections that are not read only. (Non-AC)
-        // Keykeeper: the ones they can add items to (create).
-        return c.assigned && gridOf(c).create;
+        // Keykeeper: the ones they can add items to (create), and, when
+        // editing, the ones the item is in already that they can edit in
+        // (a folder with edit but not create), so a save keeps the item there.
+        // Read-only ones the item is in are kept apart (readOnlyCollections).
+        return c.assigned && (gridOf(c).create || (heldEditable.has(c.id) && !c.readOnly));
       })
       .sort((a, b) => {
         // Show default collection first

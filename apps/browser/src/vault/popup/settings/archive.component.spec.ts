@@ -46,7 +46,9 @@ describe("ArchiveComponent", () => {
     hasOrganizations = jest.fn().mockReturnValue(of(false));
     decryptedCollections$ = jest.fn().mockReturnValue(of([]));
     userHasPremium$ = jest.fn().mockReturnValue(of(false));
-    archivedCiphers$ = jest.fn().mockReturnValue(of([{ id: "cipher-1" }]));
+    archivedCiphers$ = jest
+      .fn()
+      .mockReturnValue(of([{ id: "cipher-1", edit: true, viewPassword: true }]));
 
     await TestBed.configureTestingModule({
       imports: [ArchiveComponent],
@@ -151,6 +153,8 @@ describe("ArchiveComponent", () => {
     const mockCipher = {
       id: "cipher-1",
       reprompt: 0,
+      edit: true,
+      viewPassword: true,
     } as CipherViewLike;
 
     it("navigates to assign-collections when reprompt is not required", async () => {
@@ -172,6 +176,49 @@ describe("ArchiveComponent", () => {
       expect(navigate).toHaveBeenCalledWith(["/assign-collections"], {
         queryParams: { cipherId: "cipher-1" },
       });
+    });
+
+    it("Keykeeper: does not navigate for an organization's item without share in its shared folders", async () => {
+      decryptedCollections$.mockReturnValue(
+        of([
+          {
+            id: "col-1",
+            organizationId: "org-1",
+            readOnly: false,
+            hidePasswords: false,
+            manage: false,
+            keykeeper: {
+              seePasswords: true,
+              create: true,
+              edit: true,
+              delete: true,
+              export: false,
+              share: false,
+              print: true,
+              viewHistory: true,
+              manage: false,
+            },
+          },
+        ] as any),
+      );
+      const testFixture = TestBed.createComponent(ArchiveComponent);
+      testFixture.detectChanges();
+      await testFixture.whenStable();
+      const orgCipher = {
+        ...mockCipher,
+        organizationId: "org-1",
+        collectionIds: ["col-1"],
+      } as unknown as CipherViewLike;
+
+      await testFixture.componentInstance.conditionallyNavigateToAssignCollections(orgCipher);
+      await testFixture.componentInstance.clone(orgCipher);
+
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it("Keykeeper: does not clone an item whose passwords the person can't see", async () => {
+      await component.clone({ ...mockCipher, viewPassword: false } as CipherViewLike);
+      expect(navigate).not.toHaveBeenCalled();
     });
 
     it("does not navigate when password prompt is cancelled", async () => {

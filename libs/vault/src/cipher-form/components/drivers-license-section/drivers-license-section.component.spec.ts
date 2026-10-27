@@ -2,6 +2,7 @@ import { CommonModule } from "@angular/common";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { AbstractControl, ReactiveFormsModule } from "@angular/forms";
 import { mock, MockProxy } from "jest-mock-extended";
+import { Subject } from "rxjs";
 
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
@@ -20,7 +21,11 @@ describe("DriversLicenseSectionComponent", () => {
   const getInitialCipherView = jest.fn((): any => null);
 
   beforeEach(async () => {
-    cipherFormProvider = mock<CipherFormContainer>({ getInitialCipherView });
+    cipherFormProvider = mock<CipherFormContainer>({
+      getInitialCipherView,
+      formStatusChange$: new Subject<"enabled" | "disabled">(),
+      originalCipherView: null,
+    });
     patchCipherSpy = jest.spyOn(cipherFormProvider, "patchCipher");
 
     await TestBed.configureTestingModule({

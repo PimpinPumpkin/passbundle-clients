@@ -4,6 +4,7 @@ import { FormBuilder } from "@angular/forms";
 import {
   combineLatest,
   debounceTime,
+  defer,
   distinctUntilChanged,
   filter,
   map,
@@ -43,6 +44,7 @@ import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { FolderService } from "@bitwarden/common/vault/abstractions/folder/folder.service.abstraction";
 import { CipherType } from "@bitwarden/common/vault/enums";
+import { OwnerPlace, ownerPlaces } from "@bitwarden/common/vault/keykeeper/folders-by-owner";
 import { isMspTemplateCopy } from "@bitwarden/common/vault/keykeeper/templates";
 import { ITreeNodeObject, TreeNode } from "@bitwarden/common/vault/models/domain/tree-node";
 import { FolderView } from "@bitwarden/common/vault/models/view/folder.view";
@@ -79,6 +81,72 @@ export type PopupListFilter = {
   folder: FolderView | null;
   cipherType: CipherType | null;
 };
+
+/**
+ * Keykeeper: one entry of the folder filter (DESIGN.md, "Folders and
+ * permissions"): Personal and its folders, then each organization and its
+ * shared folders, with how many items the list shows once it's picked.
+ */
+export type KeykeeperPlaceEntry = OwnerPlace & {
+  count: number;
+  /** The list shows this place now. */
+  picked: boolean;
+  /** Personal can't be picked where an organization's policy keeps items out of it. */
+  disabled: boolean;
+  /** What the list's filters become when it's picked. */
+  filters: Pick<PopupListFilter, "organization" | "collection" | "folder">;
+  /** Its owner's name, for a shared folder: "Contoso IT · Servers". */
+  ownerName?: string;
+};
+
+/**
+ * Whether an item shows in the popup's lists under these filters. Keykeeper:
+ * a pure function, so the folder filter can count what each place shows.
+ */
+export function passesPopupFilters(cipher: PopupCipherViewLike, filters: PopupListFilter): boolean {
+  // Vault popup lists never shows deleted ciphers
+  if (CipherViewLikeUtils.isDeleted(cipher)) {
+    return false;
+  }
+
+  if (filters.cipherType !== null && CipherViewLikeUtils.getType(cipher) !== filters.cipherType) {
+    return false;
+  }
+
+  if (filters.collection && !cipher.collectionIds?.includes(asUuid(filters.collection.id!))) {
+    return false;
+  }
+
+  // Keykeeper: an MSP's template copies show only in their collection.
+  if (!filters.collection && isMspTemplateCopy(cipher)) {
+    return false;
+  }
+
+  if (filters.folder) {
+    if (!filters.folder.id) {
+      // "Items with no folder" (id is falsy): match ciphers where folderId is null, undefined, or empty
+      if (cipher.folderId) {
+        return false;
+      }
+    } else if (cipher.folderId !== filters.folder.id) {
+      return false;
+    }
+  }
+
+  const isMyVault = filters.organization?.id === MY_VAULT_ID;
+
+  if (isMyVault) {
+    if (cipher.organizationId != null) {
+      return false;
+    }
+  } else if (filters.organization) {
+    if (cipher.organizationId !== filters.organization.id) {
+      return false;
+    }
+  }
+
+  return true;
+}
 
 /** Delimiter that denotes a level of nesting  */
 const NESTING_DELIMITER = "/";
@@ -240,56 +308,7 @@ export class VaultPopupListFiltersService {
     this.filters$.pipe(
       map(
         (filters) => (ciphers: PopupCipherViewLike[]) =>
-          ciphers.filter((cipher) => {
-            // Vault popup lists never shows deleted ciphers
-            if (CipherViewLikeUtils.isDeleted(cipher)) {
-              return false;
-            }
-
-            if (
-              filters.cipherType !== null &&
-              CipherViewLikeUtils.getType(cipher) !== filters.cipherType
-            ) {
-              return false;
-            }
-
-            if (
-              filters.collection &&
-              !cipher.collectionIds?.includes(asUuid(filters.collection.id!))
-            ) {
-              return false;
-            }
-
-            // Keykeeper: an MSP's template copies show only in their collection.
-            if (!filters.collection && isMspTemplateCopy(cipher)) {
-              return false;
-            }
-
-            if (filters.folder) {
-              if (!filters.folder.id) {
-                // "Items with no folder" (id is falsy): match ciphers where folderId is null, undefined, or empty
-                if (cipher.folderId) {
-                  return false;
-                }
-              } else if (cipher.folderId !== filters.folder.id) {
-                return false;
-              }
-            }
-
-            const isMyVault = filters.organization?.id === MY_VAULT_ID;
-
-            if (isMyVault) {
-              if (cipher.organizationId != null) {
-                return false;
-              }
-            } else if (filters.organization) {
-              if (cipher.organizationId !== filters.organization.id) {
-                return false;
-              }
-            }
-
-            return true;
-          }),
+          ciphers.filter((cipher) => passesPopupFilters(cipher, filters as PopupListFilter)),
       ),
     );
 
@@ -528,6 +547,132 @@ export class VaultPopupListFiltersService {
 
   /** Organizations, collection, folders filters. */
   allFilters$ = combineLatest([this.organizations$, this.collections$, this.folders$]);
+
+  /**
+   * Keykeeper: the folder filter (DESIGN.md, "Folders and permissions"): every
+   * place an item lives, grouped by owner, as the web vault's menu has them,
+   * each with how many items the list shows once it's picked (with the kind
+   * of item picked now). Nothing when there's only Personal to pick.
+   */
+  places$: Observable<KeykeeperPlaceEntry[]> = this.activeUserId$.pipe(
+    switchMap((userId) =>
+      combineLatest([
+        // The filters as they are when someone starts watching, then each change.
+        defer(() =>
+          this.filterForm.valueChanges.pipe(
+            startWith(null),
+            map(() => this.filterForm.value),
+          ),
+        ),
+        this.folderService.folderViews$(userId),
+        this.collectionService.decryptedCollections$(userId),
+        this.organizationService.memberOrganizations$(userId),
+        this.policyService.policyAppliesToUser$(PolicyType.OrganizationDataOwnership, userId),
+        this.cipherService.cipherListViews$(userId),
+        this.restrictedItemTypesService.restricted$,
+      ]),
+    ),
+    map(([filters, folders, collections, orgs, noPersonal, ciphers, restrictions]) => {
+      const current = filters as PopupListFilter;
+      const places = ownerPlaces({
+        personalLabel: this.i18nService.t("myVault"),
+        noFolderLabel: this.i18nService.t("itemsWithNoFolder"),
+        folders: folders.filter((f) => !!f.id).map((f) => ({ id: f.id!, name: f.name })),
+        organizations: orgs.map((o) => ({ id: o.id, name: o.name })),
+        collections: collections.map((c) => ({
+          id: c.id!,
+          name: c.name,
+          organizationId: c.organizationId,
+        })),
+        compare: (a, b) => this.i18nService.collator?.compare(a, b) ?? a.localeCompare(b),
+      });
+      // Only Personal: nothing to pick, unless a place is picked already (one
+      // deleted since, say), which the menu's All folders still clears.
+      const placePicked = !!(current.organization || current.collection || current.folder);
+      if (places.length <= 1 && !placePicked) {
+        return [];
+      }
+      // As folders$ reads them (an array or a map of them), and as the list
+      // shows them: not archived, and not of a kind a policy restricts.
+      const items = (Object.values(ciphers ?? {}) as PopupCipherViewLike[]).filter(
+        (c) =>
+          !CipherViewLikeUtils.isArchived(c) &&
+          !this.restrictedItemTypesService.isCipherRestricted(c, restrictions),
+      );
+      const myVault = { id: MY_VAULT_ID } as Organization;
+      const orgById = new Map(orgs.map((o) => [o.id as string, o]));
+      const folderById = new Map(folders.map((f) => [f.id ?? "", f]));
+      const collectionById = new Map(collections.map((c) => [c.id as string, c]));
+      const picked = this.pickedPlaceKey(current);
+      return places.map((place): KeykeeperPlaceEntry => {
+        let picks: KeykeeperPlaceEntry["filters"];
+        switch (place.kind) {
+          case "personal":
+            picks = { organization: myVault, collection: null, folder: null };
+            break;
+          case "folder":
+            picks = place.folderId
+              ? { organization: null, collection: null, folder: folderById.get(place.folderId)! }
+              : { organization: myVault, collection: null, folder: { id: null } as FolderView };
+            break;
+          case "organization":
+            picks = {
+              organization: orgById.get(place.organizationId!)!,
+              collection: null,
+              folder: null,
+            };
+            break;
+          case "sharedFolder":
+            picks = {
+              organization: orgById.get(place.organizationId!)!,
+              collection: collectionById.get(place.collectionId!)!,
+              folder: null,
+            };
+            break;
+        }
+        const next: PopupListFilter = { ...current, ...picks };
+        return {
+          ...place,
+          count: items.filter((c) => passesPopupFilters(c, next)).length,
+          picked: place.key === picked,
+          disabled: place.kind === "personal" && noPersonal,
+          filters: picks,
+          ownerName:
+            place.kind === "sharedFolder" ? orgById.get(place.organizationId!)?.name : undefined,
+        };
+      });
+    }),
+    shareReplay({ refCount: true, bufferSize: 1 }),
+  );
+
+  /** Keykeeper: the place picked now, if any: what the folder filter shows as picked. */
+  pickedPlace$: Observable<KeykeeperPlaceEntry | undefined> = this.places$.pipe(
+    map((places) => places.find((p) => p.picked)),
+  );
+
+  /** Keykeeper: shows a place (or every place, with null), keeping the kind of item picked. */
+  pickPlace(place: KeykeeperPlaceEntry | null) {
+    this.filterForm.patchValue(
+      place?.filters ?? { organization: null, collection: null, folder: null },
+    );
+  }
+
+  /** The folder filter's entry the filters name, as `ownerPlaces` keys them. */
+  private pickedPlaceKey(filters: PopupListFilter): string | undefined {
+    if (filters.collection?.id) {
+      return `shared:${filters.collection.id}`;
+    }
+    if (filters.folder) {
+      return filters.folder.id ? `folder:${filters.folder.id}` : "folder:none";
+    }
+    if (filters.organization?.id === MY_VAULT_ID) {
+      return "personal";
+    }
+    if (filters.organization?.id) {
+      return `org:${filters.organization.id}`;
+    }
+    return undefined;
+  }
 
   /** Updates the stored state for filter visibility. */
   async updateFilterVisibility(isVisible: boolean): Promise<void> {

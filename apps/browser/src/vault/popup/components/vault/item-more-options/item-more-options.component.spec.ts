@@ -414,6 +414,42 @@ describe("ItemMoreOptionsComponent", () => {
       });
     });
 
+    it("Keykeeper: emits false for an organization's item without share in its shared folders", (done) => {
+      component.cipher = {
+        ...component.cipher,
+        organizationId: "org-1",
+        collectionIds: ["col-1"],
+      } as any;
+      jest.spyOn(component["organizationService"], "hasOrganizations").mockReturnValue(of(true));
+      jest.spyOn(component["collectionService"], "decryptedCollections$").mockReturnValue(
+        of([
+          {
+            id: "col-1",
+            organizationId: "org-1",
+            readOnly: false,
+            hidePasswords: false,
+            manage: false,
+            keykeeper: {
+              seePasswords: true,
+              create: true,
+              edit: true,
+              delete: true,
+              export: false,
+              share: false,
+              print: true,
+              viewHistory: true,
+              manage: false,
+            },
+          },
+        ] as any),
+      );
+
+      component["canAssignCollections$"].subscribe((result) => {
+        expect(result).toBe(false);
+        done();
+      });
+    });
+
     it("emits false when all collections are read-only", (done) => {
       jest.spyOn(component["organizationService"], "hasOrganizations").mockReturnValue(of(true));
       jest

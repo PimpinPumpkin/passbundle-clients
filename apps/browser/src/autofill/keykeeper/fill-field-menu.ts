@@ -15,6 +15,7 @@ import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { CipherType, FieldType } from "@bitwarden/common/vault/enums";
+import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 
 import { BrowserApi } from "../../platform/browser/browser-api";
@@ -33,6 +34,7 @@ import {
   upsertFillRule,
   visibleCustomFields,
 } from "./fill-rules";
+import { noteFill } from "./hidden-fills";
 
 // No underscores: menu ids are split on "_".
 export const FILL_FIELD_ID = "kkfill";
@@ -54,7 +56,7 @@ export function choicesFor(cipher: CipherView): FillChoice[] {
   if (cipher.login?.username) {
     choices.push({ key: "u", title: STRINGS.username, source: { from: "username" } });
   }
-  if (cipher.login?.password && cipher.viewPassword) {
+  if (cipher.login?.password && maySeeSecrets(cipher)) {
     choices.push({ key: "p", title: STRINGS.password, source: { from: "password" } });
   }
   if (cipher.login?.totp) {
@@ -62,7 +64,7 @@ export function choicesFor(cipher: CipherView): FillChoice[] {
   }
   visibleCustomFields(cipher).forEach((field, index) => {
     // Hidden fields stay hidden from someone who can't see the item's passwords.
-    if (field.type === FieldType.Hidden && !cipher.viewPassword) {
+    if (field.type === FieldType.Hidden && !maySeeSecrets(cipher)) {
       return;
     }
     if (field.name && field.type !== FieldType.Boolean && field.type !== FieldType.Linked) {
@@ -223,7 +225,7 @@ export async function fillFieldWith(
   }
   // For someone who can't see the item's passwords, a secret goes only into
   // a password field, as with rules (fill-rules.ts).
-  if (secret && !cipher.viewPassword && target.field.type !== "password") {
+  if (secret && !maySeeSecrets(cipher) && target.field.type !== "password") {
     return false;
   }
   const rule: FillRule = {
@@ -266,6 +268,7 @@ export async function fillFieldWith(
         { frameId },
       );
       filled = true;
+      noteFill(tab.id, tab.url, cipher);
     }
   }
 

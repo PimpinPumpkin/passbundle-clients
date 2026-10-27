@@ -24,6 +24,11 @@ import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { EventCollectionService, EventType } from "@bitwarden/common/dirt/event-logs";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { CipherType, FieldType, LinkedIdType } from "@bitwarden/common/vault/enums";
+import {
+  isSecretLinkedField,
+  maySeeSecretsOrNew,
+} from "@bitwarden/common/vault/keykeeper/hidden-secrets";
+import { isReservedFieldName } from "@bitwarden/common/vault/keykeeper/reserved-fields";
 import { CardView } from "@bitwarden/common/vault/models/view/card.view";
 import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
 import { IdentityView } from "@bitwarden/common/vault/models/view/identity.view";
@@ -109,8 +114,13 @@ export class CustomFieldsComponent implements OnInit, AfterViewInit {
   /** Reference to the add field dialog */
   dialogRef: DialogRef;
 
-  /** Options for Linked Fields */
-  linkedFieldOptions: { name: string; value: LinkedIdType }[] = [];
+  /**
+   * Options for Linked Fields. Keykeeper: someone who can't see the item's
+   * passwords can't link a field to a secret (the password, a card's number
+   * or code, an SSN, or a passport or license number), which filling would
+   * put into a page they can read.
+   */
+  linkedFieldOptions: { name: string; value: LinkedIdType; secret: boolean }[] = [];
 
   /** True when edit/reorder toggles should be hidden based on partial-edit */
   isPartialEdit: boolean;
@@ -156,12 +166,12 @@ export class CustomFieldsComponent implements OnInit, AfterViewInit {
   }
 
   canEdit(type: FieldType): boolean {
-    return (
-      !this.isPartialEdit &&
-      (type !== FieldType.Hidden ||
-        this.cipherFormContainer.originalCipherView === null ||
-        this.cipherFormContainer.originalCipherView.viewPassword)
-    );
+    return !this.isPartialEdit && (type !== FieldType.Hidden || !this.hidesSecrets);
+  }
+
+  /** Keykeeper: whether this is an existing item whose secrets the person can't see. */
+  private get hidesSecrets(): boolean {
+    return !maySeeSecretsOrNew(this.cipherFormContainer.originalCipherView);
   }
 
   dragDisabled(type: FieldType): boolean {
@@ -174,9 +184,16 @@ export class CustomFieldsComponent implements OnInit, AfterViewInit {
     optionsArray.sort((a, b) => a[1].sortPosition - b[1].sortPosition);
 
     // Populate options for linked custom fields
+    const cipherType = this.cipherFormContainer.config.cipherType;
     this.linkedFieldOptions = optionsArray.map(([id, linkedFieldOption]) => ({
       name: this.i18nService.t(linkedFieldOption.i18nKey),
       value: id as LinkedIdType,
+      secret:
+        this.hidesSecrets &&
+        isSecretLinkedField(
+          { type: cipherType, linkedFieldOptions: linkedFieldsOptionsForCipher },
+          id as LinkedIdType,
+        ),
     }));
 
     const prefillCipher = this.cipherFormContainer.getInitialCipherView();
@@ -203,8 +220,7 @@ export class CustomFieldsComponent implements OnInit, AfterViewInit {
 
       // Keykeeper: only lock hidden fields of an existing item the person may not
       // view. A new item (from a template, say) has no original and is theirs.
-      const original = this.cipherFormContainer.originalCipherView;
-      if (field.type === FieldType.Hidden && original != null && !original.viewPassword) {
+      if (field.type === FieldType.Hidden && this.hidesSecrets) {
         customField.controls.value.disable();
       }
 
@@ -251,7 +267,8 @@ export class CustomFieldsComponent implements OnInit, AfterViewInit {
           removeField: this.removeField.bind(this),
           cipherType,
           editLabelConfig,
-          disallowHiddenField: mode === "edit" && !originalCipher.viewPassword,
+          // Keykeeper: whatever the mode, for an item whose secrets the person can't see.
+          disallowHiddenField: mode !== "add" && !maySeeSecretsOrNew(originalCipher),
         },
       },
     );
@@ -259,18 +276,15 @@ export class CustomFieldsComponent implements OnInit, AfterViewInit {
 
   /** Returns true when the user has permission to view passwords for the individual cipher */
   canViewPasswords(index: number) {
-    if (this.cipherFormContainer.originalCipherView === null) {
-      return true;
-    }
-
-    return (
-      this.cipherFormContainer.originalCipherView.viewPassword ||
-      this.fields.at(index).value.newField
-    );
+    return !this.hidesSecrets || this.fields.at(index).value.newField;
   }
 
   /** Updates label for an individual field */
   updateLabel(index: number, label: string) {
+    // Keykeeper: never one of Keykeeper's own names (the dialog says so too).
+    if (isReservedFieldName(label)) {
+      return;
+    }
     this.fields.at(index).patchValue({ name: label });
     void this.dialogRef?.close();
   }
@@ -283,6 +297,10 @@ export class CustomFieldsComponent implements OnInit, AfterViewInit {
 
   /** Adds a new field to the form */
   addField(type: FieldType, label: string) {
+    // Keykeeper: never one of Keykeeper's own names (the dialog says so too).
+    if (isReservedFieldName(label)) {
+      return;
+    }
     void this.dialogRef?.close();
 
     let value = null;
@@ -294,8 +312,8 @@ export class CustomFieldsComponent implements OnInit, AfterViewInit {
     }
 
     if (type === FieldType.Linked && this.linkedFieldOptions.length > 0) {
-      // Default to the first linked field option
-      linkedId = this.linkedFieldOptions[0].value;
+      // Default to the first linked field option. Keykeeper: one the person may link to.
+      linkedId = this.linkedFieldOptions.find((option) => !option.secret)?.value ?? null;
     }
 
     this.fields.push(

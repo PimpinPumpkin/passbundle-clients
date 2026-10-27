@@ -96,6 +96,8 @@ describe("ViewIdentitySectionsComponent", () => {
 
     it("populates identification detail fields", () => {
       component.cipher = {
+        // Keykeeper: for someone who can see them (missing is hidden).
+        viewPassword: true,
         identity: {
           ssn: "123-45-6789",
           passportNumber: "998-765-4321",

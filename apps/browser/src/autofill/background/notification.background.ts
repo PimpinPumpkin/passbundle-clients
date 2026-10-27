@@ -61,6 +61,7 @@ import {
 import { CollectionView } from "../content/components/common-types";
 import { NotificationType } from "../enums/notification-type.enum";
 import { Fido2Background } from "../fido2/background/abstractions/fido2.background";
+import { isHiddenPassword, lastFillHides } from "../keykeeper/hidden-fills";
 import { AutofillService } from "../services/abstractions/autofill.service";
 
 import {
@@ -662,6 +663,11 @@ export default class NotificationBackground {
 
     const addLoginIsEnabled = await this.getEnableAddedLoginPrompt();
 
+    // Keykeeper: never offer to save a password the person can't see.
+    if (lastFillHides(tab.id, login.url)) {
+      return false;
+    }
+
     if (authStatus === AuthenticationStatus.Locked) {
       if (addLoginIsEnabled) {
         await this.pushAddLoginToQueue(loginDomain, login, tab, true);
@@ -678,6 +684,9 @@ export default class NotificationBackground {
     }
 
     const ciphers = await this.cipherService.getAllDecryptedForUrl(login.url, activeUserId);
+    if (isHiddenPassword(ciphers, data.password, data.newPassword)) {
+      return false;
+    }
     const usernameMatches = ciphers.filter(
       (c) => c.login.username != null && c.login.username.toLowerCase() === normalizedUsername,
     );
@@ -797,6 +806,12 @@ export default class NotificationBackground {
       return false;
     }
 
+    // Keykeeper: never offer to save or update with a password the person
+    // can't see (keykeeper/hidden-fills.ts).
+    if (lastFillHides(tab.id, data.uri)) {
+      return false;
+    }
+
     /*
      * We only show the unlock notification if a new password field was filled, since
      * it's very likely to blindly represent an updated cipher value whereas other
@@ -817,6 +832,9 @@ export default class NotificationBackground {
       data.uri,
       activeUserId,
     );
+    if (isHiddenPassword(ciphersForURL, currentPasswordFieldValue, newPasswordFieldValue)) {
+      return false;
+    }
 
     // Reducer structured to avoid subsequent array iterations
     const ciphersByInputMatchCategory = ciphersForURL.reduce<CiphersByInputMatchCategory>(
@@ -967,6 +985,11 @@ export default class NotificationBackground {
     const currentPasswordFieldValue = data.password || null;
     const newPasswordFieldValue = data.newPassword || null;
 
+    // Keykeeper: never offer to update with a password the person can't see.
+    if (lastFillHides(tab.id, data.uri)) {
+      return false;
+    }
+
     if (authStatus === AuthenticationStatus.Locked && newPasswordFieldValue !== null) {
       await this.pushChangePasswordToQueue(null, loginDomain, newPasswordFieldValue, tab, true);
       return true;
@@ -976,6 +999,9 @@ export default class NotificationBackground {
       data.uri,
       activeUserId,
     );
+    if (isHiddenPassword(ciphers, currentPasswordFieldValue, newPasswordFieldValue)) {
+      return false;
+    }
 
     const normalizedUsername: string = username ? username.toLowerCase() : "";
 

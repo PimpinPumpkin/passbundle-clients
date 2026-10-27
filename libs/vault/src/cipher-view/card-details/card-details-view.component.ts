@@ -6,6 +6,7 @@ import { Component, Input, OnChanges, SimpleChanges } from "@angular/core";
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { EventCollectionService, EventType } from "@bitwarden/common/dirt/event-logs";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
+import { HIDDEN_VALUE_MASK, maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
   SectionHeaderComponent,
@@ -50,6 +51,13 @@ export class CardDetailsComponent implements OnChanges {
   get card() {
     return this.cipher.card;
   }
+
+  /** Keykeeper: whether the person may see the card's number and code. */
+  get canSeeSecrets(): boolean {
+    return maySeeSecrets(this.cipher);
+  }
+
+  protected readonly mask = HIDDEN_VALUE_MASK;
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes["cipher"]) {

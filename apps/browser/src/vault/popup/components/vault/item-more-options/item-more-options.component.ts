@@ -9,6 +9,11 @@ import { PremiumBadgeComponent } from "@bitwarden/angular/billing/components/pre
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { BrowserPremiumUpgradePromptService } from "@bitwarden/browser/billing/popup/services/browser-premium-upgrade-prompt.service";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
+import {
+  gridOf,
+  itemGrid,
+  itemLike,
+} from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { DomainSettingsService } from "@bitwarden/common/autofill/services/domain-settings.service";
@@ -114,17 +119,29 @@ export class ItemMoreOptionsComponent {
     }),
   );
 
-  /** Observable Boolean dependent on the current user having access to an organization and editable collections */
-  protected canAssignCollections$ = this.accountService.activeAccount$.pipe(
-    getUserId,
-    switchMap((userId) => {
+  /**
+   * Observable Boolean dependent on the current user having access to an organization and editable collections.
+   * Keykeeper: a shared folder they can add items to (create), and share on
+   * the item, which adding it to another shared folder needs, as the server
+   * does (DESIGN.md, "Folders and permissions"). A personal item is theirs.
+   */
+  protected canAssignCollections$ = combineLatest([
+    this.accountService.activeAccount$.pipe(getUserId),
+    this._cipher$,
+  ]).pipe(
+    switchMap(([userId, cipher]) => {
       return combineLatest([
         this.organizationService.hasOrganizations(userId),
         this.collectionService.decryptedCollections$(userId),
       ]).pipe(
         map(([hasOrgs, collections]) => {
-          const canEditCollections = collections.some((c) => !c.readOnly);
-          return hasOrgs && canEditCollections;
+          // In the item's organization, for an organization's item.
+          const orgId = itemLike(cipher).organizationId;
+          const canEditCollections = collections.some(
+            (c) => gridOf(c).create && (orgId == null || c.organizationId === orgId),
+          );
+          const canShare = itemGrid(itemLike(cipher), collections).share;
+          return hasOrgs && canEditCollections && canShare;
         }),
       );
     }),

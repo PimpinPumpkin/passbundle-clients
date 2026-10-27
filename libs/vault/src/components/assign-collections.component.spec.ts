@@ -7,6 +7,7 @@ import { BehaviorSubject, of } from "rxjs";
 // eslint-disable-next-line no-restricted-imports
 import { CollectionService } from "@bitwarden/admin-console/common";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
+import { GRID_NONE } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import {
   CollectionView,
   CollectionTypes,
@@ -102,6 +103,24 @@ describe("AssignCollectionsComponent", () => {
 
   const organizations$ = jest.fn().mockReturnValue(of([org]));
 
+  // Keykeeper: the person's shared folders from sync. Assigning an item to
+  // folders needs share in one of the ones it's in (DESIGN.md, "Folders and
+  // permissions"): here the read-only folder holding the cipher lets them
+  // share it, without letting them edit there.
+  const sharingFolder = Object.assign(
+    new CollectionView({
+      id: readOnlyCollection1.id,
+      organizationId: "org-id" as OrganizationId,
+      name: readOnlyCollection1.name,
+    }),
+    {
+      readOnly: true,
+      keykeeper: { ...GRID_NONE, seePasswords: true, share: true, viewHistory: true },
+    },
+  );
+  let syncedCollections: CollectionView[] = [sharingFolder];
+  const decryptedCollections$ = jest.fn(() => of(syncedCollections));
+
   let toastService: MockProxy<ToastService>;
 
   async function setup(vfo1Enabled = false) {
@@ -114,7 +133,10 @@ describe("AssignCollectionsComponent", () => {
       providers: [
         { provide: CipherService, useValue: mock<CipherService>() },
         { provide: OrganizationService, useValue: mock<OrganizationService>({ organizations$ }) },
-        { provide: CollectionService, useValue: mock<CollectionService>() },
+        {
+          provide: CollectionService,
+          useValue: mock<CollectionService>({ decryptedCollections$ }),
+        },
         { provide: ToastService, useValue: toastService },
         { provide: AccountService, useValue: accountService },
         { provide: I18nService, useValue: { t: (...keys: string[]) => keys.join(" ") } },
@@ -438,6 +460,43 @@ describe("AssignCollectionsComponent", () => {
       expect(toastService.showToast).toHaveBeenCalledWith(
         expect.objectContaining({ message: "itemMovedToOrg vault" }),
       );
+    });
+  });
+
+  describe("Keykeeper: share", () => {
+    const orgCipher = {
+      id: "org-cipher-id",
+      name: "Front desk PC",
+      organizationId: "org-id",
+      collectionIds: [readOnlyCollection1.id],
+      edit: true,
+    } as unknown as CipherView;
+
+    async function editableWith(grid: Partial<typeof GRID_NONE>) {
+      syncedCollections = [
+        Object.assign(
+          new CollectionView({
+            id: readOnlyCollection1.id,
+            organizationId: "org-id" as OrganizationId,
+            name: readOnlyCollection1.name,
+          }),
+          { keykeeper: { ...GRID_NONE, ...grid } },
+        ),
+      ];
+      TestBed.resetTestingModule();
+      await setup(false);
+      component.params = { ...params, ciphers: [orgCipher] };
+      await component["initializeItems"]("org-id" as OrganizationId);
+      syncedCollections = [sharingFolder];
+      return component["editableItemCount"];
+    }
+
+    it("counts an organization's item without share in any of its shared folders as one it can't assign", async () => {
+      expect(await editableWith({ seePasswords: true, edit: true, viewHistory: true })).toBe(0);
+    });
+
+    it("counts one with share in a shared folder it's in as one it can", async () => {
+      expect(await editableWith({ seePasswords: true, share: true, viewHistory: true })).toBe(1);
     });
   });
 });

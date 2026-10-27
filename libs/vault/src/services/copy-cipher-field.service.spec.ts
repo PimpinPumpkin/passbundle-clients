@@ -57,7 +57,8 @@ describe("CopyCipherFieldService", () => {
     let skipReprompt: boolean;
 
     beforeEach(() => {
-      cipher = mock<CipherView>();
+      // Keykeeper: someone who can see the item's passwords (missing is hidden).
+      cipher = mock<CipherView>({ viewPassword: true });
       valueToCopy = "test";
       actionType = "username";
       skipReprompt = false;

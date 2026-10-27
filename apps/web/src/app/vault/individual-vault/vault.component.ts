@@ -81,6 +81,7 @@ import { TreeNode } from "@bitwarden/common/vault/models/domain/tree-node";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
 import { ServiceUtils } from "@bitwarden/common/vault/service-utils";
+import { CipherAuthorizationService } from "@bitwarden/common/vault/services/cipher-authorization.service";
 import { RestrictedItemTypesService } from "@bitwarden/common/vault/services/restricted-item-types.service";
 import { SearchTextDebounceInterval } from "@bitwarden/common/vault/services/search.service";
 import {
@@ -100,6 +101,7 @@ import {
   BULK_DELETE_DIALOG,
   BulkDeleteDialogResult,
   BulkMoveDialogResult,
+  CANT_COPY_ITEM_KEY,
   CipherFormConfig,
   CollectionAssignmentResult,
   createFilterFunction,
@@ -109,6 +111,7 @@ import {
   FolderFilter,
   KeykeeperNewItemDialogComponent,
   KeykeeperTemplatePickerDialogComponent,
+  mayCloneItem,
   newTemplateDefinitionField,
   NewItemResult,
   templateFieldsFromItem,
@@ -198,6 +201,7 @@ type EmptyStateMap = Record<EmptyStateType, EmptyStateItem>;
 })
 export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestroy {
   private readonly vfo1TerminologyService = inject(Vfo1TerminologyService);
+  private readonly cipherAuthorizationService = inject(CipherAuthorizationService);
 
   readonly vaultItemsComponent = viewChild(VaultItemsComponent);
 
@@ -1259,6 +1263,17 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
     const cipher = await this.cipherService.get(id, activeUserId);
     if (!cipher) {
       await this.handleUnknownCipher();
+      return;
+    }
+
+    // Keykeeper: a copy needs see passwords and share, however it was asked
+    // for, the address included (DESIGN.md, "Folders and permissions").
+    if (cloneMode && !(await mayCloneItem(this.cipherAuthorizationService, cipher))) {
+      this.toastService.showToast({
+        variant: "error",
+        message: this.i18nService.t(CANT_COPY_ITEM_KEY),
+      });
+      await this.go({ cipherId: null, itemId: null, action: null });
       return;
     }
 

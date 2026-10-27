@@ -76,6 +76,7 @@ const laptopTemplate = {
   name: " Client laptop ",
   type: CipherType.SecureNote,
   organizationId: "org-1",
+  viewPassword: true,
   fields: [
     field("Asset tag", FieldType.Text, ""),
     field("BitLocker recovery key", FieldType.Hidden, ""),
@@ -101,6 +102,65 @@ describe("Keykeeper custom templates", () => {
       { label: "Site", kind: "text", value: "Main office" },
       { label: "Encrypted", kind: "boolean", value: "true" },
     ]);
+  });
+
+  it("Keykeeper: leave a hidden default out for someone who can't see the note's passwords", () => {
+    const withSecret = {
+      ...laptopTemplate,
+      fields: [
+        field("BitLocker recovery key", FieldType.Hidden, "1234-5678-9012"),
+        field("Site", FieldType.Text, "Main office"),
+        newTemplateDefinitionField("login", "4f6c8a3e-1d2b-4c5a-9e7f-0a1b2c3d4e5f"),
+      ],
+    };
+
+    // Someone who can see them gets the default.
+    expect(templateFields(customTemplate(withSecret)!).map((f) => f.value)).toEqual([
+      "1234-5678-9012",
+      "Main office",
+      expect.any(String),
+    ]);
+
+    // Someone who can't, and an item that doesn't say: the field, empty.
+    for (const hidden of [
+      { ...withSecret, viewPassword: false },
+      { ...withSecret, viewPassword: undefined },
+    ]) {
+      const template = customTemplate(hidden)!;
+      expect(template.fields).toEqual([
+        { label: "BitLocker recovery key", kind: "hidden", value: undefined },
+        { label: "Site", kind: "text", value: "Main office" },
+      ]);
+      const fields = templateFields(template);
+      expect(fields.map((f) => [f.name, f.type, f.value]).slice(0, 2)).toEqual([
+        ["BitLocker recovery key", FieldType.Hidden, ""],
+        ["Site", FieldType.Text, "Main office"],
+      ]);
+      expect(JSON.stringify(fields)).not.toContain("1234-5678-9012");
+    }
+  });
+
+  it("Keykeeper: a template someone without see passwords made, by naming a field, copies none of the note's secrets for them", () => {
+    // A note they can edit but not see the passwords of, with a hidden field,
+    // turned into a template by a text field with the definition's name.
+    const note = {
+      id: "cipher-2",
+      name: "Server room",
+      type: CipherType.SecureNote,
+      organizationId: "org-1",
+      viewPassword: false,
+      fields: [
+        field("Door code", FieldType.Hidden, "4421-8830"),
+        field(
+          "keykeeper.template-definition",
+          FieldType.Text,
+          '{"id":"made-up","base":"note","v":1}',
+        ),
+      ],
+    };
+    const template = customTemplate(note);
+    expect(template).not.toBeNull();
+    expect(JSON.stringify(templateFields(template!))).not.toContain("4421-8830");
   });
 
   it("give new items their fields and defaults, and their name", () => {

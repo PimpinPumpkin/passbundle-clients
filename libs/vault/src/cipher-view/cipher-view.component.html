@@ -98,7 +98,10 @@
 
   <!-- SshKEY SECTIONS -->
   @if (hasSshKey()) {
-    <app-sshkey-view [sshKey]="cipher()!.sshKey"></app-sshkey-view>
+    <app-sshkey-view
+      [sshKey]="cipher()!.sshKey"
+      [canSeeSecrets]="canSeeSecrets()"
+    ></app-sshkey-view>
   }
 
   <!-- BANK ACCOUNT SECTIONS -->
@@ -152,5 +155,8 @@
   }
 
   <!-- ITEM HISTORY SECTION -->
-  <app-item-history-v2 [cipher]="cipher()"> </app-item-history-v2>
+  <!-- Keykeeper: the page showing the item can add its version history here -->
+  <app-item-history-v2 [cipher]="cipher()">
+    <ng-content select="[slot=history]"></ng-content>
+  </app-item-history-v2>
 }

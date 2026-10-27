@@ -4,6 +4,7 @@ import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormBuilder, FormGroup, ReactiveFormsModule } from "@angular/forms";
 
 import { JslibModule } from "@bitwarden/angular/jslib.module";
+import { mayShowOrNew } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { DriversLicenseView } from "@bitwarden/common/vault/models/view/drivers-license.view";
 import {
@@ -14,6 +15,7 @@ import {
   TypographyModule,
 } from "@bitwarden/components";
 
+import { lockHiddenControls } from "../../../keykeeper/hidden-controls";
 import { CipherFormContainer } from "../../cipher-form-container";
 import { DateFieldGroupComponent } from "../date-field-group/date-field-group.component";
 
@@ -60,9 +62,21 @@ export class DriversLicenseSectionComponent implements OnInit {
 
     this.cipherFormContainer.registerChildForm("driversLicenseDetails", this.driversLicenseForm);
 
+    // Keykeeper: getRawValue(), as the values the person can't see are
+    // disabled, and a save keeps them as they are.
     this.driversLicenseForm.valueChanges
       .pipe(takeUntilDestroyed())
-      .subscribe((value) => this.updateCipherFromFormValue(value));
+      .subscribe(() => this.updateCipherFromFormValue(this.driversLicenseForm.getRawValue()));
+  }
+
+  /**
+   * Keykeeper: whether the person may see one of the item's values
+   * (`part.property`): every value but the plain ones is hidden from someone
+   * who can't see the item's passwords, so its reveal toggle doesn't show
+   * (DESIGN.md, "Folders and permissions"). A new item is theirs.
+   */
+  protected canSee(key: string): boolean {
+    return mayShowOrNew(this.originalCipherView(), key);
   }
 
   ngOnInit() {
@@ -88,6 +102,25 @@ export class DriversLicenseSectionComponent implements OnInit {
     if (this.disabled()) {
       this.driversLicenseForm.disable();
     }
+
+    // Keykeeper: the license number can't be shown, overwritten, or cleared
+    // by someone who can't see it, and again whenever the form is enabled.
+    lockHiddenControls(
+      this.driversLicenseForm.controls,
+      "driversLicense",
+      this.originalCipherView(),
+    );
+    this.cipherFormContainer.formStatusChange$
+      ?.pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((status) => {
+        if (status === "enabled") {
+          lockHiddenControls(
+            this.driversLicenseForm.controls,
+            "driversLicense",
+            this.originalCipherView(),
+          );
+        }
+      });
   }
 
   /** Runs on every form value change to keep the shared cipher model in sync with the form state. */

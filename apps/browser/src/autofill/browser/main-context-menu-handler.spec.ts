@@ -285,6 +285,22 @@ describe("context-menu", () => {
       expect(expectedReceivedDiff.size).toEqual(0);
     });
 
+    it("Keykeeper: offers neither the password nor the code of an item whose shared folders hide them", async () => {
+      billingAccountProfileStateService.hasPremiumFromAnySource$.mockReturnValue(of(true));
+      const optionId = "hidden";
+      await sut.loadOptions("TEST_TITLE", optionId, createCipher({ viewPassword: false }));
+
+      const expectedMenuItems = new Set([
+        AUTOFILL_ID + `_${optionId}`,
+        COPY_USERNAME_ID + `_${optionId}`,
+      ]);
+      const expectedReceivedDiff = symmetricDifference(
+        expectedMenuItems,
+        MainContextMenuHandler["existingMenuItems"],
+      );
+      expect(expectedReceivedDiff.size).toEqual(0);
+    });
+
     it("creates a login/unlock item for each context menu action option when user is not authenticated", async () => {
       billingAccountProfileStateService.hasPremiumFromAnySource$.mockReturnValue(of(true));
 

@@ -6,6 +6,7 @@ import {
   BankAccountType,
   BankAccountTypeI18nKeys,
 } from "@bitwarden/common/vault/enums/bank-account-type";
+import { HIDDEN_VALUE_MASK, mayShow } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { BankAccountView } from "@bitwarden/common/vault/models/view/bank-account.view";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
@@ -34,6 +35,19 @@ import { ReadOnlyCipherCardComponent } from "../read-only-cipher-card/read-only-
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BankAccountViewComponent {
+  /** Keykeeper: shown in place of a value the person can't see. */
+  protected readonly mask = HIDDEN_VALUE_MASK;
+
+  /**
+   * Keykeeper: whether the person may see one of the item's values
+   * (`part.property`): someone who can't see the item's passwords gets only
+   * the plain ones (DESIGN.md, "Folders and permissions"), with a mask, and
+   * nothing to show, copy, or drag, for the rest.
+   */
+  protected canSee(key: string): boolean {
+    return mayShow(this.cipher(), key);
+  }
+
   private readonly i18nService = inject(I18nService);
   private readonly eventCollectionService = inject(EventCollectionService);
 

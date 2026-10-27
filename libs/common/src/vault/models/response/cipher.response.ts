@@ -64,11 +64,10 @@ export class CipherResponse extends BaseResponse {
     this.notes = this.getResponseProperty("Notes");
     this.favorite = this.getResponseProperty("Favorite") || false;
     this.edit = !!this.getResponseProperty("Edit");
-    if (this.getResponseProperty("ViewPassword") == null) {
-      this.viewPassword = true;
-    } else {
-      this.viewPassword = this.getResponseProperty("ViewPassword");
-    }
+    // Keykeeper: an item that doesn't say whether the person may see its
+    // passwords keeps them hidden (fail closed). Our server says on every item
+    // it sends (DESIGN.md, "Folders and permissions").
+    this.viewPassword = this.getResponseProperty("ViewPassword") === true;
     this.permissions = new CipherPermissionsApi(this.getResponseProperty("Permissions"));
     this.organizationUseTotp = this.getResponseProperty("OrganizationUseTotp");
     this.revisionDate = this.getResponseProperty("RevisionDate");

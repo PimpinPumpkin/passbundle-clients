@@ -9,6 +9,7 @@ import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/pl
 import { uuidAsString } from "@bitwarden/common/platform/abstractions/sdk/sdk.service";
 import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { CipherRepromptType } from "@bitwarden/common/vault/enums";
+import { mayCopy } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import {
   CipherViewLike,
   CipherViewLikeUtils,
@@ -167,6 +168,11 @@ export class CopyCipherFieldService {
     skipReprompt: boolean = false,
   ): Promise<boolean> {
     const action = CopyActions[actionType];
+    // Keykeeper: never a secret the person's shared folders hide from them
+    // (DESIGN.md, "Folders and permissions"), whichever button asked.
+    if (!mayCopy(cipher, actionType)) {
+      return false;
+    }
     if (
       !skipReprompt &&
       cipher.reprompt !== CipherRepromptType.None &&

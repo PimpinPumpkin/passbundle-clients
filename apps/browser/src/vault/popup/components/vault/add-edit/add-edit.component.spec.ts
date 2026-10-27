@@ -55,6 +55,7 @@ describe("AddEditComponent", () => {
   let vaultPopupAutofillService: MockProxy<VaultPopupAutofillService>;
 
   const buildConfigResponse = { originalCipher: {} } as CipherFormConfig;
+  const canCloneCipher = jest.fn().mockReturnValue(of(true));
   const buildConfig = jest.fn((mode) => Promise.resolve({ ...buildConfigResponse, mode }));
   const queryParams$ = new BehaviorSubject({});
   const disable = jest.fn();
@@ -109,6 +110,7 @@ describe("AddEditComponent", () => {
           provide: CipherAuthorizationService,
           useValue: {
             canDeleteCipher$: jest.fn().mockReturnValue(of(true)),
+            canCloneCipher$: canCloneCipher,
           },
         },
         { provide: AccountService, useValue: mockAccountServiceWith("UserId" as UserId) },
@@ -174,6 +176,7 @@ describe("AddEditComponent", () => {
       }));
 
       it("sets mode to `edit` when `params.clone` is not provided", fakeAsync(() => {
+        buildConfigResponse.originalCipher = { viewPassword: true } as Cipher;
         queryParams$.next({ cipherId: "222-333-444-5555", clone: "true" });
 
         tick();
@@ -181,6 +184,36 @@ describe("AddEditComponent", () => {
         expect(buildConfig.mock.lastCall![0]).toBe("clone");
         expect(component.config.mode).toBe("clone");
       }));
+
+      describe("Keykeeper: a copy by its address", () => {
+        afterEach(() => canCloneCipher.mockReturnValue(of(true)));
+
+        const refused = [
+          ["without see passwords", { viewPassword: false }, true],
+          ["for an item that doesn't say whether passwords show", {}, true],
+          ["without share", { viewPassword: true }, false],
+        ] as const;
+
+        refused.forEach(([why, cipher, share]) => {
+          it(`is refused ${why}: the form never opens`, fakeAsync(() => {
+            // The page shows something else first.
+            queryParams$.next({});
+            tick();
+            expect(component.config.mode).toBe("add");
+
+            canCloneCipher.mockReturnValue(of(share));
+            buildConfigResponse.originalCipher = { ...cipher } as Cipher;
+            back.mockClear();
+            queryParams$.next({ cipherId: "222-333-444-5555", clone: "true" });
+
+            tick();
+
+            expect(buildConfig.mock.lastCall![0]).toBe("clone");
+            expect(component.config.mode).toBe("add");
+            expect(back).toHaveBeenCalled();
+          }));
+        });
+      });
 
       it("sets mode to `edit` when `params.clone` is not provided", fakeAsync(() => {
         buildConfigResponse.originalCipher = { edit: true } as Cipher;
