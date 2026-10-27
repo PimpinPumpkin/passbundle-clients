@@ -126,6 +126,11 @@ export class CipherView implements View, InitializerMetadata {
   }
 
   get subTitle(): string | undefined {
+    // Keykeeper: a card's last digits are part of its number, which someone
+    // without see passwords doesn't get (DESIGN.md, "Folders and permissions").
+    if (this.type === CipherType.Card && this.viewPassword === false) {
+      return this.card?.brand || undefined;
+    }
     return this.item?.subTitle;
   }
 

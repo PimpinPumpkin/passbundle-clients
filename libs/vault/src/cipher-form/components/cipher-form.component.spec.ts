@@ -9,10 +9,13 @@ import { Account, AccountService } from "@bitwarden/common/auth/abstractions/acc
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { CipherArchiveService } from "@bitwarden/common/vault/abstractions/cipher-archive.service";
+import { FieldType } from "@bitwarden/common/vault/enums";
 import { Cipher } from "@bitwarden/common/vault/models/domain/cipher";
 import { AttachmentView } from "@bitwarden/common/vault/models/view/attachment.view";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { Fido2CredentialView } from "@bitwarden/common/vault/models/view/fido2-credential.view";
+import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
+import { PasswordHistoryView } from "@bitwarden/common/vault/models/view/password-history.view";
 import { ToastService } from "@bitwarden/components";
 
 import { CipherFormConfig } from "../abstractions/cipher-form-config.service";
@@ -202,6 +205,39 @@ describe("CipherFormComponent", () => {
       await component.ngOnInit();
 
       expect(component["updatedCipherView"]?.attachments).toEqual([]);
+    });
+
+    it("Keykeeper: leaves out every secret the source hides from the person", async () => {
+      const hiddenSource = () => {
+        const view = new CipherView();
+        view.id = "test-id";
+        view.viewPassword = false;
+        view.login.password = "hidden-password";
+        view.login.totp = "JBSWY3DPEHPK3PXP";
+        const field = new FieldView();
+        field.name = "PIN";
+        field.value = "4421";
+        field.type = FieldType.Hidden;
+        const text = new FieldView();
+        text.name = "Site";
+        text.value = "Main office";
+        text.type = FieldType.Text;
+        view.fields = [field, text];
+        const old = new PasswordHistoryView();
+        old.password = "older-password";
+        view.passwordHistory = [old];
+        return view;
+      };
+      decryptCipher.mockImplementation(async () => hiddenSource());
+
+      await component.ngOnInit();
+
+      const copy = component["updatedCipherView"]!;
+      expect(copy.login.password).toBeUndefined();
+      expect(copy.login.totp).toBeUndefined();
+      expect(copy.fields.map((f) => f.value)).toEqual([undefined, "Main office"]);
+      expect(copy.passwordHistory).toEqual([]);
+      decryptCipher.mockResolvedValue(cipherView);
     });
 
     it("does not clear archiveDate on updatedCipherView", async () => {

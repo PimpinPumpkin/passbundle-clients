@@ -37,10 +37,24 @@ export type OwnerPlacesInput = {
   compare?: (a: string, b: string) => number;
 };
 
+/**
+ * By name, a level of nesting at a time, so a folder's children come right
+ * after it ("Work", "Work/Clients", then "Work-Old"), whatever the collator
+ * makes of the separator.
+ */
 const byName =
   (compare: (a: string, b: string) => number) =>
-  <T extends { name: string }>(a: T, b: T) =>
-    compare(a.name ?? "", b.name ?? "");
+  <T extends { name: string }>(a: T, b: T) => {
+    const left = (a.name ?? "").split(FOLDER_NESTING);
+    const right = (b.name ?? "").split(FOLDER_NESTING);
+    for (let i = 0; i < Math.min(left.length, right.length); i++) {
+      const order = compare(left[i], right[i]);
+      if (order !== 0) {
+        return order;
+      }
+    }
+    return left.length - right.length;
+  };
 
 /**
  * Names nested under their parents: each name's last part as its label, one

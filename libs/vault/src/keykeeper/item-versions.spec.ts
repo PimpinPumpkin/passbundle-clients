@@ -69,8 +69,8 @@ describe("versionRows", () => {
     const asked = login("same", { reprompt: CipherRepromptType.Password });
     expect(byKey(versionRows(login("same"), asked, t)).get("reprompt")).toMatchObject({
       label: "passwordPrompt",
-      version: "off",
-      current: "on",
+      version: "keykeeperOff",
+      current: "keykeeperOn",
       changed: true,
     });
   });

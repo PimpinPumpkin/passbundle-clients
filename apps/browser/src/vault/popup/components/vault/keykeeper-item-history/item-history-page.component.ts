@@ -303,7 +303,7 @@ export class KeykeeperItemHistoryPageComponent implements OnInit {
     // as the server decides; never more than the person's folders say.
     const hidden = loaded.hidePasswords || !this.access().contents;
     this.versions.set(
-      hidden ? loaded.versions.map((v) => ({ ...v, view: null })) : loaded.versions,
+      hidden ? loaded.versions.map((v): ItemVersion => ({ ...v, view: null })) : loaded.versions,
     );
     this.unreadable.set(hidden ? 0 : loaded.unreadable);
     this.hidePasswords.set(hidden);

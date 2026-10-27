@@ -7,6 +7,7 @@ import { getOptionalUserId } from "@bitwarden/common/auth/services/account.servi
 import { Utils } from "@bitwarden/common/platform/misc/utils";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
+import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 
 import { AutofillCipherTypeId } from "../types";
@@ -110,8 +111,11 @@ export class CipherContextMenuHandler {
       title += ` (${cipher.login.username})`;
     }
 
-    if (cipher.type === CipherType.Card && cipher.card?.subTitle) {
-      title += ` ${cipher.card.subTitle}`;
+    // Keykeeper: without see passwords, the item's subtitle, which leaves the
+    // number's last digits out.
+    const cardSubtitle = maySeeSecrets(cipher) ? cipher.card?.subTitle : cipher.subTitle;
+    if (cipher.type === CipherType.Card && cardSubtitle) {
+      title += ` ${cardSubtitle}`;
     }
 
     await this.mainContextMenuHandler.loadOptions(title, cipher.id, cipher);

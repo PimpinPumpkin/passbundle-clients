@@ -1016,6 +1016,35 @@ describe("ItemDetailsSectionComponent", () => {
       expect((component as any).folderPicker).toBe(false);
     });
 
+    it("keeps an item in a shared folder where the person can edit but not create", async () => {
+      const editOnly = createMockCollection(
+        "c3",
+        "Front desk",
+        "org1",
+        false,
+        true,
+        CollectionTypes.SharedCollection,
+      );
+      editOnly.keykeeper = { ...GRID_NONE, seePasswords: true, edit: true, viewHistory: true };
+      component.config.collections = [...component.config.collections, editOnly];
+      const item = new CipherView();
+      item.id = "item1";
+      item.name = "Front desk PC";
+      item.organizationId = "org1";
+      item.collectionIds = ["c3"] as CollectionId[];
+      item.edit = true;
+      item.viewPassword = true;
+      fixture.componentRef.setInput("originalCipherView", item);
+      getInitialCipherView.mockReturnValue(item);
+      component.config.mode = "edit";
+      await component.ngOnInit();
+
+      expect(component.itemDetailsForm.controls.collectionIds.value.map((c: any) => c.id)).toEqual([
+        "c3",
+      ]);
+      expect(component.itemDetailsForm.controls.collectionIds.valid).toBe(true);
+    });
+
     it("locks the picker, and says why, for an organization's item its folder doesn't let the person move", async () => {
       const item = new CipherView();
       item.id = "item1";

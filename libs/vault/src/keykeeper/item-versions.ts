@@ -58,8 +58,10 @@ export type HistoryAccess = { view: boolean; contents: boolean; clear: boolean }
  * The person's history access to an item: everything with their own item;
  * with an organization's, from their capabilities in each of its shared
  * folders they reach (from sync, where each folder's grid already includes
- * access to every folder). `fullAccess` is for an item in none of their
- * folders that they reach anyway (an admin's), as the server allows.
+ * access to every folder). `fullAccess` is for someone who reaches every
+ * item of the organization (an owner or admin): the server gives them a way
+ * to every item with every capability these need, whatever their own
+ * folders say.
  */
 export function historyAccess(
   item: ItemLike,
@@ -309,10 +311,13 @@ export function itemEntries(item: CipherView, t: Translate): Entry[] {
     });
   }
 
+  // Whether it changed comes from the setting itself, not its words.
+  const asks = item.reprompt === CipherRepromptType.Password;
   entries.push({
     key: "reprompt",
     label: t("passwordPrompt"),
-    value: item.reprompt === CipherRepromptType.Password ? t("on") : t("off"),
+    value: asks ? t("keykeeperOn") : t("keykeeperOff"),
+    compare: asks ? "on" : "off",
   });
   return entries;
 }

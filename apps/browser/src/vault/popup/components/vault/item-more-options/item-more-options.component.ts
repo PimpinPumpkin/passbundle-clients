@@ -135,7 +135,11 @@ export class ItemMoreOptionsComponent {
         this.collectionService.decryptedCollections$(userId),
       ]).pipe(
         map(([hasOrgs, collections]) => {
-          const canEditCollections = collections.some((c) => gridOf(c).create);
+          // In the item's organization, for an organization's item.
+          const orgId = itemLike(cipher).organizationId;
+          const canEditCollections = collections.some(
+            (c) => gridOf(c).create && (orgId == null || c.organizationId === orgId),
+          );
           const canShare = itemGrid(itemLike(cipher), collections).share;
           return hasOrgs && canEditCollections && canShare;
         }),

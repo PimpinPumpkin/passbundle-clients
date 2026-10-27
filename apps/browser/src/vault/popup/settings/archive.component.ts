@@ -7,6 +7,11 @@ import { combineLatest, firstValueFrom, map, Observable, startWith, switchMap } 
 import { CollectionService } from "@bitwarden/admin-console/common";
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
+import {
+  gridOf,
+  itemGrid,
+  itemLike,
+} from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
@@ -130,7 +135,8 @@ export class ArchiveComponent {
         this.collectionService.decryptedCollections$(userId),
       ]).pipe(
         map(([hasOrgs, collections]) => {
-          const canEditCollections = collections.some((c) => !c.readOnly);
+          // Keykeeper: a shared folder they can add items to (create).
+          const canEditCollections = collections.some((c) => gridOf(c).create);
           return hasOrgs && canEditCollections;
         }),
       );
@@ -144,6 +150,20 @@ export class ArchiveComponent {
   protected userHasPremium$ = this.userId$.pipe(
     switchMap((userId) => this.cipherArchiveService.userHasPremium$(userId)),
   );
+
+  /**
+   * Keykeeper: copying an item (Clone) or adding it to more shared folders
+   * needs edit, see passwords, and share in one of its shared folders, as
+   * the item's More menu has it (DESIGN.md, "Folders and permissions"). A
+   * personal item is the person's own.
+   */
+  protected canShare(cipher: CipherViewLike): boolean {
+    return (
+      !!cipher.edit &&
+      cipher.viewPassword !== false &&
+      itemGrid(itemLike(cipher), this.collections() ?? []).share
+    );
+  }
 
   async navigateToPremium() {
     await this.router.navigate(["/premium"]);
@@ -224,7 +244,7 @@ export class ArchiveComponent {
   }
 
   async clone(cipher: CipherViewLike) {
-    if (!(await this.canInteract(cipher))) {
+    if (!this.canShare(cipher) || !(await this.canInteract(cipher))) {
       return;
     }
 
@@ -251,6 +271,9 @@ export class ArchiveComponent {
 
   /** Prompts for password when necessary then navigates to the assign collections route */
   async conditionallyNavigateToAssignCollections(cipher: CipherViewLike) {
+    if (!this.canShare(cipher)) {
+      return;
+    }
     if (cipher.reprompt && !(await this.passwordRepromptService.showPasswordPrompt())) {
       return;
     }

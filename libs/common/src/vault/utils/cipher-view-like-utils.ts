@@ -158,7 +158,16 @@ export class CipherViewLikeUtils {
    * unnecessary or unavailable.
    */
   static subtitle = (cipher: CipherViewLike, i18nService?: I18nService): string | undefined => {
-    const baseSubtitle = this.isCipherListView(cipher) ? cipher.subtitle : cipher.subTitle;
+    let baseSubtitle = this.isCipherListView(cipher) ? cipher.subtitle : cipher.subTitle;
+    // Keykeeper: without see passwords, a card's subtitle is its brand, not
+    // its last digits (DESIGN.md, "Folders and permissions").
+    if (
+      this.getType(cipher) === CipherType.Card &&
+      cipher.viewPassword === false &&
+      baseSubtitle != null
+    ) {
+      baseSubtitle = baseSubtitle.replace(/(,\s*)?\*\d+$/, "") || undefined;
+    }
 
     if (!i18nService) {
       return baseSubtitle;

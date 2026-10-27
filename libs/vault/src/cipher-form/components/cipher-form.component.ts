@@ -23,6 +23,10 @@ import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { CipherArchiveService } from "@bitwarden/common/vault/abstractions/cipher-archive.service";
 import { CipherType, SecureNoteType } from "@bitwarden/common/vault/enums";
+import {
+  clearHiddenSecrets,
+  maySeeSecrets,
+} from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
   AsyncActionsModule,
@@ -294,6 +298,13 @@ export class CipherFormComponent implements AfterViewInit, OnInit, OnChanges, Ci
 
         if (this.updatedCipherView.login) {
           this.updatedCipherView.login.fido2Credentials = null;
+        }
+        // Keykeeper: a copy never carries secrets its source hides from the
+        // person, however the copy was started (DESIGN.md, "Folders and
+        // permissions"); the pages that offer Clone need share, which needs
+        // see passwords, and this is the backstop.
+        if (!maySeeSecrets(this.originalCipherView)) {
+          clearHiddenSecrets(this.updatedCipherView);
         }
       }
     } else {

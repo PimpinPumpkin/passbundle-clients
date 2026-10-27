@@ -761,5 +761,11 @@
   },
   "keykeeperCantMoveItem": {
     "message": "Your organization doesn't let you move it to another shared folder."
+  },
+  "keykeeperOn": {
+    "message": "On"
+  },
+  "keykeeperOff": {
+    "message": "Off"
   }
 }

@@ -7,6 +7,7 @@ import { BankAccountType, CipherType } from "../enums";
 import { Attachment } from "../models/domain/attachment";
 import { AttachmentView } from "../models/view/attachment.view";
 import { BankAccountView } from "../models/view/bank-account.view";
+import { CardView } from "../models/view/card.view";
 import { CipherView } from "../models/view/cipher.view";
 import { Fido2CredentialView } from "../models/view/fido2-credential.view";
 import { IdentityView } from "../models/view/identity.view";
@@ -290,6 +291,31 @@ describe("CipherViewLikeUtils", () => {
         } as CipherListView;
 
         expect(CipherViewLikeUtils.subtitle(cipherListView)).toBe("Test Subtitle");
+      });
+    });
+
+    describe("Keykeeper: a card whose number the person can't see", () => {
+      it("leaves the last digits out of a CipherView's subtitle", () => {
+        const cipherView = createCipherView(CipherType.Card);
+        cipherView.card = new CardView();
+        cipherView.card.brand = "Visa";
+        cipherView.card.number = "4242424242424242";
+        expect(CipherViewLikeUtils.subtitle(cipherView)).toBe("Visa, *4242");
+        cipherView.viewPassword = false;
+        expect(CipherViewLikeUtils.subtitle(cipherView)).toBe("Visa");
+        expect(cipherView.subTitle).toBe("Visa");
+      });
+
+      it("leaves the last digits out of a CipherListView's subtitle", () => {
+        const visible = {
+          subtitle: "Visa, *4242",
+          type: { card: {} },
+        } as unknown as CipherListView;
+        expect(CipherViewLikeUtils.subtitle(visible)).toBe("Visa, *4242");
+        const hidden = { ...visible, viewPassword: false } as CipherListView;
+        expect(CipherViewLikeUtils.subtitle(hidden)).toBe("Visa");
+        const noBrand = { ...hidden, subtitle: "*4242" } as CipherListView;
+        expect(CipherViewLikeUtils.subtitle(noBrand)).toBeUndefined();
       });
     });
 

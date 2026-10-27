@@ -625,6 +625,11 @@ export class ItemDetailsSectionComponent implements OnInit {
         (cId) =>
           this.collections.find((c) => c.id === cId)?.type === CollectionTypes.SharedCollection,
       );
+    const heldEditable = new Set<string>(
+      this.config.mode === "edit" || this.partialEdit
+        ? (this.originalCipherView()?.collectionIds ?? [])
+        : [],
+    );
     this.collectionOptions = this.collections
       .filter((c) => {
         // The collection belongs to the organization
@@ -649,8 +654,11 @@ export class ItemDetailsSectionComponent implements OnInit {
         }
 
         // Non-admins can only select assigned collections that are not read only. (Non-AC)
-        // Keykeeper: the ones they can add items to (create).
-        return c.assigned && gridOf(c).create;
+        // Keykeeper: the ones they can add items to (create), and, when
+        // editing, the ones the item is in already that they can edit in
+        // (a folder with edit but not create), so a save keeps the item there.
+        // Read-only ones the item is in are kept apart (readOnlyCollections).
+        return c.assigned && (gridOf(c).create || (heldEditable.has(c.id) && !c.readOnly));
       })
       .sort((a, b) => {
         // Show default collection first

@@ -909,7 +909,9 @@ export class OverlayBackground implements OverlayBackgroundInterface {
     }
 
     if (cipher.type === CipherType.Card) {
-      inlineMenuData.card = cipher.card.subTitle;
+      // Keykeeper: without see passwords, the item's subtitle, which leaves
+      // the number's last digits out.
+      inlineMenuData.card = maySeeSecrets(cipher) ? cipher.card.subTitle : cipher.subTitle;
       return inlineMenuData;
     }
 

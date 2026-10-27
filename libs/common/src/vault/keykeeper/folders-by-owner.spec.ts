@@ -56,6 +56,29 @@ describe("ownerPlaces", () => {
     });
   });
 
+  it("keeps a folder's children right after it, whatever sorts between them", () => {
+    const places = ownerPlaces({
+      ...input,
+      folders: [
+        { id: "a", name: "Work-Old" },
+        { id: "b", name: "Work/Clients" },
+        { id: "c", name: "Work Stuff" },
+        { id: "d", name: "Work" },
+      ],
+      organizations: [],
+      collections: [],
+      compare: new Intl.Collator("en").compare,
+    });
+    expect(places.map((p) => [p.label, p.depth])).toEqual([
+      ["Personal", 0],
+      ["Work", 1],
+      ["Clients", 2],
+      ["Work Stuff", 1],
+      ["Work-Old", 1],
+      ["No folder", 1],
+    ]);
+  });
+
   it("shows No folder only next to real folders", () => {
     const places = ownerPlaces({ ...input, folders: [] });
     expect(places.some((p) => p.key === "folder:none")).toBe(false);

@@ -569,9 +569,10 @@ export class VaultPopupListFiltersService {
         this.organizationService.memberOrganizations$(userId),
         this.policyService.policyAppliesToUser$(PolicyType.OrganizationDataOwnership, userId),
         this.cipherService.cipherListViews$(userId),
+        this.restrictedItemTypesService.restricted$,
       ]),
     ),
-    map(([filters, folders, collections, orgs, noPersonal, ciphers]) => {
+    map(([filters, folders, collections, orgs, noPersonal, ciphers, restrictions]) => {
       const current = filters as PopupListFilter;
       const places = ownerPlaces({
         personalLabel: this.i18nService.t("myVault"),
@@ -585,11 +586,19 @@ export class VaultPopupListFiltersService {
         })),
         compare: (a, b) => this.i18nService.collator?.compare(a, b) ?? a.localeCompare(b),
       });
-      if (places.length <= 1) {
+      // Only Personal: nothing to pick, unless a place is picked already (one
+      // deleted since, say), which the menu's All folders still clears.
+      const placePicked = !!(current.organization || current.collection || current.folder);
+      if (places.length <= 1 && !placePicked) {
         return [];
       }
-      // As folders$ reads them: an array or a map of them.
-      const items = Object.values(ciphers ?? {}) as PopupCipherViewLike[];
+      // As folders$ reads them (an array or a map of them), and as the list
+      // shows them: not archived, and not of a kind a policy restricts.
+      const items = (Object.values(ciphers ?? {}) as PopupCipherViewLike[]).filter(
+        (c) =>
+          !CipherViewLikeUtils.isArchived(c) &&
+          !this.restrictedItemTypesService.isCipherRestricted(c, restrictions),
+      );
       const myVault = { id: MY_VAULT_ID } as Organization;
       const orgById = new Map(orgs.map((o) => [o.id as string, o]));
       const folderById = new Map(folders.map((f) => [f.id ?? "", f]));
