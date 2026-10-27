@@ -1,10 +1,12 @@
-import { ChangeDetectionStrategy, Component } from "@angular/core";
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from "@angular/core";
 import { of } from "rxjs";
 
+import { SsoView } from "@bitwarden/admin-console/common";
 import { PolicyType } from "@bitwarden/common/admin-console/enums";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 
+import { KeykeeperMspApiService } from "../../../../keykeeper/msp/msp-api.service";
 import { SharedModule } from "../../../../shared";
 import { BasePolicyEditDefinition, BasePolicyEditComponent } from "../base-policy-edit.component";
 import { PolicyCategory } from "../pipes/policy-category";
@@ -36,4 +38,23 @@ export class RequireSsoPolicy extends BasePolicyEditDefinition {
   imports: [SharedModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class RequireSsoPolicyComponent extends BasePolicyEditComponent {}
+export class RequireSsoPolicyComponent extends BasePolicyEditComponent implements OnInit {
+  private readonly keykeeperApi = inject(KeykeeperMspApiService);
+  /**
+   * Keykeeper: the members this policy covers who aren't linked to single
+   * sign-on yet, so admins see who will be asked to link before turning it on
+   * (DESIGN.md, "Sign in with Microsoft Entra ID"). Null until loaded.
+   */
+  protected readonly keykeeperUnlinked = signal<SsoView["unlinked"] | null>(null);
+
+  override ngOnInit(): void {
+    super.ngOnInit();
+    const orgId = this.organizationId() ?? this.policyResponse()?.organizationId;
+    if (orgId != null) {
+      this.keykeeperApi.getSso(orgId).then(
+        (view) => this.keykeeperUnlinked.set(view.unlinked ?? []),
+        () => this.keykeeperUnlinked.set(null),
+      );
+    }
+  }
+}

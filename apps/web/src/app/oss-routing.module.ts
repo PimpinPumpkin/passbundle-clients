@@ -380,6 +380,29 @@ const routes: Routes = [
         ],
       },
       {
+        // Keykeeper: linking an account to an organization's single sign-on,
+        // signed in (Link SSO) or with the linking session a password sign-in
+        // gets when single sign-on is required (DESIGN.md, "Sign in with
+        // Microsoft Entra ID").
+        path: "sso-link",
+        data: {
+          pageTitle: {
+            key: "singleSignOn",
+          },
+          titleId: "singleSignOn",
+          pageIcon: SsoKeyIcon,
+        } satisfies RouteDataProperties & AnonLayoutWrapperData,
+        children: [
+          {
+            path: "",
+            loadComponent: () =>
+              import("./keykeeper/sso-link/sso-link.component").then(
+                (mod) => mod.KeykeeperSsoLinkComponent,
+              ),
+          },
+        ],
+      },
+      {
         path: AuthRoute.TwoFactor,
         component: TwoFactorAuthComponent,
         canActivate: [unauthGuardFn(), TwoFactorAuthGuard],

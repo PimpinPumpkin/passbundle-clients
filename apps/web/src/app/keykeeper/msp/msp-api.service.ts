@@ -27,6 +27,8 @@ import {
   OrgJoining,
   ProvisioningView,
   SiteFixView,
+  SsoSettings,
+  SsoView,
   TechnicianAccess,
 } from "@bitwarden/admin-console/common";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
@@ -410,6 +412,77 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
       "PUT",
       `/keykeeper/organizations/${orgId}/provisioning/seals`,
       { seals: list },
+      true,
+      true,
+    );
+  }
+
+  // Single sign-on with Microsoft Entra ID (DESIGN.md, "Sign in with Microsoft Entra ID").
+
+  /** The organization's Single sign-on page. Anyone but those who manage it gets "not found". */
+  async getSso(orgId: string): Promise<SsoView> {
+    return this.apiService.send("GET", `/keykeeper/organizations/${orgId}/sso`, null, true, true);
+  }
+
+  /** Saves the settings. The server checks that Microsoft knows the tenant before turning it on. */
+  async saveSso(orgId: string, settings: SsoSettings): Promise<SsoView> {
+    return this.apiService.send(
+      "PUT",
+      `/keykeeper/organizations/${orgId}/sso`,
+      settings,
+      true,
+      true,
+    );
+  }
+
+  async addSsoDomain(orgId: string, domain: string): Promise<SsoView> {
+    return this.apiService.send(
+      "POST",
+      `/keykeeper/organizations/${orgId}/sso/domains`,
+      { domain },
+      true,
+      true,
+    );
+  }
+
+  /** Looks for the domain's TXT record now. */
+  async verifySsoDomain(orgId: string, domainId: string): Promise<SsoView> {
+    return this.apiService.send(
+      "POST",
+      `/keykeeper/organizations/${orgId}/sso/domains/${domainId}/verify`,
+      null,
+      true,
+      true,
+    );
+  }
+
+  async removeSsoDomain(orgId: string, domainId: string): Promise<SsoView> {
+    return this.apiService.send(
+      "DELETE",
+      `/keykeeper/organizations/${orgId}/sso/domains/${domainId}`,
+      null,
+      true,
+      true,
+    );
+  }
+
+  /** With Require single sign-on on, replaces the API keys of the members it covers. */
+  async rotateSsoApiKeys(orgId: string): Promise<SsoView> {
+    return this.apiService.send(
+      "POST",
+      `/keykeeper/organizations/${orgId}/sso/rotate-api-keys`,
+      null,
+      true,
+      true,
+    );
+  }
+
+  /** Unlinks an account: its person's next sign-in links again, under the rules. */
+  async unlinkSso(orgId: string, userId: string): Promise<SsoView> {
+    return this.apiService.send(
+      "DELETE",
+      `/keykeeper/organizations/${orgId}/sso/links/${userId}`,
+      null,
       true,
       true,
     );
