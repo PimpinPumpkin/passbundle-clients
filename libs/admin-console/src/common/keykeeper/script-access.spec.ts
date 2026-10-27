@@ -7,10 +7,11 @@ import {
   copyOf,
   KeykeeperScriptCopies,
   KeykeeperScriptKeys,
-  ScriptSpec,
+  ScriptFields,
 } from "./script-access";
 import { nodeEncrypt } from "./script-access.test-helper";
 import * as vectors from "./script-access.vectors.json";
+import * as grants from "./script-grants-v2.vectors.json";
 
 const keys = new KeykeeperScriptKeys(webcrypto.subtle as unknown as SubtleCrypto);
 const bytes = (b64: string) => new Uint8Array(Buffer.from(b64, "base64"));
@@ -37,14 +38,6 @@ describe("Script access keys, version 1, against the vectors", () => {
     expect(Buffer.from(await keys.tokenKey(seed)).toString("base64")).toBe(vectors.tokenKey);
   });
 
-  it("opens the sealed token key and spec with the organization key", async () => {
-    const tokenKey = await copies.unsealTokenKey(vectors.sealedTokenKey.encString, orgKey);
-    expect(Buffer.from(tokenKey.toEncoded()).toString("base64")).toBe(vectors.tokenKey);
-    expect(await copies.unsealSpec(vectors.sealedSpec.encString, orgKey)).toEqual(
-      JSON.parse(vectors.sealedSpec.plaintext),
-    );
-  });
-
   it("opens the copy for its own token and item, and refuses the rest", async () => {
     const tokenKey = new SymmetricCryptoKey(bytes(vectors.tokenKey));
     const opened = await copies.decryptCopy(
@@ -65,12 +58,59 @@ describe("Script access keys, version 1, against the vectors", () => {
       ).rejects.toThrow("another token or item");
     }
   });
+});
 
-  it("seals what it makes so the vectors' readers open it", async () => {
+describe("Script grant seals, version 2, against the vectors", () => {
+  const itemId = grants.inputs.itemId;
+
+  it("opens the sealed token key and spec for their own token and item", async () => {
+    const tokenKey = await copies.unsealTokenKey(grants.sealedTokenKey.encString, orgKey, tokenId);
+    expect(Buffer.from(tokenKey.toEncoded()).toString("base64")).toBe(grants.tokenKey);
+    expect(await copies.unsealSpec(grants.sealedSpec.encString, orgKey, tokenId, itemId)).toEqual(
+      JSON.parse(grants.sealedSpec.plaintext),
+    );
+    // Ids compare without regard to case.
+    await expect(
+      copies.unsealSpec(grants.sealedSpec.encString, orgKey, tokenId.toUpperCase(), itemId),
+    ).resolves.toBeTruthy();
+  });
+
+  it.each(grants.refused)("refuses $why", async (r) => {
+    const opened = async () => {
+      await copies.unsealTokenKey(r.sealedKey, orgKey, tokenId);
+      await copies.unsealSpec(r.sealedSpec, orgKey, tokenId, itemId);
+    };
+    await expect(opened()).rejects.toThrow();
+  });
+
+  it("refuses the version 1 seals, which name no token or item", async () => {
+    await expect(
+      copies.unsealTokenKey(vectors.sealedTokenKey.encString, orgKey, tokenId),
+    ).rejects.toThrow("this script token's key");
+    await expect(
+      copies.unsealSpec(vectors.sealedSpec.encString, orgKey, tokenId, itemId),
+    ).rejects.toThrow("this grant's spec");
+  });
+
+  it("seals what it makes so the vectors' readers open it, and only for that token and item", async () => {
     const tokenKey = await keys.tokenKey(seed);
-    const sealed = await copies.sealTokenKey(tokenKey, orgKey);
-    const reopened = await copies.unsealTokenKey(sealed, orgKey);
-    expect(Buffer.from(reopened.toEncoded()).toString("base64")).toBe(vectors.tokenKey);
+    const sealedKey = await copies.sealTokenKey(tokenId, tokenKey, orgKey);
+    const reopened = await copies.unsealTokenKey(sealedKey, orgKey, tokenId);
+    expect(Buffer.from(reopened.toEncoded()).toString("base64")).toBe(grants.tokenKey);
+    await expect(copies.unsealTokenKey(sealedKey, orgKey, "another-token")).rejects.toThrow();
+
+    const fields: ScriptFields = {
+      username: true,
+      password: true,
+      totp: false,
+      fields: ["Break-glass PIN"],
+    };
+    const sealedSpec = await copies.sealSpec(tokenId, itemId, fields, orgKey);
+    expect(await copies.unsealSpec(sealedSpec, orgKey, tokenId, itemId)).toEqual(
+      JSON.parse(grants.sealedSpec.plaintext),
+    );
+    await expect(copies.unsealSpec(sealedSpec, orgKey, tokenId, "another-item")).rejects.toThrow();
+    await expect(copies.unsealSpec(sealedSpec, orgKey, "another-token", itemId)).rejects.toThrow();
   });
 });
 
@@ -91,8 +131,7 @@ describe("copyOf", () => {
   };
 
   it("copies only what the spec asks for, with the token, item, and revision", () => {
-    const spec: ScriptSpec = {
-      v: 1,
+    const spec: ScriptFields = {
       username: true,
       password: true,
       totp: false,
@@ -102,8 +141,7 @@ describe("copyOf", () => {
   });
 
   it("leaves out what the item doesn't have", () => {
-    const spec: ScriptSpec = {
-      v: 1,
+    const spec: ScriptFields = {
       username: false,
       password: false,
       totp: true,

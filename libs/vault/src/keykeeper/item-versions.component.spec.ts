@@ -32,14 +32,15 @@ function login(password: string, overrides: Partial<CipherView> = {}) {
   return Object.assign(item, overrides);
 }
 
-const version = (id: string, cipher: unknown) => ({
+/** A version as the server sends it: an item response for this item, unless it says otherwise. */
+const version = (id: string, cipher: Record<string, unknown> | null) => ({
   object: "keykeeperCipherVersion" as const,
   id,
   revisionDate: "2026-10-22T10:00:00Z",
   savedBy: { id: "ana", name: "Ana", email: "ana@example.test" },
   replacedDate: "2026-10-23T10:00:00Z",
   replacedBy: null as VersionEditor | null,
-  cipher,
+  cipher: cipher == null ? null : { id: "item-1", ...cipher },
 });
 
 describe("KeykeeperItemVersionsComponent", () => {
@@ -121,6 +122,19 @@ describe("KeykeeperItemVersionsComponent", () => {
     expect(data.version.login.password).toBe("two");
     expect(data.restore).toEqual(expect.any(Function));
     expect(data.delete).toBeUndefined();
+  });
+
+  it("never decrypts another item's contents sent as a version, or one from another organization", async () => {
+    response = history([
+      version("v3", { name: "another item's", id: "item-2" }),
+      version("v2", { name: "another organization's", organizationId: "org-2" }),
+      version("v1", { name: "one", organizationId: "org-1" }),
+    ]);
+    const el = await render(login("two", { organizationId: "org-1" }));
+
+    expect(el.querySelectorAll('[data-testid="keykeeper-item-version"]')).toHaveLength(1);
+    expect(cipherService.decrypt).toHaveBeenCalledTimes(1);
+    expect(el.textContent).toContain("keykeeperVersionsUnreadable");
   });
 
   it("never opens a version for someone who can't see the item's passwords, whatever the server sends", async () => {

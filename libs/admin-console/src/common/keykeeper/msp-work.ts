@@ -4,8 +4,9 @@
 // confirms automatically (giving the org key the normal way, encrypted to the
 // member's public key), when something the server can't forge vouches for
 // them (join-checks.ts), and keeps MSP clients' copies of the MSP's templates
-// current. Both need the person's unlocked keys, so this runs in the web vault
-// and the browser extension while they're unlocked.
+// current, only in clients whose client seal this device checks. Both need
+// the person's unlocked keys, so this runs in the web vault and the browser
+// extension while they're unlocked.
 // See DESIGN.md, "Joining", "MSP console", and "MSP templates".
 
 import {
@@ -203,10 +204,17 @@ export class KeykeeperMspWork {
     await this.syncService.fullSync(false);
     const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
     const organizations = await firstValueFrom(this.organizationService.organizations$(userId));
-    const pending = await this.joinChecks.onItsOwn(userId, waiting);
+    // Only in organizations where this person is an owner or admin, whatever
+    // the server lists: holding an organization's key isn't enough.
+    const ownerOrAdmin = (id: string) =>
+      organizations.find((o) => o.id === id && (o.isOwner || o.isAdmin));
+    const pending = await this.joinChecks.onItsOwn(
+      userId,
+      waiting.filter((p) => ownerOrAdmin(p.organizationId) != null),
+    );
     const result: ConfirmResult = { confirmed: 0, failed: [] };
     for (const p of pending) {
-      const organization = organizations.find((o) => o.id === p.organizationId);
+      const organization = ownerOrAdmin(p.organizationId);
       if (organization == null) {
         continue;
       }
@@ -219,6 +227,7 @@ export class KeykeeperMspWork {
           ),
         );
         result.confirmed++;
+        await this.joinChecks.markLetIn(userId, p);
         this.letIn.next({ email: p.email, organizationName: organization.name });
       } catch (e) {
         result.failed.push(`${p.email} in ${organization.name}: ${message(e)}`);
@@ -234,7 +243,9 @@ export class KeykeeperMspWork {
    * Writes the current version of each template the person can see and share
    * into every client that's behind, and moves duplicate copies (from two
    * devices writing at once) to the client's trash. A template whose item
-   * they can't share is skipped and reported.
+   * they can't share is skipped and reported. Only clients this device trusts
+   * (`KeykeeperJoinChecks.trustedClients`) get copies or lose duplicates,
+   * whatever else the server lists.
    */
   private async updateTemplates(mspId: string): Promise<{ wrote: boolean; failures: string[] }> {
     const [msp, state] = await Promise.all([
@@ -246,10 +257,11 @@ export class KeykeeperMspWork {
       return outcome;
     }
     const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
-    const [items, folders, organizations] = await Promise.all([
+    const [items, folders, organizations, trusted] = await Promise.all([
       this.cipherService.getAllDecrypted(userId),
       firstValueFrom(this.collectionService.decryptedCollections$(userId)),
       firstValueFrom(this.organizationService.organizations$(userId)),
+      this.joinChecks.trustedClients(userId, mspId, msp.clients),
     ]);
     const rows = templateRows(
       state,
@@ -276,7 +288,7 @@ export class KeykeeperMspWork {
       }
       const revision = source.revisionDate.toISOString();
       const key = (clientId: string) => `${row.templateId}:${clientId}:${revision}`;
-      const behind = keyed(msp, row.behind).filter((c) => !this.failed.has(key(c.id)));
+      const behind = keyed(trusted, row.behind).filter((c) => !this.failed.has(key(c.id)));
       if (behind.length > 0) {
         const result = await this.sender.send(msp, source, behind, state);
         for (const f of result.failed) {
@@ -286,7 +298,7 @@ export class KeykeeperMspWork {
         outcome.wrote ||= result.sent.length > 0;
       }
     }
-    const extras = duplicateCopies(state, items);
+    const extras = duplicateCopies(state, items, new Set(trusted.map((c) => c.id)));
     if (extras.length > 0) {
       await this.sender.removeCopies(extras);
       outcome.wrote = true;
@@ -295,24 +307,26 @@ export class KeykeeperMspWork {
   }
 }
 
-/** Clients whose key the person holds, so a copy can be encrypted for them. */
-function keyed(msp: MspDetails, clients: { id: string; name: string }[]) {
-  const confirmed = new Set(
-    msp.clients.filter((c) => c.you?.status === CONFIRMED).map((c) => c.id),
-  );
+/** Of these clients, the trusted ones where the person is confirmed, so a copy can be encrypted for them. */
+function keyed(trusted: MspDetails["clients"], clients: { id: string; name: string }[]) {
+  const confirmed = new Set(trusted.filter((c) => c.you?.status === CONFIRMED).map((c) => c.id));
   return clients.filter((c) => confirmed.has(c.id));
 }
 
 /**
  * Copies of the MSP's templates that aren't the recorded copy in their client:
  * the result of two devices writing a copy at the same moment. Only live items
- * in a client with a recorded, live copy of the same template count.
+ * in a trusted client with a recorded, live copy of the same template count.
  */
-export function duplicateCopies(state: MspTemplates, items: CipherView[]): string[] {
+export function duplicateCopies(
+  state: MspTemplates,
+  items: CipherView[],
+  trusted: ReadonlySet<string>,
+): string[] {
   const live = new Set(items.filter((c) => !c.isDeleted).map((c) => c.id));
   const extras: string[] = [];
   for (const copy of state.copies) {
-    if (!live.has(copy.cipherId)) {
+    if (!live.has(copy.cipherId) || !trusted.has(copy.organizationId)) {
       continue;
     }
     for (const item of items) {

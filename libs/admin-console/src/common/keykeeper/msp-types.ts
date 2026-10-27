@@ -22,6 +22,12 @@ export type MspClient = {
   you: { memberId: string; status: number; type: number; vaultItems?: boolean } | null;
   /** Provisioning from Microsoft Entra ID, when the client has a token. Older servers leave it out. */
   provisioning?: { lastUsedAt: string | null } | null;
+  /**
+   * The client seal: that a browser holding the client's key made it this
+   * MSP's client (join-seals.ts). Apps write into a client only where it
+   * checks out. Older servers and older clients have none.
+   */
+  seal?: string | null;
 };
 
 /** The custom role permissions the server enforces. */

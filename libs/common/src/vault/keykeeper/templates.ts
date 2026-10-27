@@ -12,9 +12,10 @@
 // can see that collection.
 //
 // An MSP sends its templates to its clients as copies with the same id, whose
-// definition names the MSP ("from"). They're offered once, under "From <MSP>",
-// however many of the MSP's clients someone sees. See DESIGN.md, "MSP
-// templates", in the keykeeper repo.
+// definition says they're copies ("from"). Anyone who can edit an item can
+// write that, so nothing shown says who a template came from: templates are
+// offered by where they are, and identical copies of one template in several
+// organizations once. See DESIGN.md, "MSP templates", in the keykeeper repo.
 
 import { newGuid } from "@bitwarden/guid";
 
@@ -43,8 +44,8 @@ export type ItemTemplate = {
   fields: TemplateField[];
   /** For a custom template: the item that defines it, and its organization if any. */
   source?: { cipherId: string; organizationId: string | null };
-  /** For a copy an MSP sent: the MSP's name. */
-  from?: string;
+  /** For a copy an MSP keeps up to date: what its definition says, never shown as who sent it. */
+  copy?: boolean;
 };
 
 const text = (label: string): TemplateField => ({ label, kind: "text" });
@@ -286,7 +287,7 @@ export function customTemplate(item: TemplateItem): ItemTemplate | null {
     base: definition.base,
     fields,
     source: { cipherId: item.id ?? "", organizationId: item.organizationId ?? null },
-    ...(definition.from ? { from: definition.from } : {}),
+    ...(definition.from ? { copy: true } : {}),
   };
 }
 
@@ -300,40 +301,56 @@ export function customTemplates(items: TemplateItem[]): ItemTemplate[] {
 
 export type TemplateGroup = { name: string; templates: readonly ItemTemplate[] };
 
+/** What a template gives a new item, to tell identical copies of it apart from different ones. */
+const sameTemplate = (a: ItemTemplate, b: ItemTemplate) =>
+  a.id === b.id &&
+  a.name === b.name &&
+  a.base === b.base &&
+  JSON.stringify(a.fields) === JSON.stringify(b.fields);
+
 /**
- * Templates to choose from, grouped: each MSP's (once each, however many of
- * its clients the person sees), then each organization's own (by
- * organization name), then the person's own, then built-in. Empty groups are
- * left out.
+ * Templates to choose from, grouped by where they are: each organization's
+ * (by organization name), then the person's own, then built-in. Who a
+ * template came from isn't shown, since anyone who can edit an item could
+ * claim to be anyone. A template an MSP copies into many clients is offered
+ * once, however many of them the person sees: copies in other organizations
+ * that are identical to one already offered (the MSP's own template, if the
+ * person sees it, or the first copy) are left out. A copy that differs, such
+ * as one someone changed, is offered where it is. Empty groups are left out.
  */
 export function templateGroups(
   items: TemplateItem[],
   organizations: { id: string; name: string }[],
 ): TemplateGroup[] {
-  const all = customTemplates(items);
-  const fromMsp = all.filter((t) => t.from != null && t.source?.organizationId != null);
-  const custom = all.filter((t) => !fromMsp.includes(t));
-  const mspGroups: TemplateGroup[] = [...new Set(fromMsp.map((t) => t.from!))]
-    .sort((a, b) => a.localeCompare(b))
-    .map((msp) => {
-      const seen = new Set<string>();
-      return {
-        name: `From ${msp}`,
-        templates: fromMsp.filter((t) => t.from === msp && !seen.has(t.id) && seen.add(t.id)),
-      };
-    });
-  const groups: TemplateGroup[] = [...organizations]
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map((org) => ({
-      name: org.name,
-      templates: custom.filter((t) => t.source?.organizationId === org.id),
-    }));
+  const sorted = [...organizations].sort((a, b) => a.name.localeCompare(b.name));
+  const order = (t: ItemTemplate) => {
+    const at = sorted.findIndex((o) => o.id === t.source?.organizationId);
+    return at < 0 ? sorted.length : at;
+  };
+  // Originals before copies, then by where they are, so the one offered is
+  // the original when the person sees it.
+  const all = customTemplates(items).sort(
+    (a, b) => Number(a.copy ?? false) - Number(b.copy ?? false) || order(a) - order(b),
+  );
+  const offered: ItemTemplate[] = [];
+  for (const t of all) {
+    const twin = offered.find(
+      (o) => o.source?.organizationId !== t.source?.organizationId && sameTemplate(o, t),
+    );
+    if (!(t.copy && twin != null)) {
+      offered.push(t);
+    }
+  }
+  const byName = (list: ItemTemplate[]) => list.sort((a, b) => a.name.localeCompare(b.name));
+  const groups: TemplateGroup[] = sorted.map((org) => ({
+    name: org.name,
+    templates: byName(offered.filter((t) => t.source?.organizationId === org.id)),
+  }));
   groups.push({
     name: "My templates",
-    templates: custom.filter((t) => t.source?.organizationId == null),
+    templates: byName(offered.filter((t) => t.source?.organizationId == null)),
   });
   return [
-    ...mspGroups,
     ...groups.filter((g) => g.templates.length > 0),
     { name: "Built-in", templates: BUILT_IN_TEMPLATES },
   ];

@@ -132,8 +132,9 @@ import { KeykeeperTemplateClientsDialogComponent } from "./template-clients-dial
           <h3 bitTypography="h5">Add a template</h3>
           @if (candidates().length === 0) {
             <p bitTypography="body2" class="tw-mb-0">
-              Make a template first: in your items, choose New, then From template, then Create
-              template.
+              Make a template first, in an organization your MSP's admins share (not a client): in
+              your items, open one of its shared folders, then choose New, then From template, then
+              Create template.
             </p>
           } @else {
             <bit-form-field>
@@ -144,7 +145,7 @@ import { KeykeeperTemplateClientsDialogComponent } from "./template-clients-dial
                 }
               </select>
               <bit-hint
-                >Your own templates and your organizations', never a client's copy.</bit-hint
+                >Your organizations' templates, never one in your own vault or a client's.</bit-hint
               >
             </bit-form-field>
             <bit-radio-group formControlName="scope" [block]="true">
@@ -193,7 +194,7 @@ export class KeykeeperMspTemplatesComponent {
     ),
   );
 
-  /** Templates an admin can add: their own and their organizations', never a client's copy. */
+  /** Templates an admin can add: their organizations', never their own vault's or a client's. */
   protected readonly candidates = computed(() => {
     const clients = this.msp().clients.map((c) => c.id);
     return this.items()

@@ -65,18 +65,32 @@ const state = (cipherId: string): MspTemplates => ({
 });
 
 describe("MSP template sources", () => {
-  it("are the MSP's own templates, in a personal vault or a shared organization", () => {
-    expect(templateSourceProblem(template("a", null, "fw"), ["dental"])).toBeNull();
+  it("are the MSP's own templates, in an organization its admins share", () => {
     expect(templateSourceProblem(template("b", "msp-shared", "fw"), ["dental"])).toBeNull();
+  });
+
+  it("are never someone's own template, whatever the server names as the source", () => {
+    expect(templateSourceProblem(template("a", null, "fw"), ["dental"])).toMatch(
+      /in your own vault/,
+    );
+  });
+
+  it("aren't sent from someone's own vault", async () => {
+    const source = template("mine", null, "fw");
+    const { sender, cipherService } = setup([source]);
+    await expect(
+      sender.send(msp, source, [{ id: "dental", name: "Acme Dental" }], state("x")),
+    ).rejects.toThrow(/in your own vault/);
+    expect(cipherService.createWithServer).not.toHaveBeenCalled();
   });
 
   it("are never a client's own template, a copy from an MSP, or an ordinary item", () => {
     expect(templateSourceProblem(template("a", "dental", "fw"), ["dental"])).toMatch(
       /clients' own/,
     );
-    expect(templateSourceProblem(template("b", null, "fw", "Other IT"), ["dental"])).toMatch(
-      /copy from an MSP/,
-    );
+    expect(
+      templateSourceProblem(template("b", "msp-shared", "fw", "Other IT"), ["dental"]),
+    ).toMatch(/copy from an MSP/);
     const login = new CipherView();
     login.type = CipherType.Login;
     expect(templateSourceProblem(login, ["dental"])).toMatch(/isn't a template/);
@@ -138,7 +152,7 @@ describe("Sharing a template's item", () => {
 
 describe("Sending a template", () => {
   it("replaces the client's earlier copy", async () => {
-    const source = template("source", null, "fw");
+    const source = template("source", "msp-shared", "fw");
     const copy = template("copy", "dental", "fw", "Northwind IT");
     const { sender, cipherService } = setup([source, copy]);
     const result = await sender.send(
@@ -153,7 +167,7 @@ describe("Sending a template", () => {
   });
 
   it("never overwrites an item that isn't a copy of it, whatever the server recorded", async () => {
-    const source = template("source", null, "fw");
+    const source = template("source", "msp-shared", "fw");
     const login = new CipherView();
     login.id = "real-login";
     login.type = CipherType.Login;

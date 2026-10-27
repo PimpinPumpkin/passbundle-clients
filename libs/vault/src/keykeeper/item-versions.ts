@@ -13,7 +13,10 @@ import {
 import { CipherRepromptType, CipherType, FieldType } from "@bitwarden/common/vault/enums";
 import { EXPIRES_FIELD_NAME } from "@bitwarden/common/vault/keykeeper/expiration";
 import { isSecretField, isSecretValue } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
-import { visibleCustomFields } from "@bitwarden/common/vault/keykeeper/reserved-fields";
+import {
+  keykeeperFields,
+  visibleCustomFields,
+} from "@bitwarden/common/vault/keykeeper/reserved-fields";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { Fido2CredentialView } from "@bitwarden/common/vault/models/view/fido2-credential.view";
 import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
@@ -478,16 +481,19 @@ function restoredPasskeys(
  * contents, with what isn't part of versions kept as it is now (its id,
  * organization, folder, favorite, collections, attachments, item key, and
  * revision date, which the save sends as the last one it knows of, so it
- * can't overwrite a newer edit). A passkey the item still has stays as it is
- * now (`restoredPasskeys`). Saving it puts the replaced password in password
- * history, as any edit does.
+ * can't overwrite a newer edit). PassBundle's own fields (`keykeeper.*`:
+ * fill rules, the expiration date, template data) stay as they are now too:
+ * restoring the words someone saved never brings back a fill rule or a
+ * template marker that was since taken away. A passkey the item still has
+ * stays as it is now (`restoredPasskeys`). Saving it puts the replaced
+ * password in password history, as any edit does.
  */
 export function restoredView(version: CipherView, current: CipherView): CipherView {
   const restored = Object.assign(new CipherView(), current);
   restored.type = version.type;
   restored.name = version.name;
   restored.notes = version.notes;
-  restored.fields = version.fields;
+  restored.fields = [...visibleCustomFields(version.fields), ...keykeeperFields(current.fields)];
   restored.reprompt = version.reprompt;
   if (version.login != null) {
     const login = Object.assign(new LoginView(), version.login);

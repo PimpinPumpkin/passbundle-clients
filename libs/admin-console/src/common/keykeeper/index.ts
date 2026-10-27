@@ -9,3 +9,4 @@ export * from "./msp-template-sender";
 export * from "./msp-work";
 export * from "./script-access";
 export * from "./script-refresh";
+export * from "./script-usage";

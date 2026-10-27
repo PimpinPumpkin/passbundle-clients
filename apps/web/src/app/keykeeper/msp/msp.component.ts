@@ -292,6 +292,18 @@ const CLIENT_FEATURES = {
                             Provisioning
                           </a>
                         }
+                        @if (unconfirmedClient(client)) {
+                          <button
+                            type="button"
+                            bitLink
+                            class="tw-whitespace-nowrap"
+                            data-testid="msp-client-confirm"
+                            [attr.aria-label]="'Confirm ' + client.name + ' is your client'"
+                            (click)="confirmClient(client)"
+                          >
+                            Confirm client
+                          </button>
+                        }
                         @if (client.you?.status === CONFIRMED) {
                           <a bitLink [routerLink]="openLink(client)">Open</a>
                         } @else {
@@ -844,6 +856,11 @@ export class KeykeeperMspComponent implements OnInit {
   protected readonly CONFIRMED = CONFIRMED;
   protected readonly loading = signal(true);
   protected readonly msp = signal<MspDetails | null>(null);
+  /**
+   * For MSP admins, the clients this browser trusts (their client seal
+   * checks out), so the others can be confirmed by name. Null until known.
+   */
+  protected readonly trusted = signal<Set<string> | null>(null);
   protected readonly invitation = signal<{ token: string; info: InvitationInfo } | null>(null);
   protected readonly lastInvite = signal<{
     email: string;
@@ -1223,6 +1240,42 @@ export class KeykeeperMspComponent implements OnInit {
     this.toast("Copied the install command");
   }
 
+  /**
+   * A client an MSP admin holds the key of that this browser can't check is
+   * the MSP's: one made before client seals, or one a server lists that isn't.
+   */
+  protected unconfirmedClient(client: MspClient): boolean {
+    const trusted = this.trusted();
+    return trusted != null && client.you?.status === CONFIRMED && !trusted.has(client.id);
+  }
+
+  /**
+   * Seals that a client is this MSP's, once an admin says so by name. Until
+   * then nothing is sealed or copied there in the background (DESIGN.md,
+   * "Joins a hacked server can't forge").
+   */
+  protected async confirmClient(client: MspClient) {
+    const msp = this.msp();
+    if (msp == null) {
+      return;
+    }
+    const confirmed = await this.dialogService.openSimpleDialog({
+      title: `Is ${client.name} your client?`,
+      content: `Confirm only an organization ${msp.name} manages. Until a client is confirmed, PassBundle doesn't copy your templates there or vouch for your staff joining it, so a hacked server can't point that work at another organization you belong to.`,
+      acceptButtonText: "Confirm client",
+      type: "warning",
+    });
+    if (!confirmed) {
+      return;
+    }
+    await this.attempt(async () => {
+      await this.mspApi.confirmClient(msp.id, client.id);
+      this.toast(`Confirmed ${client.name}`);
+      await this.reload(msp.id);
+      void this.work.run();
+    });
+  }
+
   protected async replaceToken(client: MspClient) {
     const msp = this.msp();
     if (msp == null) {
@@ -1250,6 +1303,7 @@ export class KeykeeperMspComponent implements OnInit {
   protected async reload(mspId: string) {
     const msp = await this.mspApi.get(mspId);
     this.msp.set(msp);
+    this.trusted.set(msp.role === "admin" ? await this.mspApi.trustedClientIds(mspId, msp) : null);
     void this.computeHealth(msp);
     await this.loadPolicies(mspId);
     await this.loadTemplates(mspId);

@@ -41,9 +41,10 @@ type NamedClient = { id: string; name: string };
 /**
  * Why an item can't be the source of an MSP's template, or null when it can.
  * The server names the source, so every device checks it before copying: it
- * must be a custom template of the MSP's own, never a copy from an MSP, and
- * never in one of the MSP's clients, whose template would then reach the
- * others.
+ * must be a custom template in an organization the MSP's admins share, never
+ * someone's own (a server could otherwise copy anyone's "My templates" out
+ * of their vault), never a copy from an MSP, and never in one of the MSP's
+ * clients, whose template would then reach the others.
  */
 export function templateSourceProblem(
   source: CipherView,
@@ -56,7 +57,10 @@ export function templateSourceProblem(
   if (definition.from != null) {
     return "That template is a copy from an MSP, so it can't be sent on.";
   }
-  if (source.organizationId != null && new Set(clientIds).has(source.organizationId)) {
+  if (source.organizationId == null) {
+    return "That template is in your own vault. Move it to an organization your MSP's admins share to send it to clients.";
+  }
+  if (new Set(clientIds).has(source.organizationId)) {
     return "That template is one of your clients' own, so it can't go to the others.";
   }
   return null;

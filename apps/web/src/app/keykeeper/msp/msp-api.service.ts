@@ -4,7 +4,9 @@
 // so the server never sees a key it could decrypt with. Changes to staff, how
 // people join, and install commands carry this browser's seals and join
 // secrets (KeykeeperJoinSealer), so other apps can let people in on their own
-// without trusting the server. See DESIGN.md, "Joins a hacked server can't forge".
+// without trusting the server. Seals go only to clients whose client seal
+// checks out, never to whatever else the server calls a client. See
+// DESIGN.md, "Joins a hacked server can't forge".
 
 import { Injectable } from "@angular/core";
 import { firstValueFrom } from "rxjs";
@@ -19,6 +21,7 @@ import {
   Joining,
   KeykeeperJoinSeals,
   KeykeeperMspRequests,
+  MspDetails,
   MspJoining,
   MspPolicies,
   MspRole,
@@ -56,6 +59,10 @@ export function normalizeDomains(entries: string[]): string[] {
   }
   return domains;
 }
+
+/** Said when the server names a client this browser can't check is one. */
+export const UNTRUSTED_CLIENT =
+  "This browser can't check that this organization is your client. An MSP admin can confirm it under Clients.";
 
 /** What the server reports about an organization's joining, as the sealer reads it. */
 function reported(joining: OrgJoining): ReportedJoining {
@@ -108,19 +115,45 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
       staff?: { organizationId: string; email: string; seal: string }[];
       joining?: { organizationId: string; seal: string }[];
       secrets?: { organizationId: string; secret: string }[];
+      clients?: { organizationId: string; seal: string }[];
     },
   ): Promise<void> {
     await this.apiService.send("PUT", `/keykeeper/msp/${mspId}/seals`, seals, true, false);
   }
 
-  /** Seals a staff member's place in the clients they reach. */
+  /**
+   * The MSP's clients this browser trusts: whose key the person holds and
+   * whose client seal for this MSP checks out. Never the person's other
+   * organizations, whatever the server lists.
+   */
+  async trustedClientIds(mspId: string, msp?: MspDetails): Promise<Set<string>> {
+    const clients = (msp ?? (await this.get(mspId))).clients;
+    return new Set((await this.sealer.trustedClients(mspId, clients)).map((c) => c.id));
+  }
+
+  /**
+   * Seals, with its key, that a client made before client seals existed is
+   * this MSP's, once an MSP admin says so for that client by name in the
+   * console. From then on it's trusted like a client made here.
+   */
+  async confirmClient(mspId: string, orgId: string): Promise<void> {
+    const seal = await this.sealer.clientSeal(orgId, mspId);
+    if (seal == null) {
+      throw new Error("This browser doesn't have the client's key yet. Reload and try again.");
+    }
+    await this.putMspSeals(mspId, { clients: [{ organizationId: orgId, seal }] });
+  }
+
+  /** Seals a staff member's place in the clients they reach, among those this browser trusts. */
   private async sealStaff(
     mspId: string,
     email: string,
     role: MspRole,
     access: TechnicianAccess | null | undefined,
   ): Promise<void> {
-    const clients = (await this.get(mspId)).clients.map((c) => c.id);
+    const msp = await this.get(mspId);
+    const trusted = await this.trustedClientIds(mspId, msp);
+    const clients = msp.clients.map((c) => c.id).filter((c) => trusted.has(c));
     const reached =
       role === "admin" || reachesEveryClient(access ?? undefined)
         ? clients
@@ -134,7 +167,8 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
   /**
    * Seals a new organization whose key this browser just made: how people
    * join it (approval or not, no domains yet), its install command's join
-   * secret, and the places of staff who reach every client.
+   * secret, the places of staff who reach every client, and, for an MSP's
+   * client, that it's that MSP's.
    */
   private async sealNew(
     key: OrgKey,
@@ -142,10 +176,12 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     autoConfirm: boolean,
     withSecret: boolean,
     staffEmails: string[],
+    mspId?: string,
   ) {
     const seals = new KeykeeperJoinSeals();
     const joinKey = await seals.joinKey(key.toEncoded());
     return {
+      client: mspId == null ? undefined : await seals.clientSeal(joinKey, orgId, mspId),
       joining: await seals.joiningSeal(joinKey, orgId, autoConfirm, []),
       secret: withSecret
         ? (await this.encryptService.encryptString(seals.newJoinSecret(), key)).encryptedString
@@ -167,27 +203,63 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     return super.setOrgJoining(orgId, joining, seal);
   }
 
-  /** Puts the organization back on its MSP's default, or the server's, sealed. */
-  override async resetOrgJoining(orgId: string): Promise<OrgJoining> {
+  /**
+   * Puts the organization back on its MSP's default, or the server's, sealed
+   * with the default the person saw when they chose it, never a second answer
+   * from the server: if the default changed since, nothing changes. From the
+   * MSP console (`mspId`), only for a client this browser trusts.
+   */
+  async useDefaultJoining(
+    orgId: string,
+    seenDefault: boolean,
+    mspId?: string,
+  ): Promise<OrgJoining> {
+    if (mspId != null && !(await this.trustedClientIds(mspId)).has(orgId)) {
+      throw new Error(UNTRUSTED_CLIENT);
+    }
     const current = await this.getOrgJoining(orgId);
-    const seal = await this.sealer.resealJoining(
-      orgId,
-      current.default.autoConfirm,
-      reported(current),
-    );
+    if (current.default.autoConfirm !== seenDefault) {
+      throw new Error("The default changed since this page loaded. Reload and try again.");
+    }
+    const seal = await this.sealer.resealJoining(orgId, seenDefault, reported(current));
     return super.resetOrgJoining(orgId, seal);
   }
 
-  /** Sets the MSP's default, with a seal for each client that follows it. */
-  override async setMspJoining(mspId: string, joining: Joining): Promise<MspJoining> {
-    const current = await this.getMspJoining(mspId);
+  /**
+   * Sets the MSP's default, with a new seal for each client that follows it:
+   * only clients this browser trusts (`trustedClientIds`), and only those
+   * whose current seal says they follow the default the admin saw (`seen`).
+   * The server drops the seal of any other client it lists as following, so
+   * its joins wait for approval until someone saves its setting; a client
+   * that chose approval, or an organization that isn't a client, never gets
+   * "let people in" this way.
+   */
+  async saveMspJoining(mspId: string, joining: Joining, seen: Joining): Promise<MspJoining> {
+    const [current, trusted] = await Promise.all([
+      this.getMspJoining(mspId),
+      this.trustedClientIds(mspId),
+    ]);
+    if (current.default.autoConfirm !== seen.autoConfirm) {
+      throw new Error("The default changed since this page loaded. Reload and try again.");
+    }
     const seals: Record<string, string> = {};
     for (const client of current.following ?? []) {
-      const seal = await this.sealer.resealJoining(client.organizationId, joining.autoConfirm, {
-        autoConfirm: current.default.autoConfirm,
+      const followed = {
+        autoConfirm: seen.autoConfirm,
         domains: client.domains,
         seal: client.seal,
-      });
+      };
+      if (
+        !trusted.has(client.organizationId) ||
+        !(await this.sealer.vouches(client.organizationId, followed))
+      ) {
+        continue;
+      }
+      const seal = await this.sealer.joiningSeal(
+        client.organizationId,
+        joining.autoConfirm,
+        client.domains,
+      );
       if (seal != null) {
         seals[client.organizationId] = seal;
       }
@@ -232,9 +304,9 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     );
     await this.apiService.refreshIdentityToken();
     await this.syncService.fullSync(true);
-    // Sealed with the key made here: the MSP's default for how people join,
-    // a join secret for the install command, and the staff who reach every
-    // client, as the console lists them.
+    // Sealed with the key made here: that it's this MSP's client, the MSP's
+    // default for how people join, a join secret for the install command,
+    // and the staff who reach every client, as the console lists them.
     const msp = await this.get(mspId);
     const joining = await this.getMspJoining(mspId);
     const everyClient = [
@@ -247,8 +319,10 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
       joining.default.autoConfirm,
       true,
       everyClient,
+      mspId,
     );
     await this.putMspSeals(mspId, {
+      clients: [{ organizationId: created.id, seal: sealed.client! }],
       staff: sealed.staff,
       joining: [{ organizationId: created.id, seal: sealed.joining }],
       secrets: [{ organizationId: created.id, secret: sealed.secret! }],
