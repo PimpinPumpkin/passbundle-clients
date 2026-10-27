@@ -98,6 +98,14 @@ export function describeEvent(
       return `${actor} confirmed ${target} in ${org}`;
     case "client_removed_msp":
       return `${org} removed this MSP (${actor})`;
+    // Keykeeper: the client took one of the MSP's people out itself; they stay
+    // out (DESIGN.md, "Offboarding"). No actor means the client's directory.
+    case "client_removed_staff":
+      return `${org} removed ${target} (${e.actorEmail ?? "its directory"}); they stay out until ${org} invites them again`;
+    case "client_revoked_staff":
+      return `${org} revoked ${target} (${e.actorEmail ?? "its directory"}); they stay out until ${org} restores them`;
+    case "templates_collection_gone":
+      return `${org} deleted its Templates collection; the next template sent there makes a new one`;
     case "script_token_created": {
       // "<token name>: <n> items"
       const split = detail.lastIndexOf(": ");

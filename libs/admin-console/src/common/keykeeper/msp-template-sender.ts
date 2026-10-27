@@ -14,9 +14,9 @@ import {
   itemGrid,
   itemLike,
 } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
-import { CollectionAdminView } from "@bitwarden/common/admin-console/models/collections";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
+import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
 import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { CollectionId, OrganizationId, UserId } from "@bitwarden/common/types/guid";
@@ -30,6 +30,7 @@ import {
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
 import { SecureNoteView } from "@bitwarden/common/vault/models/view/secure-note.view";
+import { KeyService } from "@bitwarden/key-management";
 
 import { CollectionAdminService } from "../collections";
 
@@ -108,6 +109,8 @@ export class KeykeeperTemplateSender {
     private readonly collectionAdminService: CollectionAdminService,
     private readonly accountService: AccountService,
     private readonly syncService: SyncService,
+    private readonly keyService: KeyService,
+    private readonly encryptService: EncryptService,
   ) {}
 
   /**
@@ -204,7 +207,12 @@ export class KeykeeperTemplateSender {
     }
   }
 
-  /** The client's Templates collection, made the first time and whenever the client deleted it. */
+  /**
+   * The client's Templates collection, made the first time and whenever the
+   * client deleted it. The server makes it, new and empty with nobody given
+   * it, since every member of the client gets to read it; this browser only
+   * names it, with the client's key.
+   */
   private async templatesCollection(
     mspId: string,
     orgId: string,
@@ -220,15 +228,16 @@ export class KeykeeperTemplateSender {
         return recorded;
       }
     }
-    const view = new CollectionAdminView({
-      id: undefined as unknown as CollectionId,
-      organizationId: orgId as OrganizationId,
-      name: "Templates",
-    });
-    const created = await this.collectionAdminService.create(view, userId);
-    await this.mspApi.setTemplatesCollection(mspId, orgId, created.id);
-    state.collections[orgId] = created.id;
-    return created.id;
+    const orgKey = (await firstValueFrom(this.keyService.orgKeys$(userId)))?.[
+      orgId as OrganizationId
+    ];
+    if (orgKey == null) {
+      throw new Error("You don't have this client's key yet.");
+    }
+    const name = await this.encryptService.encryptString("Templates", orgKey);
+    const id = await this.mspApi.setTemplatesCollection(mspId, orgId, name.encryptedString!);
+    state.collections[orgId] = id;
+    return id;
   }
 }
 
