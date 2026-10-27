@@ -6,6 +6,7 @@ import {
   FolderLike,
 } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
@@ -13,6 +14,7 @@ import { CipherType } from "@bitwarden/common/vault/enums";
 import { newTemplateDefinitionField } from "@bitwarden/common/vault/keykeeper/templates";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
+import { KeyService } from "@bitwarden/key-management";
 
 import { CollectionAdminService } from "../collections";
 
@@ -38,24 +40,31 @@ const template = (id: string, organizationId: string | null, templateId: string,
   return view;
 };
 
-function setup(items: CipherView[]) {
+function setup(items: CipherView[], collections = [{ id: "templates" }], orgKeys: any = {}) {
   const requests = mock<KeykeeperMspRequests>();
+  requests.setTemplatesCollection.mockResolvedValue("made-by-server");
   const cipherService = mock<CipherService>();
   cipherService.getAllDecrypted.mockResolvedValue(items);
   cipherService.createWithServer.mockImplementation(async (c) => ({ ...c, id: "new-copy" }) as any);
   cipherService.updateWithServer.mockImplementation(async (c) => c as any);
   const collectionAdminService = mock<CollectionAdminService>();
-  collectionAdminService.collectionAdminViews$.mockReturnValue(of([{ id: "templates" } as any]));
+  collectionAdminService.collectionAdminViews$.mockReturnValue(of(collections as any));
   const accountService = mock<AccountService>();
   accountService.activeAccount$ = new BehaviorSubject({ id: USER } as any);
+  const keyService = mock<KeyService>();
+  keyService.orgKeys$.mockReturnValue(of(orgKeys));
+  const encryptService = mock<EncryptService>();
+  encryptService.encryptString.mockResolvedValue({ encryptedString: "2.name|enc|mac" } as any);
   const sender = new KeykeeperTemplateSender(
     requests,
     cipherService,
     collectionAdminService,
     accountService,
     mock<SyncService>(),
+    keyService,
+    encryptService,
   );
-  return { sender, cipherService, requests };
+  return { sender, cipherService, collectionAdminService, requests, encryptService };
 }
 
 const state = (cipherId: string): MspTemplates => ({
@@ -181,6 +190,48 @@ describe("Sending a template", () => {
       expect(cipherService.createWithServer).toHaveBeenCalledTimes(1);
       expect(cipherService.createWithServer.mock.calls[0][0].organizationId).toBe("dental");
     }
+  });
+
+  it("has the server make a new Templates collection when the client deleted its own, never one of its own", async () => {
+    const source = template("source", "msp-shared", "fw");
+    const dentalKey = { key: "dental" };
+    const { sender, cipherService, collectionAdminService, requests, encryptService } = setup(
+      [source],
+      [],
+      { dental: dentalKey },
+    );
+    const result = await sender.send(
+      msp,
+      source,
+      [{ id: "dental", name: "Acme Dental" }],
+      state("gone"),
+    );
+    expect(result.failed).toEqual([]);
+    expect(encryptService.encryptString).toHaveBeenCalledWith("Templates", dentalKey);
+    expect(requests.setTemplatesCollection).toHaveBeenCalledWith(
+      "msp-1",
+      "dental",
+      "2.name|enc|mac",
+    );
+    expect(collectionAdminService.create).not.toHaveBeenCalled();
+    expect(cipherService.createWithServer.mock.calls[0][0].collectionIds).toEqual([
+      "made-by-server",
+    ]);
+  });
+
+  it("says so for a client whose key it doesn't have yet", async () => {
+    const source = template("source", "msp-shared", "fw");
+    const { sender, requests } = setup([source], []);
+    const result = await sender.send(
+      msp,
+      source,
+      [{ id: "dental", name: "Acme Dental" }],
+      state("gone"),
+    );
+    expect(result.failed).toEqual([
+      { id: "dental", name: "Acme Dental", error: "You don't have this client's key yet." },
+    ]);
+    expect(requests.setTemplatesCollection).not.toHaveBeenCalled();
   });
 
   it("removes only copies from an MSP", async () => {

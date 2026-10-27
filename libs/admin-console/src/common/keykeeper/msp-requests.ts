@@ -134,15 +134,19 @@ export class KeykeeperMspRequests {
     );
   }
 
-  /** Records a client's Templates collection. */
-  async setTemplatesCollection(mspId: string, orgId: string, collectionId: string): Promise<void> {
-    await this.apiService.send(
+  /**
+   * Has the server make a client's Templates collection, new and empty with
+   * nobody given it, named with this encrypted name. Returns its id.
+   */
+  async setTemplatesCollection(mspId: string, orgId: string, name: string): Promise<string> {
+    const made: { collectionId: string } = await this.apiService.send(
       "PUT",
       `/keykeeper/msp/${mspId}/clients/${orgId}/templates-collection`,
-      { collectionId },
+      { name },
       true,
       true,
     );
+    return made.collectionId;
   }
 
   // Script access (docs/script-access.md in the meta repo).

@@ -28,6 +28,17 @@ export type MspClient = {
    * checks out. Older servers and older clients have none.
    */
   seal?: string | null;
+  /**
+   * The MSP's people this client removed or revoked itself. They stay out of
+   * it: the MSP's changes never add them there again. Older servers leave it out.
+   */
+  removedByClient?: { userId: string; email: string | null; revoked: boolean; at: string }[];
+  /**
+   * How many people the client removed since its install command's token was
+   * made. Each may still have the command, so the console offers to replace
+   * the token. Older servers leave it out.
+   */
+  removedSinceToken?: number;
 };
 
 /** The custom role permissions the server enforces. */
@@ -68,6 +79,8 @@ export type MspStaffMember = {
   role: MspRole;
   /** A technician's access. Only MSP admins see it. */
   access: TechnicianAccess | null;
+  /** Clients that removed or revoked this person themselves. Older servers leave it out. */
+  removedByClient?: { organizationId: string; revoked: boolean; at: string }[];
 };
 
 export type MspInvite = {
@@ -119,6 +132,34 @@ export type ClientEnrollment = {
   domains: string[];
   /** The command's join secret, encrypted with the organization's key. Older servers leave it out. */
   secret?: string | null;
+  /**
+   * How many people the organization removed since the token was made, who
+   * may still have the command. Older servers leave it out.
+   */
+  removedSinceToken?: number;
+};
+
+/**
+ * What removing an MSP took out of a client besides its people, for the
+ * client's owner to see. See DESIGN.md, "Offboarding".
+ */
+export type MspRemoval = {
+  msp: { id: string; name: string };
+  peopleRemoved: number;
+  scriptTokensRevoked: { id: string; name: string; createdBy: string | null }[];
+  provisioningTokenRevoked: { createdBy: string } | null;
+  eventDestinationsDeleted: { id: string; name: string }[];
+  staffSealsDeleted: number;
+  /** The MSP's install command stopped working with it. */
+  installCommandRemoved: boolean;
+  /** The organization's single sign-on settings, for the owner to review. */
+  singleSignOn: {
+    enabled: boolean;
+    updatedBy: string;
+    /** Whether one of the MSP's people last changed them. */
+    updatedByProvider: boolean;
+    updatedAt: string;
+  } | null;
 };
 
 /** One of the MSP's people in a client, and what they can do there. */
@@ -270,6 +311,11 @@ export type ScriptTokenView = {
   sealedKey: string;
   lastUsedAt: string | null;
   lastUsedIp: string | null;
+  /**
+   * Whoever made it no longer manages the organization, so it stopped
+   * working. Older servers leave it out.
+   */
+  creatorLostAccess?: boolean;
   grants: {
     itemId: string;
     revision: string;
@@ -327,6 +373,8 @@ export type ProvisioningView = {
     createdBy: string;
     lastUsedAt: string | null;
     lastUsedIp: string | null;
+    /** Whoever made it no longer manages the organization, so it stopped working. */
+    creatorLostAccess?: boolean;
   } | null;
   /** Only in the answer that made a token: the token itself, shown once. */
   newToken?: string;

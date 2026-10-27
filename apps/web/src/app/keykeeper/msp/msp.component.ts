@@ -45,6 +45,11 @@ import { KeykeeperEventStreamingComponent } from "../event-streaming/event-strea
 import { KeykeeperBreachCheckSetting } from "../health/breach-check-setting.service";
 import { KeykeeperExposureChecks } from "../health/exposure-checks.service";
 import { KeykeeperJoinSealer } from "../joining/join-sealer.service";
+import {
+  clientRemovedLine,
+  removedByClientLine,
+  replaceTokenPrompt,
+} from "../offboarding/offboarding";
 
 import {
   ClientHealth,
@@ -230,6 +235,29 @@ const CLIENT_FEATURES = {
                           }}
                         </div>
                       }
+                      <!-- Keykeeper: people the client took out itself, who stay out (DESIGN.md, "Offboarding"). -->
+                      @if (clientRemovedLine(client); as removed) {
+                        <div class="tw-text-xs tw-text-muted" data-testid="msp-client-removed">
+                          {{ removed }}
+                        </div>
+                      }
+                      @if (m.role === "admin" && client.removedSinceToken) {
+                        <div class="tw-text-xs" data-testid="msp-client-replace-token">
+                          <button
+                            type="button"
+                            bitLink
+                            class="tw-text-start"
+                            (click)="toggleInstall(client)"
+                          >
+                            {{
+                              client.removedSinceToken === 1
+                                ? "1 person was"
+                                : client.removedSinceToken + " people were"
+                            }}
+                            removed since its install command was made: replace its token
+                          </button>
+                        </div>
+                      }
                     </td>
                     <td bitCell data-testid="msp-client-policies">{{ policySummary(client) }}</td>
                     <td bitCell data-testid="msp-client-members">{{ client.members.confirmed }}</td>
@@ -306,6 +334,12 @@ const CLIENT_FEATURES = {
                         }
                         @if (client.you?.status === CONFIRMED) {
                           <a bitLink [routerLink]="openLink(client)">Open</a>
+                        } @else if ((client.you?.status ?? 0) < 0) {
+                          <span
+                            class="tw-whitespace-nowrap tw-text-muted"
+                            data-testid="msp-client-revoked"
+                            >Revoked by the client</span
+                          >
                         } @else {
                           <span class="tw-whitespace-nowrap tw-text-muted">Waiting for access</span>
                         }
@@ -341,6 +375,15 @@ const CLIENT_FEATURES = {
               data-testid="msp-install"
             >
               <h3 bitTypography="h5">Install command for {{ install.client.name }}</h3>
+              @if (replaceTokenPrompt(install.enrollment.removedSinceToken); as prompt) {
+                <bit-callout
+                  type="warning"
+                  title="Replace the token?"
+                  data-testid="msp-install-replace-prompt"
+                >
+                  {{ prompt }}
+                </bit-callout>
+              }
               @if (install.enrollment.token; as token) {
                 <p bitTypography="body2">
                   Run this from your RMM on {{ install.client.name }}'s computers, as an
@@ -623,6 +666,11 @@ const CLIENT_FEATURES = {
                   <td bitCell>
                     <div>{{ person.name || person.email }}</div>
                     <div class="tw-text-sm tw-text-muted">{{ person.email }}</div>
+                    @if (removedByClientLine(person, m.clients); as removed) {
+                      <div class="tw-text-sm tw-text-muted" data-testid="msp-staff-removed">
+                        {{ removed }}
+                      </div>
+                    }
                   </td>
                   <td bitCell>
                     @if (m.role === "admin") {
@@ -1229,6 +1277,12 @@ export class KeykeeperMspComponent implements OnInit {
   }
 
   protected readonly refusedCommand = INSTALL_COMMAND_REFUSED;
+
+  // Keykeeper: offboarding's words (DESIGN.md, "Offboarding").
+  protected readonly clientRemovedLine = clientRemovedLine;
+  protected readonly removedByClientLine = removedByClientLine;
+  protected readonly replaceTokenPrompt = (removedSinceToken: number | undefined) =>
+    replaceTokenPrompt(removedSinceToken);
 
   protected copyCommand(token: string) {
     const command = this.installCommand(token);

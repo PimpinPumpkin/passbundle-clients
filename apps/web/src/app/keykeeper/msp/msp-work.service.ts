@@ -31,8 +31,18 @@ export class KeykeeperTemplateSenderService extends KeykeeperTemplateSender {
     collectionAdminService: CollectionAdminService,
     accountService: AccountService,
     syncService: SyncService,
+    keyService: KeyService,
+    encryptService: EncryptService,
   ) {
-    super(mspApi, cipherService, collectionAdminService, accountService, syncService);
+    super(
+      mspApi,
+      cipherService,
+      collectionAdminService,
+      accountService,
+      syncService,
+      keyService,
+      encryptService,
+    );
   }
 }
 
