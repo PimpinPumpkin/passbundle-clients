@@ -1,47 +1,22 @@
 // FIXME: Update this file to be type safe and remove this and next line
 // @ts-strict-ignore
-import {
-  b64Decode,
-  buildMobileDeeplinkUriFromParam,
-  getQsParam,
-  isKnownCloudOrigin,
-  navigateToUrl,
-  resolvePostMessageOrigin,
-} from "./common";
+import { allowedParentOrigin, b64Decode, framedOnlyBy, getQsParam } from "./common";
 import { buildDataString, parseWebauthnJson } from "./common-webauthn";
 
-const mobileCallbackUri = "bitwarden://webauthn-callback";
-
-/**
- * Determines the callback URI for mobile deep-link return.
- *
- * Priority: 1) deeplinkScheme query param, 2) mobile flag, 3) legacy callbackUri signal from data.
- * The dataObj.callbackUri value is intentionally never used as the URI — only its presence
- * signals a mobile flow. This prevents client-supplied payloads from governing the redirect target.
- */
-export function resolveWebauthnCallbackUri(
-  deeplinkScheme: string | null,
-  dataObj: { mobile?: boolean; callbackUri?: string },
-  buildDeeplink: () => string,
-): string | null {
-  if (deeplinkScheme) {
-    return buildDeeplink();
-  }
-  const isMobileFlow = dataObj.mobile === true || dataObj.callbackUri != null;
-  return isMobileFlow ? mobileCallbackUri : null;
-}
+// The security key step of signing in, in a frame on the web vault's sign-in
+// page (WebAuthnIFrame, libs/common/src/auth/webauthn-iframe.ts). PassBundle:
+// it answers only the page that framed it, and only when that page is the web
+// vault itself or PassBundle's own extension; for any other page it asks no
+// security key and sends nothing (DESIGN.md, "Connector pages"). Upstream's
+// mobile and desktop return paths (deep links to upstream's apps) are gone:
+// PassBundle's own apps don't use this page.
 
 let parsed = false;
 let webauthnJson: any;
 let headerText: string = null;
 let btnText: string = null;
 let btnAwaitingInteractionText: string = null;
-let btnReturnText: string = null;
-let parentUrl: string = null;
 let parentOrigin: string = null;
-let postMessageOrigin: string = null;
-let callbackUri: string = null;
-let mobileResponse = false;
 let stopWebAuthn = false;
 let sentSuccess = false;
 let obj: any = null;
@@ -101,9 +76,33 @@ function setAwaitingInteractionWebAuthnButtonState() {
 }
 
 export function init() {
+  // WebAuthnIFrame encodes the parent's address once more inside the query.
+  let parentUrl = getQsParam("parent");
+  try {
+    parentUrl = parentUrl ? decodeURIComponent(parentUrl) : null;
+  } catch {
+    parentUrl = null;
+  }
+  parentOrigin = allowedParentOrigin(parentUrl);
+  if (!parentOrigin || !framedOnlyBy(parentOrigin)) {
+    refuse();
+    return;
+  }
+
   start();
   onMessage();
   info("ready");
+}
+
+/**
+ * Framed by a page it may not answer, or opened on its own: no security key
+ * prompt, no message to anyone, and a page that says so.
+ */
+function refuse() {
+  parentOrigin = null;
+  stopWebAuthn = true;
+  document.body.setAttribute("data-refused", "");
+  document.body.textContent = "This page works only inside your vault.";
 }
 
 function parseParameters() {
@@ -111,31 +110,6 @@ function parseParameters() {
     return;
   }
 
-  parentUrl = getQsParam("parent");
-  if (parentUrl) {
-    parentUrl = decodeURIComponent(parentUrl);
-    parentOrigin = new URL(parentUrl).origin;
-  }
-  postMessageOrigin = resolvePostMessageOrigin(parentUrl);
-
-  const version = getQsParam("v");
-
-  if (version === "1") {
-    parseParametersV1();
-  } else {
-    parseParametersV2();
-  }
-
-  // Require at least one return mechanism
-  if (!parentUrl && !callbackUri) {
-    error("No return target provided.");
-    return;
-  }
-
-  parsed = true;
-}
-
-function parseParametersV1() {
   const data = getQsParam("data");
   if (!data) {
     error("No data.");
@@ -146,36 +120,8 @@ function parseParametersV1() {
   headerText = getQsParam("headerText");
   btnText = getQsParam("btnText");
   btnAwaitingInteractionText = getQsParam("btnAwaitingInteractionText");
-  btnReturnText = getQsParam("btnReturnText");
-}
 
-function parseParametersV2() {
-  let dataObj: {
-    data: any;
-    headerText: string;
-    btnText: string;
-    btnReturnText: string;
-    callbackUri?: string;
-    mobile?: boolean;
-  } = null;
-  try {
-    dataObj = JSON.parse(b64Decode(getQsParam("data")));
-    // FIXME: Remove when updating file. Eslint update
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  } catch (e) {
-    error("Cannot parse data.");
-    return;
-  }
-
-  callbackUri = resolveWebauthnCallbackUri(getQsParam("deeplinkScheme"), dataObj, () =>
-    buildMobileDeeplinkUriFromParam("webauthn"),
-  );
-  mobileResponse = callbackUri != null;
-
-  webauthnJson = dataObj.data;
-  headerText = dataObj.headerText;
-  btnText = dataObj.btnText;
-  btnReturnText = dataObj.btnReturnText;
+  parsed = true;
 }
 
 function start() {
@@ -190,7 +136,9 @@ function start() {
 
   if (headerText) {
     const header = document.getElementById("webauthn-header");
-    header.innerText = decodeURI(headerText);
+    if (header) {
+      header.innerText = decodeURI(headerText);
+    }
   }
 
   setDefaultWebAuthnButtonState();
@@ -212,10 +160,10 @@ function start() {
   stopWebAuthn = false;
 
   if (
-    mobileResponse ||
-    (navigator.userAgent.indexOf(" Safari/") !== -1 && navigator.userAgent.indexOf("Chrome") === -1)
+    navigator.userAgent.indexOf(" Safari/") !== -1 &&
+    navigator.userAgent.indexOf("Chrome") === -1
   ) {
-    // Safari and mobile chrome blocks non-user initiated WebAuthn requests.
+    // Safari blocks non-user initiated WebAuthn requests.
   } else {
     executeWebAuthn();
   }
@@ -236,13 +184,8 @@ function onMessage() {
   window.addEventListener(
     "message",
     (event) => {
-      const isFileParent = parentUrl && parentUrl.startsWith("file:");
-      const expectedOrigin =
-        !isFileParent && isKnownCloudOrigin() ? window.location.origin : parentOrigin;
-      if (
-        expectedOrigin &&
-        (!event.origin || event.origin === "" || event.origin !== expectedOrigin)
-      ) {
+      // Only the page that framed this one, from the origin it was given.
+      if (event.source !== window.parent || event.origin !== parentOrigin) {
         return;
       }
 
@@ -257,47 +200,29 @@ function onMessage() {
   );
 }
 
-function error(message: string) {
-  if (callbackUri) {
-    const uri = callbackUri + "?error=" + encodeURIComponent(message);
-    navigateToUrl(uri);
-    returnButton(uri);
-  } else if (parentUrl) {
-    parent.postMessage("error|" + message, postMessageOrigin);
-    setDefaultWebAuthnButtonState();
+// Every message goes to the parent's own origin, never "*": if the frame's
+// parent isn't that origin anymore, the browser drops it.
+function send(message: string) {
+  if (!parentOrigin) {
+    return;
   }
+  window.parent.postMessage(message, parentOrigin);
+}
+
+function error(message: string) {
+  send("error|" + message);
+  setDefaultWebAuthnButtonState();
 }
 
 function success(assertedCredential: PublicKeyCredential) {
-  if (sentSuccess) {
+  if (sentSuccess || !parentOrigin) {
     return;
   }
 
-  const dataString = buildDataString(assertedCredential);
-
-  if (callbackUri) {
-    const uri = callbackUri + "?data=" + encodeURIComponent(dataString);
-    navigateToUrl(uri);
-    returnButton(uri);
-  } else if (parentUrl) {
-    parent.postMessage("success|" + dataString, postMessageOrigin);
-    sentSuccess = true;
-  }
+  send("success|" + buildDataString(assertedCredential));
+  sentSuccess = true;
 }
 
 function info(message: string) {
-  if (mobileResponse || !parentUrl) {
-    return;
-  }
-
-  parent.postMessage("info|" + message, postMessageOrigin);
-}
-
-function returnButton(uri: string) {
-  // provides 'return' button in case scripted navigation is blocked
-  const button = document.getElementById("webauthn-button");
-  button.innerText = decodeURI(btnReturnText);
-  button.onclick = () => {
-    navigateToUrl(uri);
-  };
+  send("info|" + message);
 }
