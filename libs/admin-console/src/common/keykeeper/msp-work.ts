@@ -298,9 +298,10 @@ export class KeykeeperMspWork {
         outcome.wrote ||= result.sent.length > 0;
       }
     }
-    const extras = duplicateCopies(state, items, new Set(trusted.map((c) => c.id)));
+    const trustedIds = new Set(trusted.map((c) => c.id));
+    const extras = duplicateCopies(state, items, trustedIds);
     if (extras.length > 0) {
-      await this.sender.removeCopies(extras);
+      await this.sender.removeCopies(extras, trustedIds);
       outcome.wrote = true;
     }
     return outcome;

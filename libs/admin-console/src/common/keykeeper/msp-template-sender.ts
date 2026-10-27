@@ -192,17 +192,22 @@ export class KeykeeperTemplateSender {
 
   /**
    * Moves copies to the trash in each client, for when the MSP stops sending a
-   * template. Items that aren't copies from an MSP are left alone, whatever
-   * the server listed.
+   * template. Items that aren't copies from an MSP, or aren't in one of the
+   * `clients` this device trusts, are left alone, whatever the server listed.
    */
-  async removeCopies(copyIds: string[]): Promise<void> {
+  async removeCopies(copyIds: string[], clients: ReadonlySet<string>): Promise<void> {
     const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
     const items = new Map(
       (await this.cipherService.getAllDecrypted(userId)).map((c) => [c.id, c] as const),
     );
     for (const id of copyIds) {
       const item = items.get(id);
-      if (item != null && item.organizationId != null && templateDefinition(item)?.from != null) {
+      if (
+        item != null &&
+        item.organizationId != null &&
+        clients.has(item.organizationId) &&
+        templateDefinition(item)?.from != null
+      ) {
         await this.cipherService.softDeleteWithServer(id, userId, true);
       }
     }

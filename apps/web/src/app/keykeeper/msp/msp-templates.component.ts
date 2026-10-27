@@ -334,7 +334,7 @@ export class KeykeeperMspTemplatesComponent {
         clients: choice.clients,
       });
       if (removeCopies) {
-        await this.sender.removeCopies(dropped);
+        await this.sender.removeCopies(dropped, await this.mspApi.trustedClientIds(m.id));
       }
       const names = m.clients.filter((c) => choice.clients.includes(c.id));
       this.report(
@@ -377,7 +377,7 @@ export class KeykeeperMspTemplatesComponent {
       }));
     await this.attempt(async () => {
       if (removeCopies) {
-        await this.sender.removeCopies(copies);
+        await this.sender.removeCopies(copies, await this.mspApi.trustedClientIds(this.msp().id));
       }
       await this.mspApi.stopTemplate(this.msp().id, row.templateId);
       this.toast("success", `Removed ${name}`);

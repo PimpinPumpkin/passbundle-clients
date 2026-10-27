@@ -190,7 +190,15 @@ describe("Sending a template", () => {
     login.id = "real-login";
     login.organizationId = "dental" as any;
     const { sender, cipherService } = setup([copy, own, login]);
-    await sender.removeCopies(["copy", "own", "real-login", "missing"]);
+    await sender.removeCopies(["copy", "own", "real-login", "missing"], new Set(["dental"]));
+    expect(cipherService.softDeleteWithServer.mock.calls.map((c) => c[0])).toEqual(["copy"]);
+  });
+
+  it("removes copies only in clients this device trusts", async () => {
+    const copy = template("copy", "dental", "fw", "Northwind IT");
+    const family = template("family-copy", "family", "fw", "Northwind IT");
+    const { sender, cipherService } = setup([copy, family]);
+    await sender.removeCopies(["copy", "family-copy"], new Set(["dental"]));
     expect(cipherService.softDeleteWithServer.mock.calls.map((c) => c[0])).toEqual(["copy"]);
   });
 });

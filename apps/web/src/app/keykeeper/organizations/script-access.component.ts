@@ -251,8 +251,7 @@ export class KeykeeperScriptAccessComponent {
   }
 
   /**
-   * The organization's items this browser has and whose passwords the person
-   * may see (a token would show them its copy). Items saved from the Admin
+   * The organization's items this browser has. Items saved from the Admin
    * Console reach it at the next sync, so sync first (nothing happens when
    * nothing changed).
    */
@@ -263,14 +262,17 @@ export class KeykeeperScriptAccessComponent {
       // What this browser already has will do.
     }
     const all = await this.cipherService.getAllDecrypted(await this.userId());
-    return all.filter((c) => c.organizationId === orgId && !c.isDeleted && maySeeSecrets(c));
+    return all.filter((c) => c.organizationId === orgId && !c.isDeleted);
   }
 
   protected async newToken() {
     const orgId = this.organizationId();
     this.items.set(await this.organizationItems(orgId));
+    // Only items whose passwords the person may see: the token's copy would show them.
     const choice = await firstValueFrom(
-      KeykeeperScriptTokenDialogComponent.open(this.dialogService, { items: this.items() }).closed,
+      KeykeeperScriptTokenDialogComponent.open(this.dialogService, {
+        items: this.items().filter((c) => maySeeSecrets(c)),
+      }).closed,
     );
     if (choice == null) {
       return;
