@@ -7,6 +7,7 @@ import { FormBuilder, ReactiveFormsModule } from "@angular/forms";
 
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
+import { mayShow } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { IdentityView } from "@bitwarden/common/vault/models/view/identity.view";
 import {
@@ -112,6 +113,16 @@ export class IdentitySectionComponent implements OnInit {
         return cipher;
       });
     });
+  }
+
+  /**
+   * Keykeeper: whether the person may see one of the item's values
+   * (`part.property`): every value but the plain ones is hidden from someone
+   * who can't see the item's passwords, so its reveal toggle doesn't show
+   * (DESIGN.md, "Folders and permissions"). A new item is theirs.
+   */
+  protected canSee(key: string): boolean {
+    return mayShow(this.originalCipherView, key);
   }
 
   ngOnInit() {

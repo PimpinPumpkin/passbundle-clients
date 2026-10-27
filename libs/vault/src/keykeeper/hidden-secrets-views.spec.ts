@@ -3,6 +3,7 @@
 // "Folders and permissions"): the password, one-time codes, a card's number
 // and code, an SSH key's private key, hidden fields, and earlier passwords.
 // The web vault and the extension share these components.
+import { DatePipe } from "@angular/common";
 import { Type } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
@@ -22,21 +23,31 @@ import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { ViewPasswordHistoryService } from "@bitwarden/common/vault/abstractions/view-password-history.service";
 import { CipherType, FieldType } from "@bitwarden/common/vault/enums";
 import { HIDDEN_VALUE_MASK } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
+import { BankAccountView } from "@bitwarden/common/vault/models/view/bank-account.view";
 import { CardView } from "@bitwarden/common/vault/models/view/card.view";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
+import { DriversLicenseView } from "@bitwarden/common/vault/models/view/drivers-license.view";
 import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
+import { IdentityView } from "@bitwarden/common/vault/models/view/identity.view";
 import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
+import { PassportView } from "@bitwarden/common/vault/models/view/passport.view";
 import { PasswordHistoryView } from "@bitwarden/common/vault/models/view/password-history.view";
 import { SshKeyView } from "@bitwarden/common/vault/models/view/ssh-key.view";
 import { ToastService } from "@bitwarden/components";
 
+// Through the library's index first, as the apps load it: the item views and
+// the copy directive import each other through it.
+import { CopyCipherFieldService } from "..";
+import { BankAccountViewComponent } from "../cipher-view/bank-account-sections/bank-account-view.component";
 import { CardDetailsComponent } from "../cipher-view/card-details/card-details-view.component";
 import { CustomFieldV2Component } from "../cipher-view/custom-fields/custom-fields-v2.component";
+import { DriversLicenseViewComponent } from "../cipher-view/drivers-license-sections/drivers-license-view.component";
 import { ItemHistoryV2Component } from "../cipher-view/item-history/item-history-v2.component";
 import { LoginCredentialsViewComponent } from "../cipher-view/login-credentials/login-credentials-view.component";
+import { PassportViewComponent } from "../cipher-view/passport-sections/passport-view.component";
 import { SshKeyViewComponent } from "../cipher-view/sshkey-sections/sshkey-view.component";
+import { ViewIdentitySectionsComponent } from "../cipher-view/view-identity-sections/view-identity-sections.component";
 import { PasswordHistoryViewComponent } from "../components/password-history-view/password-history-view.component";
-import { CopyCipherFieldService } from "../services/copy-cipher-field.service";
 import { PasswordRepromptService } from "../services/password-reprompt.service";
 
 const SECRETS = [
@@ -47,6 +58,14 @@ const SECRETS = [
   "PRIVATE-KEY",
   "old-password",
   "pin-1234",
+  "078-05-1120",
+  "P1234567",
+  "D7654321",
+  "ACCT-9988776655",
+  "PIN-4421",
+  "SWIFT-BOFAUS3N",
+  "IBAN-GB33BUKB20201555555555",
+  "NID-55-66",
 ];
 
 function item(overrides: Partial<CipherView> = {}): CipherView {
@@ -67,10 +86,12 @@ describe("an item's view, without see passwords", () => {
   async function render<T>(
     component: Type<T>,
     setup: (c: T) => void,
+    inputs: Record<string, unknown> = {},
   ): Promise<ComponentFixture<T>> {
     await TestBed.configureTestingModule({
       imports: [component],
       providers: [
+        DatePipe,
         {
           provide: BillingAccountProfileStateService,
           useValue: mock<BillingAccountProfileStateService>({
@@ -86,6 +107,7 @@ describe("an item's view, without see passwords", () => {
         { provide: ConfigService, useValue: mock<ConfigService>() },
         { provide: CipherService, useValue: mock<CipherService>() },
         { provide: ViewPasswordHistoryService, useValue: mock<ViewPasswordHistoryService>() },
+        { provide: PasswordRepromptService, useValue: mock<PasswordRepromptService>() },
         {
           provide: TotpService,
           useValue: { getCode$: () => of({ code: "123456", period: 30 }) },
@@ -94,6 +116,9 @@ describe("an item's view, without see passwords", () => {
     }).compileComponents();
     const fixture = TestBed.createComponent(component);
     setup(fixture.componentInstance);
+    for (const [name, value] of Object.entries(inputs)) {
+      fixture.componentRef.setInput(name, value);
+    }
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
@@ -193,6 +218,76 @@ describe("an item's view, without see passwords", () => {
     await fixture.componentInstance.toggleHiddenField(true, 0);
     fixture.detectChanges();
     expectNoSecrets(fixture);
+  });
+
+  it("identity: the SSN, passport, and license numbers masked, with nothing to show, copy, or drag", async () => {
+    const identity = Object.assign(new IdentityView(), {
+      firstName: "Dana",
+      email: "dana@example.test",
+      ssn: "078-05-1120",
+      passportNumber: "P1234567",
+      licenseNumber: "D7654321",
+    });
+    const fixture = await render(ViewIdentitySectionsComponent, (c) => {
+      c.cipher = item({ type: CipherType.Identity, identity });
+    });
+    expectNoSecrets(fixture);
+    expect(exposed(fixture)).toContain("dana@example.test");
+    for (const id of [
+      "ssn-toggle",
+      "copy-ssn",
+      "passport-toggle",
+      "copy-passport",
+      "copy-license",
+    ]) {
+      expect(buttons(fixture, `[data-testid="${id}"]`)).toHaveLength(0);
+    }
+  });
+
+  it("bank account: the account number, PIN, SWIFT, and IBAN masked; the plain ones stay", async () => {
+    const bankAccount = Object.assign(new BankAccountView(), {
+      bankName: "First Lakeside",
+      nameOnAccount: "Lakeside Clinic",
+      routingNumber: "021000021",
+      accountNumber: "ACCT-9988776655",
+      pin: "PIN-4421",
+      swiftCode: "SWIFT-BOFAUS3N",
+      iban: "IBAN-GB33BUKB20201555555555",
+    });
+    const cipher = item({ type: CipherType.BankAccount, bankAccount });
+    const fixture = await render(BankAccountViewComponent, () => {}, { bankAccount, cipher });
+    expectNoSecrets(fixture);
+    expect(exposed(fixture)).toContain("021000021");
+    expect(buttons(fixture, '[data-testid="toggle-pin"]')).toHaveLength(0);
+    expect(buttons(fixture, '[data-testid="toggle-account-number"]')).toHaveLength(0);
+    // Copy for the plain ones only: name on account, routing number.
+    expect(buttons(fixture, 'button[bitIconButton="bwi-clone"]')).toHaveLength(2);
+  });
+
+  it("driver's license and passport: their numbers masked, with nothing to show or copy", async () => {
+    const driversLicense = Object.assign(new DriversLicenseView(), {
+      firstName: "Dana",
+      licenseNumber: "D7654321",
+    });
+    const license = await render(DriversLicenseViewComponent, () => {}, {
+      driversLicense,
+      cipher: item({ type: CipherType.DriversLicense, driversLicense }),
+    });
+    expectNoSecrets(license);
+    expect(buttons(license, 'button[bitIconButton="bwi-clone"]')).toHaveLength(1);
+    TestBed.resetTestingModule();
+
+    const passport = Object.assign(new PassportView(), {
+      givenName: "Dana",
+      passportNumber: "P1234567",
+      nationalIdentificationNumber: "NID-55-66",
+    });
+    const view = await render(PassportViewComponent, () => {}, {
+      passport,
+      cipher: item({ type: CipherType.Passport, passport }),
+    });
+    expectNoSecrets(view);
+    expect(buttons(view, 'button[bitIconButton="bwi-clone"]')).toHaveLength(1);
   });
 
   it("password history: no link to it, and nothing in it", async () => {

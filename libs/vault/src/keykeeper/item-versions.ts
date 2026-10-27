@@ -10,6 +10,7 @@ import {
 } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { CipherRepromptType, CipherType, FieldType } from "@bitwarden/common/vault/enums";
 import { EXPIRES_FIELD_NAME } from "@bitwarden/common/vault/keykeeper/expiration";
+import { isSecretField, isSecretValue } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { visibleCustomFields } from "@bitwarden/common/vault/keykeeper/reserved-fields";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { Fido2CredentialView } from "@bitwarden/common/vault/models/view/fido2-credential.view";
@@ -142,8 +143,11 @@ function typeLabel(type: CipherType, t: Translate): string {
   }
 }
 
-/** Plain fields of a type's part of an item: [property, label key, secret]. */
-type Spec = [string, string, boolean?];
+/**
+ * A type's part of an item: [property, label key]. Which are secrets is the
+ * shared rule's (hidden-secrets.ts), as everywhere else.
+ */
+type Spec = [string, string];
 
 const IDENTITY: Spec[] = [
   ["title", "title"],
@@ -152,9 +156,9 @@ const IDENTITY: Spec[] = [
   ["lastName", "lastName"],
   ["username", "username"],
   ["company", "company"],
-  ["ssn", "ssn", true],
-  ["passportNumber", "passportNumber", true],
-  ["licenseNumber", "licenseNumber", true],
+  ["ssn", "ssn"],
+  ["passportNumber", "passportNumber"],
+  ["licenseNumber", "licenseNumber"],
   ["email", "email"],
   ["phone", "phone"],
   ["address1", "address1"],
@@ -166,7 +170,7 @@ const IDENTITY: Spec[] = [
   ["country", "country"],
 ];
 const SSH_KEY: Spec[] = [
-  ["privateKey", "sshPrivateKey", true],
+  ["privateKey", "sshPrivateKey"],
   ["publicKey", "sshPublicKey"],
   ["keyFingerprint", "sshFingerprint"],
 ];
@@ -174,12 +178,12 @@ const BANK_ACCOUNT: Spec[] = [
   ["bankName", "bankName"],
   ["nameOnAccount", "nameOnAccount"],
   ["accountType", "bankAccountType"],
-  ["accountNumber", "accountNumber", true],
+  ["accountNumber", "accountNumber"],
   ["routingNumber", "bankRoutingNumber"],
   ["branchNumber", "branchNumber"],
-  ["pin", "pin", true],
-  ["swiftCode", "swiftCode", true],
-  ["iban", "iban", true],
+  ["pin", "pin"],
+  ["swiftCode", "swiftCode"],
+  ["iban", "iban"],
   ["bankContactPhone", "bankContactPhone"],
 ];
 const DRIVERS_LICENSE: Spec[] = [
@@ -187,7 +191,7 @@ const DRIVERS_LICENSE: Spec[] = [
   ["middleName", "middleName"],
   ["lastName", "lastName"],
   ["dateOfBirth", "dateOfBirth"],
-  ["licenseNumber", "licenseNumber", true],
+  ["licenseNumber", "licenseNumber"],
   ["issuingCountry", "issuingCountry"],
   ["issuingState", "issuingState"],
   ["issueDate", "issueDate"],
@@ -203,9 +207,9 @@ const PASSPORT: Spec[] = [
   ["birthPlace", "birthPlace"],
   ["nationality", "nationality"],
   ["issuingCountry", "issuingCountry"],
-  ["passportNumber", "passportNumber", true],
+  ["passportNumber", "passportNumber"],
   ["passportType", "passportType"],
-  ["nationalIdentificationNumber", "nationalIdentificationNumber", true],
+  ["nationalIdentificationNumber", "nationalIdentificationNumber"],
   ["issuingAuthority", "issuingAuthority"],
   ["issueDate", "issueDate"],
   ["expirationDate", "expirationDate"],
@@ -213,11 +217,11 @@ const PASSPORT: Spec[] = [
 
 function plain(prefix: string, part: unknown, specs: Spec[], t: Translate): Entry[] {
   const values = (part ?? {}) as Record<string, unknown>;
-  return specs.map(([property, label, secret]) => ({
+  return specs.map(([property, label]) => ({
     key: `${prefix}.${property}`,
     label: t(label),
     value: text(values[property]),
-    secret: !!secret,
+    secret: isSecretValue(`${prefix}.${property}`),
   }));
 }
 
@@ -232,13 +236,23 @@ export function itemEntries(item: CipherView, t: Translate): Entry[] {
     case CipherType.Login: {
       const login = item.login;
       entries.push(
-        { key: "login.username", label: t("username"), value: text(login?.username) },
-        { key: "login.password", label: t("password"), value: text(login?.password), secret: true },
+        {
+          key: "login.username",
+          label: t("username"),
+          value: text(login?.username),
+          secret: isSecretValue("login.username"),
+        },
+        {
+          key: "login.password",
+          label: t("password"),
+          value: text(login?.password),
+          secret: isSecretValue("login.password"),
+        },
         {
           key: "login.totp",
           label: t("verificationCodeTotp"),
           value: text(login?.totp),
-          secret: true,
+          secret: isSecretValue("login.totp"),
         },
       );
       (login?.uris ?? []).forEach((uri, i) =>
@@ -262,11 +276,32 @@ export function itemEntries(item: CipherView, t: Translate): Entry[] {
           key: "card.cardholderName",
           label: t("cardholderName"),
           value: text(card?.cardholderName),
+          secret: isSecretValue("card.cardholderName"),
         },
-        { key: "card.brand", label: t("brand"), value: text(card?.brand) },
-        { key: "card.number", label: t("number"), value: text(card?.number), secret: true },
-        { key: "card.expiration", label: t("expiration"), value: expiration },
-        { key: "card.code", label: t("securityCode"), value: text(card?.code), secret: true },
+        {
+          key: "card.brand",
+          label: t("brand"),
+          value: text(card?.brand),
+          secret: isSecretValue("card.brand"),
+        },
+        {
+          key: "card.number",
+          label: t("number"),
+          value: text(card?.number),
+          secret: isSecretValue("card.number"),
+        },
+        {
+          key: "card.expiration",
+          label: t("expiration"),
+          value: expiration,
+          secret: isSecretValue("card.expiration"),
+        },
+        {
+          key: "card.code",
+          label: t("securityCode"),
+          value: text(card?.code),
+          secret: isSecretValue("card.code"),
+        },
       );
       break;
     }
@@ -307,7 +342,7 @@ export function itemEntries(item: CipherView, t: Translate): Entry[] {
       key: `field.${name}.${n}`,
       label: name,
       value,
-      secret: field.type === FieldType.Hidden,
+      secret: isSecretField(field.type),
     });
   }
 

@@ -4,6 +4,7 @@ import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormBuilder, FormGroup, ReactiveFormsModule } from "@angular/forms";
 
 import { JslibModule } from "@bitwarden/angular/jslib.module";
+import { mayShow } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { DriversLicenseView } from "@bitwarden/common/vault/models/view/drivers-license.view";
 import {
@@ -63,6 +64,16 @@ export class DriversLicenseSectionComponent implements OnInit {
     this.driversLicenseForm.valueChanges
       .pipe(takeUntilDestroyed())
       .subscribe((value) => this.updateCipherFromFormValue(value));
+  }
+
+  /**
+   * Keykeeper: whether the person may see one of the item's values
+   * (`part.property`): every value but the plain ones is hidden from someone
+   * who can't see the item's passwords, so its reveal toggle doesn't show
+   * (DESIGN.md, "Folders and permissions"). A new item is theirs.
+   */
+  protected canSee(key: string): boolean {
+    return mayShow(this.originalCipherView(), key);
   }
 
   ngOnInit() {

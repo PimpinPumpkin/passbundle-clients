@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, input } from "@angular/core";
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
+import { mayCopy } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import {
   CipherViewLike,
   CipherViewLikeUtils,
@@ -19,6 +20,19 @@ type CipherItem = {
   /** Property key on `CipherView` to retrieve the copy value */
   field: CopyFieldAction;
 };
+/** Keykeeper: the list view's copyable fields whose copy the person may make. */
+function copyableOnly(
+  cipher: CipherViewLike,
+  fields: [CopyableCipherFields, CopyFieldAction][],
+): CopyableCipherFields[] {
+  return fields.filter(([, action]) => mayCopy(cipher, action)).map(([field]) => field);
+}
+
+/** Keykeeper: how many of these values there are that the person may copy. */
+function valuesOnly(cipher: CipherViewLike, values: [CopyFieldAction, unknown][]): number {
+  return values.filter(([action, value]) => !!value && mayCopy(cipher, action)).length;
+}
+
 @Component({
   selector: "vault-item-copy-actions",
   templateUrl: "./item-copy-actions.component.html",
@@ -127,8 +141,9 @@ export class VaultItemCopyActionsComponent {
    * return it with the translated key. Otherwise return null.
    */
   findSingleCopyableItem(cipher: CipherViewLike, items: CipherItem[]): CipherItem | null {
-    const itemsWithValue = items.filter(({ field }) =>
-      CipherViewLikeUtils.hasCopyableValue(cipher, field),
+    // Keykeeper: never a secret the person can't see (DESIGN.md, "Folders and permissions").
+    const itemsWithValue = items.filter(
+      ({ field }) => mayCopy(cipher, field) && CipherViewLikeUtils.hasCopyableValue(cipher, field),
     );
 
     return itemsWithValue.length === 1
@@ -223,20 +238,20 @@ export class VaultItemCopyActionsComponent {
   /** Sets the number of populated passport values for the cipher */
   private getNumberOfPassportValues(cipher: CipherViewLike) {
     if (CipherViewLikeUtils.isCipherListView(cipher)) {
-      const copyablePassportFields: CopyableCipherFields[] = [
-        "PassportGivenName",
-        "PassportSurname",
-        "PassportPassportNumber",
-        "PassportNationalIdentificationNumber",
-      ];
+      const copyablePassportFields = copyableOnly(cipher, [
+        ["PassportGivenName", "givenName"],
+        ["PassportSurname", "surname"],
+        ["PassportPassportNumber", "passportNumber"],
+        ["PassportNationalIdentificationNumber", "nationalIdentificationNumber"],
+      ]);
       return cipher.copyableFields.filter((field) => copyablePassportFields.includes(field)).length;
     }
-    return [
-      cipher.passport?.givenName,
-      cipher.passport?.surname,
-      cipher.passport?.passportNumber,
-      cipher.passport?.nationalIdentificationNumber,
-    ].filter(Boolean).length;
+    return valuesOnly(cipher, [
+      ["givenName", cipher.passport?.givenName],
+      ["surname", cipher.passport?.surname],
+      ["passportNumber", cipher.passport?.passportNumber],
+      ["nationalIdentificationNumber", cipher.passport?.nationalIdentificationNumber],
+    ]);
   }
 
   /** Sets the number of populated SSH key values for the cipher */
@@ -256,50 +271,50 @@ export class VaultItemCopyActionsComponent {
   /** Sets the number of populated bank account values for the cipher */
   private getNumberOfBankAccountValues(cipher: CipherViewLike) {
     if (CipherViewLikeUtils.isCipherListView(cipher)) {
-      const copyableBankAccountFields: CopyableCipherFields[] = [
-        "BankAccountNameOnAccount",
-        "BankAccountAccountNumber",
-        "BankAccountRoutingNumber",
-        "BankAccountBranchNumber",
-        "BankAccountPin",
-        "BankAccountIban",
-        "BankAccountSwift",
-      ];
+      const copyableBankAccountFields = copyableOnly(cipher, [
+        ["BankAccountNameOnAccount", "nameOnAccount"],
+        ["BankAccountAccountNumber", "accountNumber"],
+        ["BankAccountRoutingNumber", "routingNumber"],
+        ["BankAccountBranchNumber", "branchNumber"],
+        ["BankAccountPin", "pin"],
+        ["BankAccountIban", "iban"],
+        ["BankAccountSwift", "swiftCode"],
+      ]);
 
       return cipher.copyableFields.filter((field) => copyableBankAccountFields.includes(field))
         .length;
     }
 
-    return [
-      cipher.bankAccount.nameOnAccount,
-      cipher.bankAccount.accountNumber,
-      cipher.bankAccount.routingNumber,
-      cipher.bankAccount.branchNumber,
-      cipher.bankAccount.pin,
-      cipher.bankAccount.iban,
-      cipher.bankAccount.swiftCode,
-    ].filter(Boolean).length;
+    return valuesOnly(cipher, [
+      ["nameOnAccount", cipher.bankAccount.nameOnAccount],
+      ["accountNumber", cipher.bankAccount.accountNumber],
+      ["routingNumber", cipher.bankAccount.routingNumber],
+      ["branchNumber", cipher.bankAccount.branchNumber],
+      ["pin", cipher.bankAccount.pin],
+      ["iban", cipher.bankAccount.iban],
+      ["swiftCode", cipher.bankAccount.swiftCode],
+    ]);
   }
 
   /** Sets the number of populated drivers license values for the cipher */
   private getNumberOfDriversLicenseValues(cipher: CipherViewLike) {
     if (CipherViewLikeUtils.isCipherListView(cipher)) {
-      const copyableDriversLicenseFields: CopyableCipherFields[] = [
-        "DriversLicenseFirstName",
-        "DriversLicenseMiddleName",
-        "DriversLicenseLastName",
-        "DriversLicenseLicenseNumber",
-      ];
+      const copyableDriversLicenseFields = copyableOnly(cipher, [
+        ["DriversLicenseFirstName", "firstNameLicense"],
+        ["DriversLicenseMiddleName", "middleNameLicense"],
+        ["DriversLicenseLastName", "lastNameLicense"],
+        ["DriversLicenseLicenseNumber", "licenseNumber"],
+      ]);
 
       return cipher.copyableFields.filter((field) => copyableDriversLicenseFields.includes(field))
         .length;
     }
 
-    return [
-      cipher.driversLicense?.firstName,
-      cipher.driversLicense?.middleName,
-      cipher.driversLicense?.lastName,
-      cipher.driversLicense?.licenseNumber,
-    ].filter(Boolean).length;
+    return valuesOnly(cipher, [
+      ["firstNameLicense", cipher.driversLicense?.firstName],
+      ["middleNameLicense", cipher.driversLicense?.middleName],
+      ["lastNameLicense", cipher.driversLicense?.lastName],
+      ["licenseNumber", cipher.driversLicense?.licenseNumber],
+    ]);
   }
 }

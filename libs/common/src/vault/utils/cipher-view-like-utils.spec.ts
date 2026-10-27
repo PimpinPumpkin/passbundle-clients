@@ -317,6 +317,31 @@ describe("CipherViewLikeUtils", () => {
         const noBrand = { ...hidden, subtitle: "*4242" } as CipherListView;
         expect(CipherViewLikeUtils.subtitle(noBrand)).toBeUndefined();
       });
+
+      it("leaves a bank account's last digits out too", () => {
+        const i18nService = mock<I18nService>();
+        i18nService.t.mockImplementation((key: string) => `translated:${key}`);
+        const cipherView = createCipherView(CipherType.BankAccount);
+        cipherView.bankAccount = Object.assign(new BankAccountView(), {
+          bankName: "Bank of America",
+          accountType: BankAccountType.Checking,
+          accountNumber: "987651234",
+        });
+        cipherView.viewPassword = false;
+        expect(CipherViewLikeUtils.subtitle(cipherView, i18nService)).toBe(
+          "translated:bankAccountTypeChecking",
+        );
+        cipherView.bankAccount.accountType = undefined;
+        expect(CipherViewLikeUtils.subtitle(cipherView, i18nService)).toBe("Bank of America");
+
+        const listView = {
+          type: { bankAccount: { accountNumber: "987651234", accountType: undefined } },
+          subtitle: "*1234",
+          viewPassword: false,
+        } as unknown as CipherListView;
+        expect(CipherViewLikeUtils.subtitle(listView, i18nService)).toBeUndefined();
+        expect(CipherViewLikeUtils.subtitle(listView)).toBeUndefined();
+      });
     });
 
     describe("bank account with i18nService", () => {

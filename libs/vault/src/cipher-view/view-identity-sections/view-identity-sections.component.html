@@ -83,88 +83,99 @@
     <read-only-cipher-card>
       @if (cipher.identity.ssn) {
         <bit-form-field>
-          <bit-label [appTextDrag]="cipher.identity.ssn">{{ "ssn" | i18n }}</bit-label>
+          <bit-label [appTextDrag]="canSee('identity.ssn') ? cipher.identity.ssn : ''">{{
+            "ssn" | i18n
+          }}</bit-label>
           <input
             bitInput
             id="ssn"
             type="password"
-            [value]="cipher.identity.ssn"
+            [value]="canSee('identity.ssn') ? cipher.identity.ssn : mask"
             readonly
             data-testid="ssn"
           />
-          <button
-            type="button"
-            bitIconButton
-            bitSuffix
-            bitPasswordInputToggle
-            data-testid="ssn-toggle"
-          ></button>
-          <button
-            type="button"
-            bitIconButton="bwi-clone"
-            bitSuffix
-            [label]="'copySSN' | i18n"
-            [appCopyClick]="cipher.identity.ssn"
-            showToast
-            [valueLabel]="'ssn' | i18n"
-            data-testid="copy-ssn"
-          ></button>
+          @if (canSee("identity.ssn")) {
+            <button
+              type="button"
+              bitIconButton
+              bitSuffix
+              bitPasswordInputToggle
+              data-testid="ssn-toggle"
+            ></button>
+            <button
+              type="button"
+              bitIconButton="bwi-clone"
+              bitSuffix
+              [label]="'copySSN' | i18n"
+              [appCopyClick]="cipher.identity.ssn"
+              showToast
+              [valueLabel]="'ssn' | i18n"
+              data-testid="copy-ssn"
+            ></button>
+          }
         </bit-form-field>
       }
       @if (cipher.identity.passportNumber) {
         <bit-form-field>
-          <bit-label [appTextDrag]="cipher.identity.passportNumber">{{
-            "passportNumber" | i18n
-          }}</bit-label>
+          <bit-label
+            [appTextDrag]="canSee('identity.passportNumber') ? cipher.identity.passportNumber : ''"
+            >{{ "passportNumber" | i18n }}</bit-label
+          >
           <input
             id="passportNumber"
             bitInput
             type="password"
-            [value]="cipher.identity.passportNumber"
+            [value]="canSee('identity.passportNumber') ? cipher.identity.passportNumber : mask"
             readonly
             data-testid="passport"
           />
-          <button
-            type="button"
-            bitIconButton
-            bitSuffix
-            bitPasswordInputToggle
-            data-testid="passport-toggle"
-          ></button>
-          <button
-            type="button"
-            bitIconButton="bwi-clone"
-            bitSuffix
-            [label]="'copyPassportNumber' | i18n"
-            [appCopyClick]="cipher.identity.passportNumber"
-            showToast
-            [valueLabel]="'passportNumber' | i18n"
-            data-testid="copy-passport"
-          ></button>
+          @if (canSee("identity.passportNumber")) {
+            <button
+              type="button"
+              bitIconButton
+              bitSuffix
+              bitPasswordInputToggle
+              data-testid="passport-toggle"
+            ></button>
+            <button
+              type="button"
+              bitIconButton="bwi-clone"
+              bitSuffix
+              [label]="'copyPassportNumber' | i18n"
+              [appCopyClick]="cipher.identity.passportNumber"
+              showToast
+              [valueLabel]="'passportNumber' | i18n"
+              data-testid="copy-passport"
+            ></button>
+          }
         </bit-form-field>
       }
       @if (cipher.identity.licenseNumber) {
         <bit-form-field>
-          <bit-label [appTextDrag]="cipher.identity.licenseNumber">{{
-            "licenseNumber" | i18n
-          }}</bit-label>
+          <bit-label
+            [appTextDrag]="canSee('identity.licenseNumber') ? cipher.identity.licenseNumber : ''"
+            >{{ "licenseNumber" | i18n }}</bit-label
+          >
           <input
+            [type]="canSee('identity.licenseNumber') ? 'text' : 'password'"
             bitInput
             id="licenseNumber"
-            [value]="cipher.identity.licenseNumber"
+            [value]="canSee('identity.licenseNumber') ? cipher.identity.licenseNumber : mask"
             readonly
             data-testid="license"
           />
-          <button
-            type="button"
-            bitIconButton="bwi-clone"
-            bitSuffix
-            [label]="'copyLicenseNumber' | i18n"
-            [appCopyClick]="cipher.identity.licenseNumber"
-            showToast
-            [valueLabel]="'licenseNumber' | i18n"
-            data-testid="copy-license"
-          ></button>
+          @if (canSee("identity.licenseNumber")) {
+            <button
+              type="button"
+              bitIconButton="bwi-clone"
+              bitSuffix
+              [label]="'copyLicenseNumber' | i18n"
+              [appCopyClick]="cipher.identity.licenseNumber"
+              showToast
+              [valueLabel]="'licenseNumber' | i18n"
+              data-testid="copy-license"
+            ></button>
+          }
         </bit-form-field>
       }
     </read-only-cipher-card>

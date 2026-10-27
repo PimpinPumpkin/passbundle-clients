@@ -11,6 +11,7 @@ import { AbstractControl, FormBuilder, ReactiveFormsModule } from "@angular/form
 
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { BankAccountType } from "@bitwarden/common/vault/enums/bank-account-type";
+import { mayShow } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { BankAccountView } from "@bitwarden/common/vault/models/view/bank-account.view";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
@@ -109,6 +110,16 @@ export class BankAccountSectionComponent implements OnInit {
         return cipher;
       });
     });
+  }
+
+  /**
+   * Keykeeper: whether the person may see one of the item's values
+   * (`part.property`): every value but the plain ones is hidden from someone
+   * who can't see the item's passwords, so its reveal toggle doesn't show
+   * (DESIGN.md, "Folders and permissions"). A new item is theirs.
+   */
+  protected canSee(key: string): boolean {
+    return mayShow(this.originalCipherView(), key);
   }
 
   ngOnInit() {

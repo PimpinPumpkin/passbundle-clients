@@ -159,10 +159,12 @@ export class CipherViewLikeUtils {
    */
   static subtitle = (cipher: CipherViewLike, i18nService?: I18nService): string | undefined => {
     let baseSubtitle = this.isCipherListView(cipher) ? cipher.subtitle : cipher.subTitle;
-    // Keykeeper: without see passwords, a card's subtitle is its brand, not
-    // its last digits (DESIGN.md, "Folders and permissions").
+    // Keykeeper: without see passwords, a card's or bank account's subtitle
+    // leaves out the last digits of its number (DESIGN.md, "Folders and
+    // permissions").
+    const type = this.getType(cipher);
     if (
-      this.getType(cipher) === CipherType.Card &&
+      (type === CipherType.Card || type === CipherType.BankAccount) &&
       cipher.viewPassword === false &&
       baseSubtitle != null
     ) {
@@ -173,7 +175,7 @@ export class CipherViewLikeUtils {
       return baseSubtitle;
     }
 
-    switch (this.getType(cipher)) {
+    switch (type) {
       case CipherType.BankAccount: {
         const bankAccountSubtitle = this.bankAccountSubtitle(cipher, i18nService);
         return bankAccountSubtitle ?? baseSubtitle;
@@ -213,7 +215,10 @@ export class CipherViewLikeUtils {
     const translatedAccountType = accountTypeKey ? i18nService.t(accountTypeKey) : undefined;
 
     let shownDigits: string | undefined = undefined;
-    if (bankAccount.accountNumber && bankAccount.accountNumber?.length > 4) {
+    // Keykeeper: the account number's digits only for someone who can see it.
+    if (cipher.viewPassword === false) {
+      shownDigits = undefined;
+    } else if (bankAccount.accountNumber && bankAccount.accountNumber?.length > 4) {
       shownDigits = bankAccount.accountNumber?.slice(-4);
     } else if (bankAccount.accountNumber && bankAccount.accountNumber?.length > 1) {
       const length = bankAccount.accountNumber?.length;

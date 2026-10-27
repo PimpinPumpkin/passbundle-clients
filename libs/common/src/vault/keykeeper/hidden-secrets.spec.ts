@@ -1,15 +1,23 @@
 import { FieldType } from "../enums";
+import { BankAccountView } from "../models/view/bank-account.view";
 import { CardView } from "../models/view/card.view";
 import { CipherView } from "../models/view/cipher.view";
 import { FieldView } from "../models/view/field.view";
+import { IdentityView } from "../models/view/identity.view";
+import { PassportView } from "../models/view/passport.view";
 import { SshKeyView } from "../models/view/ssh-key.view";
 
 import {
   clearHiddenSecrets,
-  HIDDEN_SECRET_ACTIONS,
   HIDDEN_VALUE_MASK,
+  isSecretCopyAction,
+  isSecretField,
+  isSecretValue,
+  ITEM_VALUES,
   mayCopy,
+  mayShow,
   maySeeSecrets,
+  PLAIN_VALUES,
   shownSecret,
 } from "./hidden-secrets";
 
@@ -21,20 +29,82 @@ describe("hidden secrets", () => {
     expect(maySeeSecrets({ viewPassword: false })).toBe(false);
   });
 
-  it("covers the password, one-time codes, a card's number and code, SSH private keys, and hidden fields", () => {
-    expect([...HIDDEN_SECRET_ACTIONS].sort()).toEqual(
-      ["cardNumber", "hiddenField", "password", "privateKey", "securityCode", "totp"].sort(),
+  // The apps' rule (passbundle-apps, core/src/vault.rs, Item::is_secret).
+  it("hides every value but the plain ones, as the apps do", () => {
+    const secrets = Object.entries(ITEM_VALUES)
+      .flatMap(([part, properties]) => properties.map((p) => `${part}.${p}`))
+      .filter(isSecretValue)
+      .sort();
+    expect(secrets).toEqual(
+      [
+        "bankAccount.accountNumber",
+        "bankAccount.iban",
+        "bankAccount.pin",
+        "bankAccount.swiftCode",
+        "card.code",
+        "card.number",
+        "driversLicense.licenseNumber",
+        "identity.licenseNumber",
+        "identity.passportNumber",
+        "identity.ssn",
+        "login.password",
+        "login.totp",
+        "passport.nationalIdentificationNumber",
+        "passport.passportNumber",
+        "sshKey.privateKey",
+      ].sort(),
     );
   });
 
-  it("refuses copying a secret without see passwords, and allows the rest", () => {
+  it("calls a value no one has listed yet a secret", () => {
+    expect(isSecretValue("bankAccount.cvv")).toBe(true);
+    expect(isSecretValue("someNewKind.anything")).toBe(true);
+    // Every plain value is one an item has, or one the views name.
+    for (const key of PLAIN_VALUES) {
+      expect(isSecretValue(key)).toBe(false);
+    }
+  });
+
+  it("hides hidden custom fields and any kind not known to be plain", () => {
+    expect(isSecretField(FieldType.Hidden)).toBe(true);
+    expect(isSecretField(FieldType.Text)).toBe(false);
+    expect(isSecretField(FieldType.Boolean)).toBe(false);
+    expect(isSecretField(FieldType.Linked)).toBe(false);
+    expect(isSecretField(99 as FieldType)).toBe(true);
+    expect(isSecretField(undefined)).toBe(true);
+  });
+
+  it("refuses copying a secret without see passwords, and allows the plain ones", () => {
     const hidden = { viewPassword: false };
-    for (const action of HIDDEN_SECRET_ACTIONS) {
+    for (const action of [
+      "password",
+      "totp",
+      "cardNumber",
+      "securityCode",
+      "privateKey",
+      "hiddenField",
+      "accountNumber",
+      "pin",
+      "iban",
+      "swiftCode",
+      "licenseNumber",
+      "passportNumber",
+      "nationalIdentificationNumber",
+      "someFutureAction",
+    ]) {
+      expect(isSecretCopyAction(action)).toBe(true);
       expect(mayCopy(hidden, action)).toBe(false);
       expect(mayCopy({ viewPassword: true }, action)).toBe(true);
     }
-    expect(mayCopy(hidden, "username")).toBe(true);
-    expect(mayCopy(hidden, "publicKey")).toBe(true);
+    for (const action of ["username", "email", "phone", "address", "publicKey", "routingNumber"]) {
+      expect(mayCopy(hidden, action)).toBe(true);
+    }
+  });
+
+  it("shows a plain value to anyone, and a secret only with see passwords", () => {
+    expect(mayShow({ viewPassword: false }, "identity.email")).toBe(true);
+    expect(mayShow({ viewPassword: false }, "identity.ssn")).toBe(false);
+    expect(mayShow({ viewPassword: true }, "identity.ssn")).toBe(true);
   });
 
   it("shows the mask in place of a hidden value, and nothing for an empty one", () => {
@@ -68,8 +138,18 @@ describe("hidden secrets", () => {
     });
     item.fields = [hidden, text];
 
+    item.identity = Object.assign(new IdentityView(), { ssn: "123-45-6789", email: "a@b.test" });
+    item.bankAccount = Object.assign(new BankAccountView(), { pin: "4421", bankName: "First" });
+    item.passport = Object.assign(new PassportView(), { passportNumber: "X1", surname: "Reyes" });
+
     clearHiddenSecrets(item);
 
+    expect(item.identity.ssn).toBeUndefined();
+    expect(item.identity.email).toBe("a@b.test");
+    expect(item.bankAccount.pin).toBeUndefined();
+    expect(item.bankAccount.bankName).toBe("First");
+    expect(item.passport.passportNumber).toBeUndefined();
+    expect(item.passport.surname).toBe("Reyes");
     expect(item.login.username).toBe("frontdesk");
     expect(item.login.password).toBeUndefined();
     expect(item.login.totp).toBeUndefined();

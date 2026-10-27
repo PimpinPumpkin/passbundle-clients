@@ -29,7 +29,9 @@
         type="password"
         class="tw-font-mono"
       />
-      <button type="button" bitIconButton bitSuffix bitPasswordInputToggle></button>
+      @if (canSee("driversLicense.licenseNumber")) {
+        <button type="button" bitIconButton bitSuffix bitPasswordInputToggle></button>
+      }
     </bit-form-field>
 
     <vault-date-field-group
