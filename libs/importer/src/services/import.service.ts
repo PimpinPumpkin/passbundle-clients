@@ -39,6 +39,7 @@ import {
   AvastJsonImporter,
   AviraCsvImporter,
   BitwardenCsvImporter,
+  BitwardenJsonImporter,
   BitwardenPasswordProtectedImporter,
   BlackBerryCsvImporter,
   BlurCsvImporter,
@@ -117,6 +118,7 @@ import {
 } from "../sdk";
 import { ImportApiServiceAbstraction } from "../services/import-api.service.abstraction";
 import { ImportServiceAbstraction } from "../services/import.service.abstraction";
+import { guardReservedFields, ImportSource } from "../services/keykeeper/reserved-fields";
 
 export class ImportService implements ImportServiceAbstraction {
   featuredImportOptions = featuredImportOptions as readonly ImportOption[];
@@ -160,8 +162,10 @@ export class ImportService implements ImportServiceAbstraction {
       throw error;
     }
 
-    return this.importImportResult(
+    return this.importParsed(
       importResult,
+      // Keykeeper: our own .json export may bring our fields back (reserved-fields.ts).
+      importer instanceof BitwardenJsonImporter ? "ours" : "other",
       organizationId,
       selectedImportTarget,
       canAccessImportExport,
@@ -170,6 +174,23 @@ export class ImportService implements ImportServiceAbstraction {
 
   async importImportResult(
     importResult: ImportResult,
+    organizationId: OrganizationId = null,
+    selectedImportTarget: FolderView | CollectionView = null,
+    canAccessImportExport: boolean = false,
+  ): Promise<ImportResult> {
+    // Keykeeper: a result parsed elsewhere (a browser's export) is never ours.
+    return this.importParsed(
+      importResult,
+      "other",
+      organizationId,
+      selectedImportTarget,
+      canAccessImportExport,
+    );
+  }
+
+  private async importParsed(
+    importResult: ImportResult,
+    source: ImportSource,
     organizationId: OrganizationId = null,
     selectedImportTarget: FolderView | CollectionView = null,
     canAccessImportExport: boolean = false,
@@ -208,6 +229,9 @@ export class ImportService implements ImportServiceAbstraction {
     importResult.ciphers = importResult.ciphers.filter(
       (cipher) => !restrictedItemTypes.includes(cipher.type),
     );
+
+    // Keykeeper: no import plants our own fields (fill rules, template markers).
+    guardReservedFields(importResult, source);
 
     if (organizationId && !selectedImportTarget && !canAccessImportExport) {
       const hasUnassignedCollections =

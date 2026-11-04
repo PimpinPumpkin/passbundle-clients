@@ -59,7 +59,17 @@ export class DashlaneCsvImporter extends BaseImporter implements Importer {
       return Promise.resolve(result);
     }
 
-    if (results[0].type != null && results[0].title != null) {
+    // Keykeeper: which of Dashlane's files this is, by the columns it has
+    // rather than their order or what the first row holds: a payments file
+    // with a title column is cards, not personal info. A file that's none of
+    // them doesn't import as empty items.
+    const kind = this.fileKind(Object.keys(results[0]));
+    if (kind == null) {
+      result.success = false;
+      return Promise.resolve(result);
+    }
+
+    if (kind === "personalInfo") {
       // Keykeeper: an identity for each person, however many there are.
       this.peopleOf(results as PersonalInformationRecord[]).forEach((rows) => {
         const cipher = this.initLoginCipher();
@@ -81,26 +91,20 @@ export class DashlaneCsvImporter extends BaseImporter implements Importer {
     results.forEach((row) => {
       const cipher = this.initLoginCipher();
 
-      const rowKeys = Object.keys(row);
-      if (rowKeys[0] === "username") {
-        this.processFolder(result, row.category);
-        this.parseCredentialsRecord(cipher, row);
-      }
-
-      if (rowKeys[0] === "type" && rowKeys[1] === "account_name") {
-        this.parsePaymentRecord(cipher, row);
-      }
-
-      if (rowKeys[0] === "type" && rowKeys[1] === "number") {
-        this.parseIdRecord(cipher, row);
-      }
-
-      if (rowKeys[0] === "type" && rowKeys[1] === "title") {
-        this.parsePersonalInformationRecord(cipher, row);
-      }
-
-      if (rowKeys[0] === "title" && rowKeys[1] === "note") {
-        this.parseSecureNoteRecords(cipher, row);
+      switch (kind) {
+        case "credentials":
+          this.processFolder(result, row.category);
+          this.parseCredentialsRecord(cipher, row);
+          break;
+        case "payments":
+          this.parsePaymentRecord(cipher, row);
+          break;
+        case "ids":
+          this.parseIdRecord(cipher, row);
+          break;
+        case "secureNotes":
+          this.parseSecureNoteRecords(cipher, row);
+          break;
       }
 
       this.convertToNoteIfNeeded(cipher);
@@ -130,7 +134,42 @@ export class DashlaneCsvImporter extends BaseImporter implements Importer {
     this.importUnmappedFields(cipher, row, _mappedCredentialsColumns);
   }
 
+  /** Keykeeper: which of Dashlane's CSV files has these columns, or null for none of them. */
+  private fileKind(
+    columns: string[],
+  ): "credentials" | "payments" | "ids" | "personalInfo" | "secureNotes" | null {
+    const has = (...names: string[]) => names.every((n) => columns.includes(n));
+    if (has("username", "password")) {
+      return "credentials";
+    }
+    if (has("type") && (has("cc_number") || has("account_holder") || has("account_number"))) {
+      return "payments";
+    }
+    if (has("type", "number", "name")) {
+      return "ids";
+    }
+    if (
+      has("type") &&
+      ["first_name", "last_name", "email", "phone_number", "address"].some((n) => has(n))
+    ) {
+      return "personalInfo";
+    }
+    if (has("title", "note")) {
+      return "secureNotes";
+    }
+    return null;
+  }
+
   parsePaymentRecord(cipher: CipherView, row: PaymentsRecord) {
+    // Keykeeper: a payment of a kind that isn't a card or a bank account is a
+    // secure note with its fields, not an empty card.
+    if (row.type !== "credit_card" && row.type !== "bank") {
+      cipher.type = CipherType.SecureNote;
+      cipher.secureNote.type = SecureNoteType.Generic;
+      cipher.name = this.getValueOrDefault(row.account_name, row.type);
+      this.importUnmappedFields(cipher, row, new Set(["account_name"]));
+      return;
+    }
     cipher.type = CipherType.Card;
     cipher.card = new CardView();
 

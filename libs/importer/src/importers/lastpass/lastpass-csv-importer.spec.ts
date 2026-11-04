@@ -224,6 +224,21 @@ Notes:",Zoë,,0`);
     expect(plain.fields).toEqual([]);
   });
 
+  it("reads a long phone value at once, as it is (Keykeeper)", async () => {
+    // A pattern took seconds on this, growing with the length squared.
+    const long = "{" + '""num""'.repeat(20000);
+    const started = Date.now();
+    const result = await new LastPassCsvImporter()
+      .parse(`url,username,password,totp,extra,name,grouping,fav
+http://sn,,,,"NoteType:Address
+First Name:Test
+Phone:${long}
+Notes:",Test Person,,0`);
+
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(result.ciphers[0].identity.phone).toBe(long.replace(/""/g, '"'));
+  });
+
   it("should parse login with totp", async () => {
     const input = `url,username,password,totp,extra,name,grouping,fav
         http://example.com,someUser,myPassword,Y64VEVMBTSXCYIWRSHRNDZW62MPGVU2G,super secure notes,example.com,,0`;

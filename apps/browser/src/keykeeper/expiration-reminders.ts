@@ -2,7 +2,9 @@
 // every few hours while the vault is unlocked and shows a browser notification
 // at 30, 7, and 1 day before an item expires, and once when it has expired.
 // Nothing leaves the device; what was already shown is remembered on it, per
-// account and cleared at logout, so each step notifies once.
+// account and cleared at logout, so each step notifies once. The notification
+// says how many items, never which: the system shows it on the lock screen and
+// in its notification history, outside the vault.
 
 import { firstValueFrom } from "rxjs";
 
@@ -13,7 +15,6 @@ import { getOptionalUserId } from "@bitwarden/common/auth/services/account.servi
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import {
   ExpirationStatus,
-  expirationLabel,
   expirationStatus,
   itemExpiration,
 } from "@bitwarden/common/vault/keykeeper/expiration";
@@ -98,7 +99,7 @@ export class KeykeeperExpirationReminders {
     });
   }
 
-  /** Looks for items to remind about and notifies. Returns the titles shown. */
+  /** Looks for items to remind about and notifies, once for all of them. Returns the titles shown. */
   async check(now: Date = new Date()): Promise<string[]> {
     if ((await this.authService.getAuthStatus()) !== AuthenticationStatus.Unlocked) {
       return [];
@@ -110,7 +111,7 @@ export class KeykeeperExpirationReminders {
 
     const state = this.stateProvider.getUser(userId, SHOWN_REMINDERS);
     const shown: ShownReminders = { ...((await firstValueFrom(state.state$)) ?? {}) };
-    const titles: string[] = [];
+    const due: ReminderLevel[] = [];
     for (const cipher of await this.cipherService.getAllDecrypted(userId)) {
       const expires = itemExpiration(cipher);
       if (!cipher.id || cipher.isDeleted || !expires) {
@@ -122,18 +123,43 @@ export class KeykeeperExpirationReminders {
       if (!level || !shouldRemind(shown[cipher.id], date, level)) {
         continue;
       }
-      const title = `${cipher.name}: ${expirationLabel(status).toLowerCase()}`;
-      await chrome.notifications.create(`${REMINDER_ALARM}-${cipher.id}`, {
-        type: "basic",
-        iconUrl: chrome.runtime.getURL("images/icon128.png"),
-        title,
-        message: "Renew or rotate it, then update its expiration date.",
-        priority: 1,
-      });
       shown[cipher.id] = { date, level };
-      titles.push(title);
+      due.push(level);
     }
+    if (!due.length) {
+      return [];
+    }
+    const { title, message } = reminderText(due);
+    // One notification, which a newer one replaces.
+    await chrome.notifications.create(`${REMINDER_ALARM}-items`, {
+      type: "basic",
+      iconUrl: chrome.runtime.getURL("images/icon128.png"),
+      title,
+      message,
+      priority: 1,
+    });
     await state.update(() => shown);
-    return titles;
+    return [title];
   }
+}
+
+/**
+ * What a reminder says: how many items, and whether they expire soon or
+ * already have. Never an item's name.
+ */
+export function reminderText(levels: ReminderLevel[]): { title: string; message: string } {
+  const count = levels.length;
+  const expired = levels.filter((level) => level === "expired").length;
+  const items = count === 1 ? "1 item" : `${count} items`;
+  const title =
+    expired === count
+      ? `${items} ${count === 1 ? "has" : "have"} expired`
+      : expired === 0
+        ? `${items} ${count === 1 ? "expires" : "expire"} soon`
+        : `${items} expire soon or have expired`;
+  const message =
+    count === 1
+      ? "Open your vault to see which. Renew or rotate it, then update its expiration date."
+      : "Open your vault to see which. Renew or rotate them, then update their expiration dates.";
+  return { title, message };
 }

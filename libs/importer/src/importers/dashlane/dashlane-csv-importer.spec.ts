@@ -119,6 +119,37 @@ describe("Dashlane CSV Importer", () => {
     ]);
   });
 
+  // Keykeeper: which file it is comes from its columns, not their order.
+  it("should keep cards as cards when the payments file has a title column, in any order", async () => {
+    const result = await importer.parse(
+      [
+        "title,type,account_name,account_holder,cc_number,code,expiration_month,expiration_year,country",
+        "Travel card,credit_card,Test Person,,5555555555554444,321,01,2029,US",
+        "Savings,bank,Test Bank,Test Person,,,,,US",
+        ",paypal,Test PayPal,,,,,,US",
+      ].join("\n"),
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.ciphers.map((c) => [c.type, c.name])).toEqual([
+      [CipherType.Card, "Travel card"],
+      [CipherType.Card, "Test Bank"],
+      [CipherType.SecureNote, "Test PayPal"],
+    ]);
+    expect(result.ciphers[0].card.number).toBe("5555555555554444");
+    expect(result.ciphers[2].fields.map((f) => [f.name, f.value])).toEqual([
+      ["type", "paypal"],
+      ["country", "US"],
+    ]);
+  });
+
+  it("should refuse a file that isn't one of Dashlane's, rather than import empty items", async () => {
+    const result = await importer.parse(["kind,label,secret", "x,y,z"].join("\n"));
+
+    expect(result.success).toBe(false);
+    expect(result.ciphers).toEqual([]);
+  });
+
   it("should parse ids records", async () => {
     const result = await importer.parse(identityData);
 

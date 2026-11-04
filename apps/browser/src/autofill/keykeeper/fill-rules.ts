@@ -12,9 +12,11 @@ import {
   FILL_RULE_FIELD_NAME,
   FillRule,
   FillSource,
-  isFillRule,
+  parseFillRule,
   readFillRules,
-  sameField,
+  RuleScheme,
+  sameRuleTarget,
+  schemeOf,
 } from "@bitwarden/common/vault/keykeeper/fill-rules";
 import {
   isSecretCustomField,
@@ -40,6 +42,22 @@ export function hostOf(url: string | null | undefined): string {
   } catch {
     return "";
   }
+}
+
+/** A page's scheme when it's one rules fill on (http or https), or null. */
+export function schemeOfUrl(url: string | null | undefined): RuleScheme | null {
+  try {
+    const protocol = new URL(url ?? "").protocol;
+    return protocol === "https:" ? "https" : protocol === "http:" ? "http" : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether a rule made for a site applies on the page at `url`: the same scheme and host. */
+export function ruleAppliesOn(rule: FillRule, url: string | null | undefined): boolean {
+  const host = hostOf(url);
+  return rule.host != null && host !== "" && rule.host === host && schemeOf(rule) === schemeOfUrl(url);
 }
 
 const normalize = (text: string | null | undefined) =>
@@ -143,16 +161,8 @@ export function upsertFillRule(cipher: CipherView, rule: FillRule): void {
     if (field.name !== FILL_RULE_FIELD_NAME) {
       return true;
     }
-    try {
-      const existing = JSON.parse(field.value ?? "");
-      return !(
-        isFillRule(existing) &&
-        (existing.host ?? null) === (rule.host ?? null) &&
-        sameField(existing.field, rule.field)
-      );
-    } catch {
-      return true;
-    }
+    const existing = parseFillRule(field.value);
+    return existing == null || !sameRuleTarget(existing, rule);
   });
   const ruleField = new FieldView();
   ruleField.name = FILL_RULE_FIELD_NAME;
@@ -167,17 +177,6 @@ export function visibleCustomFields(cipher: CipherView): FieldView[] {
 }
 
 /**
- * Applies an item's fill rules, then any site fixes for the page, to a fill
- * script, before upstream's own matching runs. Only rules made on this page's
- * host apply; a never rule from
- * before rules had a host applies anywhere, since it only holds a value back.
- * Value rules fill their field. Never rules claim their field
- * without filling it. Fields claimed here are added to `filledFields`, which
- * upstream's matching skips. Returns the never-fill fields' opids, which the
- * caller also hides from upstream's field selection, so a password meant for
- * a never-fill field goes to the next fitting field instead of nowhere.
- */
-/**
  * Site fixes (site-fixes.ts): rules that apply to everyone on the server for a
  * site, and sharing a rule someone made. The extension's background fills
  * these in; until then there are none.
@@ -187,6 +186,78 @@ export const keykeeperSiteFixes = {
   share: async (_rule: FillRule): Promise<void> => {},
 };
 
+/** How a fill was started, and upstream's limits for it, which rules keep too. */
+export type FillRuleOptions = {
+  /**
+   * The person started this fill (the popup, the inline menu, a shortcut, the
+   * context menu), not autofill on page load. Site fixes apply only then.
+   */
+  userStarted: boolean;
+  /** Upstream's onlyEmptyFields (page load): a field that has a value keeps it. */
+  onlyEmptyFields: boolean;
+  /** Upstream's skipUsernameOnlyFill (page load): no username on a page without a password field. */
+  skipUsernameOnlyFill: boolean;
+  /** Upstream's allowTotpAutofill and canAccessTotp, together: whether a one-time code may fill. */
+  allowTotp: boolean;
+  /**
+   * Upstream's exclusions (AutofillService.isExcludedFromFillRules): search
+   * boxes, captchas, "forgot" fields, newsletter forms, and the field types
+   * autofill never fills.
+   */
+  excluded: (field: AutofillField, pageDetails: AutofillPageDetails) => boolean;
+};
+
+/** A rule, and whether it came from the server (a site fix) rather than the item. */
+type AppliedRule = { rule: FillRule; fix: boolean };
+
+/**
+ * Whether a rule's value may go into this field on this fill. On top of
+ * `mayFill`: upstream's exclusions and page-load limits, and for a site fix,
+ * a password only into a password field, whoever it fills for, since anyone
+ * who runs the server (or a few accounts on it) can publish one.
+ */
+function mayApply(
+  cipher: CipherView,
+  { rule, fix }: AppliedRule,
+  field: AutofillField,
+  pageDetails: AutofillPageDetails,
+  options: FillRuleOptions,
+): boolean {
+  const from = rule.fill.from;
+  if (options.excluded(field, pageDetails) || !mayFill(cipher, rule.fill, field)) {
+    return false;
+  }
+  if (fix && from === "password" && field.type !== "password") {
+    return false;
+  }
+  if (options.onlyEmptyFields && (field.value ?? "").trim() !== "") {
+    return false;
+  }
+  if (from === "totp" && !options.allowTotp) {
+    return false;
+  }
+  if (
+    from === "username" &&
+    options.skipUsernameOnlyFill &&
+    !pageDetails.fields.some((f) => f.type === "password" && f.viewable)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Applies an item's fill rules, then any site fixes for the page, to a fill
+ * script, before upstream's own matching runs. Only rules made on this page's
+ * scheme and host apply; a never rule from before rules had a host applies
+ * anywhere, since it only holds a value back. Site fixes apply only to a fill
+ * the person started, never on page load. Value rules fill their field, within
+ * upstream's limits for the fill (`FillRuleOptions`). Never rules claim their
+ * field without filling it. Fields claimed here are added to `filledFields`,
+ * which upstream's matching skips. Returns the never-fill fields' opids, which
+ * the caller also hides from upstream's field selection, so a password meant
+ * for a never-fill field goes to the next fitting field instead of nowhere.
+ */
 export async function applyFillRules(
   cipher: CipherView,
   pageDetails: AutofillPageDetails,
@@ -194,15 +265,18 @@ export async function applyFillRules(
   filledFields: { [opid: string]: AutofillField },
   valueFor: (source: FillSource) => Promise<string | null>,
   fill: (fillScript: AutofillScript, field: AutofillField, value: string) => void,
+  options: FillRuleOptions,
 ): Promise<Set<string>> {
   const neverFill = new Set<string>();
-  const host = hostOf(pageDetails.url);
-  // The item's own rules first, then site fixes for this host: a field the
+  const applies = (r: FillRule) =>
+    r.host == null ? r.fill.from === "never" : ruleAppliesOn(r, pageDetails.url);
+  // The item's own rules first, then site fixes for this site: a field the
   // item has a rule for is the item's.
-  const rules = [
-    ...readFillRules(cipher),
-    ...(await keykeeperSiteFixes.rulesFor(pageDetails.url)),
-  ].filter((r) => (r.host == null ? r.fill.from === "never" : r.host === host && host !== ""));
+  const fixes = options.userStarted ? await keykeeperSiteFixes.rulesFor(pageDetails.url) : [];
+  const rules: AppliedRule[] = [
+    ...readFillRules(cipher).map((rule) => ({ rule, fix: false })),
+    ...fixes.map((rule) => ({ rule, fix: true })),
+  ].filter(({ rule }) => applies(rule));
   if (!rules.length) {
     return neverFill;
   }
@@ -210,19 +284,19 @@ export async function applyFillRules(
     if (field.opid == null || Object.prototype.hasOwnProperty.call(filledFields, field.opid)) {
       continue;
     }
-    const rule = rules.find((r) => fieldMatches(r.field, field));
-    if (!rule) {
+    const applied = rules.find(({ rule }) => fieldMatches(rule.field, field));
+    if (!applied) {
       continue;
     }
-    if (rule.fill.from === "never") {
+    if (applied.rule.fill.from === "never") {
       filledFields[field.opid] = field;
       neverFill.add(field.opid);
       continue;
     }
-    if (!mayFill(cipher, rule.fill, field)) {
+    if (!mayApply(cipher, applied, field, pageDetails, options)) {
       continue;
     }
-    const value = await valueFor(rule.fill);
+    const value = await valueFor(applied.rule.fill);
     if (value == null || value === "") {
       continue;
     }

@@ -322,7 +322,15 @@ export class LastPassCsvImporter extends BaseImporter implements Importer {
    * the number, with its extension. Anything else as it is.
    */
   private phoneNumber(value: string): string {
-    if (!/^\s*\{.*"num".*\}\s*$/.test(value)) {
+    // Without a pattern to backtrack through: a long value with braces and
+    // "num" in it took time growing with its length squared.
+    const trimmed = value.trim();
+    if (
+      trimmed.length > 1000 ||
+      !trimmed.startsWith("{") ||
+      !trimmed.endsWith("}") ||
+      !trimmed.includes('"num"')
+    ) {
       return value;
     }
     try {

@@ -841,6 +841,7 @@ describe("AutofillService", () => {
           canAccessTotp: true,
           tabUrl: autofillOptions.tab.url,
           defaultUriMatch: 0,
+          onPageLoad: false,
         },
       );
       expect(autofillService["generateLoginFillScript"]).toHaveBeenCalled();
@@ -1225,6 +1226,7 @@ describe("AutofillService", () => {
           allowUntrustedIframe: fromCommand,
           allowTotpAutofill: fromCommand,
           autoSubmitLogin: false,
+          onPageLoad: !fromCommand,
         });
         expect(result).toEqual({ didAutofill: true, totp: totpCode });
       });
@@ -1256,6 +1258,7 @@ describe("AutofillService", () => {
           allowUntrustedIframe: fromCommand,
           allowTotpAutofill: fromCommand,
           autoSubmitLogin: false,
+          onPageLoad: !fromCommand,
         });
         expect(result).toEqual({ didAutofill: true, totp: totpCode });
       });
@@ -1284,6 +1287,7 @@ describe("AutofillService", () => {
           allowUntrustedIframe: fromCommand,
           allowTotpAutofill: fromCommand,
           autoSubmitLogin: false,
+          onPageLoad: !fromCommand,
         });
         expect(result).toEqual({ didAutofill: true, totp: totpCode });
       });
@@ -1459,6 +1463,7 @@ describe("AutofillService", () => {
         fillNewPassword: false,
         allowUntrustedIframe: true,
         allowTotpAutofill: false,
+        onPageLoad: false,
       });
     });
 
@@ -1505,6 +1510,7 @@ describe("AutofillService", () => {
         fillNewPassword: false,
         allowUntrustedIframe: true,
         allowTotpAutofill: false,
+        onPageLoad: false,
       });
     });
   });

@@ -149,7 +149,11 @@ export class ImportCommand {
           return Response.success(res);
         }
 
-        return Response.success(new MessageResponse("Imported " + filepath, null));
+        // Keykeeper: what was left out on purpose, counted (KeePass's Recycle Bin, say).
+        const leftOut = response.leftOut ?? [];
+        return Response.success(
+          new MessageResponse("Imported " + filepath, leftOut.length ? leftOut.join("\n") : null),
+        );
       }
     } catch (err) {
       if (err.message) {

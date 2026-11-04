@@ -173,6 +173,13 @@ export class KeePass2XmlImporter extends BaseImporter implements Importer {
         this.recycleBin != null &&
         this.querySelectorDirectChild(group, "UUID")?.textContent.trim() === this.recycleBin
       ) {
+        // Left out, and counted: every entry in it, in its groups too.
+        const count = group.querySelectorAll("Entry").length;
+        if (count > 0) {
+          (this.result.leftOut ??= []).push(
+            `Left out ${count} ${count === 1 ? "item" : "items"} in KeePass's Recycle Bin.`,
+          );
+        }
         return;
       }
       this.traverse(group, false, groupName);
@@ -231,8 +238,8 @@ export function keePassTotp(
     const [key, encoding] = timeOtp;
     const secret = base32Secret(get(key), encoding);
     const algorithm = totpAlgorithm(get("TimeOtp-Algorithm"));
-    const digits = whole(get("TimeOtp-Length"), totpDefaults.digits);
-    const period = whole(get("TimeOtp-Period"), totpDefaults.period);
+    const digits = whole(get("TimeOtp-Length"), totpDefaults.digits, DIGITS);
+    const period = whole(get("TimeOtp-Period"), totpDefaults.period, PERIOD);
     if (secret == null || algorithm == null || digits == null || period == null) {
       return null;
     }
@@ -266,8 +273,8 @@ export function keePassTotp(
       (params.get("encoding") ?? "base32").toLowerCase(),
     );
     const algorithm = totpAlgorithm(params.get("otphashmode"));
-    const digits = whole(params.get("size"), totpDefaults.digits);
-    const period = whole(params.get("step"), totpDefaults.period);
+    const digits = whole(params.get("size"), totpDefaults.digits, DIGITS);
+    const period = whole(params.get("step"), totpDefaults.period, PERIOD);
     if (secret == null || algorithm == null || digits == null || period == null) {
       return null;
     }
@@ -282,7 +289,7 @@ export function keePassTotp(
   if (seed != null) {
     const secret = base32Secret(seed, "base32");
     const [periodSetting, digitsSetting] = (get("TOTP Settings") ?? "").split(";");
-    const period = whole(periodSetting, totpDefaults.period);
+    const period = whole(periodSetting, totpDefaults.period, PERIOD);
     if (secret == null || period == null) {
       return null;
     }
@@ -290,7 +297,7 @@ export function keePassTotp(
     if (digitsSetting?.trim().toUpperCase() === "S") {
       return { keys, value: () => "steam://" + secret };
     }
-    const digits = whole(digitsSetting, totpDefaults.digits);
+    const digits = whole(digitsSetting, totpDefaults.digits, DIGITS);
     if (digits == null) {
       return null;
     }
@@ -340,13 +347,28 @@ function totpAlgorithm(value: string | undefined): string | null {
   return ["SHA1", "SHA256", "SHA512"].includes(name) ? name : null;
 }
 
-/** A positive whole number, the default when there's none, or null when it isn't one. */
-function whole(value: string | undefined, defaultValue: number): number | null {
+/**
+ * A whole number from `min` to `max`, the default when there's none, or null
+ * when it isn't one: a code of 4 to 10 digits, every 1 to 300 seconds, as
+ * authenticator apps take it.
+ */
+function whole(
+  value: string | undefined,
+  defaultValue: number,
+  [min, max]: [number, number],
+): number | null {
   if (Utils.isNullOrWhitespace(value)) {
     return defaultValue;
   }
-  return /^\d+$/.test(value.trim()) && Number(value) > 0 ? Number(value) : null;
+  const trimmed = value.trim();
+  if (!/^\d{1,4}$/.test(trimmed)) {
+    return null;
+  }
+  const number = Number(trimmed);
+  return number >= min && number <= max ? number : null;
 }
+const DIGITS: [number, number] = [4, 10];
+const PERIOD: [number, number] = [1, 300];
 
 function decodeParam(value: string): string {
   try {

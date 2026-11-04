@@ -31,7 +31,11 @@ import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets"
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { RestrictedItemTypesService } from "@bitwarden/common/vault/services/restricted-item-types.service";
 
-import { addCipherToFillFieldMenu, initFillFieldMenu } from "../keykeeper/fill-field-menu";
+import {
+  addCipherToFillFieldMenu,
+  initFillFieldMenu,
+  removeFillFieldMenu,
+} from "../keykeeper/fill-field-menu";
 
 import { InitContextMenuItems } from "./abstractions/main-context-menu-handler";
 
@@ -426,6 +430,8 @@ export class MainContextMenuHandler {
           await MainContextMenuHandler.remove(menuItem.id);
         }
       }
+      // Keykeeper: and "Fill this field with", which fills as autofill does.
+      await removeFillFieldMenu();
     } catch (error) {
       if (error instanceof Error) {
         this.logService.warning(error.message);

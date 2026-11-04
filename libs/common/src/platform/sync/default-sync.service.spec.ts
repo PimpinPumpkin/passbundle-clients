@@ -489,6 +489,34 @@ describe("DefaultSyncService", () => {
         expect(apiService.refreshIdentityToken).toHaveBeenCalledTimes(1);
       });
 
+      it("does not take the answer to a request sent before it started (Keykeeper)", async () => {
+        // A sync that went out while an import was still being saved, then
+        // the sync the import asks for once it's done.
+        let answerEarly: (response: SyncResponse) => void = () => {};
+        const early = new Promise<SyncResponse>((resolve) => (answerEarly = resolve));
+        apiService.getSync.mockReturnValueOnce(early).mockResolvedValueOnce(emptySyncResponse);
+        const flush = async () => {
+          for (let i = 0; i < 50; i++) {
+            await Promise.resolve();
+          }
+        };
+
+        const first = sut.fullSync(true, { skipTokenRefresh: true });
+        await flush();
+        expect(apiService.getSync).toHaveBeenCalledTimes(1);
+
+        jest.advanceTimersByTime(10);
+        const second = sut.fullSync(true, { skipTokenRefresh: true });
+        await flush();
+        // Still one: it waits for the earlier request first.
+        expect(apiService.getSync).toHaveBeenCalledTimes(1);
+
+        answerEarly(emptySyncResponse);
+        await Promise.all([first, second]);
+        expect(apiService.getSync).toHaveBeenCalledTimes(2);
+        expect(sut["inFlightApiCalls"].sync).toBeNull();
+      });
+
       it("resets the in-flight properties when the complete", async () => {
         const fullSyncPromises = [sut.fullSync(true), sut.fullSync(true)];
 

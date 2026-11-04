@@ -30,10 +30,15 @@ import { isDefaultPasswordManagerPromptFeatureEnabled } from "../autofill/defaul
 import { DefaultPasswordManagerPromptStateAccessor } from "../autofill/default-password-manager-prompt-state.accessor";
 import { completePendingDefaultPasswordManagerApply } from "../autofill/default-password-manager-session.util";
 import { AutofillMessageCommand } from "../autofill/enums/autofill-message.enums";
+import {
+  FILL_FIELD_REPROMPTED,
+  finishPickAfterReprompt,
+} from "../autofill/keykeeper/fill-field-menu";
 import { AutofillLifecycleService } from "../autofill/services/abstractions/autofill-lifecycle.service";
 import { AutofillService } from "../autofill/services/abstractions/autofill.service";
 import { FORCE_TARGETING_RULES_UPDATE_COMMAND } from "../autofill/services/targeting-rules-data.service";
 import { ENROLL_BIOMETRICS, REMOVE_BIOMETRICS } from "../keykeeper/agent-biometrics-messages";
+import { fromExtensionPage } from "../keykeeper/extension-sender";
 import { BrowserApi } from "../platform/browser/browser-api";
 import BrowserPopupUtils from "../platform/browser/browser-popup-utils";
 import { BrowserEnvironmentService } from "../platform/services/browser-environment.service";
@@ -216,12 +221,27 @@ export default class RuntimeBackground {
       case BiometricsCommands.CanEnableBiometricUnlock: {
         return await this.main.biometricsService.canEnableBiometricUnlock();
       }
-      // Keykeeper: biometric unlock through the desktop agent.
+      // Keykeeper: biometric unlock through the desktop agent, only from the
+      // extension's own pages: enrolling hands the agent the user key.
       case ENROLL_BIOMETRICS: {
+        if (!fromExtensionPage(sender)) {
+          throw new Error("Not from the extension");
+        }
         return await this.main.keykeeperAgentBiometrics.enroll(msg.userId);
       }
       case REMOVE_BIOMETRICS: {
+        if (!fromExtensionPage(sender)) {
+          throw new Error("Not from the extension");
+        }
         return await this.main.keykeeperAgentBiometrics.remove(msg.userId);
+      }
+      // Keykeeper: the master password prompt's answer for a fill picker
+      // choice (autofill/keykeeper/fill-field-menu.ts), only from the prompt.
+      case FILL_FIELD_REPROMPTED: {
+        if (fromExtensionPage(sender) && typeof msg.cipherId === "string") {
+          await finishPickAfterReprompt(msg.cipherId, msg.success === true);
+        }
+        break;
       }
       case "getUserPremiumStatus": {
         const activeUserId = await firstValueFrom(

@@ -10,12 +10,12 @@
       @for (uri of uriControls; track uri; let i = $index) {
         <vault-autofill-uri-option
           cdkDrag
-          [cdkDragDisabled]="uriControls.length <= 1 || autofillOptionsForm.disabled"
+          [cdkDragDisabled]="uriControls.length <= 1 || autofillOptionsForm.disabled || websitesLocked"
           [formControlName]="i"
           (remove)="removeUri(i)"
           (onKeydown)="onUriItemKeydown($event, i)"
-          [canReorder]="uriControls.length > 1 && autofillOptionsForm.enabled"
-          [canRemove]="uriControls.length > 1 && autofillOptionsForm.enabled"
+          [canReorder]="uriControls.length > 1 && autofillOptionsForm.enabled && !websitesLocked"
+          [canRemove]="uriControls.length > 1 && autofillOptionsForm.enabled && !websitesLocked"
           [defaultMatchDetection]="defaultMatchDetection$ | async"
           [index]="i"
           [showAppLabel]="showAddAppDropdown()"
@@ -23,7 +23,13 @@
       }
     </ng-container>
 
-    @if (autofillOptionsForm.enabled) {
+    <!-- Keykeeper: see websitesLocked. English until our strings are translated. -->
+    @if (websitesLocked) {
+      <p bitTypography="helper" class="tw-mb-4" data-testid="websites-locked">
+        Someone who can see this item's passwords can change its websites.
+      </p>
+    }
+    @if (autofillOptionsForm.enabled && !websitesLocked) {
       @if (showAddAppDropdown()) {
         <button
           type="button"

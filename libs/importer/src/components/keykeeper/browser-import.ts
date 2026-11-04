@@ -6,6 +6,7 @@
 // they have. See DESIGN.md, "Browser import".
 
 import { CipherType } from "@bitwarden/common/vault/enums";
+import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { FolderView } from "@bitwarden/common/vault/models/view/folder.view";
 
@@ -190,7 +191,8 @@ const keyOf = (cipher: CipherView) =>
  * username, and password) and repeats are left out, logins without a
  * password are skipped, and a login whose password differs from one the
  * person already has for that site and username goes into `checkFolder`,
- * imported, for them to compare.
+ * imported, for them to compare. Items whose passwords the person can't see
+ * aren't compared at all.
  */
 export function prepareImport(
   parsed: ImportResult,
@@ -204,7 +206,11 @@ export function prepareImport(
     passwords.add(cipher.login?.password ?? "");
     known.set(key, passwords);
   };
-  existing.filter((c) => c.type === CipherType.Login && !c.isDeleted).forEach((c) => remember(c));
+  // Not items whose passwords the person can't see: "already there" or "a
+  // different password" would confirm or rule out a guess at one.
+  existing
+    .filter((c) => c.type === CipherType.Login && !c.isDeleted && maySeeSecrets(c))
+    .forEach((c) => remember(c));
 
   const result = new ImportResult();
   result.success = parsed.success;

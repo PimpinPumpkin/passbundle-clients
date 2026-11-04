@@ -4,11 +4,13 @@ import { BehaviorSubject, of } from "rxjs";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { AuthService } from "@bitwarden/common/auth/abstractions/auth.service";
 import { AuthenticationStatus } from "@bitwarden/common/auth/enums/authentication-status";
+import { UriMatchStrategy } from "@bitwarden/common/models/domain/domain-service";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { CipherType, FieldType } from "@bitwarden/common/vault/enums";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
+import { LoginUriView } from "@bitwarden/common/vault/models/view/login-uri.view";
 import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
 
 import { BrowserApi } from "../../platform/browser/browser-api";
@@ -19,8 +21,10 @@ import {
   choicesFor,
   createdFillFieldMenuIds,
   FILL_FIELD_ID,
+  finishPickAfterReprompt,
   handleFillFieldMenuClick,
   initFillFieldMenu,
+  keykeeperFillPicker,
   parseFillFieldMenuId,
 } from "./fill-field-menu";
 import { readFillRules } from "./fill-rules";
@@ -35,6 +39,9 @@ function bankItem(): CipherView {
   cipher.login = new LoginView();
   cipher.login.username = "alice";
   cipher.login.password = "correct-password";
+  const website = new LoginUriView();
+  website.uri = "https://bank.example.test/login";
+  cipher.login.uris = [website];
   const customerId = new FieldView();
   customerId.name = "Customer ID";
   customerId.value = "C-12345";
@@ -145,8 +152,9 @@ describe("Keykeeper fill picker menu", () => {
       cipherService: ReturnType<typeof mock<CipherService>>;
       totpService: ReturnType<typeof mock<TotpService>>;
       passwordRepromptRequired: jest.Mock<Promise<boolean>, [CipherView]>;
-      fillAfterReprompt: jest.Mock<Promise<void>, [chrome.tabs.Tab, CipherView]>;
+      openReprompt: jest.Mock<Promise<void>, [chrome.tabs.Tab, CipherView]>;
     };
+    const originalMatches = keykeeperFillPicker.itemMatches;
     let tabSendMessage: jest.SpyInstance;
     /** The page or frame the right-clicked field is in. */
     let frameUrl: string;
@@ -162,8 +170,11 @@ describe("Keykeeper fill picker menu", () => {
         cipherService: mock<CipherService>(),
         totpService: mock<TotpService>(),
         passwordRepromptRequired: jest.fn<Promise<boolean>, [CipherView]>(async () => false),
-        fillAfterReprompt: jest.fn<Promise<void>, [chrome.tabs.Tab, CipherView]>(async () => {}),
+        openReprompt: jest.fn<Promise<void>, [chrome.tabs.Tab, CipherView]>(async () => {}),
       };
+      // As main.background sets it: the item's websites, by base domain.
+      keykeeperFillPicker.itemMatches = async (c, url) =>
+        c.login?.matchesUri(url, new Set(), UriMatchStrategy.Domain) ?? false;
       deps.authService.getAuthStatus.mockResolvedValue(AuthenticationStatus.Unlocked);
       deps.cipherService.getAllDecrypted.mockResolvedValue([cipher]);
       deps.cipherService.updateWithServer.mockImplementation(async (c) => c);
@@ -181,7 +192,10 @@ describe("Keykeeper fill picker menu", () => {
         });
     });
 
-    afterEach(() => jest.restoreAllMocks());
+    afterEach(() => {
+      jest.restoreAllMocks();
+      keykeeperFillPicker.itemMatches = originalMatches;
+    });
 
     const click = (key: string) =>
       handleFillFieldMenuClick(
@@ -206,6 +220,9 @@ describe("Keykeeper fill picker menu", () => {
               ["focus_by_opid", "__3"],
               ["fill_by_opid", "__3", "C-12345"],
             ],
+            // Upstream's warnings: before an http page, and for a frame the item isn't for.
+            savedUrls: ["https://bank.example.test/login"],
+            untrustedIframe: false,
           }),
         }),
         { frameId: 0 },
@@ -215,6 +232,7 @@ describe("Keykeeper fill picker menu", () => {
         {
           v: 1,
           host: "bank.example.test",
+          scheme: "https",
           field: { id: "custno", name: "customer_number", label: "customer number" },
           fill: { from: "field", name: "Customer ID" },
         },
@@ -224,26 +242,49 @@ describe("Keykeeper fill picker menu", () => {
     const filled = () =>
       tabSendMessage.mock.calls.some(([, message]) => message.command === "fillForm");
 
-    it("asks for the master password before filling a secret of an item that wants it", async () => {
+    it("asks for the master password first for any value of an item that wants it, and saves nothing until then", async () => {
+      deps.passwordRepromptRequired.mockResolvedValue(true);
+
+      for (const key of ["u", "p", "f0", "n"]) {
+        await click(key);
+      }
+
+      expect(filled()).toBe(false);
+      expect(readFillRules(cipher)).toEqual([]);
+      expect(deps.cipherService.updateWithServer).not.toHaveBeenCalled();
+      expect(deps.openReprompt).toHaveBeenCalledTimes(4);
+      expect(deps.openReprompt).toHaveBeenCalledWith(tab, cipher);
+    });
+
+    it("goes ahead with the pick once the prompt succeeds, and drops it when it doesn't", async () => {
       deps.passwordRepromptRequired.mockResolvedValue(true);
 
       await click("p");
-
+      expect(await finishPickAfterReprompt(cipherId, false)).toBe(false);
+      // A failed prompt dropped the pick: a later success finds nothing.
+      expect(await finishPickAfterReprompt(cipherId, true)).toBe(false);
       expect(filled()).toBe(false);
+      expect(readFillRules(cipher)).toEqual([]);
+
+      await click("p");
+      expect(await finishPickAfterReprompt(cipherId, true)).toBe(true);
+      expect(filled()).toBe(true);
       expect(readFillRules(cipher)[0].fill).toEqual({ from: "password" });
-      expect(deps.fillAfterReprompt).toHaveBeenCalledWith(tab, cipher);
+      expect(deps.cipherService.updateWithServer).toHaveBeenCalledTimes(1);
     });
 
-    it("fills the username of such an item at once, as upstream copies it", async () => {
+    it("drops a pick the prompt answers after five minutes", async () => {
       deps.passwordRepromptRequired.mockResolvedValue(true);
 
       await click("u");
 
-      expect(filled()).toBe(true);
-      expect(deps.fillAfterReprompt).not.toHaveBeenCalled();
+      expect(await finishPickAfterReprompt(cipherId, true, Date.now() + 5 * 60 * 1000 + 1)).toBe(
+        false,
+      );
+      expect(filled()).toBe(false);
     });
 
-    it("never puts a secret into a frame from another site, and remembers nothing", async () => {
+    it("never puts a secret into a frame the item isn't for, and remembers nothing", async () => {
       frameUrl = "https://ads.example.net/frame";
 
       await click("p");
@@ -251,6 +292,30 @@ describe("Keykeeper fill picker menu", () => {
       expect(filled()).toBe(false);
       expect(readFillRules(cipher)).toEqual([]);
       expect(deps.cipherService.updateWithServer).not.toHaveBeenCalled();
+    });
+
+    it("never puts a secret into a page of the same site the item's websites don't match", async () => {
+      cipher.login.uris[0].match = UriMatchStrategy.Exact;
+      frameUrl = "https://bank.example.test/other";
+
+      await click("p");
+
+      expect(filled()).toBe(false);
+    });
+
+    it("asks first before filling anything else into a frame the item isn't for, as upstream does", async () => {
+      frameUrl = "https://ads.example.net/frame";
+
+      await click("u");
+
+      expect(tabSendMessage).toHaveBeenCalledWith(
+        tab,
+        expect.objectContaining({
+          command: "fillForm",
+          fillScript: expect.objectContaining({ untrustedIframe: true }),
+        }),
+        { frameId: 0 },
+      );
     });
 
     it("never shows a hidden value in a plain field to someone who can't see passwords, even through a field of the same name", async () => {

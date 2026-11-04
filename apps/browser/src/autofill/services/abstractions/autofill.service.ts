@@ -53,6 +53,8 @@ export interface AutoFillOptions {
   focusedFieldForm?: string;
   focusedFieldOpid?: string;
   inlineMenuFillType?: InlineMenuFillType;
+  /** Keykeeper: autofill on page load, not a fill the person started (keykeeper/fill-rules.ts). */
+  onPageLoad?: boolean;
 }
 
 interface FormDataBase {
@@ -87,6 +89,8 @@ export interface GenerateFillScriptOptions {
   defaultUriMatch: UriMatchStrategySetting;
   focusedFieldOpid?: string;
   inlineMenuFillType?: InlineMenuFillType;
+  /** Keykeeper: autofill on page load, not a fill the person started (keykeeper/fill-rules.ts). */
+  onPageLoad?: boolean;
 }
 
 export type CollectPageDetailsResponseMessage = {

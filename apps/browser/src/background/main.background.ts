@@ -366,6 +366,7 @@ import {
   BrowserFido2ParentWindowReference,
   BrowserFido2UserInterfaceService,
 } from "../autofill/fido2/services/browser-fido2-user-interface.service";
+import { keykeeperFillPicker as fillPickerHooks } from "../autofill/keykeeper/fill-field-menu";
 import { keykeeperSiteFixes as siteFixHooks } from "../autofill/keykeeper/fill-rules";
 import { KeykeeperSiteFixes } from "../autofill/keykeeper/site-fixes";
 import { AutofillLifecycleService } from "../autofill/services/abstractions/autofill-lifecycle.service";
@@ -1874,6 +1875,16 @@ export default class MainBackground {
     this.keykeeperSiteFixes.init();
     siteFixHooks.rulesFor = (url) => this.keykeeperSiteFixes.rulesFor(url);
     siteFixHooks.share = (rule) => this.keykeeperSiteFixes.share(rule);
+    // Keykeeper: the fill picker matches an item to a page as autofill does.
+    fillPickerHooks.itemMatches = async (cipher, url) => {
+      const equivalentDomains = await firstValueFrom(
+        this.domainSettingsService.getUrlEquivalentDomains(url),
+      );
+      const defaultUriMatch = await firstValueFrom(
+        this.domainSettingsService.resolvedDefaultUriMatchStrategy$,
+      );
+      return cipher.login?.matchesUri(url, equivalentDomains, defaultUriMatch) ?? false;
+    };
     // Keykeeper: join the client organization named by the MSP's install command.
     this.keykeeperEnrollment = new KeykeeperEnrollment(
       this.accountService,

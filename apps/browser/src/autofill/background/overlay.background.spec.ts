@@ -48,6 +48,9 @@ import { GeneratedCredential, GeneratorHistoryService } from "@bitwarden/generat
 
 import { BrowserApi } from "../../platform/browser/browser-api";
 import { BrowserPlatformUtilsService } from "../../platform/services/platform-utils/browser-platform-utils.service";
+// FIXME (PM-22628): Popup imports are forbidden in background
+// eslint-disable-next-line no-restricted-imports
+import * as vaultPopoutWindow from "../../vault/popup/utils/vault-popout-window";
 import {
   AutofillOverlayElement,
   AutofillOverlayPort,
@@ -3716,7 +3719,7 @@ describe("OverlayBackground", () => {
         expect(cipher.fields.map((f) => f.name)).toEqual(["Customer ID", "keykeeper.fill"]);
       });
 
-      it("saves the rule before asking for the master password, for an item that asks", async () => {
+      it("asks for the master password first, for an item that asks, and saves nothing until it succeeds", async () => {
         const cipher = new CipherView();
         cipher.id = "cipher-1";
         cipher.type = CipherType.Login;
@@ -3746,15 +3749,9 @@ describe("OverlayBackground", () => {
             },
           ],
         ]);
-        const order: string[] = [];
-        cipherService.updateWithServer.mockImplementation(async () => {
-          order.push("saved");
-          return undefined;
-        });
-        autofillService.isPasswordRepromptRequired.mockImplementation(async () => {
-          order.push("asked");
-          return true;
-        });
+        const prompt = jest
+          .spyOn(vaultPopoutWindow, "openVaultItemPasswordRepromptPopout")
+          .mockResolvedValue(undefined);
 
         sendPortMessage(listMessageConnectorSpy, {
           command: "keykeeperFillFieldWith",
@@ -3764,7 +3761,11 @@ describe("OverlayBackground", () => {
         });
         await flushPromises();
 
-        expect(order).toEqual(["saved", "asked"]);
+        expect(prompt).toHaveBeenCalledWith(sender.tab, {
+          cipherId: "cipher-1",
+          action: "keykeeper-fill-field",
+        });
+        expect(cipherService.updateWithServer).not.toHaveBeenCalled();
         expect(tabsSendMessageSpy).not.toHaveBeenCalledWith(
           sender.tab,
           expect.objectContaining({ command: "fillForm" }),
