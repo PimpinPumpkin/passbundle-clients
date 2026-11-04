@@ -2,11 +2,12 @@
 // (DESIGN.md). Each one is an HMAC-SHA256 over its parts joined with a zero
 // byte, under a key the server never has: the organization's join key (made
 // from the organization key) for seals, and the install command's join secret
-// for join proofs. The join key, joining seals, and join proofs are version 1
-// (the meta repo's docs/vectors/joins-v1.json); invitation and staff seals are
-// version 2, which end and carry a nonce, and the client seal is new in the
-// same change (docs/vectors/joins-v2.json). The unit tests check every one
-// against a copy of the vectors that sits next to them.
+// for join proofs. The join key and join proofs are version 1 (the meta
+// repo's docs/vectors/joins-v1.json); invitation and staff seals are version
+// 2, which end and carry a nonce, and the client seal is new in the same
+// change (docs/vectors/joins-v2.json); joining seals are version 2, which say
+// where the setting comes from (docs/vectors/joining-v2.json). The unit tests
+// check every one against a copy of the vectors that sits next to them.
 
 const encoder = new TextEncoder();
 
@@ -54,6 +55,22 @@ export const SEAL_MAX_AHEAD_SECONDS = 30 * 86_400;
 
 /** An invitation's or staff member's seal, version 2: `v2.<expires>.<nonce>.<mac>`. */
 const EXPIRING_SEAL = /^v2\.([0-9]{1,12})\.([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{43})$/;
+
+/**
+ * Where an organization's joining setting comes from, as its joining seal
+ * says: its own setting, or a default it follows (its MSP's, or the server's
+ * outside an MSP).
+ */
+export type JoiningSource = "own" | "default";
+
+/** A joining seal, version 2: `v2.<source>.<mac>`. */
+const JOINING_SEAL = /^v2\.(own|default)\.([A-Za-z0-9_-]{43})$/;
+
+/** Where a joining seal says the setting comes from, or null for anything else. */
+export function joiningSealSource(seal: string | null | undefined): JoiningSource | null {
+  const match = seal == null ? null : JOINING_SEAL.exec(seal);
+  return match == null ? null : (match[1] as JoiningSource);
+}
 
 /** What an expiring seal says besides its MAC: when it ends (Unix seconds) and its nonce. */
 export type ExpiringSeal = { expires: number; nonce: string };
@@ -201,24 +218,52 @@ export class KeykeeperJoinSeals {
     return this.verify(joinKey, this.clientParts(organizationId, mspId), seal);
   }
 
-  /** An organization's joining setting and email domains, as an owner or admin saved them. */
-  joiningSeal(
+  /**
+   * An organization's joining setting and email domains, as an owner or
+   * admin saved them, and where the setting comes from: the organization's
+   * own, or a default it follows.
+   */
+  async joiningSeal(
     joinKey: Uint8Array,
     organizationId: string,
     autoConfirm: boolean,
     domains: readonly string[],
+    source: JoiningSource,
   ): Promise<string> {
-    return this.sign(joinKey, this.joiningParts(organizationId, autoConfirm, domains));
+    const mac = await this.mac(
+      joinKey,
+      this.joiningParts(organizationId, autoConfirm, domains, source),
+    );
+    return `v2.${source}.${toB64Url(mac)}`;
   }
 
-  checkJoiningSeal(
+  /**
+   * Whether a joining seal vouches for this setting and these domains, and,
+   * with `source`, that it comes from there. A version 1 seal, which says
+   * nothing of where the setting comes from, doesn't.
+   */
+  async checkJoiningSeal(
     seal: string | null | undefined,
     joinKey: Uint8Array,
     organizationId: string,
     autoConfirm: boolean,
     domains: readonly string[],
+    source?: JoiningSource,
   ): Promise<boolean> {
-    return this.verify(joinKey, this.joiningParts(organizationId, autoConfirm, domains), seal);
+    const said = joiningSealSource(seal);
+    if (said == null || (source != null && said !== source)) {
+      return false;
+    }
+    const mac = fromB64(seal!.slice(seal!.lastIndexOf(".") + 1));
+    if (mac == null || mac.length !== 32) {
+      return false;
+    }
+    return this.subtle.verify(
+      "HMAC",
+      await this.hmacKey(joinKey, "verify"),
+      mac,
+      this.joiningParts(organizationId, autoConfirm, domains, said),
+    );
   }
 
   private async proofParts(organizationId: string, userId: string, userPublicKey: Uint8Array) {
@@ -298,12 +343,18 @@ export class KeykeeperJoinSeals {
     return this.subtle.verify("HMAC", await this.hmacKey(joinKey, "verify"), mac, data);
   }
 
-  private joiningParts(organizationId: string, autoConfirm: boolean, domains: readonly string[]) {
+  private joiningParts(
+    organizationId: string,
+    autoConfirm: boolean,
+    domains: readonly string[],
+    source: JoiningSource,
+  ) {
     return joinParts([
-      "passbundle joining v1",
+      "passbundle joining v2",
       organizationId,
       autoConfirm ? "1" : "0",
       [...domains].sort().join(","),
+      source,
     ]);
   }
 
