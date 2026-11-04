@@ -112,7 +112,7 @@ function wellFormed(field: FieldView, seen: Set<string>): string | null {
       return rule ? JSON.stringify(rule) : null;
     }
     case EXPIRES_FIELD_NAME:
-      return !seen.has(name) && parseIsoDate(field.value) ? field.value : null;
+      return !seen.has(name) && parseIsoDate(field.value) ? (field.value ?? null) : null;
     case TEMPLATE_FIELD_NAME:
       return !seen.has(name) ? wellFormedMarker(field.value) : null;
     case TEMPLATE_DEFINITION_FIELD_NAME: {

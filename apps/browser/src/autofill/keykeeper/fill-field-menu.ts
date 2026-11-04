@@ -180,9 +180,9 @@ export type PickDependencies = Pick<
 
 /** The item's websites, for upstream's warning before filling an http page. */
 function savedUrls(cipher: CipherView): string[] {
-  return (cipher.login?.uris ?? [])
-    .filter((u) => u.match != UriMatchStrategy.Never && u.uri != null)
-    .map((u) => u.uri);
+  return (cipher.login?.uris ?? []).flatMap((u) =>
+    u.match != UriMatchStrategy.Never && u.uri != null ? [u.uri] : [],
+  );
 }
 
 /** Asks the page which field was right-clicked, with the page details it belongs to. */
@@ -247,7 +247,10 @@ export type FillFieldTarget = {
 const PICK_WAITS_MS = 5 * 60 * 1000;
 
 /** Picks waiting for the master password, by item. */
-const waitingPicks = new Map<string, { pick: FillFieldTarget; deps: PickDependencies; at: number }>();
+const waitingPicks = new Map<
+  string,
+  { pick: FillFieldTarget; deps: PickDependencies; at: number }
+>();
 
 /**
  * Fills one of an item's values into one field now, and remembers it as a
@@ -257,7 +260,10 @@ const waitingPicks = new Map<string, { pick: FillFieldTarget; deps: PickDependen
  * pick waits for the prompt (`finishPickAfterReprompt`): nothing fills, is
  * saved, or is shared before it succeeds.
  */
-export async function fillFieldWith(pick: FillFieldTarget, deps: PickDependencies): Promise<boolean> {
+export async function fillFieldWith(
+  pick: FillFieldTarget,
+  deps: PickDependencies,
+): Promise<boolean> {
   if (await deps.passwordRepromptRequired(pick.cipher)) {
     if (pick.cipher.id != null) {
       waitingPicks.set(pick.cipher.id, { pick, deps, at: Date.now() });

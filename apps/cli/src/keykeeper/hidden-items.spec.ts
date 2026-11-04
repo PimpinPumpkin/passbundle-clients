@@ -233,13 +233,23 @@ describe("keepHiddenSecrets", () => {
     ],
     [
       "a website, where autofill sends the password",
-      (r: any) => (r.login.uris = [{ uri: "https://evil.example", match: null }]),
+      (r: any) => {
+        r.login.uris = [{ uri: "https://evil.example", match: null as number | null }];
+      },
       "change its websites",
     ],
-    ["its websites, by leaving them out", (r: any) => (r.login.uris = null), "change its websites"],
+    [
+      "its websites, by leaving them out",
+      (r: any) => {
+        r.login.uris = null;
+      },
+      "change its websites",
+    ],
     [
       "how a website is matched",
-      (r: any) => (r.login.uris[0].match = 3),
+      (r: any) => {
+        r.login.uris[0].match = 3;
+      },
       "change its websites",
     ],
   ])("refuses changing %s", (_, change, why) => {
