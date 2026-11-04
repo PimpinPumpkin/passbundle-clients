@@ -55,6 +55,8 @@ function setup() {
   joinChecks.onItsOwn.mockImplementation(async (_userId, pending) =>
     pending.filter((p) => p.autoConfirm),
   );
+  // Which clients carry a client seal is join-checks.spec.ts's; here, all of them.
+  joinChecks.trustedClients.mockImplementation(async (_userId, _mspId, clients) => clients);
   const work = new KeykeeperMspWork(
     requests,
     sender,
@@ -115,7 +117,7 @@ describe("MSP background work", () => {
     expect(updated).toHaveBeenCalledTimes(1);
   });
 
-  it("confirms only those the checks let in, and announces each on this device", async () => {
+  it("confirms only those the checks let in, announces each on this device, and remembers the seal it used", async () => {
     const { work, requests, organizationUserService, joinChecks } = setup();
     requests.pending.mockResolvedValue([member("dental", "ana"), member("dental", "ben")]);
     joinChecks.onItsOwn.mockImplementation(async (_userId, pending) =>
@@ -127,6 +129,26 @@ describe("MSP background work", () => {
     expect(await work.confirmPending("msp-1")).toEqual({ confirmed: 1, failed: [] });
     expect(organizationUserService.confirmUser.mock.calls.map((c) => c[1])).toEqual(["ben"]);
     expect(letIn).toEqual([{ email: "ben@example.test", organizationName: "Acme Dental" }]);
+    expect(joinChecks.markLetIn.mock.calls.map((c) => c[1].memberId)).toEqual(["ben"]);
+  });
+
+  it("never confirms in an organization where the person isn't an owner or admin, though they hold its key", async () => {
+    const { work, requests, organizationService, organizationUserService, joinChecks } = setup();
+    organizationService.organizations$.mockReturnValue(
+      of([
+        { id: "dental", name: "Acme Dental", isOwner: false, isAdmin: true } as Organization,
+        { id: "family", name: "Family", isOwner: false, isAdmin: false } as Organization,
+      ]),
+    );
+    requests.organizationsPending.mockResolvedValue([
+      member("dental", "ana"),
+      member("family", "mallory"),
+    ]);
+    requests.list.mockResolvedValue([]);
+
+    expect(await work.run()).toEqual([]);
+    expect(joinChecks.onItsOwn.mock.calls[0][1].map((p) => p.memberId)).toEqual(["ana"]);
+    expect(organizationUserService.confirmUser.mock.calls.map((c) => c[1])).toEqual(["ana"]);
   });
 
   it("does nothing while the vault is locked", async () => {
@@ -244,6 +266,25 @@ describe("Keeping clients' templates current", () => {
     expect(sender.send.mock.calls[0][2]).toEqual([{ id: "dental", name: "Acme Dental" }]);
   });
 
+  it("never copies into an organization the server lists as a client without a client seal this device checks", async () => {
+    const setUp = withTemplate({ ...FOLDER_PRESETS.edit });
+    setUp.joinChecks.trustedClients.mockResolvedValue([]);
+    expect(await setUp.work.run()).toEqual([]);
+    expect(setUp.sender.send).not.toHaveBeenCalled();
+    expect(setUp.joinChecks.trustedClients.mock.calls[0][1]).toBe("msp-1");
+  });
+
+  it("never copies a template from someone's own vault, whatever the server names as the source", async () => {
+    const setUp = withTemplate({ ...FOLDER_PRESETS.edit });
+    const [source] = await setUp.cipherService.getAllDecrypted(USER);
+    source.organizationId = null;
+    source.collectionIds = [];
+    const failures = await setUp.work.run();
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toContain("Firewall: That template is in your own vault.");
+    expect(setUp.sender.send).not.toHaveBeenCalled();
+  });
+
   it("skips and reports, once a session, a template whose item the person can't share", async () => {
     const { work, sender } = withTemplate({ ...FOLDER_PRESETS.view });
     expect(await work.run()).toEqual([
@@ -273,23 +314,41 @@ describe("Duplicate template copies", () => {
     collections: {},
   };
 
+  const trusted = new Set(["dental"]);
+
   it("are the MSP's copies in a client other than the recorded one", () => {
     const deleted = item("old", "dental", "fw", "Northwind IT");
     deleted.deletedDate = new Date();
     expect(
-      duplicateCopies(state, [
-        item("kept", "dental", "fw", "Northwind IT"),
-        item("extra", "dental", "fw", "Northwind IT"),
-        deleted,
-        // Another client's copy, the client's own template, and the source.
-        item("law-copy", "law", "fw", "Northwind IT"),
-        item("own", "dental", "fw"),
-        item("source", null, "fw"),
-      ]),
+      duplicateCopies(
+        state,
+        [
+          item("kept", "dental", "fw", "Northwind IT"),
+          item("extra", "dental", "fw", "Northwind IT"),
+          deleted,
+          // Another client's copy, the client's own template, and the source.
+          item("law-copy", "law", "fw", "Northwind IT"),
+          item("own", "dental", "fw"),
+          item("source", null, "fw"),
+        ],
+        trusted,
+      ),
     ).toEqual(["extra"]);
   });
 
   it("are left alone when the recorded copy is gone", () => {
-    expect(duplicateCopies(state, [item("extra", "dental", "fw", "Northwind IT")])).toEqual([]);
+    expect(
+      duplicateCopies(state, [item("extra", "dental", "fw", "Northwind IT")], trusted),
+    ).toEqual([]);
+  });
+
+  it("are left alone in an organization this device doesn't trust as a client", () => {
+    expect(
+      duplicateCopies(
+        state,
+        [item("kept", "dental", "fw", "Northwind IT"), item("extra", "dental", "fw", "X")],
+        new Set(),
+      ),
+    ).toEqual([]);
   });
 });

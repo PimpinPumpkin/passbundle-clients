@@ -20,7 +20,9 @@ export type ReportedJoining = { autoConfirm: boolean; domains: string[]; seal: s
  * when they invite someone, change how people join, or make an install
  * command, so other apps can let people in on their own without trusting
  * the server. Made only on these actions, never from what the server lists
- * on its own. See DESIGN.md, "Joins a hacked server can't forge".
+ * on its own, and for an MSP's clients only in those whose client seal
+ * checks out (`trustedClients`). See DESIGN.md, "Joins a hacked server can't
+ * forge".
  */
 @Injectable({ providedIn: "root" })
 export class KeykeeperJoinSealer {
@@ -77,6 +79,35 @@ export class KeykeeperJoinSealer {
     return out;
   }
 
+  /** The seal that says this organization is this MSP's client, made where its key was. */
+  async clientSeal(organizationId: string, mspId: string): Promise<string | undefined> {
+    const joinKey = await this.joinKey(organizationId);
+    return joinKey == null ? undefined : this.seals.clientSeal(joinKey, organizationId, mspId);
+  }
+
+  /**
+   * Of the clients the server lists for an MSP, those this person holds the
+   * key of and whose client seal for this MSP checks out. A hacked server
+   * could list any organization the person belongs to as a client; seals and
+   * template copies go only to these.
+   */
+  async trustedClients<T extends { id: string; seal?: string | null }>(
+    mspId: string,
+    clients: T[],
+  ): Promise<T[]> {
+    const trusted: T[] = [];
+    for (const client of clients) {
+      const joinKey = await this.joinKey(client.id);
+      if (
+        joinKey != null &&
+        (await this.seals.checkClientSeal(client.seal, joinKey, client.id, mspId))
+      ) {
+        trusted.push(client);
+      }
+    }
+    return trusted;
+  }
+
   /**
    * The seal for a joining setting with these domains. Without the
    * organization's key, none: joins then wait for approval.
@@ -120,7 +151,8 @@ export class KeykeeperJoinSealer {
     return this.joiningSeal(organizationId, autoConfirm, domains);
   }
 
-  private async vouches(organizationId: string, current: ReportedJoining): Promise<boolean> {
+  /** Whether the reported setting, domains included, is what its seal says. */
+  async vouches(organizationId: string, current: ReportedJoining): Promise<boolean> {
     const joinKey = await this.joinKey(organizationId);
     if (joinKey == null) {
       return false;

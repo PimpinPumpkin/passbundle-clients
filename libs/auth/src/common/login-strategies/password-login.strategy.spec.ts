@@ -7,6 +7,7 @@ import { MasterPasswordPolicyOptions } from "@bitwarden/common/admin-console/mod
 import { TokenService } from "@bitwarden/common/auth/abstractions/token.service";
 import { TwoFactorProviderType } from "@bitwarden/common/auth/enums/two-factor-provider-type";
 import { ForceSetPasswordReason } from "@bitwarden/common/auth/models/domain/force-set-password-reason";
+import { IdentityKeykeeperTwoStepSetupResponse } from "@bitwarden/common/auth/models/response/identity-keykeeper-two-step-setup.response";
 import { IdentitySsoRequiredResponse } from "@bitwarden/common/auth/models/response/identity-sso-required.response";
 import { IdentityTokenResponse } from "@bitwarden/common/auth/models/response/identity-token.response";
 import { IdentityTwoFactorResponse } from "@bitwarden/common/auth/models/response/identity-two-factor.response";
@@ -436,6 +437,36 @@ describe("PasswordLoginStrategy", () => {
       expect(policyService.evaluateMasterPassword).not.toHaveBeenCalled();
       expect(masterPasswordService.mock.setForceSetPasswordReason).not.toHaveBeenCalled();
     });
+  });
+
+  // Keykeeper: two-step login for admins (DESIGN.md, "Two-step login for admins").
+  it("hands back a setup session, with the password's server hash and nothing signed in, when the role requires two-step login", async () => {
+    apiService.postIdentityToken.mockResolvedValueOnce(
+      new IdentityKeykeeperTwoStepSetupResponse({
+        error: "invalid_grant",
+        KeykeeperTwoStepSetup: "setup-token",
+        KeykeeperTwoStepRequiredBy: ["Acme Dental"],
+        ErrorModel: {
+          Message: "Acme Dental requires two-step login for your role.",
+          Object: "error",
+        },
+      }),
+    );
+    policyService.evaluateMasterPassword.mockReturnValue(false);
+
+    const result = await passwordLoginStrategy.logIn(credentials);
+
+    expect(result.keykeeperTwoStepSetup).toEqual({
+      token: "setup-token",
+      requiredBy: ["Acme Dental"],
+      message: "Acme Dental requires two-step login for your role.",
+      email,
+      masterPasswordHash: hashedPassword,
+    });
+    expect(result.requiresTwoFactor).toBe(false);
+    expect(result.userId).toBeUndefined();
+    expect(policyService.evaluateMasterPassword).not.toHaveBeenCalled();
+    expect(unlockService.unlockWithMasterPassword).not.toHaveBeenCalled();
   });
 
   describe("processForceSetPasswordReason", () => {

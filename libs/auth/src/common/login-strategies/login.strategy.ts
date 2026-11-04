@@ -13,6 +13,7 @@ import { TokenTwoFactorRequest } from "@bitwarden/common/auth/models/request/ide
 import { UserApiTokenRequest } from "@bitwarden/common/auth/models/request/identity-token/user-api-token.request";
 import { WebAuthnLoginTokenRequest } from "@bitwarden/common/auth/models/request/identity-token/webauthn-login-token.request";
 import { IdentityDeviceVerificationResponse } from "@bitwarden/common/auth/models/response/identity-device-verification.response";
+import { IdentityKeykeeperTwoStepSetupResponse } from "@bitwarden/common/auth/models/response/identity-keykeeper-two-step-setup.response";
 import { IdentitySsoRequiredResponse } from "@bitwarden/common/auth/models/response/identity-sso-required.response";
 import { IdentityTokenResponse } from "@bitwarden/common/auth/models/response/identity-token.response";
 import { IdentityTwoFactorResponse } from "@bitwarden/common/auth/models/response/identity-two-factor.response";
@@ -50,7 +51,8 @@ type IdentityResponse =
   | IdentityTokenResponse
   | IdentityTwoFactorResponse
   | IdentityDeviceVerificationResponse
-  | IdentitySsoRequiredResponse;
+  | IdentitySsoRequiredResponse
+  | IdentityKeykeeperTwoStepSetupResponse;
 
 export abstract class LoginStrategyData {
   tokenRequest:
@@ -132,6 +134,8 @@ export abstract class LoginStrategy {
       return [await this.processDeviceVerificationResponse(response), response];
     } else if (response instanceof IdentitySsoRequiredResponse) {
       return [await this.processSsoRequiredResponse(response), response];
+    } else if (response instanceof IdentityKeykeeperTwoStepSetupResponse) {
+      return [await this.processKeykeeperTwoStepSetupResponse(response), response];
     }
 
     throw new Error("Invalid response object.");
@@ -412,6 +416,29 @@ export abstract class LoginStrategy {
     const result = new AuthResult();
     result.ssoOrganizationIdentifier = response.ssoOrganizationIdentifier;
     result.keykeeperSsoLinkSession = response.keykeeperSsoLinkSession;
+    return result;
+  }
+
+  /**
+   * Keykeeper: the person's role requires two-step login, which they haven't
+   * set up, so the server answered with a setup session instead of a login
+   * (DESIGN.md, "Two-step login for admins"). Nothing is signed in. A password
+   * sign-in's server hash comes along in memory, since the setup endpoints ask
+   * for it; after single sign-on the setup page asks for the master password.
+   */
+  protected async processKeykeeperTwoStepSetupResponse(
+    response: IdentityKeykeeperTwoStepSetupResponse,
+  ): Promise<AuthResult> {
+    const result = new AuthResult();
+    const request = this.cache.value?.tokenRequest;
+    const password = request instanceof PasswordTokenRequest ? request : null;
+    result.keykeeperTwoStepSetup = {
+      token: response.token,
+      requiredBy: response.requiredBy,
+      message: response.message,
+      email: password?.email ?? null,
+      masterPasswordHash: password?.masterPasswordHash ?? null,
+    };
     return result;
   }
 }

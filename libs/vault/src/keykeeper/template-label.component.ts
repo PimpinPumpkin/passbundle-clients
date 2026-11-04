@@ -6,7 +6,9 @@ import { templateDefinition, templateOf } from "./templates";
 
 /**
  * Keykeeper: in the item view, which template an item came from, or that the
- * item is itself a custom template.
+ * item is itself a custom template. A copy an MSP keeps up to date says so,
+ * but never who it's from: the item's own contents can't be trusted to say
+ * (DESIGN.md, "MSP templates").
  */
 @Component({
   selector: "app-keykeeper-template-label",
@@ -21,7 +23,7 @@ import { templateDefinition, templateOf } from "./templates";
         New {{ d.base === "login" ? "logins" : "notes" }} from this template start with its custom
         fields.
         @if (d.from) {
-          It comes from {{ d.from }}, which keeps it up to date.
+          It's a copy of a template kept up to date elsewhere, so changes made here may be replaced.
         }
       </p>
     }

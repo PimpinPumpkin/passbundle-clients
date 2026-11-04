@@ -4,6 +4,10 @@
     {{ "loading" | i18n }}
   </div>
   <div *ngIf="!loggingIn">
+    <!-- Keykeeper: the command-line tool's sign-in, which a link alone can't start. -->
+    <p *ngIf="clientId === 'cli'" data-testid="sso-for-command-line">
+      {{ "keykeeperSsoForCommandLine" | i18n }}
+    </p>
     <bit-form-field>
       <bit-label>{{ "ssoIdentifier" | i18n }}</bit-label>
       <input bitInput type="text" formControlName="identifier" appAutofocus />

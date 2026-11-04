@@ -43,7 +43,17 @@ export function installCommand(
 
 /** A PowerShell literal string. The checks above already rule out quotes. */
 function quote(value: string): string {
-  return `'${value.replace(/'/g, "''")}'`;
+  return powerShellLiteral(value);
+}
+
+/**
+ * Any text as a PowerShell single-quoted (literal) string, in which nothing
+ * is expanded. PowerShell ends one at any of four quote characters, the
+ * apostrophe and three curly ones, and reads any of them twice as one, so
+ * each is doubled.
+ */
+export function powerShellLiteral(value: string): string {
+  return `'${value.replace(/['\u2018\u2019\u201A\u201B]/g, (q) => q + q)}'`;
 }
 
 /** Shown in place of a command that didn't pass the checks. */

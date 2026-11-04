@@ -60,6 +60,7 @@ import {
 } from "@bitwarden/components";
 
 import { keykeeperStartSsoLink } from "../sso/keykeeper-sso-link";
+import { keykeeperStartTwoStepSetup } from "../two-step/keykeeper-two-step-setup";
 
 import { TwoFactorAuthAuthenticatorComponent } from "./child-components/two-factor-auth-authenticator/two-factor-auth-authenticator.component";
 import { TwoFactorAuthDuoComponent } from "./child-components/two-factor-auth-duo/two-factor-auth-duo.component";
@@ -459,6 +460,23 @@ export class TwoFactorAuthComponent implements OnInit, OnDestroy {
         toastService: this.toastService,
         i18nService: this.i18nService,
         clientType: this.platformUtilsService.getClientType(),
+      })
+    ) {
+      return;
+    }
+
+    // Keykeeper: the second step checked out, but it doesn't count for the
+    // person's role (an email code), or none was asked: set up a method that
+    // counts first (DESIGN.md, "Two-step login for admins").
+    if (
+      await keykeeperStartTwoStepSetup(authResult, {
+        router: this.router,
+        i18nService: this.i18nService,
+        dialogService: this.dialogService,
+        platformUtilsService: this.platformUtilsService,
+        clientType: this.platformUtilsService.getClientType(),
+        webVaultUrl: async () =>
+          (await firstValueFrom(this.environmentService.environment$)).getWebVaultUrl(),
       })
     ) {
       return;

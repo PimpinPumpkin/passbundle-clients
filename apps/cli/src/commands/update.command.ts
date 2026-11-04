@@ -3,6 +3,8 @@
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 
+import { CLI_BRAND } from "../keykeeper/brand";
+import { cliVersion, updateMessage } from "../keykeeper/version";
 import { Response } from "../models/response";
 import { MessageResponse } from "../models/response/message.response";
 
@@ -21,6 +23,17 @@ export class UpdateCommand {
   }
 
   async run(): Promise<Response> {
+    // Keykeeper: a branded tool doesn't update itself or ask anyone about
+    // updates; it says which version it is and where to get the newest.
+    if (CLI_BRAND.releases) {
+      const version = cliVersion(await this.platformUtilsService.getApplicationVersion());
+      const res = new MessageResponse(null, null);
+      res.title = updateMessage(version);
+      res.raw = CLI_BRAND.releases;
+      res.noColor = true;
+      return Response.success(res);
+    }
+
     const response = await this.apiService.nativeFetch(new Request(CLIENTS_RELEASE_LIST_ENDPOINT));
     if (response.status !== 200) {
       return Response.error("Error contacting update API: " + response.status);

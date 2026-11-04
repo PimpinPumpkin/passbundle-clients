@@ -243,6 +243,7 @@ import { CliBiometricsService } from "../key-management/cli-biometrics-service";
 import { CliProcessReloadService } from "../key-management/cli-process-reload.service";
 import { CliUserKeyRotationService } from "../key-management/cli-user-key-rotation-service";
 import { CliSessionTimeoutTypeService } from "../key-management/session-timeout/services/cli-session-timeout-type.service";
+import { secureDataFolder } from "../keykeeper/data-folder";
 import { flagEnabled } from "../platform/flags";
 import { CliPlatformUtilsService } from "../platform/services/cli-platform-utils.service";
 import { CliSdkLoadService } from "../platform/services/cli-sdk-load.service";
@@ -392,6 +393,16 @@ export class ServiceContainer {
       p = path.join(process.env.XDG_CONFIG_HOME, "Bitwarden CLI");
     } else {
       p = path.join(process.env.HOME ?? "", ".config/Bitwarden CLI");
+    }
+    // Keykeeper: never a data folder others can change, and data.json the
+    // owner's alone (keykeeper/data-folder.ts).
+    const folderCheck = secureDataFolder(p);
+    if (folderCheck.warn != null) {
+      process.stderr.write(folderCheck.warn + "\n");
+    }
+    if (folderCheck.refuse != null) {
+      process.stderr.write(folderCheck.refuse + "\n");
+      process.exit(process.env.BW_CLEANEXIT ? 0 : 1);
     }
 
     const logoutCallback = async () => await this.logout();

@@ -2,6 +2,7 @@ import { firstValueFrom } from "rxjs";
 
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
+import { checksPassword } from "@bitwarden/common/dirt/keykeeper/password-health";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { uuidAsString } from "@bitwarden/common/platform/abstractions/sdk/sdk.service";
 import { CipherRiskService } from "@bitwarden/common/vault/abstractions/cipher-risk.service";
@@ -39,7 +40,11 @@ export class ReportCommand {
 
     const ciphers = await this.cipherService.getAllDecrypted(userId);
     // Filter once: drives both the progress count and the result-name lookup.
-    const logins = ciphers.filter(isRiskableLoginCipher);
+    // Keykeeper: only passwords the person may see (DESIGN.md, "Folders and
+    // permissions"): a report on one they can't, such as which of their own
+    // passwords it's the same as, would tell them something about it. The
+    // same rule as the web vault's reports (dirt/keykeeper/password-health.ts).
+    const logins = ciphers.filter((c) => isRiskableLoginCipher(c) && checksPassword(c, false));
     const names = new Map<string, string>(logins.map((c) => [c.id, c.name]));
 
     try {

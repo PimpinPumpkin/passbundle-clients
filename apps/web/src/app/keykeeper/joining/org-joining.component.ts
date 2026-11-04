@@ -131,7 +131,11 @@ export class KeykeeperOrgJoiningComponent {
   };
 
   protected readonly useDefault = async () => {
-    this.show(await this.api.resetOrgJoining(this.organizationId()));
+    const seen = this.joining();
+    if (seen == null) {
+      return;
+    }
+    this.show(await this.api.useDefaultJoining(this.organizationId(), seen.default.autoConfirm));
     this.toastService.showToast({ variant: "success", message: "Back on the default" });
   };
 }

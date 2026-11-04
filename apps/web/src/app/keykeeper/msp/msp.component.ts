@@ -51,6 +51,7 @@ import {
   replaceTokenPrompt,
 } from "../offboarding/offboarding";
 
+import { withAdminTwoStep } from "./admin-two-step-policy";
 import {
   ClientHealth,
   clientHealth,
@@ -80,6 +81,7 @@ import { KeykeeperMspJoiningComponent } from "./msp-joining.component";
 import { clientPolicySummary } from "./msp-policies";
 import { KeykeeperMspSiteFixesComponent } from "./msp-site-fixes.component";
 import { KeykeeperMspTemplatesComponent } from "./msp-templates.component";
+import { KeykeeperMspTwoStepComponent } from "./msp-two-step.component";
 import { KeykeeperMspWorkService } from "./msp-work.service";
 import { DEFAULT_ACCESS, describeAccess, reachesEveryClient } from "./technician-access";
 import { KeykeeperTechnicianAccessEditorComponent } from "./technician-access-editor.component";
@@ -115,6 +117,7 @@ const CLIENT_FEATURES = {
     KeykeeperEventStreamingComponent,
     KeykeeperMspSiteFixesComponent,
     KeykeeperMspTemplatesComponent,
+    KeykeeperMspTwoStepComponent,
     KeykeeperTechnicianAccessEditorComponent,
   ],
   template: `
@@ -319,6 +322,18 @@ const CLIENT_FEATURES = {
                           >
                             Provisioning
                           </a>
+                        }
+                        @if (unconfirmedClient(client)) {
+                          <button
+                            type="button"
+                            bitLink
+                            class="tw-whitespace-nowrap"
+                            data-testid="msp-client-confirm"
+                            [attr.aria-label]="'Confirm ' + client.name + ' is your client'"
+                            (click)="confirmClient(client)"
+                          >
+                            Confirm client
+                          </button>
                         }
                         @if (client.you?.status === CONFIRMED) {
                           <a bitLink [routerLink]="openLink(client)">Open</a>
@@ -616,6 +631,12 @@ const CLIENT_FEATURES = {
           />
         }
 
+        <app-keykeeper-msp-two-step
+          [mspId]="m.id"
+          [isAdmin]="m.role === 'admin'"
+          (changed)="reload(m.id)"
+        />
+
         @if (templates(); as t) {
           <app-keykeeper-msp-templates [msp]="m" [templates]="t" (changed)="reload(m.id)" />
         }
@@ -877,6 +898,14 @@ const CLIENT_FEATURES = {
           Run all of your clients from one place. You'll be an admin of your MSP, and you can add
           technicians next.
         </bit-callout>
+        @if (needsTwoStep()) {
+          <bit-callout type="warning" [title]="null" data-testid="msp-setup-two-step">
+            Your MSP's staff sign in with two-step login: an authenticator app, a security key or
+            passkey, or Duo. You haven't set it up, so once your MSP is made you'll be signed out,
+            and asked to set it up when you sign in again.
+            <a bitLink routerLink="/settings/security/two-factor">Set it up first</a>
+          </bit-callout>
+        }
         <form [formGroup]="mspForm" [bitSubmit]="createMsp" class="tw-flex tw-items-end tw-gap-2">
           <bit-form-field disableMargin class="tw-grow">
             <bit-label>Your MSP's name</bit-label>
@@ -892,6 +921,13 @@ export class KeykeeperMspComponent implements OnInit {
   protected readonly CONFIRMED = CONFIRMED;
   protected readonly loading = signal(true);
   protected readonly msp = signal<MspDetails | null>(null);
+  /**
+   * For MSP admins, the clients this browser trusts (their client seal
+   * checks out), so the others can be confirmed by name. Null until known.
+   */
+  protected readonly trusted = signal<Set<string> | null>(null);
+  /** Keykeeper: no two-step login that counts for MSP staff yet (DESIGN.md, "Two-step login for admins"). */
+  protected readonly needsTwoStep = signal(false);
   protected readonly invitation = signal<{ token: string; info: InvitationInfo } | null>(null);
   protected readonly lastInvite = signal<{
     email: string;
@@ -996,6 +1032,10 @@ export class KeykeeperMspComponent implements OnInit {
   ) {}
 
   async ngOnInit() {
+    this.mspApi.hasQualifyingTwoStep().then(
+      (has) => this.needsTwoStep.set(!has),
+      () => this.needsTwoStep.set(false),
+    );
     try {
       const token = this.route.snapshot.queryParamMap.get("invite");
       if (token) {
@@ -1115,7 +1155,7 @@ export class KeykeeperMspComponent implements OnInit {
       return;
     }
     await this.attempt(async () => {
-      await this.mspApi.setAccess(msp.id, person.userId, this.accessDraft());
+      await this.mspApi.setAccess(msp.id, person, this.accessDraft());
       this.accessFor.set(null);
       // Clients they now reach are waiting for the org key; give it now.
       await this.confirmWaiting(msp.id);
@@ -1168,7 +1208,7 @@ export class KeykeeperMspComponent implements OnInit {
       return;
     }
     await this.attempt(async () => {
-      await this.mspApi.changeRole(msp.id, person.userId, role);
+      await this.mspApi.changeRole(msp.id, person, role);
       this.accessFor.set(null);
       // A new admin joins clients they didn't reach before; give them the keys.
       await this.confirmWaiting(msp.id);
@@ -1277,6 +1317,42 @@ export class KeykeeperMspComponent implements OnInit {
     this.toast("Copied the install command");
   }
 
+  /**
+   * A client an MSP admin holds the key of that this browser can't check is
+   * the MSP's: one made before client seals, or one a server lists that isn't.
+   */
+  protected unconfirmedClient(client: MspClient): boolean {
+    const trusted = this.trusted();
+    return trusted != null && client.you?.status === CONFIRMED && !trusted.has(client.id);
+  }
+
+  /**
+   * Seals that a client is this MSP's, once an admin says so by name. Until
+   * then nothing is sealed or copied there in the background (DESIGN.md,
+   * "Joins a hacked server can't forge").
+   */
+  protected async confirmClient(client: MspClient) {
+    const msp = this.msp();
+    if (msp == null) {
+      return;
+    }
+    const confirmed = await this.dialogService.openSimpleDialog({
+      title: `Is ${client.name} your client?`,
+      content: `Confirm only an organization ${msp.name} manages. Until a client is confirmed, PassBundle doesn't copy your templates there or vouch for your staff joining it, so a hacked server can't point that work at another organization you belong to.`,
+      acceptButtonText: "Confirm client",
+      type: "warning",
+    });
+    if (!confirmed) {
+      return;
+    }
+    await this.attempt(async () => {
+      await this.mspApi.confirmClient(msp.id, client.id);
+      this.toast(`Confirmed ${client.name}`);
+      await this.reload(msp.id);
+      void this.work.run();
+    });
+  }
+
   protected async replaceToken(client: MspClient) {
     const msp = this.msp();
     if (msp == null) {
@@ -1304,6 +1380,7 @@ export class KeykeeperMspComponent implements OnInit {
   protected async reload(mspId: string) {
     const msp = await this.mspApi.get(mspId);
     this.msp.set(msp);
+    this.trusted.set(msp.role === "admin" ? await this.mspApi.trustedClientIds(mspId, msp) : null);
     void this.computeHealth(msp);
     await this.loadPolicies(mspId);
     await this.loadTemplates(mspId);
@@ -1340,7 +1417,8 @@ export class KeykeeperMspComponent implements OnInit {
           definitions.push(definition);
         }
       }
-      this.policyDefinitions.set(definitions);
+      // Keykeeper: and two-step login for each client's admins.
+      this.policyDefinitions.set(withAdminTwoStep(definitions, policies.types));
     }
     this.policies.set(policies);
   }

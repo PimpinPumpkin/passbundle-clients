@@ -14,6 +14,18 @@ export class AuthResult {
   ssoOrganizationIdentifier?: string | null;
   /** Keykeeper: a linking session, when the account must link to that single sign-on first. */
   keykeeperSsoLinkSession?: string | null;
+  /**
+   * Keykeeper: a setup session, when the account's role requires two-step
+   * login and it isn't set up yet. The password sign-in's server hash comes
+   * along (in memory only), since the setup endpoints still ask for it.
+   */
+  keykeeperTwoStepSetup?: {
+    token: string;
+    requiredBy: string[];
+    message: string;
+    email: string | null;
+    masterPasswordHash: string | null;
+  } | null;
   // The master-password used in the authentication process
   masterPassword: string | null;
 

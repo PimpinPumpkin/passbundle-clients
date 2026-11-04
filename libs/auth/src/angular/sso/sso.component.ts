@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { Component, OnInit } from "@angular/core";
+import { Component, inject, OnInit } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormControl, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { ActivatedRoute, Router, RouterModule } from "@angular/router";
@@ -40,6 +40,7 @@ import {
   AsyncActionsModule,
   ButtonModule,
   CheckboxModule,
+  DialogService,
   FormFieldModule,
   IconButtonModule,
   IconModule,
@@ -47,6 +48,8 @@ import {
   ToastService,
 } from "@bitwarden/components";
 import { PasswordGenerationServiceAbstraction } from "@bitwarden/generator-legacy";
+
+import { keykeeperStartTwoStepSetup } from "../two-step/keykeeper-two-step-setup";
 
 import { SsoClientType, SsoComponentService } from "./sso-component.service";
 
@@ -88,6 +91,8 @@ export class SsoComponent implements OnInit {
 
   protected redirectUri: string | undefined;
   protected loggingIn = false;
+  /** Keykeeper: for the message that sends someone to set up two-step login. */
+  private readonly keykeeperDialogService = inject(DialogService);
   protected identifier: string | undefined;
   protected state: string | undefined;
   protected codeChallenge: string | undefined;
@@ -171,6 +176,13 @@ export class SsoComponent implements OnInit {
     // directly to their IdP to simulate IdP-initiated SSO, so we submit automatically.
     if (qParams.identifier != null) {
       this.identifierFormControl.setValue(qParams.identifier);
+      // Keykeeper: for the command-line tool, whose answer goes to a listener
+      // on this computer, the person presses Continue. A link alone, which
+      // anyone can send, never starts a sign-in for it (DESIGN.md, "Sign in
+      // with Microsoft Entra ID", "Threat model").
+      if (this.clientId === ClientType.Cli) {
+        return;
+      }
       this.loggingIn = true;
       await this.submit();
       return;
@@ -290,7 +302,10 @@ export class SsoComponent implements OnInit {
       return;
     }
 
-    const autoSubmit = (await firstValueFrom(this.route.queryParams)).identifier != null;
+    // Keykeeper: the command-line tool's sign-in waits for Continue (above).
+    const autoSubmit =
+      (await firstValueFrom(this.route.queryParams)).identifier != null &&
+      this.clientId !== ClientType.Cli;
 
     this.identifier = this.identifierFormControl.value ?? "";
     await this.ssoLoginService.setOrganizationSsoIdentifier(this.identifier);
@@ -437,6 +452,25 @@ export class SsoComponent implements OnInit {
       const authResult = await this.formPromise;
       if (authResult.requiresTwoFactor) {
         return await this.handleTwoFactorRequired(orgSsoIdentifier);
+      }
+
+      // Keykeeper: this organization's single sign-on doesn't meet every rule
+      // that requires two-step login of this person (another organization's,
+      // an owner's, or their MSP's): set it up first (DESIGN.md, "Two-step
+      // login for admins").
+      if (
+        await keykeeperStartTwoStepSetup(authResult, {
+          router: this.router,
+          i18nService: this.i18nService,
+          dialogService: this.keykeeperDialogService,
+          platformUtilsService: this.platformUtilsService,
+          clientType: this.platformUtilsService.getClientType(),
+          webVaultUrl: async () =>
+            (await firstValueFrom(this.environmentService.environment$)).getWebVaultUrl(),
+        })
+      ) {
+        this.loggingIn = false;
+        return;
       }
 
       // Everything after the 2FA check is considered a successful login
@@ -628,6 +662,11 @@ export class SsoComponent implements OnInit {
 
         if (response.data.length > 0) {
           this.identifierFormControl.setValue(response.data[0].organizationIdentifier);
+          // Keykeeper: never by itself for the command-line tool (see ngOnInit).
+          if (this.clientId === ClientType.Cli) {
+            this.loggingIn = false;
+            return;
+          }
           await this.submit();
           return;
         }

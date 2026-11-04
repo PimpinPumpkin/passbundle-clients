@@ -39,8 +39,18 @@ export function describeEvent(
     case "client_created":
       // Clients added before default policies started with "Business defaults".
       return `${actor} added the client ${org}${e.detail === "Default policies" || e.detail === "Business defaults" ? " with the default policies" : ""}`;
+    // Two-step login for admins is a default too, logged as a security setting.
     case "default_policy_changed":
+    case "admin_two_step_default_set":
       return `${actor} set the default ${e.detail ?? "policy"}`;
+    case "staff_two_step_set":
+      return detail === "off"
+        ? `${actor} stopped requiring two-step login of the MSP's staff`
+        : `${actor} required two-step login of the MSP's staff`;
+    case "client_admin_two_step_set":
+      return detail === "off"
+        ? `${actor} stopped requiring two-step login of ${org}'s admins`
+        : `${actor} required two-step login of ${org}'s admins`;
     case "template_added":
       return `${actor} added ${theTemplate} for ${clients || "clients"}`;
     case "template_changed":

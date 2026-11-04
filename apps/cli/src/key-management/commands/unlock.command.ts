@@ -91,10 +91,9 @@ export class UnlockCommand {
         '"\n' +
         '> $env:BW_SESSION="' +
         process.env.BW_SESSION +
-        '"\n\n' +
-        "You can also pass the session key to any command with the `--session` option. ex:\n" +
-        "$ bw list items --session " +
-        process.env.BW_SESSION,
+        // Keykeeper: not on the command line, where other programs on the
+        // computer can read it (keykeeper/command-line.ts).
+        '"',
     );
     res.raw = process.env.BW_SESSION;
     return Response.success(res);

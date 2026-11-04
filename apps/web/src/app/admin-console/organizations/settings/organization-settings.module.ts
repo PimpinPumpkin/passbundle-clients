@@ -8,6 +8,7 @@ import { Vfo1I18nPipe } from "@bitwarden/vault";
 import { DangerZoneComponent } from "../../../auth/settings/account/danger-zone.component";
 import { AccountFingerprintComponent } from "../../../key-management/account-fingerprint/account-fingerprint.component";
 import { KeykeeperOrgJoiningComponent } from "../../../keykeeper/joining/org-joining.component";
+import { KeykeeperAdminTwoStepComponent } from "../../../keykeeper/organizations/admin-two-step.component";
 import { KeykeeperOrgInstallComponent } from "../../../keykeeper/organizations/org-install.component";
 import { KeykeeperScriptAccessComponent } from "../../../keykeeper/organizations/script-access.component";
 import { HeaderModule } from "../../../layouts/header/header.module";
@@ -22,6 +23,8 @@ import { TwoFactorSetupComponent } from "./two-factor-setup.component";
     SharedModule,
     // Keykeeper: how people join the organization, and its install command.
     KeykeeperOrgJoiningComponent,
+    // Keykeeper: two-step login for admins.
+    KeykeeperAdminTwoStepComponent,
     KeykeeperOrgInstallComponent,
     KeykeeperScriptAccessComponent,
     OrganizationSettingsRoutingModule,

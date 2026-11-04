@@ -24,6 +24,7 @@ import { KeyService } from "@bitwarden/key-management";
 import { CollectionResponse } from "../admin-console/models/response/collection.response";
 import { OrganizationUserResponse } from "../admin-console/models/response/organization-user.response";
 import { OrganizationResponse } from "../admin-console/models/response/organization.response";
+import { ItemTemplateResponse, templatesFor } from "../keykeeper/templates";
 import { Response } from "../models/response";
 import { ListResponse } from "../models/response/list.response";
 import { CliUtils } from "../utils";
@@ -62,6 +63,9 @@ export class ListCommand {
         return await this.listOrganizationMembers(normalizedOptions);
       case "organizations":
         return await this.listOrganizations(normalizedOptions);
+      // Keykeeper: the item templates (keykeeper/templates.ts).
+      case "templates":
+        return await this.listTemplates(normalizedOptions);
       default:
         return Response.badRequest("Unknown object.");
     }
@@ -296,6 +300,23 @@ export class ListCommand {
 
     const res = new ListResponse(organizations.map((o) => new OrganizationResponse(o)));
     return Response.success(res);
+  }
+
+  /** Keykeeper: every item template the person can use, as the web vault lists them. */
+  private async listTemplates(options: Options) {
+    const userId = await firstValueFrom(getUserId(this.accountService.activeAccount$));
+    const items = await this.cipherService.getAllDecrypted(userId);
+    const organizations = await firstValueFrom(
+      this.organizationService.memberOrganizations$(userId),
+    );
+    let templates = templatesFor(items, organizations).map((t) => new ItemTemplateResponse(t));
+    if (options.search != null && options.search.trim() !== "") {
+      const search = options.search.trim().toLowerCase();
+      templates = templates.filter(
+        (t) => t.name.toLowerCase().includes(search) || t.group.toLowerCase().includes(search),
+      );
+    }
+    return Response.success(new ListResponse(templates));
   }
 
   /**

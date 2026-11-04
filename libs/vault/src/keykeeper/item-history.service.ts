@@ -24,6 +24,23 @@ import {
 } from "./item-versions";
 
 /**
+ * Whether a version the server sent is this item's, in the item's own
+ * organization or vault. Ids aren't encrypted, so the server could send
+ * another item's contents under this id; it can't make them decrypt with
+ * another organization's key, which is what the organization check decides.
+ */
+export function isVersionOf(
+  version: { id?: string | null; organizationId?: string | null },
+  current: { id?: string | null; organizationId?: string | null },
+): boolean {
+  return (
+    version.id != null &&
+    version.id === current.id &&
+    (version.organizationId ?? null) === (current.organizationId ?? null)
+  );
+}
+
+/**
  * A version as the apps list it: decrypted, or, for someone who can't see the
  * item's passwords, only when and by whom (`view` null).
  */
@@ -49,7 +66,10 @@ export type LoadedItemHistory = {
  * the extension's history page alike (DESIGN.md, "Item history"): loading and
  * decrypting them, restoring one as a normal edit, and deleting one or all.
  * The server decides who gets what; this never decrypts a version for someone
- * the item says can't see its passwords, whatever the server sends.
+ * the item says can't see its passwords, whatever the server sends, nor a
+ * version that isn't this item's in this item's organization (or the
+ * person's own vault): restoring another item's contents here would copy them
+ * across organizations.
  */
 @Injectable()
 export class KeykeeperItemHistoryService {
@@ -80,8 +100,13 @@ export class KeykeeperItemHistoryService {
         versions.push({ ...listed, view: null });
         continue;
       }
-      // Decrypted as the vault decrypts any item from the server.
+      // Decrypted as the vault decrypts any item from the server, once it's
+      // known to be a version of this item, where this item is.
       const cipher = new Cipher(new CipherData(new CipherResponse(version.cipher)));
+      if (!isVersionOf(cipher, current)) {
+        unreadable++;
+        continue;
+      }
       const view = await this.cipherService
         .decrypt(cipher, userId)
         .catch((): CipherView | null => null);

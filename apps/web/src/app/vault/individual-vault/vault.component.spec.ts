@@ -193,7 +193,13 @@ describe("VaultComponent", () => {
         { provide: SearchPipe, useValue: mock<SearchPipe>() },
         { provide: ApiService, useValue: mock<ApiService>() },
         // Keykeeper: the two-step login notice asks who's waiting.
-        { provide: KeykeeperMspApiService, useValue: { twoStepNeeded: () => Promise.resolve([]) } },
+        {
+          provide: KeykeeperMspApiService,
+          useValue: {
+            twoStepNeeded: () => Promise.resolve([]),
+            unacceptedRoles: () => Promise.resolve([]),
+          },
+        },
         { provide: ToastService, useValue: mock<ToastService>() },
         { provide: BillingApiServiceAbstraction, useValue: mock<BillingApiServiceAbstraction>() },
         { provide: OrganizationWarningsService, useValue: mock<OrganizationWarningsService>() },

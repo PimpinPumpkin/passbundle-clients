@@ -46,9 +46,10 @@ import { NodeUtils } from "@bitwarden/node/node-utils";
 import { PureCrypto } from "@bitwarden/sdk-internal";
 
 import { ConfirmKeyConnectorDomainCommand } from "../../key-management/confirm-key-connector-domain.command";
+import { ssoPromptMessage, ssoRequiredRefusal } from "../../keykeeper/sign-in";
 import { Response } from "../../models/response";
 import { MessageResponse } from "../../models/response/message.response";
-import { firstValueFromOrNull } from "../../utils";
+import { CliUtils, firstValueFromOrNull } from "../../utils";
 
 export class LoginCommand {
   protected canInteract: boolean;
@@ -230,6 +231,16 @@ export class LoginCommand {
         return Response.error(this.i18nService.t("legacyEncryptionUnsupported"));
       }
 
+      // Keykeeper: an organization requires single sign-on (DESIGN.md, "Require
+      // single sign-on"), and this account isn't linked to it yet, which only
+      // the web vault does; or the tool can't open a browser for it.
+      if (response.requiresSso) {
+        const refused = ssoRequiredRefusal(response, this.canInteract);
+        if (refused != null) {
+          return Response.error(refused);
+        }
+      }
+
       // Opting for not checking feature flag since the server will not respond with
       // SsoOrganizationIdentifier if the feature flag is not enabled.
       if (response.requiresSso && this.canInteract) {
@@ -359,6 +370,17 @@ export class LoginCommand {
         return Response.error("Login failed.");
       }
 
+      // Keykeeper: the role requires two-step login (an authenticator app, a
+      // security key or passkey, or Duo), which isn't set up yet, so the
+      // server gave a setup session, not a login. It's set up in the web
+      // vault (DESIGN.md, "Two-step login for admins").
+      if (response.keykeeperTwoStepSetup) {
+        return Response.error(
+          response.keykeeperTwoStepSetup.message ||
+            "Your role requires two-step login. Set it up in the web vault, then log in again.",
+        );
+      }
+
       // If we are in the SSO flow and we got a successful login response (we are past rejection scenarios
       // and should always have a userId here), validate that SSO user in MP encryption org has MP set
       // This must be done here b/c we have 2 places we try to login with SSO above and neither has a
@@ -468,10 +490,9 @@ export class LoginCommand {
         '"\n' +
         '> $env:BW_SESSION="' +
         process.env.BW_SESSION +
-        '"\n\n' +
-        "You can also pass the session key to any command with the `--session` option. ex:\n" +
-        "$ bw list items --session " +
-        process.env.BW_SESSION,
+        // Keykeeper: not on the command line, where other programs on the
+        // computer can read it (keykeeper/command-line.ts).
+        '"',
     );
     res.raw = process.env.BW_SESSION;
     return Response.success(res);
@@ -595,32 +616,44 @@ export class LoginCommand {
           callbackServer.close(() => reject());
         }
       });
-      let foundPort = false;
       const webUrl = env.getWebVaultUrl();
-      for (let port = 8065; port <= 8070; port++) {
-        try {
-          this.ssoRedirectUri = "http://localhost:" + port;
-          callbackServer.listen(port, "localhost", () => {
-            const webAppSsoUrl = this.ssoUrlService.buildSsoUrl(
-              webUrl,
-              ClientType.Cli,
-              this.ssoRedirectUri,
-              state,
-              codeChallenge,
-              null,
-              orgSsoIdentifier,
-            );
-            this.platformUtilsService.launchUri(webAppSsoUrl);
-          });
-          foundPort = true;
-          break;
-        } catch {
-          // Ignore error since we run the same command up to 5 times.
+      // Keykeeper: the first free port of 8065 to 8070, the ones the server
+      // takes. Upstream's loop never moved on: `listen` reports a busy port
+      // later, as an error event, not by throwing.
+      const listenOn = (port: number): void => {
+        if (port > 8070) {
+          reject();
+          return;
         }
-      }
-      if (!foundPort) {
-        reject();
-      }
+        const taken = (error: NodeJS.ErrnoException) => {
+          if (error.code === "EADDRINUSE" || error.code === "EACCES") {
+            listenOn(port + 1);
+          } else {
+            reject();
+          }
+        };
+        callbackServer.once("error", taken);
+        this.ssoRedirectUri = "http://localhost:" + port;
+        callbackServer.listen(port, "localhost", () => {
+          callbackServer.removeListener("error", taken);
+          const webAppSsoUrl = this.ssoUrlService.buildSsoUrl(
+            webUrl,
+            ClientType.Cli,
+            this.ssoRedirectUri,
+            state,
+            codeChallenge,
+            null,
+            orgSsoIdentifier,
+          );
+          // Keykeeper: the address too, for when no browser opens (a
+          // server's shell, say), on stderr so scripts' output stays clean.
+          if (process.env.BW_QUIET !== "true") {
+            CliUtils.writeLn(ssoPromptMessage(webAppSsoUrl), false, true);
+          }
+          this.platformUtilsService.launchUri(webAppSsoUrl);
+        });
+      };
+      listenOn(8065);
     });
   }
 

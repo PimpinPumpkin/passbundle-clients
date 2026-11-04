@@ -53,10 +53,8 @@ describe("UnlockCommand", () => {
       '"\n' +
       '> $env:BW_SESSION="' +
       b64sessionKey +
-      '"\n\n' +
-      "You can also pass the session key to any command with the `--session` option. ex:\n" +
-      "$ bw list items --session " +
-      b64sessionKey,
+      // Keykeeper: no session key on the command line (keykeeper/command-line.ts).
+      '"',
   );
   expectedSuccessMessage.raw = b64sessionKey;
 

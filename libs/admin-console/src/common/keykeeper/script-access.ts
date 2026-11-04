@@ -4,7 +4,10 @@
 // the server never sees. The token key is also sealed with the organization
 // key, so apps that hold that key can refresh copies after an item changes.
 // Every app must compute these exactly as docs/vectors/script-access-v1.json,
-// which the unit tests check (a copy sits next to them).
+// and seal and open the token key and specs as docs/vectors/script-grants-v2.json
+// (version 2: each seal names the token, and a spec its item, so a server
+// can't pair a token's key with an item it was never granted). The unit tests
+// check both (copies sit next to them).
 
 import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
 import { EncString } from "@bitwarden/common/key-management/crypto/models/enc-string";
@@ -26,9 +29,8 @@ function fromB64(value: string): Uint8Array<ArrayBuffer> | null {
   }
 }
 
-/** What a grant copies from its item. */
-export type ScriptSpec = {
-  v: 1;
+/** What a grant copies from its item, as an admin chose it. */
+export type ScriptFields = {
   username: boolean;
   password: boolean;
   /** The item's one-time code secret, so the script can make codes. */
@@ -36,6 +38,28 @@ export type ScriptSpec = {
   /** Custom fields, by name. */
   fields: string[];
 };
+
+/**
+ * A grant's spec as it's sealed, version 2: what it copies, and the token
+ * and item it's for.
+ */
+export type ScriptSpec = ScriptFields & { v: 2; token: string; item: string };
+
+/** A token key as it's sealed, version 2: the key, and the token it belongs to. */
+type SealedTokenKey = { v: 2; token: string; key: string };
+
+/** Ids as the server and the apps write them, compared without regard to case. */
+const sameId = (a: unknown, b: string) =>
+  typeof a === "string" && a.toLowerCase() === b.toLowerCase();
+
+function parseJson(text: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(text);
+    return parsed != null && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 /** A grant's copy, as the token key encrypts it. */
 export type ScriptCopy = {
@@ -67,7 +91,7 @@ export function revisionText(revisionDate: Date | string): string {
 }
 
 /** The copy of an item a spec asks for, never anything it doesn't. */
-export function copyOf(tokenId: string, item: CopiedItem, spec: ScriptSpec): ScriptCopy {
+export function copyOf(tokenId: string, item: CopiedItem, spec: ScriptFields): ScriptCopy {
   const fields: Record<string, string> = {};
   for (const name of spec.fields) {
     const field = (item.fields ?? []).find((f) => f.name === name);
@@ -159,30 +183,86 @@ export class KeykeeperScriptKeys {
 export class KeykeeperScriptCopies {
   constructor(private readonly encryptService: EncryptService) {}
 
-  /** The token key, sealed with the organization key. */
-  async sealTokenKey(tokenKey: Uint8Array, orgKey: SymmetricCryptoKey): Promise<string> {
-    return (await this.encryptService.encryptString(toB64(tokenKey), orgKey)).encryptedString!;
+  /** The token key, sealed with the organization key together with its token's id. */
+  async sealTokenKey(
+    tokenId: string,
+    tokenKey: Uint8Array,
+    orgKey: SymmetricCryptoKey,
+  ): Promise<string> {
+    const sealed: SealedTokenKey = { v: 2, token: tokenId, key: toB64(tokenKey) };
+    return (await this.encryptService.encryptString(JSON.stringify(sealed), orgKey))
+      .encryptedString!;
   }
 
-  async unsealTokenKey(sealed: string, orgKey: SymmetricCryptoKey): Promise<SymmetricCryptoKey> {
-    const b64 = await this.encryptService.decryptString(new EncString(sealed), orgKey);
-    const bytes = fromB64(b64);
-    if (bytes?.length !== 64) {
-      throw new Error("That isn't a script token's key");
+  /**
+   * Opens a sealed token key, only if it's version 2 and sealed for this
+   * token: a server could otherwise hand an app another token's key, whose
+   * seed someone else knows, to write this token's copies with.
+   */
+  async unsealTokenKey(
+    sealed: string,
+    orgKey: SymmetricCryptoKey,
+    tokenId: string,
+  ): Promise<SymmetricCryptoKey> {
+    const opened = parseJson(
+      await this.encryptService.decryptString(new EncString(sealed), orgKey),
+    );
+    const bytes = typeof opened?.key === "string" ? fromB64(opened.key) : null;
+    if (opened?.v !== 2 || !sameId(opened.token, tokenId) || bytes?.length !== 64) {
+      throw new Error("That isn't this script token's key");
     }
     return new SymmetricCryptoKey(bytes);
   }
 
-  async sealSpec(spec: ScriptSpec, orgKey: SymmetricCryptoKey): Promise<string> {
+  /** What a grant copies, sealed with the organization key together with its token's and item's ids. */
+  async sealSpec(
+    tokenId: string,
+    itemId: string,
+    fields: ScriptFields,
+    orgKey: SymmetricCryptoKey,
+  ): Promise<string> {
+    const spec: ScriptSpec = {
+      v: 2,
+      token: tokenId,
+      item: itemId,
+      username: fields.username,
+      password: fields.password,
+      totp: fields.totp,
+      fields: fields.fields,
+    };
     return (await this.encryptService.encryptString(JSON.stringify(spec), orgKey)).encryptedString!;
   }
 
-  async unsealSpec(sealed: string, orgKey: SymmetricCryptoKey): Promise<ScriptSpec> {
-    const spec = JSON.parse(await this.encryptService.decryptString(new EncString(sealed), orgKey));
-    if (spec?.v !== 1 || !Array.isArray(spec.fields)) {
-      throw new Error("That isn't a grant's spec");
+  /**
+   * Opens a grant's spec, only if it's version 2 and sealed for this token
+   * and this item: a server could otherwise pair a spec with an item it was
+   * never granted.
+   */
+  async unsealSpec(
+    sealed: string,
+    orgKey: SymmetricCryptoKey,
+    tokenId: string,
+    itemId: string,
+  ): Promise<ScriptSpec> {
+    const spec = parseJson(await this.encryptService.decryptString(new EncString(sealed), orgKey));
+    if (
+      spec?.v !== 2 ||
+      !sameId(spec.token, tokenId) ||
+      !sameId(spec.item, itemId) ||
+      !Array.isArray(spec.fields) ||
+      !spec.fields.every((f) => typeof f === "string")
+    ) {
+      throw new Error("That isn't this grant's spec");
     }
-    return spec;
+    return {
+      v: 2,
+      token: tokenId,
+      item: itemId,
+      username: spec.username === true,
+      password: spec.password === true,
+      totp: spec.totp === true,
+      fields: spec.fields as string[],
+    };
   }
 
   async encryptCopy(scriptCopy: ScriptCopy, tokenKey: SymmetricCryptoKey): Promise<string> {

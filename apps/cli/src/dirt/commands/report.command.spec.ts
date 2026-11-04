@@ -74,6 +74,27 @@ describe("ReportCommand", () => {
     expect(response.success).toBe(false);
   });
 
+  // Keykeeper: a report on a password someone can't see would tell them
+  // something about it (DESIGN.md, "Folders and permissions").
+  it("leaves out passwords the person can't see", async () => {
+    const hidden = buildCipher("cipher-hidden", "Domain admin");
+    hidden.viewPassword = false;
+    const unsaid = buildCipher("cipher-unsaid", "Says nothing");
+    unsaid.viewPassword = undefined as unknown as boolean;
+    cipherService.getAllDecrypted.mockResolvedValue([
+      buildCipher("cipher-1", "Mine"),
+      hidden,
+      unsaid,
+    ]);
+
+    await command.run("password-health", {});
+
+    const checked = cipherRiskService.computeRiskForCiphers.mock.calls[0][0].map((c) => c.id);
+    expect(checked).toEqual(["cipher-1"]);
+    const reuse = cipherRiskService.buildPasswordReuseMap.mock.calls[0][0].map((c) => c.id);
+    expect(reuse).toEqual(["cipher-1"]);
+  });
+
   it("maps SDK results into password-health rows enriched with the cipher name", async () => {
     cipherService.getAllDecrypted.mockResolvedValue([buildCipher("cipher-1", "Example")]);
     cipherRiskService.computeRiskForCiphers.mockResolvedValue([

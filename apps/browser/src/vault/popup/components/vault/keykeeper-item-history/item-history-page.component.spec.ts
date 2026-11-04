@@ -162,7 +162,15 @@ describe("KeykeeperItemHistoryPageComponent", () => {
             revisionDate: "2026-10-26T10:00:00Z",
             savedBy: null,
             hidePasswords,
-            data: versions,
+            // Versions of this item, where it is now, as the server sends them.
+            data: versions.map((v: any) =>
+              v.cipher == null
+                ? v
+                : {
+                    ...v,
+                    cipher: { id: current.id, organizationId: current.organizationId, ...v.cipher },
+                  },
+            ),
           }
         : null,
     );

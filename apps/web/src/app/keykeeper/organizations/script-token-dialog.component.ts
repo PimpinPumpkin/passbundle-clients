@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, Inject, computed, signal } from "@angular/core";
 import { FormBuilder, Validators } from "@angular/forms";
 
-import { ScriptSpec } from "@bitwarden/admin-console/common";
+import { ScriptFields } from "@bitwarden/admin-console/common";
 import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { DIALOG_DATA, DialogRef, DialogService, ToastService } from "@bitwarden/components";
@@ -19,7 +19,7 @@ export type ScriptTokenDialogResult = {
   /** End of the chosen day, as an ISO date and time. */
   expiresAt: string;
   networks: string[];
-  grants: { item: CipherView; spec: ScriptSpec }[];
+  grants: { item: CipherView; spec: ScriptFields }[];
 };
 
 const DAY = 86_400_000;
@@ -159,7 +159,7 @@ export class KeykeeperScriptTokenDialogComponent {
   });
   protected readonly search = signal("");
   /** The chosen items, by id, with what each grant copies. */
-  protected readonly specs = signal<Record<string, ScriptSpec>>({});
+  protected readonly specs = signal<Record<string, ScriptFields>>({});
 
   protected readonly shown = computed(() => {
     const words = this.search().trim().toLowerCase();
@@ -188,7 +188,7 @@ export class KeykeeperScriptTokenDialogComponent {
       if (on) {
         // A login's username and password to start; anything else is chosen.
         const login = item.type === CipherType.Login;
-        next[item.id] = { v: 1, username: login, password: login, totp: false, fields: [] };
+        next[item.id] = { username: login, password: login, totp: false, fields: [] };
       } else {
         delete next[item.id];
       }

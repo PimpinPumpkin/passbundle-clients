@@ -125,7 +125,7 @@ describe("making a script token", () => {
     expect(page["made"]()).toEqual({
       name: "Join domain",
       tokenString: TOKEN_STRING,
-      firstItem: "Domain admin",
+      firstItem: { id: ITEM, name: "Domain admin" },
     });
   });
 });

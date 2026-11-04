@@ -74,18 +74,32 @@ const state = (cipherId: string): MspTemplates => ({
 });
 
 describe("MSP template sources", () => {
-  it("are the MSP's own templates, in a personal vault or a shared organization", () => {
-    expect(templateSourceProblem(template("a", null, "fw"), ["dental"])).toBeNull();
+  it("are the MSP's own templates, in an organization its admins share", () => {
     expect(templateSourceProblem(template("b", "msp-shared", "fw"), ["dental"])).toBeNull();
+  });
+
+  it("are never someone's own template, whatever the server names as the source", () => {
+    expect(templateSourceProblem(template("a", null, "fw"), ["dental"])).toMatch(
+      /in your own vault/,
+    );
+  });
+
+  it("aren't sent from someone's own vault", async () => {
+    const source = template("mine", null, "fw");
+    const { sender, cipherService } = setup([source]);
+    await expect(
+      sender.send(msp, source, [{ id: "dental", name: "Acme Dental" }], state("x")),
+    ).rejects.toThrow(/in your own vault/);
+    expect(cipherService.createWithServer).not.toHaveBeenCalled();
   });
 
   it("are never a client's own template, a copy from an MSP, or an ordinary item", () => {
     expect(templateSourceProblem(template("a", "dental", "fw"), ["dental"])).toMatch(
       /clients' own/,
     );
-    expect(templateSourceProblem(template("b", null, "fw", "Other IT"), ["dental"])).toMatch(
-      /copy from an MSP/,
-    );
+    expect(
+      templateSourceProblem(template("b", "msp-shared", "fw", "Other IT"), ["dental"]),
+    ).toMatch(/copy from an MSP/);
     const login = new CipherView();
     login.type = CipherType.Login;
     expect(templateSourceProblem(login, ["dental"])).toMatch(/isn't a template/);
@@ -147,7 +161,7 @@ describe("Sharing a template's item", () => {
 
 describe("Sending a template", () => {
   it("replaces the client's earlier copy", async () => {
-    const source = template("source", null, "fw");
+    const source = template("source", "msp-shared", "fw");
     const copy = template("copy", "dental", "fw", "Northwind IT");
     const { sender, cipherService } = setup([source, copy]);
     const result = await sender.send(
@@ -162,7 +176,7 @@ describe("Sending a template", () => {
   });
 
   it("never overwrites an item that isn't a copy of it, whatever the server recorded", async () => {
-    const source = template("source", null, "fw");
+    const source = template("source", "msp-shared", "fw");
     const login = new CipherView();
     login.id = "real-login";
     login.type = CipherType.Login;
@@ -179,7 +193,7 @@ describe("Sending a template", () => {
   });
 
   it("has the server make a new Templates collection when the client deleted its own, never one of its own", async () => {
-    const source = template("source", null, "fw");
+    const source = template("source", "msp-shared", "fw");
     const dentalKey = { key: "dental" };
     const { sender, cipherService, collectionAdminService, requests, encryptService } = setup(
       [source],
@@ -206,7 +220,7 @@ describe("Sending a template", () => {
   });
 
   it("says so for a client whose key it doesn't have yet", async () => {
-    const source = template("source", null, "fw");
+    const source = template("source", "msp-shared", "fw");
     const { sender, requests } = setup([source], []);
     const result = await sender.send(
       msp,
@@ -227,7 +241,15 @@ describe("Sending a template", () => {
     login.id = "real-login";
     login.organizationId = "dental" as any;
     const { sender, cipherService } = setup([copy, own, login]);
-    await sender.removeCopies(["copy", "own", "real-login", "missing"]);
+    await sender.removeCopies(["copy", "own", "real-login", "missing"], new Set(["dental"]));
+    expect(cipherService.softDeleteWithServer.mock.calls.map((c) => c[0])).toEqual(["copy"]);
+  });
+
+  it("removes copies only in clients this device trusts", async () => {
+    const copy = template("copy", "dental", "fw", "Northwind IT");
+    const family = template("family-copy", "family", "fw", "Northwind IT");
+    const { sender, cipherService } = setup([copy, family]);
+    await sender.removeCopies(["copy", "family-copy"], new Set(["dental"]));
     expect(cipherService.softDeleteWithServer.mock.calls.map((c) => c[0])).toEqual(["copy"]);
   });
 });

@@ -23,6 +23,12 @@ export type MspClient = {
   /** Provisioning from Microsoft Entra ID, when the client has a token. Older servers leave it out. */
   provisioning?: { lastUsedAt: string | null } | null;
   /**
+   * The client seal: that a browser holding the client's key made it this
+   * MSP's client (join-seals.ts). Apps write into a client only where it
+   * checks out. Older servers and older clients have none.
+   */
+  seal?: string | null;
+  /**
    * The MSP's people this client removed or revoked itself. They stay out of
    * it: the MSP's changes never add them there again. Older servers leave it out.
    */
@@ -291,6 +297,17 @@ export type MspSiteFixes = {
 /** An organization that can't confirm the person until they turn on two-step login. */
 export type TwoStepNeeded = { organizationId: string; name: string };
 
+/**
+ * A role the server joined someone to without asking them (a server that
+ * sends no email), which two-step login for admins doesn't count until they
+ * accept it. See DESIGN.md, "Two-step login for admins".
+ */
+export type UnacceptedRole = {
+  organizationId: string;
+  name: string;
+  role: "owner" | "admin" | "custom";
+};
+
 /** A script token as its organization's admins see it (docs/script-access.md). */
 export type ScriptTokenView = {
   id: string;
@@ -447,11 +464,51 @@ export type SsoSettings = {
 };
 
 /**
+ * The type number of the MSP default that isn't an upstream policy: two-step
+ * login for each client's admins. Never an upstream policy type: upstream's
+ * apps refuse every policy when one has a type they don't know. See DESIGN.md,
+ * "Two-step login for admins".
+ */
+export const KEYKEEPER_ADMIN_TWO_STEP_POLICY = 1000;
+
+/** Someone two-step login for admins covers who hasn't set up a method that counts. */
+export type TwoStepNotSetUp = {
+  /** Their membership, in an organization's list. */
+  id?: string;
+  userId: string;
+  email: string;
+  name: string | null;
+  /** "owner", "admin", or "custom" in an organization; "admin" or "technician" on an MSP's staff. */
+  role: string | null;
+  /** The membership came through the MSP. */
+  fromMsp?: boolean;
+  /** Linked to this organization's single sign-on, which covers them there. */
+  singleSignOn?: boolean;
+};
+
+/** An organization's two-step login for admins, as its Settings page shows it. */
+export type OrgAdminTwoStep = {
+  required: boolean;
+  /** The MSP that manages the organization, if one does. */
+  msp: { id: string; name: string } | null;
+  /** Who it covers (or would) without a method that counts. */
+  notSetUp: TwoStepNotSetUp[];
+};
+
+/** An MSP's two-step login: for its staff, and each client's own admins. */
+export type MspTwoStep = {
+  staffRequired: boolean;
+  staffNotSetUp: TwoStepNotSetUp[];
+  clients: { id: string; name: string; required: boolean; notSetUp: TwoStepNotSetUp[] }[];
+};
+
+/**
  * The person's proof for a sensitive change (DESIGN.md, "Confirming sensitive
  * changes"), as upstream's SecretVerificationRequest carries it: their master
  * password's server-side hash, or a one-time code emailed to an account
  * without a master password. The server asks for it to make a provisioning
  * token, save single sign-on settings, add or change an event destination or
- * make its signing secret, and make a script token or add to one.
+ * make its signing secret, make a script token or add to one, and turn
+ * two-step login for admins, or for an MSP's staff, on or off.
  */
 export type ChangeVerification = { masterPasswordHash?: string; otp?: string };

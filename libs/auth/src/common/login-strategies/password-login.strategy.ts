@@ -10,6 +10,7 @@ import { ForceSetPasswordReason } from "@bitwarden/common/auth/models/domain/for
 import { PasswordTokenRequest } from "@bitwarden/common/auth/models/request/identity-token/password-token.request";
 import { TokenTwoFactorRequest } from "@bitwarden/common/auth/models/request/identity-token/token-two-factor.request";
 import { IdentityDeviceVerificationResponse } from "@bitwarden/common/auth/models/response/identity-device-verification.response";
+import { IdentityKeykeeperTwoStepSetupResponse } from "@bitwarden/common/auth/models/response/identity-keykeeper-two-step-setup.response";
 import { IdentitySsoRequiredResponse } from "@bitwarden/common/auth/models/response/identity-sso-required.response";
 import { IdentityTokenResponse } from "@bitwarden/common/auth/models/response/identity-token.response";
 import { IdentityTwoFactorResponse } from "@bitwarden/common/auth/models/response/identity-two-factor.response";
@@ -150,7 +151,8 @@ export class PasswordLoginStrategy extends LoginStrategy {
       | IdentityTokenResponse
       | IdentityTwoFactorResponse
       | IdentityDeviceVerificationResponse
-      | IdentitySsoRequiredResponse,
+      | IdentitySsoRequiredResponse
+      | IdentityKeykeeperTwoStepSetupResponse,
     credentials: PasswordLoginCredentials,
     authResult: AuthResult,
   ): Promise<void> {
@@ -161,7 +163,9 @@ export class PasswordLoginStrategy extends LoginStrategy {
     // authenticate with their SSO IdP Provider
     if (
       identityResponse instanceof IdentityDeviceVerificationResponse ||
-      identityResponse instanceof IdentitySsoRequiredResponse
+      identityResponse instanceof IdentitySsoRequiredResponse ||
+      // Keykeeper: nothing is signed in until two-step login is set up.
+      identityResponse instanceof IdentityKeykeeperTwoStepSetupResponse
     ) {
       return;
     }
