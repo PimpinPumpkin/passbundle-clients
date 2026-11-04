@@ -11,7 +11,7 @@ import { KeykeeperMspRequests } from "./msp-requests";
 import { StaleScriptGrant } from "./msp-types";
 import { KeykeeperScriptCopies } from "./script-access";
 import { nodeEncrypt } from "./script-access.test-helper";
-import * as grants from "./script-grants-v2.vectors.json";
+import * as grants from "./script-grants-v3.vectors.json";
 import { KeykeeperScriptRefresher } from "./script-refresh";
 
 const bytes = (b64: string) => new Uint8Array(Buffer.from(b64, "base64"));
@@ -23,6 +23,8 @@ const orgKey = new SymmetricCryptoKey(bytes(grants.inputs.organizationKey));
 const tokenKey = new SymmetricCryptoKey(bytes(grants.tokenKey));
 const copies = new KeykeeperScriptCopies(nodeEncrypt);
 const REVISION = "2026-10-21T09:30:00.123Z";
+/** When the vectors' token was made: its seals say it lasts 90 days from then. */
+const NOW = new Date(grants.inputs.madeAt * 1000);
 
 function item(overrides: Partial<CipherView> = {}): CipherView {
   return Object.assign(new CipherView(), {
@@ -76,7 +78,7 @@ describe("KeykeeperScriptRefresher", () => {
   it("remakes a copy behind its item with the token's key and the grant's spec", async () => {
     const { requests, refresher } = setUp([item()]);
 
-    expect(await refresher.refresh()).toEqual([]);
+    expect(await refresher.refresh(NOW)).toEqual([]);
 
     expect(requests.setScriptGrant).toHaveBeenCalledTimes(1);
     const [org, token, itemId, sent] = requests.setScriptGrant.mock.calls[0];
@@ -102,7 +104,7 @@ describe("KeykeeperScriptRefresher", () => {
       { items: [item()], keys: {} },
     ]) {
       const { requests, refresher } = setUp(items, undefined, keys);
-      expect(await refresher.refresh()).toEqual([]);
+      expect(await refresher.refresh(NOW)).toEqual([]);
       expect(requests.setScriptGrant).not.toHaveBeenCalled();
     }
   });
@@ -136,16 +138,45 @@ describe("KeykeeperScriptRefresher", () => {
     },
   ])("never writes a copy of $why", async ({ items, stale }) => {
     const { requests, refresher } = setUp(items, stale);
-    expect(await refresher.refresh()).toEqual([]);
+    expect(await refresher.refresh(NOW)).toEqual([]);
     expect(requests.setScriptGrant).not.toHaveBeenCalled();
   });
 
-  it.each(grants.refused)("never writes a copy with $why, and says so", async (r) => {
+  it.each(grants.checks.filter((c) => !c.refreshes))(
+    "never writes a copy with $why, and says so",
+    async (r) => {
+      const { requests, refresher } = setUp(
+        [item()],
+        [grant({ sealedKey: r.sealedKey, sealedSpec: r.sealedSpec })],
+      );
+      const failures = await refresher.refresh(new Date(r.at * 1000));
+      expect(failures).toHaveLength(1);
+      expect(failures[0]).toContain("A script token's copy of Domain admin wasn't updated");
+      expect(requests.setScriptGrant).not.toHaveBeenCalled();
+    },
+  );
+
+  it("remakes a copy until its token ends, as its seals say, and not after", async () => {
+    for (const { at, made } of [
+      { at: grants.expires - 1, made: true },
+      { at: grants.expires, made: false },
+    ]) {
+      const { requests, refresher } = setUp([item()]);
+      const failures = await refresher.refresh(new Date(at * 1000));
+      expect(requests.setScriptGrant).toHaveBeenCalledTimes(made ? 1 : 0);
+      expect(failures).toEqual(
+        made ? [] : ["A script token's copy of Domain admin wasn't updated: its token has ended"],
+      );
+    }
+  });
+
+  it("never writes a copy with a version 2 seal, and says so", async () => {
+    const r = grants.checks.find((c) => c.why.startsWith("a version 2 token key"))!;
     const { requests, refresher } = setUp(
       [item()],
       [grant({ sealedKey: r.sealedKey, sealedSpec: r.sealedSpec })],
     );
-    const failures = await refresher.refresh();
+    const failures = await refresher.refresh(NOW);
     expect(failures).toHaveLength(1);
     expect(failures[0]).toContain("A script token's copy of Domain admin wasn't updated");
     expect(requests.setScriptGrant).not.toHaveBeenCalled();
@@ -155,14 +186,14 @@ describe("KeykeeperScriptRefresher", () => {
     // The seals are for ITEM; the server says they're for another item the person can edit.
     const other = item({ id: "99999999-4b5c-4d6e-8f70-819a2b3c4d5e" });
     const { requests, refresher } = setUp([other], [grant({ itemId: other.id })]);
-    expect(await refresher.refresh()).toHaveLength(1);
+    expect(await refresher.refresh(NOW)).toHaveLength(1);
     expect(requests.setScriptGrant).not.toHaveBeenCalled();
   });
 
   it("says when a copy couldn't be made", async () => {
     const { requests, refresher } = setUp([item()]);
     requests.setScriptGrant.mockRejectedValue(new Error("server down"));
-    expect(await refresher.refresh()).toEqual([
+    expect(await refresher.refresh(NOW)).toEqual([
       "A script token's copy of Domain admin wasn't updated: server down",
     ]);
   });
