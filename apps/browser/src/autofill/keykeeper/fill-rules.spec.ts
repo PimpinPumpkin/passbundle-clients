@@ -352,7 +352,7 @@ describe("Keykeeper fill rules", () => {
         ],
         PAGE,
         STARTED,
-        { f1: { opid: "f1", htmlID: "newsletter-signup" } } as AutofillPageDetails["forms"],
+        { f1: { opid: "f1", htmlID: "newsletter-signup" } } as unknown as AutofillPageDetails["forms"],
       );
 
       expect(result.script).toEqual([["fill_by_opid", "__5", "alice"]]);
