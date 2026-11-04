@@ -6,6 +6,7 @@ import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/pl
 import { DialogService, ToastService } from "@bitwarden/components";
 
 import { SharedModule } from "../../shared";
+import { KeykeeperConfirmChangeService } from "../confirm-change/confirm-change.service";
 
 import {
   Destination,
@@ -30,8 +31,9 @@ type Made = { name: string; secret: string };
  * client's, and its own activity) are sent, its security tools. Used on the
  * organization's Event streaming page and in the MSP console. The server
  * answers only owners and admins (not MSP technicians) and MSP admins; for
- * anyone else this says who can. See DESIGN.md, "Sending events to security
- * tools".
+ * anyone else this says who can. Adding, changing, turning on or off, and a
+ * new signing secret ask the person to confirm it's them first. See
+ * DESIGN.md, "Sending events to security tools".
  */
 @Component({
   selector: "app-keykeeper-event-streaming",
@@ -395,6 +397,7 @@ export class KeykeeperEventStreamingComponent {
     private readonly toastService: ToastService,
     private readonly dialogService: DialogService,
     private readonly platformUtilsService: PlatformUtilsService,
+    private readonly confirmChange: KeykeeperConfirmChangeService,
   ) {
     effect(() => {
       void this.load(this.scope());
@@ -447,11 +450,18 @@ export class KeykeeperEventStreamingComponent {
 
   protected readonly save = async () => {
     const editing = this.editing() ?? null;
+    const scope = this.scope();
     const request = requestFor(this.form.getRawValue(), editing);
     await this.attempt(async () => {
-      const saved = editing
-        ? await this.api.update(this.scope(), editing.id, request)
-        : await this.api.create(this.scope(), request);
+      const saved = await this.confirmChange.send("keykeeperConfirmEventDestination", (v) =>
+        editing
+          ? this.api.update(scope, editing.id, request, v)
+          : this.api.create(scope, request, v),
+      );
+      if (saved == null) {
+        // Still editing.
+        return;
+      }
       if (saved.signingSecret) {
         this.made.set({ name: saved.name, secret: saved.signingSecret });
       }
@@ -491,8 +501,14 @@ export class KeykeeperEventStreamingComponent {
         return;
       }
     }
+    const scope = this.scope();
     await this.attempt(async () => {
-      await this.api.setEnabled(this.scope(), d.id, enabled);
+      const saved = await this.confirmChange.send("keykeeperConfirmEventDestination", (v) =>
+        this.api.setEnabled(scope, d.id, enabled, v),
+      );
+      if (saved == null) {
+        return;
+      }
       this.toastService.showToast({
         variant: "success",
         message: enabled ? `${d.name} is on` : `${d.name} is off`,
@@ -512,8 +528,14 @@ export class KeykeeperEventStreamingComponent {
     if (!confirmed) {
       return;
     }
+    const scope = this.scope();
     await this.attempt(async () => {
-      const saved = await this.api.newSecret(this.scope(), d.id);
+      const saved = await this.confirmChange.send("keykeeperConfirmSigningSecret", (v) =>
+        this.api.newSecret(scope, d.id, v),
+      );
+      if (saved == null) {
+        return;
+      }
       this.made.set({ name: saved.name, secret: saved.signingSecret ?? "" });
       await this.load(this.scope());
       this.changed.emit();

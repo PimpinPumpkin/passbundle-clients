@@ -8,6 +8,7 @@ import { ErrorResponse } from "@bitwarden/common/models/response/error.response"
 import { DialogService, ToastService } from "@bitwarden/components";
 
 import { SharedModule } from "../../shared";
+import { KeykeeperConfirmChangeService } from "../confirm-change/confirm-change.service";
 import { KeykeeperMspApiService } from "../msp/msp-api.service";
 
 /** How the list names someone's role. */
@@ -111,6 +112,7 @@ export class KeykeeperAdminTwoStepComponent {
     private readonly accountService: AccountService,
     private readonly dialogService: DialogService,
     private readonly toastService: ToastService,
+    private readonly confirmChange: KeykeeperConfirmChangeService,
   ) {
     effect(() => {
       const id = this.organizationId();
@@ -147,7 +149,17 @@ export class KeykeeperAdminTwoStepComponent {
       }
     }
     try {
-      this.show(await this.api.setOrgAdminTwoStep(this.organizationId(), required));
+      // Keykeeper: the person confirms it's them first (DESIGN.md,
+      // "Confirming sensitive changes"); cancelling changes nothing.
+      const orgId = this.organizationId();
+      const saved = await this.confirmChange.send("keykeeperConfirmAdminTwoStep", (verification) =>
+        this.api.setOrgAdminTwoStep(orgId, required, verification),
+      );
+      if (saved == null) {
+        this.form.controls.required.setValue(current?.required ?? false);
+        return;
+      }
+      this.show(saved);
       this.toastService.showToast({
         variant: "success",
         message: required ? "Two-step login is required for admins" : "Turned off",

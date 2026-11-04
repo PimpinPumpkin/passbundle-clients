@@ -501,3 +501,14 @@ export type MspTwoStep = {
   staffNotSetUp: TwoStepNotSetUp[];
   clients: { id: string; name: string; required: boolean; notSetUp: TwoStepNotSetUp[] }[];
 };
+
+/**
+ * The person's proof for a sensitive change (DESIGN.md, "Confirming sensitive
+ * changes"), as upstream's SecretVerificationRequest carries it: their master
+ * password's server-side hash, or a one-time code emailed to an account
+ * without a master password. The server asks for it to make a provisioning
+ * token, save single sign-on settings, add or change an event destination or
+ * make its signing secret, make a script token or add to one, and turn
+ * two-step login for admins, or for an MSP's staff, on or off.
+ */
+export type ChangeVerification = { masterPasswordHash?: string; otp?: string };

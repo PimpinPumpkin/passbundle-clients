@@ -1,9 +1,12 @@
 // Keykeeper: the event streaming API on the server, for an organization
 // (/api/keykeeper/organizations/<id>/event-streaming) or an MSP
-// (/api/keykeeper/msp/<id>/event-streaming). See event-streaming.ts.
+// (/api/keykeeper/msp/<id>/event-streaming). See event-streaming.ts. Adding
+// or changing a destination, and a new signing secret, carry the person's
+// proof (ChangeVerification); removing one and a test don't.
 
 import { Injectable } from "@angular/core";
 
+import { ChangeVerification, verificationFields } from "@bitwarden/admin-console/common";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 
 import { Destination, DestinationList, StreamingScope } from "./event-streaming";
@@ -24,16 +27,42 @@ export class KeykeeperEventStreamingApiService {
     return this.apiService.send("GET", this.path(scope), null, true, true);
   }
 
-  create(scope: StreamingScope, request: object): Promise<Destination> {
-    return this.apiService.send("POST", this.path(scope), request, true, true);
+  create(
+    scope: StreamingScope,
+    request: object,
+    verification: ChangeVerification,
+  ): Promise<Destination> {
+    return this.apiService.send(
+      "POST",
+      this.path(scope),
+      { ...request, ...verificationFields(verification) },
+      true,
+      true,
+    );
   }
 
-  update(scope: StreamingScope, id: string, request: object): Promise<Destination> {
-    return this.apiService.send("PUT", this.path(scope, `/${id}`), request, true, true);
+  update(
+    scope: StreamingScope,
+    id: string,
+    request: object,
+    verification: ChangeVerification,
+  ): Promise<Destination> {
+    return this.apiService.send(
+      "PUT",
+      this.path(scope, `/${id}`),
+      { ...request, ...verificationFields(verification) },
+      true,
+      true,
+    );
   }
 
-  setEnabled(scope: StreamingScope, id: string, enabled: boolean): Promise<Destination> {
-    return this.update(scope, id, { enabled });
+  setEnabled(
+    scope: StreamingScope,
+    id: string,
+    enabled: boolean,
+    verification: ChangeVerification,
+  ): Promise<Destination> {
+    return this.update(scope, id, { enabled }, verification);
   }
 
   async remove(scope: StreamingScope, id: string): Promise<void> {
@@ -49,7 +78,17 @@ export class KeykeeperEventStreamingApiService {
   }
 
   /** A new signing secret for a webhook, in the answer's signingSecret. */
-  newSecret(scope: StreamingScope, id: string): Promise<Destination> {
-    return this.apiService.send("POST", this.path(scope, `/${id}/secret`), null, true, true);
+  newSecret(
+    scope: StreamingScope,
+    id: string,
+    verification: ChangeVerification,
+  ): Promise<Destination> {
+    return this.apiService.send(
+      "POST",
+      this.path(scope, `/${id}/secret`),
+      verificationFields(verification),
+      true,
+      true,
+    );
   }
 }

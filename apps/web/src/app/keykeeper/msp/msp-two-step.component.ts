@@ -16,6 +16,7 @@ import { ErrorResponse } from "@bitwarden/common/models/response/error.response"
 import { DialogService, ToastService } from "@bitwarden/components";
 
 import { SharedModule } from "../../shared";
+import { KeykeeperConfirmChangeService } from "../confirm-change/confirm-change.service";
 import { twoStepRoleLabel } from "../organizations/admin-two-step.component";
 
 import { KeykeeperMspApiService } from "./msp-api.service";
@@ -127,6 +128,7 @@ export class KeykeeperMspTwoStepComponent {
     private readonly accountService: AccountService,
     private readonly dialogService: DialogService,
     private readonly toastService: ToastService,
+    private readonly confirmChange: KeykeeperConfirmChangeService,
   ) {
     effect(() => {
       const id = this.mspId();
@@ -161,7 +163,17 @@ export class KeykeeperMspTwoStepComponent {
       }
     }
     try {
-      this.show(await this.api.setMspStaffTwoStep(this.mspId(), required));
+      // Keykeeper: the person confirms it's them first (DESIGN.md,
+      // "Confirming sensitive changes"); cancelling changes nothing.
+      const mspId = this.mspId();
+      const saved = await this.confirmChange.send("keykeeperConfirmStaffTwoStep", (verification) =>
+        this.api.setMspStaffTwoStep(mspId, required, verification),
+      );
+      if (saved == null) {
+        this.form.controls.staffRequired.setValue(this.view()?.staffRequired ?? false);
+        return;
+      }
+      this.show(saved);
       this.toastService.showToast({
         variant: "success",
         message: required ? "Your staff must use two-step login" : "Turned off for your staff",

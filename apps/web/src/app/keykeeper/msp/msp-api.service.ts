@@ -13,6 +13,7 @@ import { firstValueFrom } from "rxjs";
 
 import {
   AddStaffResult,
+  ChangeVerification,
   ClientEnrollment,
   ClientMsp,
   ClientPreset,
@@ -37,6 +38,7 @@ import {
   SsoView,
   TechnicianAccess,
   UnacceptedRole,
+  verificationFields,
 } from "@bitwarden/admin-console/common";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
@@ -476,12 +478,18 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     );
   }
 
-  /** Makes the organization's provisioning token, or replaces it; the answer carries it once. */
-  async makeProvisioningToken(orgId: string): Promise<ProvisioningView> {
+  /**
+   * Makes the organization's provisioning token, or replaces it, with the
+   * person's proof (ChangeVerification); the answer carries it once.
+   */
+  async makeProvisioningToken(
+    orgId: string,
+    verification: ChangeVerification,
+  ): Promise<ProvisioningView> {
     return this.apiService.send(
       "POST",
       `/keykeeper/organizations/${orgId}/provisioning/token`,
-      null,
+      verificationFields(verification),
       true,
       true,
     );
@@ -539,11 +547,16 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     );
   }
 
-  async setOrgAdminTwoStep(orgId: string, required: boolean): Promise<OrgAdminTwoStep> {
+  /** Turns it on or off, with the person's proof (ChangeVerification). */
+  async setOrgAdminTwoStep(
+    orgId: string,
+    required: boolean,
+    verification: ChangeVerification,
+  ): Promise<OrgAdminTwoStep> {
     return this.apiService.send(
       "PUT",
       `/keykeeper/organizations/${orgId}/admin-two-step`,
-      { required },
+      { required, ...verificationFields(verification) },
       true,
       true,
     );
@@ -593,12 +606,19 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     return this.apiService.send("GET", `/keykeeper/msp/${mspId}/two-step`, null, true, true);
   }
 
-  /** Whether everyone on the MSP's staff must use two-step login. MSP admins only. */
-  async setMspStaffTwoStep(mspId: string, staffRequired: boolean): Promise<MspTwoStep> {
+  /**
+   * Whether everyone on the MSP's staff must use two-step login. MSP admins
+   * only, with the person's proof (ChangeVerification).
+   */
+  async setMspStaffTwoStep(
+    mspId: string,
+    staffRequired: boolean,
+    verification: ChangeVerification,
+  ): Promise<MspTwoStep> {
     return this.apiService.send(
       "PUT",
       `/keykeeper/msp/${mspId}/two-step`,
-      { staffRequired },
+      { staffRequired, ...verificationFields(verification) },
       true,
       true,
     );
@@ -608,12 +628,19 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     return this.apiService.send("GET", `/keykeeper/organizations/${orgId}/sso`, null, true, true);
   }
 
-  /** Saves the settings. The server checks that Microsoft knows the tenant before turning it on. */
-  async saveSso(orgId: string, settings: SsoSettings): Promise<SsoView> {
+  /**
+   * Saves the settings, with the person's proof (ChangeVerification). The
+   * server checks that Microsoft knows the tenant before turning it on.
+   */
+  async saveSso(
+    orgId: string,
+    settings: SsoSettings,
+    verification: ChangeVerification,
+  ): Promise<SsoView> {
     return this.apiService.send(
       "PUT",
       `/keykeeper/organizations/${orgId}/sso`,
-      settings,
+      { ...settings, ...verificationFields(verification) },
       true,
       true,
     );

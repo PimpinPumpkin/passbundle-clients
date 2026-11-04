@@ -26,6 +26,7 @@ import { DialogService, ToastService } from "@bitwarden/components";
 import { KeyService } from "@bitwarden/key-management";
 
 import { SharedModule } from "../../shared";
+import { KeykeeperConfirmChangeService } from "../confirm-change/confirm-change.service";
 import { KeykeeperMspApiService } from "../msp/msp-api.service";
 
 import { KeykeeperScriptTokenDialogComponent } from "./script-token-dialog.component";
@@ -37,8 +38,9 @@ type Made = { name: string; tokenString: string; firstItem: { id: string; name: 
  * Keykeeper: script access on an organization's Settings page, for its owners
  * and admins and its MSP's admins (the server answers no one else, and the
  * section stays hidden). Tokens are made here: the seed and token key never
- * leave this browser except in the token string shown once. See
- * docs/script-access.md in the meta repo.
+ * leave this browser except in the token string shown once. Making one asks
+ * the person to confirm it's them first. See docs/script-access.md in the
+ * meta repo.
  */
 @Component({
   selector: "app-keykeeper-script-access",
@@ -195,6 +197,7 @@ export class KeykeeperScriptAccessComponent {
     private readonly dialogService: DialogService,
     private readonly toastService: ToastService,
     private readonly syncService: SyncService,
+    private readonly confirmChange: KeykeeperConfirmChangeService,
     encryptService: EncryptService,
   ) {
     this.copies = new KeykeeperScriptCopies(encryptService);
@@ -299,7 +302,7 @@ export class KeykeeperScriptAccessComponent {
           sealedSpec: await this.copies.sealSpec(id, item.id, spec, orgKey),
         });
       }
-      await this.api.createScriptToken(orgId, {
+      const token = {
         id,
         name: choice.name,
         expiresAt: choice.expiresAt,
@@ -307,7 +310,13 @@ export class KeykeeperScriptAccessComponent {
         authHash: await this.keys.authHash(seed),
         sealedKey: await this.copies.sealTokenKey(id, await this.keys.tokenKey(seed), orgKey),
         grants,
-      });
+      };
+      const created = await this.confirmChange.send("keykeeperConfirmScriptToken", (verification) =>
+        this.api.createScriptToken(orgId, token, verification),
+      );
+      if (created == null) {
+        return;
+      }
       const first = choice.grants[0].item;
       this.made.set({
         name: choice.name,

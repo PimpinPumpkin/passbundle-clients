@@ -863,6 +863,27 @@
   "keykeeperReservedFieldName": {
     "message": "Names starting with \"keykeeper.\" are reserved."
   },
+  "keykeeperConfirmProvisioningToken": {
+    "message": "Confirm it's you to make a provisioning token. Whoever has it can add and remove people in this organization."
+  },
+  "keykeeperConfirmSsoSettings": {
+    "message": "Confirm it's you to save the single sign-on settings, which decide how people in this organization sign in."
+  },
+  "keykeeperConfirmEventDestination": {
+    "message": "Confirm it's you to change where events are sent."
+  },
+  "keykeeperConfirmSigningSecret": {
+    "message": "Confirm it's you to make a new signing secret."
+  },
+  "keykeeperConfirmScriptToken": {
+    "message": "Confirm it's you to make this script token. Scripts with it can read the fields you chose."
+  },
+  "keykeeperConfirmAdminTwoStep": {
+    "message": "Confirm it's you to change whether this organization's admins must use two-step login."
+  },
+  "keykeeperConfirmStaffTwoStep": {
+    "message": "Confirm it's you to change whether your staff must use two-step login."
+  },
   "keykeeperSsoForCommandLine": {
     "message": "This signs in the command-line tool on this computer. Continue only if you started that sign-in yourself, just now."
   }

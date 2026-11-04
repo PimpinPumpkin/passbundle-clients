@@ -10,6 +10,7 @@ import { DialogService, ToastService } from "@bitwarden/components";
 
 import { HeaderModule } from "../../layouts/header/header.module";
 import { SharedModule } from "../../shared";
+import { KeykeeperConfirmChangeService } from "../confirm-change/confirm-change.service";
 import { KeykeeperMspApiService } from "../msp/msp-api.service";
 
 /**
@@ -19,7 +20,8 @@ import { KeykeeperMspApiService } from "../msp/msp-api.service";
  * registration's client ID and secret, the identifier people type, and email
  * domains they prove with a DNS TXT record. Single sign-on proves who someone
  * is; their master password still unlocks. The secret is sent once and
- * never shown again. See DESIGN.md, "Sign in with Microsoft Entra ID".
+ * never shown again. Saving the settings asks the person to confirm it's
+ * them first. See DESIGN.md, "Sign in with Microsoft Entra ID".
  */
 @Component({
   selector: "app-keykeeper-sso",
@@ -343,6 +345,7 @@ export class KeykeeperSsoComponent implements OnInit {
     private readonly platformUtilsService: PlatformUtilsService,
     private readonly dialogService: DialogService,
     private readonly toastService: ToastService,
+    private readonly confirmChange: KeykeeperConfirmChangeService,
   ) {}
 
   async ngOnInit() {
@@ -377,14 +380,21 @@ export class KeykeeperSsoComponent implements OnInit {
 
   protected readonly save = async () => {
     const f = this.form.getRawValue();
+    const orgId = this.organizationId();
+    const settings = {
+      enabled: f.enabled,
+      identifier: f.identifier.trim(),
+      tenantId: f.tenantId.trim(),
+      clientId: f.clientId.trim(),
+      clientSecret: f.clientSecret.trim() === "" ? null : f.clientSecret.trim(),
+    };
     await this.attempt(async () => {
-      const view = await this.api.saveSso(this.organizationId(), {
-        enabled: f.enabled,
-        identifier: f.identifier.trim(),
-        tenantId: f.tenantId.trim(),
-        clientId: f.clientId.trim(),
-        clientSecret: f.clientSecret.trim() === "" ? null : f.clientSecret.trim(),
-      });
+      const view = await this.confirmChange.send("keykeeperConfirmSsoSettings", (verification) =>
+        this.api.saveSso(orgId, settings, verification),
+      );
+      if (view == null) {
+        return;
+      }
       this.show(view, true);
       this.toastService.showToast({
         variant: "success",
