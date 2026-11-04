@@ -1,7 +1,11 @@
 import { Injectable } from "@angular/core";
 import { firstValueFrom } from "rxjs";
 
-import { KeykeeperJoinSeals } from "@bitwarden/admin-console/common";
+import {
+  joiningSealSource,
+  JoiningSource,
+  KeykeeperJoinSeals,
+} from "@bitwarden/admin-console/common";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
@@ -109,50 +113,63 @@ export class KeykeeperJoinSealer {
   }
 
   /**
-   * The seal for a joining setting with these domains. Without the
+   * The seal for a joining setting with these domains, from this source (the
+   * organization's own setting, or a default it follows). Without the
    * organization's key, none: joins then wait for approval.
    */
   async joiningSeal(
     organizationId: string,
     autoConfirm: boolean,
     domains: string[],
+    source: JoiningSource,
   ): Promise<string | undefined> {
     const joinKey = await this.joinKey(organizationId);
     return joinKey == null
       ? undefined
-      : this.seals.joiningSeal(joinKey, organizationId, autoConfirm, domains);
+      : this.seals.joiningSeal(joinKey, organizationId, autoConfirm, domains, source);
   }
 
   /**
-   * The seal for a new joining setting, keeping the email domains only if the
-   * current seal vouches for them: the person changing the setting isn't
-   * looking at the domains, and the server could have changed them.
+   * The seal for a new joining setting from this source, keeping the email
+   * domains only if the current seal vouches for them: the person changing
+   * the setting isn't looking at the domains, and the server could have
+   * changed them.
    */
   async resealJoining(
     organizationId: string,
     autoConfirm: boolean,
     current: ReportedJoining,
+    source: JoiningSource,
   ): Promise<string | undefined> {
     const domains = (await this.vouches(organizationId, current)) ? current.domains : [];
-    return this.joiningSeal(organizationId, autoConfirm, domains);
+    return this.joiningSeal(organizationId, autoConfirm, domains, source);
   }
 
   /**
-   * The seal for new email domains, keeping "let people in" only if the
-   * current seal vouches for it. Otherwise approval, until an admin saves
-   * the setting.
+   * The seal for new email domains, keeping "let people in", and where the
+   * setting comes from, only if the current seal vouches for them. Otherwise
+   * approval, as the organization's own setting, until an admin saves it.
    */
   async sealDomains(
     organizationId: string,
     domains: string[],
     current: ReportedJoining,
   ): Promise<string | undefined> {
-    const autoConfirm = current.autoConfirm && (await this.vouches(organizationId, current));
-    return this.joiningSeal(organizationId, autoConfirm, domains);
+    const vouched = await this.vouches(organizationId, current);
+    const autoConfirm = current.autoConfirm && vouched;
+    const source = (vouched ? joiningSealSource(current.seal) : null) ?? "own";
+    return this.joiningSeal(organizationId, autoConfirm, domains, source);
   }
 
-  /** Whether the reported setting, domains included, is what its seal says. */
-  async vouches(organizationId: string, current: ReportedJoining): Promise<boolean> {
+  /**
+   * Whether the reported setting, domains included, is what its seal says,
+   * and, with `source`, that the seal says it comes from there.
+   */
+  async vouches(
+    organizationId: string,
+    current: ReportedJoining,
+    source?: JoiningSource,
+  ): Promise<boolean> {
     const joinKey = await this.joinKey(organizationId);
     if (joinKey == null) {
       return false;
@@ -163,6 +180,7 @@ export class KeykeeperJoinSealer {
       organizationId,
       current.autoConfirm,
       current.domains,
+      source,
     );
   }
 

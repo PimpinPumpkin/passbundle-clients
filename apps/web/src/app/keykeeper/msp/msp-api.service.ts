@@ -202,7 +202,8 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     const joinKey = await seals.joinKey(key.toEncoded());
     return {
       client: mspId == null ? undefined : await seals.clientSeal(joinKey, orgId, mspId),
-      joining: await seals.joiningSeal(joinKey, orgId, autoConfirm, []),
+      // It follows the default: its MSP's, or the server's outside an MSP.
+      joining: await seals.joiningSeal(joinKey, orgId, autoConfirm, [], "default"),
       secret: withSecret
         ? (await this.encryptService.encryptString(seals.newJoinSecret(), key)).encryptedString
         : undefined,
@@ -219,7 +220,12 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
   /** Sets the organization's own setting, sealed. */
   override async setOrgJoining(orgId: string, joining: Joining): Promise<OrgJoining> {
     const current = await this.getOrgJoining(orgId);
-    const seal = await this.sealer.resealJoining(orgId, joining.autoConfirm, reported(current));
+    const seal = await this.sealer.resealJoining(
+      orgId,
+      joining.autoConfirm,
+      reported(current),
+      "own",
+    );
     return super.setOrgJoining(orgId, joining, seal);
   }
 
@@ -241,28 +247,21 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     if (current.default.autoConfirm !== seenDefault) {
       throw new Error("The default changed since this page loaded. Reload and try again.");
     }
-    const seal = await this.sealer.resealJoining(orgId, seenDefault, reported(current));
+    const seal = await this.sealer.resealJoining(orgId, seenDefault, reported(current), "default");
     return super.resetOrgJoining(orgId, seal);
   }
 
   /**
    * Sets the MSP's default, with a new seal for each client that follows it:
    * only clients this browser trusts (`trustedClientIds`), and only those
-   * whose current seal says they follow the default the admin saw (`seen`).
+   * whose current seal says they follow the default (version 2 joining
+   * seals say where the setting comes from) as the admin saw it (`seen`).
    * The server drops the seal of any other client it lists as following, so
    * its joins wait for approval until someone saves its setting. An
    * organization that isn't a client never gets "let people in" this way,
    * and neither does a client whose own setting differs from the default the
-   * admin saw.
-   *
-   * Known limit: a joining seal says what the setting is, not where it comes
-   * from. A client that chose approval while the default was approval too
-   * can't be told apart from one that follows the default, so if the default
-   * changes to "let people in", a hacked server can list that client as
-   * following and have it resealed with "let people in". The planned fix is
-   * a version 2 joining seal that records its source (the client's own
-   * setting or the MSP's default). See DESIGN.md, "Changing the MSP's default
-   * safely".
+   * admin saw, or one that chose its own setting, even the same as the
+   * default. See DESIGN.md, "Changing the MSP's default safely".
    */
   async saveMspJoining(mspId: string, joining: Joining, seen: Joining): Promise<MspJoining> {
     const [current, trusted] = await Promise.all([
@@ -281,7 +280,7 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
       };
       if (
         !trusted.has(client.organizationId) ||
-        !(await this.sealer.vouches(client.organizationId, followed))
+        !(await this.sealer.vouches(client.organizationId, followed, "default"))
       ) {
         continue;
       }
@@ -289,6 +288,7 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
         client.organizationId,
         joining.autoConfirm,
         client.domains,
+        "default",
       );
       if (seal != null) {
         seals[client.organizationId] = seal;

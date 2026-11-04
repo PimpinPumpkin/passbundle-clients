@@ -127,6 +127,11 @@ describe("event streaming status", () => {
       ),
     ).toMatchObject({ variant: "danger", detail: "It answered 410 Gone" });
     expect(statusView(destination({ status: "off", enabled: false })).label).toBe("Off");
+    // On, but its maker no longer has access: nothing is sent, and it says so.
+    expect(statusView(destination({ status: "stopped" }))).toMatchObject({
+      label: "Stopped: its maker left",
+      variant: "danger",
+    });
     // Slow isn't failing: it's sent to less often, and says why.
     expect(
       statusView(destination({ status: "slow", lastError: "It took 9 seconds to answer." })),

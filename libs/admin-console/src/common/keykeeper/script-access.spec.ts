@@ -8,10 +8,13 @@ import {
   KeykeeperScriptCopies,
   KeykeeperScriptKeys,
   ScriptFields,
+  sealedExpiry,
+  sealsStillLive,
 } from "./script-access";
 import { nodeEncrypt } from "./script-access.test-helper";
 import * as vectors from "./script-access.vectors.json";
-import * as grants from "./script-grants-v2.vectors.json";
+import * as grantsV2 from "./script-grants-v2.vectors.json";
+import * as grants from "./script-grants-v3.vectors.json";
 
 const keys = new KeykeeperScriptKeys(webcrypto.subtle as unknown as SubtleCrypto);
 const bytes = (b64: string) => new Uint8Array(Buffer.from(b64, "base64"));
@@ -60,12 +63,14 @@ describe("Script access keys, version 1, against the vectors", () => {
   });
 });
 
-describe("Script grant seals, version 2, against the vectors", () => {
+describe("Script grant seals, version 3, against the vectors", () => {
   const itemId = grants.inputs.itemId;
+  const at = (seconds: number) => new Date(seconds * 1000);
 
-  it("opens the sealed token key and spec for their own token and item", async () => {
+  it("opens the sealed token key and spec for their own token and item, with when the token ends", async () => {
     const tokenKey = await copies.unsealTokenKey(grants.sealedTokenKey.encString, orgKey, tokenId);
-    expect(Buffer.from(tokenKey.toEncoded()).toString("base64")).toBe(grants.tokenKey);
+    expect(Buffer.from(tokenKey.key.toEncoded()).toString("base64")).toBe(grants.tokenKey);
+    expect(tokenKey.expires).toBe(grants.expires);
     expect(await copies.unsealSpec(grants.sealedSpec.encString, orgKey, tokenId, itemId)).toEqual(
       JSON.parse(grants.sealedSpec.plaintext),
     );
@@ -75,12 +80,13 @@ describe("Script grant seals, version 2, against the vectors", () => {
     ).resolves.toBeTruthy();
   });
 
-  it.each(grants.refused)("refuses $why", async (r) => {
-    const opened = async () => {
-      await copies.unsealTokenKey(r.sealedKey, orgKey, tokenId);
-      await copies.unsealSpec(r.sealedSpec, orgKey, tokenId, itemId);
+  it.each(grants.checks)("$why: refreshes $refreshes", async (c) => {
+    const refreshes = async () => {
+      const key = await copies.unsealTokenKey(c.sealedKey, orgKey, tokenId);
+      const spec = await copies.unsealSpec(c.sealedSpec, orgKey, tokenId, itemId);
+      return sealsStillLive(key, spec, at(c.at));
     };
-    await expect(opened()).rejects.toThrow();
+    expect(await refreshes().catch(() => false)).toBe(c.refreshes);
   });
 
   it("refuses the version 1 seals, which name no token or item", async () => {
@@ -92,11 +98,27 @@ describe("Script grant seals, version 2, against the vectors", () => {
     ).rejects.toThrow("this grant's spec");
   });
 
+  it("refuses every version 2 seal, which says nothing of when the token ends", async () => {
+    const v2 = [
+      { sealedKey: grantsV2.sealedTokenKey.encString, sealedSpec: grantsV2.sealedSpec.encString },
+      ...grantsV2.refused,
+    ];
+    for (const r of v2) {
+      await expect(copies.unsealTokenKey(r.sealedKey, orgKey, tokenId)).rejects.toThrow();
+    }
+    await expect(
+      copies.unsealSpec(grantsV2.sealedSpec.encString, orgKey, tokenId, itemId),
+    ).rejects.toThrow("this grant's spec");
+  });
+
   it("seals what it makes so the vectors' readers open it, and only for that token and item", async () => {
     const tokenKey = await keys.tokenKey(seed);
-    const sealedKey = await copies.sealTokenKey(tokenId, tokenKey, orgKey);
+    const expires = sealedExpiry(new Date(grants.expires * 1000).toISOString());
+    expect(expires).toBe(grants.expires);
+    const sealedKey = await copies.sealTokenKey(tokenId, expires, tokenKey, orgKey);
     const reopened = await copies.unsealTokenKey(sealedKey, orgKey, tokenId);
-    expect(Buffer.from(reopened.toEncoded()).toString("base64")).toBe(grants.tokenKey);
+    expect(Buffer.from(reopened.key.toEncoded()).toString("base64")).toBe(grants.tokenKey);
+    expect(reopened.expires).toBe(grants.expires);
     await expect(copies.unsealTokenKey(sealedKey, orgKey, "another-token")).rejects.toThrow();
 
     const fields: ScriptFields = {
@@ -105,7 +127,7 @@ describe("Script grant seals, version 2, against the vectors", () => {
       totp: false,
       fields: ["Break-glass PIN"],
     };
-    const sealedSpec = await copies.sealSpec(tokenId, itemId, fields, orgKey);
+    const sealedSpec = await copies.sealSpec(tokenId, itemId, expires, fields, orgKey);
     expect(await copies.unsealSpec(sealedSpec, orgKey, tokenId, itemId)).toEqual(
       JSON.parse(grants.sealedSpec.plaintext),
     );

@@ -216,6 +216,14 @@ export class SessionTimeoutInputComponent implements ControlValueAccessor, Valid
       return;
     }
 
+    // Keykeeper: a value written from the model never comes back as a change
+    // (no events, so onChange isn't called). The settings page writes the
+    // timeout it reads whenever that changes, such as when a policy arrives
+    // while the page is open; echoing it back saved it over the person's
+    // stored choice, so a stored "On browser refresh" that "when the computer
+    // locks" only shows as minutes became those minutes. See DESIGN.md,
+    // "Staying unlocked across a reload", in the meta repo.
+
     // Normalize the custom numeric value to preset (i.e. 1 minute), otherwise set as custom
     const options = this.availableTimeoutOptions();
     const matchingOption = options.some((opt) => opt.value === value);
@@ -223,13 +231,16 @@ export class SessionTimeoutInputComponent implements ControlValueAccessor, Valid
       this.logService.debug(
         `[SessionTimeoutInputComponent] form control write value as custom ${value}`,
       );
-      this.form.setValue({
-        vaultTimeout: VaultTimeoutStringType.Custom,
-        custom: {
-          hours: Math.floor((value as number) / 60),
-          minutes: (value as number) % 60,
+      this.form.setValue(
+        {
+          vaultTimeout: VaultTimeoutStringType.Custom,
+          custom: {
+            hours: Math.floor((value as number) / 60),
+            minutes: (value as number) % 60,
+          },
         },
-      });
+        { emitEvent: false },
+      );
       return;
     }
 
@@ -237,10 +248,18 @@ export class SessionTimeoutInputComponent implements ControlValueAccessor, Valid
       `[SessionTimeoutInputComponent] form control write value as preset ${value}`,
     );
 
-    // For string values (e.g., "onLocked", "never"), set directly
-    this.form.patchValue({
-      vaultTimeout: value,
-    });
+    // For string values (e.g., "onLocked", "never"), set directly, with the
+    // custom fields showing a numeric one, as choosing it does.
+    const current = isVaultTimeoutTypeNumeric(value)
+      ? (value as number)
+      : VaultTimeoutNumberType.EightHours;
+    this.form.setValue(
+      {
+        vaultTimeout: value,
+        custom: { hours: Math.floor(current / 60), minutes: current % 60 },
+      },
+      { emitEvent: false },
+    );
   }
 
   registerOnChange(onChange: (vaultTimeout: VaultTimeout) => void): void {

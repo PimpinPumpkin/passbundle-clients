@@ -1,12 +1,15 @@
 import { webcrypto } from "node:crypto";
 
 import {
+  joiningSealSource,
+  JoiningSource,
   KeykeeperJoinSeals,
   parseExpiringSeal,
   SEAL_LIFETIME_SECONDS,
   SEAL_MAX_AHEAD_SECONDS,
 } from "./join-seals";
 import * as vectors from "./join-seals.vectors.json";
+import * as joining from "./joining-v2.vectors.json";
 import * as v2 from "./joins-v2.vectors.json";
 
 const seals = new KeykeeperJoinSeals(webcrypto.subtle as unknown as SubtleCrypto);
@@ -62,33 +65,19 @@ describe("Join seals, version 1, against the vectors", () => {
     expect(await seals.checkStaffSeal(v.seal, joinKey, input.organizationId, v.email)).toBe(false);
   });
 
-  it("seals the joining setting with its domains, in any order", async () => {
+  it("no longer takes version 1 joining seals, which say nothing of where the setting comes from", async () => {
     const joinKey = await seals.joinKey(orgKey);
     for (const v of vectors.joiningSeals) {
-      expect(await seals.joiningSeal(joinKey, input.organizationId, v.autoConfirm, v.domains)).toBe(
-        v.seal,
-      );
       expect(
         await seals.checkJoiningSeal(
           v.seal,
           joinKey,
           input.organizationId,
           v.autoConfirm,
-          [...v.domains].reverse(),
+          v.domains,
         ),
-      ).toBe(true);
+      ).toBe(false);
     }
-    // Approval turned off, or a domain added, without a new seal: no.
-    const [, approval, withDomains] = vectors.joiningSeals;
-    expect(
-      await seals.checkJoiningSeal(approval.seal, joinKey, input.organizationId, true, []),
-    ).toBe(false);
-    expect(
-      await seals.checkJoiningSeal(withDomains.seal, joinKey, input.organizationId, true, [
-        ...withDomains.domains,
-        "attacker.example",
-      ]),
-    ).toBe(false);
   });
 
   it("makes new join secrets in the install command's form", () => {
@@ -148,5 +137,53 @@ describe("Join seals, version 2, against the vectors", () => {
 
   it.each(v2.clientChecks)("client: $why", async (c) => {
     expect(await seals.checkClientSeal(c.seal, await key(), org, c.mspId)).toBe(c.vouches);
+  });
+});
+
+describe("Joining seals, version 2, against the vectors", () => {
+  const org = joining.inputs.organizationId;
+  const joinKey = () => seals.joinKey(bytes(joining.inputs.organizationKey));
+
+  it("makes the join key as version 1 does", async () => {
+    expect(Buffer.from(await joinKey()).toString("base64")).toBe(joining.joinKey);
+  });
+
+  it("seals the setting with its domains, in any order, and where it comes from", async () => {
+    for (const v of joining.seals) {
+      const source = v.source as JoiningSource;
+      expect(await seals.joiningSeal(await joinKey(), org, v.autoConfirm, v.domains, source)).toBe(
+        v.seal,
+      );
+      expect(joiningSealSource(v.seal)).toBe(source);
+      expect(
+        await seals.checkJoiningSeal(
+          v.seal,
+          await joinKey(),
+          org,
+          v.autoConfirm,
+          [...v.domains].reverse(),
+          source,
+        ),
+      ).toBe(true);
+    }
+  });
+
+  it.each(joining.checks)("$why: vouches $vouches", async (c) => {
+    expect(
+      await seals.checkJoiningSeal(
+        c.seal,
+        await joinKey(),
+        org,
+        c.autoConfirm,
+        c.domains,
+        (c.source ?? undefined) as JoiningSource | undefined,
+      ),
+    ).toBe(c.vouches);
+  });
+
+  it("reads no source from anything but a version 2 joining seal", () => {
+    expect(joiningSealSource(null)).toBeNull();
+    expect(joiningSealSource(vectors.joiningSeals[0].seal)).toBeNull();
+    expect(joiningSealSource(v2.inviteSeal.seal)).toBeNull();
   });
 });

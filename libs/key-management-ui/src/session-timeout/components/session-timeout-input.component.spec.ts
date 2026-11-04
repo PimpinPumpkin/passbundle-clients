@@ -713,6 +713,25 @@ describe("SessionTimeoutInputComponent", () => {
       expect(component.form.controls.vaultTimeout.value).toBe(ONE_HOUR);
     }));
 
+    it("never calls onChange for a value the model writes", fakeAsync(() => {
+      // Keykeeper: the settings page writes the timeout it reads whenever a
+      // policy changes it; echoing that back would save it over the person's
+      // stored choice.
+      const onChange = jest.fn();
+      component.registerOnChange(onChange);
+      for (const value of [NINETY_MINUTES, FIFTEEN_MINUTES, VaultTimeoutStringType.OnRestart]) {
+        component.writeValue(value);
+        flush();
+      }
+      expect(onChange).not.toHaveBeenCalled();
+      expect(component.form.controls.vaultTimeout.value).toBe(VaultTimeoutStringType.OnRestart);
+
+      // The person's own choice still is a change.
+      component.form.controls.vaultTimeout.setValue(FIFTEEN_MINUTES);
+      flush();
+      expect(onChange).toHaveBeenCalledWith(FIFTEEN_MINUTES);
+    }));
+
     it("should set form to custom mode when value doesn't match any available option", fakeAsync(() => {
       component.writeValue(NINETY_MINUTES);
       flush();
