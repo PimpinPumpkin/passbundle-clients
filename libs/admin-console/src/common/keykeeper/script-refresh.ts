@@ -9,7 +9,8 @@
 // an item the token was never granted. So a copy is remade only for an item
 // in the token's own organization, not in the trash, that this person can
 // edit and see the passwords of, with a token key sealed for that token and a
-// spec sealed for that token and that item.
+// spec sealed for that token and that item, before the token's end as both
+// seals say it.
 
 import { firstValueFrom } from "rxjs";
 
@@ -23,7 +24,7 @@ import { KeyService } from "@bitwarden/key-management";
 
 import { KeykeeperMspRequests } from "./msp-requests";
 import { StaleScriptGrant } from "./msp-types";
-import { copyOf, KeykeeperScriptCopies, revisionText } from "./script-access";
+import { copyOf, KeykeeperScriptCopies, revisionText, sealsStillLive } from "./script-access";
 
 const sameMoment = (a: string, b: string) => new Date(a).getTime() === new Date(b).getTime();
 
@@ -53,7 +54,7 @@ export class KeykeeperScriptRefresher {
   ) {}
 
   /** Remakes copies that are behind their items. Resolves to what failed, in sentences. */
-  async refresh(): Promise<string[]> {
+  async refresh(now: Date = new Date()): Promise<string[]> {
     const stale = await this.requests.staleScriptGrants();
     if (stale.length === 0) {
       return [];
@@ -81,7 +82,10 @@ export class KeykeeperScriptRefresher {
       try {
         const tokenKey = await this.copies.unsealTokenKey(grant.sealedKey, orgKey, grant.tokenId);
         const spec = await this.copies.unsealSpec(grant.sealedSpec, orgKey, grant.tokenId, item.id);
-        const copy = await this.copies.encryptCopy(copyOf(grant.tokenId, item, spec), tokenKey);
+        if (!sealsStillLive(tokenKey, spec, now)) {
+          throw new Error("its token has ended");
+        }
+        const copy = await this.copies.encryptCopy(copyOf(grant.tokenId, item, spec), tokenKey.key);
         await this.requests.setScriptGrant(grant.organizationId, grant.tokenId, grant.itemId, {
           copy,
           revision: revisionText(item.revisionDate),

@@ -49,7 +49,7 @@ async function sealedJoining(autoConfirm = true, domains: string[] = []) {
   return {
     autoConfirm,
     domains,
-    seal: await seals.joiningSeal(await joinKey(), ORG, autoConfirm, domains),
+    seal: await seals.joiningSeal(await joinKey(), ORG, autoConfirm, domains, "default"),
   };
 }
 

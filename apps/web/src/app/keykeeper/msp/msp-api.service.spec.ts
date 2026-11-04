@@ -38,8 +38,12 @@ const keys: Record<string, OrgKey> = { [DENTAL]: keyOf(1), [LAW]: keyOf(2), [FAM
 const joinKey = (org: string) => seals.joinKey(keys[org].toEncoded());
 
 const clientSeal = async (org: string) => seals.clientSeal(await joinKey(org), org, MSP);
-const joiningSeal = async (org: string, autoConfirm: boolean, domains: string[] = []) =>
-  seals.joiningSeal(await joinKey(org), org, autoConfirm, domains);
+const joiningSeal = async (
+  org: string,
+  autoConfirm: boolean,
+  domains: string[] = [],
+  source: "own" | "default" = "default",
+) => seals.joiningSeal(await joinKey(org), org, autoConfirm, domains, source);
 
 const client = (id: string, seal: string | null) => ({
   id,
@@ -222,6 +226,24 @@ describe("Saving the MSP's default for how people join", () => {
     expect(joiningPut(sent).seals).toEqual({});
   });
 
+  it("never reseals a client whose own setting is the same as the default the admin saw", async () => {
+    const msp = await mspWith(client(DENTAL, await clientSeal(DENTAL)));
+    // Dental chose approval itself while the default was approval too; the
+    // server lists it as following, and the admin turns on letting people in.
+    const seen = { autoConfirm: false, inviteHours: 120 };
+    const { api, sent } = setUp(msp, {
+      default: seen,
+      ownSettings: [],
+      following: [
+        { organizationId: DENTAL, domains: [], seal: await joiningSeal(DENTAL, false, [], "own") },
+      ],
+    });
+
+    await api.saveMspJoining(MSP, { autoConfirm: true, inviteHours: 120 }, seen);
+
+    expect(joiningPut(sent).seals).toEqual({});
+  });
+
   it("changes nothing when the default isn't what the admin saw", async () => {
     const msp = await mspWith(client(DENTAL, await clientSeal(DENTAL)));
     const { api, sent } = setUp(msp, {
@@ -255,7 +277,7 @@ describe("Use default", () => {
             source: "own",
             default: { autoConfirm: defaultAutoConfirm, inviteHours: 120 },
             domains: [],
-            seal: await joiningSeal(DENTAL, false),
+            seal: await joiningSeal(DENTAL, false, [], "own"),
           }
         : original(method, path, body),
     );
@@ -267,6 +289,17 @@ describe("Use default", () => {
     await api.useDefaultJoining(DENTAL, true);
     const reset = sent.find((s) => s.method === "DELETE")!;
     expect(reset.body.seal).toBe(await joiningSeal(DENTAL, true));
+  });
+
+  it("seals the organization's own setting as its own, and new domains as the old seal says", async () => {
+    const { api, sent } = withOrgJoining(true);
+    await api.setOrgJoining(DENTAL, { autoConfirm: true, inviteHours: 120 });
+    const own = sent.find((s) => s.method === "PUT" && s.path.endsWith("/joining"))!;
+    expect(own.body.seal).toBe(await joiningSeal(DENTAL, true, [], "own"));
+
+    await api.setOrgEnrollmentDomains(DENTAL, ["acme.example"]);
+    const domains = sent.find((s) => s.path.endsWith("/enrollment/domains"))!;
+    expect(domains.body.seal).toBe(await joiningSeal(DENTAL, false, ["acme.example"], "own"));
   });
 
   it("changes nothing when the server's default isn't the one the person saw", async () => {

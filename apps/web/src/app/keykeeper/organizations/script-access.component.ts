@@ -6,6 +6,7 @@ import {
   KeykeeperScriptCopies,
   KeykeeperScriptKeys,
   revisionText,
+  sealedExpiry,
   scriptUsage,
   ScriptReadView,
   ScriptTokenView,
@@ -293,13 +294,15 @@ export class KeykeeperScriptAccessComponent {
       }
       const { id, seed } = this.keys.newToken();
       const tokenKey = new SymmetricCryptoKey(await this.keys.tokenKey(seed));
+      // The seals carry when the token ends, as the server keeps it.
+      const expires = sealedExpiry(choice.expiresAt);
       const grants = [];
       for (const { item, spec } of choice.grants) {
         grants.push({
           itemId: item.id,
           copy: await this.copies.encryptCopy(copyOf(id, item, spec), tokenKey),
           revision: revisionText(item.revisionDate),
-          sealedSpec: await this.copies.sealSpec(id, item.id, spec, orgKey),
+          sealedSpec: await this.copies.sealSpec(id, item.id, expires, spec, orgKey),
         });
       }
       const token = {
@@ -308,7 +311,12 @@ export class KeykeeperScriptAccessComponent {
         expiresAt: choice.expiresAt,
         networks: choice.networks,
         authHash: await this.keys.authHash(seed),
-        sealedKey: await this.copies.sealTokenKey(id, await this.keys.tokenKey(seed), orgKey),
+        sealedKey: await this.copies.sealTokenKey(
+          id,
+          expires,
+          await this.keys.tokenKey(seed),
+          orgKey,
+        ),
         grants,
       };
       const created = await this.confirmChange.send("keykeeperConfirmScriptToken", (verification) =>

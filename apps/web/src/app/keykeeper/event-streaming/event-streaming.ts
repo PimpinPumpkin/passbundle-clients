@@ -6,7 +6,7 @@
 // to security tools", in the meta repo.
 
 export type DestinationKind = "webhook" | "syslog" | "sentinel";
-export type DestinationStatus = "on" | "slow" | "failing" | "paused" | "off";
+export type DestinationStatus = "on" | "slow" | "failing" | "paused" | "stopped" | "off";
 
 export type Destination = {
   id: string;
@@ -192,6 +192,15 @@ export function statusView(d: Destination): StatusView {
       };
     case "paused":
       return { label: "Stopped by the server", variant: "danger", detail: d.pausedReason };
+    // Keykeeper: a destination sends only while whoever set it up still has
+    // access, as script tokens do (DESIGN.md, "Offboarding").
+    case "stopped":
+      return {
+        label: "Stopped: its maker left",
+        variant: "danger",
+        detail:
+          "Whoever set it up no longer has access here, so nothing is sent to it. Delete it, and set it up again if it's still needed.",
+      };
     case "off":
       return { label: "Off", variant: "secondary", detail: null };
   }

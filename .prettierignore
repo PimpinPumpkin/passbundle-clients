@@ -28,3 +28,7 @@ libs/.github
 
 # Forked library files
 libs/common/src/types/deep-jsonify.ts
+
+# Keykeeper: copies of the meta repo's test vectors, which tier 1 compares
+# with the originals byte for byte.
+libs/admin-console/src/common/keykeeper/*.vectors.json

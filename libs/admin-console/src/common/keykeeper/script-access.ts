@@ -4,10 +4,11 @@
 // the server never sees. The token key is also sealed with the organization
 // key, so apps that hold that key can refresh copies after an item changes.
 // Every app must compute these exactly as docs/vectors/script-access-v1.json,
-// and seal and open the token key and specs as docs/vectors/script-grants-v2.json
-// (version 2: each seal names the token, and a spec its item, so a server
-// can't pair a token's key with an item it was never granted). The unit tests
-// check both (copies sit next to them).
+// and seal and open the token key and specs as docs/vectors/script-grants-v3.json
+// (version 3: each seal names the token, and a spec its item, so a server
+// can't pair a token's key with an item it was never granted; and both say
+// when the token ends, so a server can't have apps refresh a copy after
+// that). The unit tests check both (copies sit next to them).
 
 import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
 import { EncString } from "@bitwarden/common/key-management/crypto/models/enc-string";
@@ -40,13 +41,49 @@ export type ScriptFields = {
 };
 
 /**
- * A grant's spec as it's sealed, version 2: what it copies, and the token
- * and item it's for.
+ * A grant's spec as it's sealed, version 3: what it copies, the token and
+ * item it's for, and when the token ends (Unix seconds).
  */
-export type ScriptSpec = ScriptFields & { v: 2; token: string; item: string };
+export type ScriptSpec = ScriptFields & { v: 3; token: string; item: string; expires: number };
 
-/** A token key as it's sealed, version 2: the key, and the token it belongs to. */
-type SealedTokenKey = { v: 2; token: string; key: string };
+/** A token key as it's sealed, version 3: the key, the token it belongs to, and when that ends. */
+type SealedTokenKey = { v: 3; token: string; expires: number; key: string };
+
+/** A token key opened from its seal: the key, and when its token ends (Unix seconds). */
+export type UnsealedTokenKey = { key: SymmetricCryptoKey; expires: number };
+
+/**
+ * The furthest ahead an app accepts a sealed end: a token lasts at most a
+ * year, with a day's slack for a sealing device whose clock runs ahead.
+ */
+export const SCRIPT_SEAL_MAX_AHEAD_SECONDS = 366 * 86_400;
+
+/** A token's end as the seals carry it: Unix seconds. */
+export function sealedExpiry(expiresAt: Date | string): number {
+  return Math.floor(new Date(expiresAt).getTime() / 1000);
+}
+
+/**
+ * Whether a copy may be remade now, by what the seals say: the token key and
+ * spec end at the same time, the token hasn't ended, and its end isn't
+ * further ahead than any token lasts. A server that keeps listing a grant
+ * after its token ended gets nothing.
+ */
+export function sealsStillLive(
+  key: UnsealedTokenKey,
+  spec: ScriptSpec,
+  now: Date = new Date(),
+): boolean {
+  const at = Math.floor(now.getTime() / 1000);
+  return (
+    key.expires === spec.expires &&
+    at < key.expires &&
+    key.expires <= at + SCRIPT_SEAL_MAX_AHEAD_SECONDS
+  );
+}
+
+const isSeconds = (value: unknown): value is number =>
+  typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 
 /** Ids as the server and the apps write them, compared without regard to case. */
 const sameId = (a: unknown, b: string) =>
@@ -183,48 +220,63 @@ export class KeykeeperScriptKeys {
 export class KeykeeperScriptCopies {
   constructor(private readonly encryptService: EncryptService) {}
 
-  /** The token key, sealed with the organization key together with its token's id. */
+  /**
+   * The token key, sealed with the organization key together with its
+   * token's id and when the token ends (Unix seconds, `sealedExpiry`).
+   */
   async sealTokenKey(
     tokenId: string,
+    expires: number,
     tokenKey: Uint8Array,
     orgKey: SymmetricCryptoKey,
   ): Promise<string> {
-    const sealed: SealedTokenKey = { v: 2, token: tokenId, key: toB64(tokenKey) };
+    const sealed: SealedTokenKey = { v: 3, token: tokenId, expires, key: toB64(tokenKey) };
     return (await this.encryptService.encryptString(JSON.stringify(sealed), orgKey))
       .encryptedString!;
   }
 
   /**
-   * Opens a sealed token key, only if it's version 2 and sealed for this
+   * Opens a sealed token key, only if it's version 3 and sealed for this
    * token: a server could otherwise hand an app another token's key, whose
-   * seed someone else knows, to write this token's copies with.
+   * seed someone else knows, to write this token's copies with. With it,
+   * when the token ends, which `sealsStillLive` checks.
    */
   async unsealTokenKey(
     sealed: string,
     orgKey: SymmetricCryptoKey,
     tokenId: string,
-  ): Promise<SymmetricCryptoKey> {
+  ): Promise<UnsealedTokenKey> {
     const opened = parseJson(
       await this.encryptService.decryptString(new EncString(sealed), orgKey),
     );
     const bytes = typeof opened?.key === "string" ? fromB64(opened.key) : null;
-    if (opened?.v !== 2 || !sameId(opened.token, tokenId) || bytes?.length !== 64) {
+    if (
+      opened?.v !== 3 ||
+      !sameId(opened.token, tokenId) ||
+      !isSeconds(opened.expires) ||
+      bytes?.length !== 64
+    ) {
       throw new Error("That isn't this script token's key");
     }
-    return new SymmetricCryptoKey(bytes);
+    return { key: new SymmetricCryptoKey(bytes), expires: opened.expires };
   }
 
-  /** What a grant copies, sealed with the organization key together with its token's and item's ids. */
+  /**
+   * What a grant copies, sealed with the organization key together with its
+   * token's and item's ids and when the token ends.
+   */
   async sealSpec(
     tokenId: string,
     itemId: string,
+    expires: number,
     fields: ScriptFields,
     orgKey: SymmetricCryptoKey,
   ): Promise<string> {
     const spec: ScriptSpec = {
-      v: 2,
+      v: 3,
       token: tokenId,
       item: itemId,
+      expires,
       username: fields.username,
       password: fields.password,
       totp: fields.totp,
@@ -234,7 +286,7 @@ export class KeykeeperScriptCopies {
   }
 
   /**
-   * Opens a grant's spec, only if it's version 2 and sealed for this token
+   * Opens a grant's spec, only if it's version 3 and sealed for this token
    * and this item: a server could otherwise pair a spec with an item it was
    * never granted.
    */
@@ -246,18 +298,20 @@ export class KeykeeperScriptCopies {
   ): Promise<ScriptSpec> {
     const spec = parseJson(await this.encryptService.decryptString(new EncString(sealed), orgKey));
     if (
-      spec?.v !== 2 ||
+      spec?.v !== 3 ||
       !sameId(spec.token, tokenId) ||
       !sameId(spec.item, itemId) ||
+      !isSeconds(spec.expires) ||
       !Array.isArray(spec.fields) ||
       !spec.fields.every((f) => typeof f === "string")
     ) {
       throw new Error("That isn't this grant's spec");
     }
     return {
-      v: 2,
+      v: 3,
       token: tokenId,
       item: itemId,
+      expires: spec.expires,
       username: spec.username === true,
       password: spec.password === true,
       totp: spec.totp === true,
