@@ -108,6 +108,25 @@ describe("Guided browser import", () => {
     expect(prepared.result.folderRelationships).toEqual([[0, 0]]);
   });
 
+  it("never compares against an item whose password the person can't see", () => {
+    const hidden = login("Payroll", "https://payroll.example.com", "ana", "Guess-1");
+    hidden.viewPassword = false;
+    const parsed = new ImportResult();
+    parsed.success = true;
+    parsed.ciphers = [
+      login("Payroll", "https://payroll.example.com/login", "ana", "Guess-1"),
+      login("Payroll", "https://payroll.example.com/login", "ana", "Guess-2"),
+    ];
+
+    const prepared = prepareImport(parsed, [hidden], "Check these");
+
+    // Neither "already there" nor "a different password": both are new to them.
+    expect(prepared.alreadyThere).toBe(0);
+    expect(prepared.toCheck).toBe(1);
+    expect(prepared.added).toBe(1);
+    expect(prepared.result.folderRelationships).toEqual([[1, 0]]);
+  });
+
   it("works on a real Chrome export, read by upstream's importer", async () => {
     const csv = [
       "name,url,username,password,note",

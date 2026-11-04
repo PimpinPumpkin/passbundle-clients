@@ -50,6 +50,7 @@ import {
 import { CipherFileUploadService } from "../abstractions/file-upload/cipher-file-upload.service";
 import { FieldType } from "../enums";
 import { CipherType } from "../enums/cipher-type";
+import { keepHiddenItemWebsites } from "../keykeeper/hidden-websites";
 import { CipherData } from "../models/data/cipher.data";
 import { LocalData } from "../models/data/local.data";
 import { Cipher } from "../models/domain/cipher";
@@ -860,6 +861,12 @@ export class CipherService implements CipherServiceAbstraction {
     }
 
     const encrypted = await this.encrypt(cipherView, userId);
+    // Keykeeper: an item's websites stay as stored for someone who can't see its passwords.
+    await keepHiddenItemWebsites(
+      encrypted.cipher,
+      encrypted.cipher.id ? await this.get(encrypted.cipher.id, userId) : null,
+      (cipher) => this.decrypt(cipher, userId),
+    );
     const updatedCipher = await this.updateWithServerLegacy(encrypted, orgAdmin);
     const updatedCipherView = await this.decrypt(updatedCipher, userId);
     return updatedCipherView;

@@ -13,6 +13,7 @@ import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
 import {
   KeykeeperExpirationReminders,
   reminderLevel,
+  reminderText,
   SHOWN_REMINDERS,
   shouldRemind,
 } from "./expiration-reminders";
@@ -78,8 +79,12 @@ describe("Keykeeper expiration reminders", () => {
       const userId = "user-1" as UserId;
       const { reminders, stateProvider } = setUp(userId);
 
-      expect(await reminders.check(now)).toEqual(["Firewall admin: expires in 5 days"]);
+      expect(await reminders.check(now)).toEqual(["1 item expires soon"]);
       expect(await reminders.check(now)).toEqual([]);
+      // The notification says how many, never which: no item's name on the lock screen.
+      const shownNotifications = ((chrome as any).notifications.create as jest.Mock).mock.calls;
+      expect(shownNotifications).toHaveLength(1);
+      expect(JSON.stringify(shownNotifications)).not.toContain("Firewall admin");
 
       expect(SHOWN_REMINDERS.clearOn).toEqual(["logout"]);
       expect(
@@ -88,5 +93,13 @@ describe("Keykeeper expiration reminders", () => {
         "item-1": { date: "2026-10-25", level: "7" },
       });
     });
+  });
+
+  it("counts the items in one notification, and says when they've expired", () => {
+    expect(reminderText(["7"]).title).toBe("1 item expires soon");
+    expect(reminderText(["30", "1"]).title).toBe("2 items expire soon");
+    expect(reminderText(["expired"]).title).toBe("1 item has expired");
+    expect(reminderText(["expired", "expired"]).title).toBe("2 items have expired");
+    expect(reminderText(["expired", "7", "30"]).title).toBe("3 items expire soon or have expired");
   });
 });

@@ -165,6 +165,11 @@ export abstract class BaseImporter {
           this.logService.warning("Error parsing row " + e.row + ": " + e.message);
         }
       });
+      // Keykeeper: a quote that's never closed swallows every row after it
+      // into one value. That isn't a file to import as if nothing happened.
+      if (result.errors.some((e) => e.code === "MissingQuotes")) {
+        return null;
+      }
     }
     return result.data && result.data.length > 0 ? result.data : null;
   }
@@ -295,7 +300,9 @@ export abstract class BaseImporter {
       chinaunionpay: "UnionPay",
       rupay: "RuPay",
     };
-    return brands[name.toLowerCase().replace(/[^a-z]/g, "")];
+    // Only the brands' own names: "constructor" is a name every object has.
+    const key = name.toLowerCase().replace(/[^a-z]/g, "");
+    return Object.prototype.hasOwnProperty.call(brands, key) ? brands[key] : undefined;
   }
 
   protected moveFoldersToCollections(result: ImportResult) {

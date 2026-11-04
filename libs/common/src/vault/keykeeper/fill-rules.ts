@@ -28,9 +28,19 @@ export type FillRule = {
    * someone else with edit rights added, can't send a value anywhere else.
    */
   host?: string;
+  /**
+   * The page's scheme, "https" when left out: a rule fills only on that
+   * scheme, so an http:// copy of the site never gets a rule's value.
+   */
+  scheme?: RuleScheme;
   field: FieldFingerprint;
   fill: FillSource;
 };
+
+export type RuleScheme = "http" | "https";
+
+/** The scheme a rule fills on: the one it records, https when it records none. */
+export const schemeOf = (rule: Pick<FillRule, "scheme">): RuleScheme => rule.scheme ?? "https";
 
 type ItemFields = { fields?: { name?: string | null; value?: string | null }[] | null };
 
@@ -42,7 +52,8 @@ export function isFillRule(value: unknown): value is FillRule {
     rule.field == null ||
     typeof rule.fill !== "object" ||
     rule.fill == null ||
-    (rule.host != null && typeof rule.host !== "string")
+    (rule.host != null && typeof rule.host !== "string") ||
+    (rule.scheme != null && rule.scheme !== "http" && rule.scheme !== "https")
   ) {
     return false;
   }
@@ -53,7 +64,8 @@ export function isFillRule(value: unknown): value is FillRule {
   return from === "username" || from === "password" || from === "totp" || from === "never";
 }
 
-function parseRule(value: string | null | undefined): FillRule | null {
+/** A stored rule, or null when the value isn't one. */
+export function parseFillRule(value: string | null | undefined): FillRule | null {
   try {
     const parsed = JSON.parse(value ?? "");
     return isFillRule(parsed) ? parsed : null;
@@ -69,7 +81,7 @@ export function readFillRules(item: ItemFields | null | undefined): FillRule[] {
     if (field.name !== FILL_RULE_FIELD_NAME || !field.value) {
       continue;
     }
-    const rule = parseRule(field.value);
+    const rule = parseFillRule(field.value);
     if (rule) {
       rules.push(rule);
     }
@@ -82,9 +94,11 @@ export const sameField = (a: FieldFingerprint, b: FieldFingerprint) =>
   (a.name ?? null) === (b.name ?? null) &&
   (a.label ?? null) === (b.label ?? null);
 
-/** Whether two rules are for the same field on the same host (an item keeps one of those). */
+/** Whether two rules are for the same field on the same site (an item keeps one of those). */
 export const sameRuleTarget = (a: FillRule, b: FillRule) =>
-  (a.host ?? null) === (b.host ?? null) && sameField(a.field, b.field);
+  (a.host ?? null) === (b.host ?? null) &&
+  schemeOf(a) === schemeOf(b) &&
+  sameField(a.field, b.field);
 
 /**
  * Removes a rule from an item: the stored rule for the same field on the same
@@ -96,7 +110,7 @@ export function removeFillRule<T extends ItemFields>(item: T, rule: FillRule): T
     if (field.name !== FILL_RULE_FIELD_NAME) {
       return true;
     }
-    const stored = parseRule(field.value);
+    const stored = parseFillRule(field.value);
     return stored == null || !sameRuleTarget(stored, rule);
   }) as T["fields"];
   return item;
@@ -128,7 +142,7 @@ export function describeSource(source: FillSource): string {
 /** A rule in plain language: where it applies, and what it does there. */
 export function describeFillRule(rule: FillRule): { site: string; text: string } {
   return {
-    site: rule.host || "Every site",
+    site: rule.host ? (schemeOf(rule) === "http" ? `http://${rule.host}` : rule.host) : "Every site",
     text: `${describeFingerprint(rule.field)} gets ${describeSource(rule.fill)}`,
   };
 }

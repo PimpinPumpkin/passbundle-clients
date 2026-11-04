@@ -19,10 +19,12 @@ import {
   UserKeyDefinition,
 } from "@bitwarden/common/platform/state";
 import { UserId } from "@bitwarden/common/types/guid";
+import { schemeOf } from "@bitwarden/common/vault/keykeeper/fill-rules";
 
 import { BrowserApi } from "../../platform/browser/browser-api";
 
-import { FieldFingerprint, FillRule, hostOf } from "./fill-rules";
+
+import { FieldFingerprint, FillRule, hostOf, schemeOfUrl } from "./fill-rules";
 
 export type FixFill = "username" | "password" | "totp" | "never";
 export type SiteFix = {
@@ -40,6 +42,43 @@ export const SHARE_SITE_FIXES = new UserKeyDefinition<boolean>(KEYKEEPER_SITE_FI
   clearOn: [],
 });
 
+/**
+ * Whether fixes other people shared (and the person's MSPs' site rules) fill
+ * for this person. On until they turn it off; off, the list isn't downloaded.
+ */
+export const USE_SITE_FIXES = new UserKeyDefinition<boolean>(KEYKEEPER_SITE_FIXES_DISK, "use", {
+  deserializer: (use) => use !== false,
+  clearOn: [],
+});
+
+/** The most of a field's id, name, or label the server keeps. */
+const MAX_TEXT = 200;
+const EMAIL = /[^\s@<>()"',;:]+@[^\s@<>()"',;:]+\.[a-z]{2,}/gi;
+// Seven or more digits, with the separators phone numbers are written with.
+const PHONE = /\+?\d(?:[\s().-]*\d){6,}/g;
+
+/**
+ * Whether page text carries something personal: an email address anywhere,
+ * or a phone number in a label (a placeholder or an aria label can say "Code
+ * sent to +1 555 010 1234"). Ids and names often have long numbers, which
+ * aren't someone's.
+ */
+export function hasPersonal(text: string, kind: "label" | "id"): boolean {
+  // Longer than any field's text the server keeps: not worth the search.
+  if (text.length > MAX_TEXT) {
+    return true;
+  }
+  EMAIL.lastIndex = 0;
+  PHONE.lastIndex = 0;
+  return EMAIL.test(text) || (kind === "label" && PHONE.test(text));
+}
+
+/** Page text with any email address or (in a label) phone number replaced by what it was. */
+export function scrubPersonal(text: string, kind: "label" | "id"): string {
+  const scrubbed = text.slice(0, MAX_TEXT).replace(EMAIL, "(email address)");
+  return kind === "label" ? scrubbed.replace(PHONE, "(phone number)") : scrubbed;
+}
+
 const FIX_LIST = new UserKeyDefinition<FixList | null>(KEYKEEPER_SITE_FIXES_DISK, "list", {
   deserializer: (list) => list ?? null,
   clearOn: ["logout"],
@@ -48,13 +87,31 @@ const FIX_LIST = new UserKeyDefinition<FixList | null>(KEYKEEPER_SITE_FIXES_DISK
 export const SITE_FIXES_ALARM = "keykeeper-site-fixes";
 const REFRESH_MINUTES = 24 * 60;
 
-/** A rule as a fix, or null when it can't be one: a custom field, or no site. */
+/**
+ * A rule as a fix, or null when it can't be one: a custom field, no site, a
+ * site that isn't https (fixes fill only there), or a field known only by
+ * something personal. A label with an email address or phone number is left
+ * out; an id or name with an email address keeps the whole fix on the device.
+ */
 export function toFix(rule: FillRule): SiteFix | null {
   const fill = rule.fill.from;
-  if (rule.host == null || rule.host === "" || !KINDS.includes(fill as FixFill)) {
+  if (
+    rule.host == null ||
+    rule.host === "" ||
+    schemeOf(rule) !== "https" ||
+    !KINDS.includes(fill as FixFill)
+  ) {
     return null;
   }
-  const field = { id: rule.field.id ?? "", name: rule.field.name ?? "", label: rule.field.label ?? "" };
+  const label = rule.field.label ?? "";
+  const field = {
+    id: rule.field.id ?? "",
+    name: rule.field.name ?? "",
+    label: hasPersonal(label, "label") ? "" : label,
+  };
+  if (hasPersonal(field.id, "id") || hasPersonal(field.name, "id")) {
+    return null;
+  }
   if (field.id === "" && field.name === "" && field.label === "") {
     return null;
   }
@@ -83,6 +140,9 @@ export function toRule(fix: SiteFix): FillRule | null {
 }
 
 export class KeykeeperSiteFixes {
+  /** The downloaded list, so turning fixes off can drop it. */
+  static readonly LIST = FIX_LIST;
+
   constructor(
     private readonly apiService: ApiService,
     private readonly accountService: AccountService,
@@ -131,8 +191,19 @@ export class KeykeeperSiteFixes {
     }
   }
 
-  /** The whole list from the server. A server without site fixes leaves none. */
+  private async using(userId: UserId): Promise<boolean> {
+    return (await firstValueFrom(this.stateProvider.getUser(userId, USE_SITE_FIXES).state$)) !== false;
+  }
+
+  /**
+   * The whole list from the server. A server without site fixes leaves none,
+   * and so does someone who turned them off.
+   */
   async refresh(userId: UserId) {
+    if (!(await this.using(userId))) {
+      await this.stateProvider.getUser(userId, FIX_LIST).update(() => null);
+      return;
+    }
     try {
       const list = await this.apiService.send("GET", "/keykeeper/site-fixes", null, true, true);
       await this.stateProvider.getUser(userId, FIX_LIST).update(() => ({
@@ -145,11 +216,17 @@ export class KeykeeperSiteFixes {
     }
   }
 
-  /** The fixes for the page at `url`: its MSPs' rules first, then the confirmed ones. */
+  /**
+   * The fixes for the page at `url`: its MSPs' rules first, then the confirmed
+   * ones. Only on https pages, and none for someone who turned them off.
+   */
   async rulesFor(url: string): Promise<FillRule[]> {
     const userId = await this.activeUser();
     const host = hostOf(url);
-    if (userId == null || host === "") {
+    if (userId == null || host === "" || schemeOfUrl(url) !== "https") {
+      return [];
+    }
+    if (!(await this.using(userId))) {
       return [];
     }
     const list = await firstValueFrom(this.stateProvider.getUser(userId, FIX_LIST).state$);

@@ -17,6 +17,7 @@ import { UriMatchStrategySetting } from "@bitwarden/common/models/domain/domain-
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
+import { maySeeSecretsOrNew } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { LoginUriView } from "@bitwarden/common/vault/models/view/login-uri.view";
 import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
 import {
@@ -79,6 +80,15 @@ export class AutofillOptionsComponent implements OnInit {
     return this.autofillOptionsForm.controls.uris.controls;
   }
 
+  /**
+   * Keykeeper: someone who can't see the item's passwords can't change its
+   * websites either: that would send the password, as autofill fills it, to a
+   * site they choose. The server keeps them as they are too.
+   */
+  protected get websitesLocked() {
+    return !maySeeSecretsOrNew(this.cipherFormContainer.originalCipherView);
+  }
+
   protected get isPartialEdit() {
     return this.cipherFormContainer.config.mode === "partial-edit";
   }
@@ -127,8 +137,12 @@ export class AutofillOptionsComponent implements OnInit {
     this.cipherFormContainer.registerChildForm("autoFillOptions", this.autofillOptionsForm);
 
     this.autofillOptionsForm.valueChanges.pipe(takeUntilDestroyed()).subscribe((value) => {
+      // Keykeeper: locked websites are disabled, so `value` leaves them out.
+      const uris = this.websitesLocked
+        ? this.autofillOptionsForm.controls.uris.getRawValue()
+        : value.uris;
       this.cipherFormContainer.patchCipher((cipher) => {
-        cipher.login.uris = value.uris?.map((uri: UriField) =>
+        cipher.login.uris = uris?.map((uri: UriField) =>
           Object.assign(new LoginUriView(), {
             uri: uri.uri,
             match: uri.matchDetection,
@@ -159,8 +173,16 @@ export class AutofillOptionsComponent implements OnInit {
         this.autofillOptionsForm.disable({ emitEvent: false });
       } else if (!this.isPartialEdit) {
         this.autofillOptionsForm.enable({ emitEvent: false });
+        this.lockWebsites();
       }
     });
+  }
+
+  /** Keykeeper: see `websitesLocked`. */
+  private lockWebsites() {
+    if (this.websitesLocked) {
+      this.autofillOptionsForm.controls.uris.disable({ emitEvent: false });
+    }
   }
 
   ngOnInit() {
@@ -174,6 +196,7 @@ export class AutofillOptionsComponent implements OnInit {
     if (this.isPartialEdit) {
       this.autofillOptionsForm.disable();
     }
+    this.lockWebsites();
   }
 
   private initFromExistingCipher(existingLogin: LoginView) {

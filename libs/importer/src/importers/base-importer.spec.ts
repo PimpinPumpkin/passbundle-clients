@@ -27,7 +27,23 @@ class FakeBaseImporter extends BaseImporter {
   processKvp(cipher: CipherView, key: string, value: string): void {
     return super.processKvp(cipher, key, value);
   }
+
+  cardBrandFromName(name: string): string | undefined {
+    return super.cardBrandFromName(name);
+  }
 }
+
+describe("cardBrandFromName (Keykeeper)", () => {
+  const importer = new FakeBaseImporter();
+
+  it("names the brands it knows, and nothing else, not even what every object has", () => {
+    expect(importer.cardBrandFromName("American Express")).toBe("Amex");
+    expect(importer.cardBrandFromName("visa")).toBe("Visa");
+    for (const name of ["constructor", "toString", "__proto__", "hasOwnProperty", "Laser"]) {
+      expect(importer.cardBrandFromName(name)).toBeUndefined();
+    }
+  });
+});
 
 // Keykeeper: a value too long or on more than one line goes to the notes, on a line of its own.
 describe("processKvp method", () => {

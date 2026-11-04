@@ -60,6 +60,10 @@ import {
   PasswordRepromptService,
 } from "@bitwarden/vault";
 
+import {
+  FILL_FIELD_REPROMPT_ACTION,
+  FILL_FIELD_REPROMPTED,
+} from "../../../../../autofill/keykeeper/fill-field-reprompt";
 import { sendExtensionMessage } from "../../../../../autofill/utils/index";
 import { BrowserApi } from "../../../../../platform/browser/browser-api";
 import BrowserPopupUtils from "../../../../../platform/browser/browser-popup-utils";
@@ -90,7 +94,9 @@ type LoadAction =
   | typeof COPY_USERNAME_ID
   | typeof COPY_PASSWORD_ID
   | typeof COPY_VERIFICATION_CODE_ID
-  | typeof UPDATE_PASSWORD;
+  | typeof UPDATE_PASSWORD
+  // Keykeeper: a fill picker choice waiting for the master password.
+  | typeof FILL_FIELD_REPROMPT_ACTION;
 
 // FIXME(https://bitwarden.atlassian.net/browse/CL-764): Migrate to OnPush
 // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
@@ -202,9 +208,12 @@ export class ViewComponent {
             // The cipher details can flash on the screen before the popout closes,
             // pass `null` to prevent this.
             if (
-              [AUTOFILL_ID, COPY_PASSWORD_ID, COPY_VERIFICATION_CODE_ID].includes(
-                this.loadAction,
-              ) &&
+              [
+                AUTOFILL_ID,
+                COPY_PASSWORD_ID,
+                COPY_VERIFICATION_CODE_ID,
+                FILL_FIELD_REPROMPT_ACTION,
+              ].includes(this.loadAction) &&
               success === false &&
               cipher.reprompt !== CipherRepromptType.None
             ) {
@@ -547,6 +556,16 @@ export class ViewComponent {
         break;
       case COPY_VERIFICATION_CODE_ID:
         actionSuccess = await this.copyCipherFieldService.copy(cipher.login.totp, "totp", cipher);
+        break;
+      // Keykeeper: the fill picker's choice for an item that asks for the
+      // master password goes ahead only if the prompt succeeds
+      // (autofill/keykeeper/fill-field-menu.ts).
+      case FILL_FIELD_REPROMPT_ACTION:
+        actionSuccess = await this.passwordRepromptService.showPasswordPrompt();
+        await sendExtensionMessage(FILL_FIELD_REPROMPTED, {
+          cipherId: cipher.id,
+          success: actionSuccess,
+        });
         break;
       case UPDATE_PASSWORD: {
         const repromptSuccess = await this.passwordRepromptService.showPasswordPrompt();

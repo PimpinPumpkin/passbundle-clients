@@ -68,7 +68,10 @@ const blank = (value: unknown) => value == null || value === "";
 type Values = Record<string, unknown>;
 type Request = {
   type?: unknown;
-  login?: { fido2Credentials?: unknown[] | null } | null;
+  login?: {
+    fido2Credentials?: unknown[] | null;
+    uris?: { uri?: string | null; match?: number | null }[] | null;
+  } | null;
   fields?: { name?: string | null; type?: FieldView["type"]; value?: string | null }[] | null;
   [part: string]: unknown;
 };
@@ -105,6 +108,19 @@ export function refuseSentSecrets(original: CipherView, request: Request): strin
   }
   if ((request.login?.fido2Credentials ?? []).length > 0) {
     return refusal("change its passkeys", "Leave them out to keep them.");
+  }
+  // Its websites decide where autofill sends the password.
+  const websites = (uris: { uri?: string | null; match?: number | null }[] | null | undefined) =>
+    JSON.stringify((uris ?? []).map((u) => [u?.uri ?? null, u?.match ?? null]));
+  if (
+    request.login != null &&
+    original.login != null &&
+    websites(request.login.uris) !== websites(original.login.uris)
+  ) {
+    return refusal(
+      "change its websites",
+      `Send them as \`${CLI_BRAND.command} get item\` shows them, to keep them as they are.`,
+    );
   }
   for (const field of request.fields ?? []) {
     if (field == null || !isSecretCustomField(original, field) || blank(field.value)) {

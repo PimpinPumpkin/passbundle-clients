@@ -63,13 +63,20 @@ import { CoreSyncService } from "./core-sync.service";
 import { SyncResponse } from "./sync.response";
 import { SyncOptions } from "./sync.service";
 
+/** Keykeeper: a sync request in flight, and when it went out. */
+type InFlightSync = { response: Promise<SyncResponse>; sentAt: Date };
+
 export class DefaultSyncService extends CoreSyncService {
   syncInProgress = false;
 
-  /** The promises associated with any in-flight api calls. */
+  /**
+   * The promises associated with any in-flight api calls. Keykeeper: with
+   * when the sync request went out, so a sync asked for later doesn't take
+   * an answer from before it (see `fullSync`).
+   */
   private inFlightApiCalls: {
     refreshToken: Promise<void> | null;
-    sync: Promise<SyncResponse> | null;
+    sync: InFlightSync | null;
   } = {
     refreshToken: null,
     sync: null,
@@ -157,6 +164,7 @@ export class DefaultSyncService extends CoreSyncService {
       return this.syncCompleted(false, userId);
     }
 
+    let inFlightSync: InFlightSync | null = null;
     try {
       if (!skipTokenRefresh) {
         // Store the promise so multiple calls to refresh the token are not made
@@ -167,16 +175,27 @@ export class DefaultSyncService extends CoreSyncService {
         await this.inFlightApiCalls.refreshToken;
       }
 
-      // Store the promise so multiple calls to sync are not made
-      if (this.inFlightApiCalls.sync === null) {
-        this.inFlightApiCalls.sync = this.apiService.getSync();
+      // Store the promise so multiple calls to sync are not made. Keykeeper:
+      // only for calls that started before it went out. A request sent
+      // before this call started may predate the change it's syncing for (an
+      // import still being saved, say), and its answer would then count as
+      // newer than that change: wait for it, then ask again.
+      let sync = this.inFlightApiCalls.sync;
+      if (sync != null && sync.sentAt < now) {
+        await sync.response.catch((): void => undefined);
+        sync = this.inFlightApiCalls.sync;
+      }
+      if (sync == null || sync.sentAt < now) {
+        sync = { response: this.apiService.getSync(), sentAt: new Date() };
+        this.inFlightApiCalls.sync = sync;
       } else {
         this.logService.debug(
           "Sync: Sync network call already in progress, returning existing promise",
         );
       }
+      inFlightSync = sync;
 
-      const response = await this.inFlightApiCalls.sync;
+      const response = await sync.response;
 
       // The crypto sync handler *MUST* be the first sync handler to run. It reserves
       // the option to reject a sync, should the data be inconsitent. In this case, it will throw.
@@ -195,7 +214,8 @@ export class DefaultSyncService extends CoreSyncService {
       await this.syncPolicies(response.policies, response.profile.id);
       await this.syncNewPolicies(response.policiesNew, response.policies, response.profile.id);
 
-      await this.setLastSync(now, userId);
+      // Keykeeper: as of when the request went out, which is what it shows.
+      await this.setLastSync(sync.sentAt, userId);
       return this.syncCompleted(true, userId);
     } catch (e) {
       if (allowThrowOnError) {
@@ -206,7 +226,10 @@ export class DefaultSyncService extends CoreSyncService {
       }
     } finally {
       this.inFlightApiCalls.refreshToken = null;
-      this.inFlightApiCalls.sync = null;
+      // Keykeeper: not a newer request another call is waiting on.
+      if (this.inFlightApiCalls.sync === inFlightSync) {
+        this.inFlightApiCalls.sync = null;
+      }
     }
   }
 

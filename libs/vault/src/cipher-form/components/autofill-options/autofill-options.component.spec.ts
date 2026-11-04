@@ -44,7 +44,10 @@ describe("AutofillOptionsComponent", () => {
 
   beforeEach(async () => {
     getInitialCipherView.mockClear();
-    cipherFormContainer = mock<CipherFormContainer>({ getInitialCipherView });
+    cipherFormContainer = mock<CipherFormContainer>({
+      getInitialCipherView,
+      originalCipherView: null,
+    });
     cipherFormContainer.formStatusChange$ = formStatusChange$.asObservable();
     liveAnnouncer = mock<LiveAnnouncer>();
     platformUtilsService = mock<PlatformUtilsService>();
@@ -142,6 +145,37 @@ describe("AutofillOptionsComponent", () => {
       { uri: "https://example.com", matchDetection: UriMatchStrategy.Exact },
     ]);
     expect(component.autofillOptionsForm.value.autofillOnPageLoad).toEqual(true);
+  });
+
+  // Keykeeper: autofill sends the password where the websites point.
+  it("keeps the websites as they are for someone who can't see the item's passwords", () => {
+    const existingLogin = new LoginUriView();
+    existingLogin.uri = "https://example.com";
+    existingLogin.match = UriMatchStrategy.Exact;
+    const cipher = new CipherView();
+    cipher.viewPassword = false;
+    cipher.login = { autofillOnPageLoad: true, uris: [existingLogin] } as LoginView;
+    getInitialCipherView.mockReturnValueOnce(cipher);
+    (cipherFormContainer as any).originalCipherView = cipher;
+
+    fixture.detectChanges();
+
+    expect(component.autofillOptionsForm.controls.uris.disabled).toBe(true);
+    expect(component.autofillOptionsForm.controls.autofillOnPageLoad.enabled).toBe(true);
+    expect(fixture.nativeElement.querySelector("[data-testid='websites-locked']")).not.toBeNull();
+    expect(
+      Array.from(fixture.nativeElement.querySelectorAll("button")).some((b: HTMLElement) =>
+        b.textContent.includes("addWebsite"),
+      ),
+    ).toBe(false);
+
+    // Saving keeps them, though the form's value leaves out what's disabled.
+    component.autofillOptionsForm.patchValue({ autofillOnPageLoad: false });
+    const patchFn = cipherFormContainer.patchCipher.mock.lastCall[0];
+    const patched = patchFn(Object.assign(new CipherView(), { login: new LoginView() }));
+    expect(patched.login.uris.map((u) => [u.uri, u.match])).toEqual([
+      ["https://example.com", UriMatchStrategy.Exact],
+    ]);
   });
 
   it("initializes 'autoFillOptionsForm' with initialValues when creating a new cipher", () => {

@@ -6,11 +6,13 @@ import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
 import AutofillField from "../models/autofill-field";
 import AutofillPageDetails from "../models/autofill-page-details";
 import AutofillScript from "../models/autofill-script";
+import AutofillService from "../services/autofill.service";
 
 import {
   applyFillRules,
   fieldMatches,
   FillRule,
+  FillRuleOptions,
   FILL_RULE_FIELD_NAME,
   FillSource,
   fingerprintField,
@@ -61,6 +63,23 @@ const rule = (field: FillRule["field"], fill: FillSource, host: string | null = 
 function fill(fillScript: AutofillScript, field: AutofillField, value: string) {
   fillScript.script.push(["fill_by_opid", field.opid, value]);
 }
+
+/** A fill the person started, as from the popup: upstream's limits for page load are off. */
+const STARTED: FillRuleOptions = {
+  userStarted: true,
+  onlyEmptyFields: false,
+  skipUsernameOnlyFill: false,
+  allowTotp: true,
+  excluded: AutofillService.isExcludedFromFillRules,
+};
+/** Autofill on page load, with upstream's limits for it. */
+const PAGE_LOAD: FillRuleOptions = {
+  userStarted: false,
+  onlyEmptyFields: true,
+  skipUsernameOnlyFill: true,
+  allowTotp: false,
+  excluded: AutofillService.isExcludedFromFillRules,
+};
 
 describe("Keykeeper fill rules", () => {
   describe("fingerprintField", () => {
@@ -193,7 +212,7 @@ describe("Keykeeper fill rules", () => {
       const fillScript = new AutofillScript();
       const filledFields: { [opid: string]: AutofillField } = {};
 
-      await applyFillRules(cipher, pageDetails, fillScript, filledFields, valueFor(cipher), fill);
+      await applyFillRules(cipher, pageDetails, fillScript, filledFields, valueFor(cipher), fill, STARTED);
 
       expect(fillScript.script).toEqual([["fill_by_opid", "__1", "C-12345"]]);
       expect(Object.keys(filledFields)).toEqual(["__1"]);
@@ -216,6 +235,7 @@ describe("Keykeeper fill rules", () => {
         filledFields,
         valueFor(cipher),
         fill,
+        STARTED,
       );
 
       expect(fillScript.script).toEqual([]);
@@ -232,7 +252,7 @@ describe("Keykeeper fill rules", () => {
       } as AutofillPageDetails;
       const fillScript = new AutofillScript();
 
-      await applyFillRules(cipher, pageDetails, fillScript, {}, valueFor(cipher), fill);
+      await applyFillRules(cipher, pageDetails, fillScript, {}, valueFor(cipher), fill, STARTED);
 
       expect(fillScript.script).toEqual([["fill_by_opid", "__3", "123456"]]);
     });
@@ -255,23 +275,118 @@ describe("Keykeeper fill rules", () => {
         { __4: already },
         valueFor(cipher),
         fill,
+        STARTED,
       );
 
       expect(fillScript.script).toEqual([]);
     });
 
-    const run = async (cipher: CipherView, fields: AutofillField[], url = PAGE) => {
+    const run = async (
+      cipher: CipherView,
+      fields: AutofillField[],
+      url = PAGE,
+      options = STARTED,
+      forms: AutofillPageDetails["forms"] = {},
+    ) => {
       const fillScript = new AutofillScript();
       const neverFill = await applyFillRules(
         cipher,
-        { url, fields } as AutofillPageDetails,
+        { url, fields, forms } as AutofillPageDetails,
         fillScript,
         {},
         valueFor(cipher),
         fill,
+        options,
       );
       return { script: fillScript.script, neverFill: [...neverFill] };
     };
+
+    it("fills only on the scheme the rule was made on, https when it doesn't say", async () => {
+      const cipher = loginItem([customField("Customer ID", "C-12345")]);
+      upsertFillRule(cipher, rule({ id: "custno" }, { from: "field", name: "Customer ID" }));
+      const field = pageField({ opid: "__1", htmlID: "custno" });
+
+      expect((await run(cipher, [field], `http://${HOST}/login`)).script).toEqual([]);
+      expect((await run(cipher, [field])).script).toEqual([["fill_by_opid", "__1", "C-12345"]]);
+
+      // A rule made on an http page fills only there.
+      const intranet = loginItem([customField("Customer ID", "C-12345")]);
+      upsertFillRule(intranet, {
+        ...rule({ id: "custno" }, { from: "field", name: "Customer ID" }),
+        scheme: "http",
+      });
+      expect((await run(intranet, [field])).script).toEqual([]);
+      expect((await run(intranet, [field], `http://${HOST}/login`)).script).toEqual([
+        ["fill_by_opid", "__1", "C-12345"],
+      ]);
+    });
+
+    it("keeps one rule per field and site, the scheme included", () => {
+      const cipher = loginItem();
+      upsertFillRule(cipher, rule({ id: "a" }, { from: "username" }));
+      upsertFillRule(cipher, { ...rule({ id: "a" }, { from: "password" }), scheme: "http" });
+      upsertFillRule(cipher, rule({ id: "a" }, { from: "never" }));
+
+      expect(readFillRules(cipher)).toEqual([
+        { ...rule({ id: "a" }, { from: "password" }), scheme: "http" },
+        rule({ id: "a" }, { from: "never" }),
+      ]);
+    });
+
+    it("never fills a field upstream never would: a search box, a captcha, a newsletter form", async () => {
+      const cipher = loginItem([customField("Customer ID", "C-12345")]);
+      upsertFillRule(cipher, rule({ id: "q" }, { from: "password" }));
+      upsertFillRule(cipher, rule({ id: "query" }, { from: "username" }));
+      upsertFillRule(cipher, rule({ id: "captcha-answer" }, { from: "field", name: "Customer ID" }));
+      upsertFillRule(cipher, rule({ id: "news-email" }, { from: "username" }));
+      upsertFillRule(cipher, rule({ id: "member" }, { from: "username" }));
+
+      const result = await run(
+        cipher,
+        [
+          pageField({ opid: "__1", htmlID: "q", type: "search" }),
+          pageField({ opid: "__2", htmlID: "query", type: "text" }),
+          pageField({ opid: "__3", htmlID: "captcha-answer", type: "text" }),
+          pageField({ opid: "__4", htmlID: "news-email", type: "email", form: "f1" }),
+          pageField({ opid: "__5", htmlID: "member", type: "text" }),
+        ],
+        PAGE,
+        STARTED,
+        { f1: { opid: "f1", htmlID: "newsletter-signup" } } as unknown as AutofillPageDetails["forms"],
+      );
+
+      expect(result.script).toEqual([["fill_by_opid", "__5", "alice"]]);
+    });
+
+    it("keeps upstream's limits on page load: empty fields only, no code, no username alone", async () => {
+      const cipher = loginItem();
+      upsertFillRule(cipher, rule({ id: "member" }, { from: "username" }));
+      upsertFillRule(cipher, rule({ id: "otp" }, { from: "totp" }));
+      upsertFillRule(cipher, rule({ id: "pw" }, { from: "password" }));
+      const member = pageField({ opid: "__1", htmlID: "member", type: "text" });
+      const otp = pageField({ opid: "__2", htmlID: "otp", type: "text" });
+      const typed = pageField({ opid: "__3", htmlID: "pw", type: "password", value: "typed" });
+      const pw = pageField({ opid: "__3", htmlID: "pw", type: "password" });
+
+      // A username on a page without a password field, and a code: not on page load.
+      expect((await run(cipher, [member, otp], PAGE, PAGE_LOAD)).script).toEqual([]);
+      expect((await run(cipher, [member, otp])).script).toEqual([
+        ["fill_by_opid", "__1", "alice"],
+        ["fill_by_opid", "__2", "123456"],
+      ]);
+      // A field that has a value keeps it on page load.
+      expect((await run(cipher, [member, typed], PAGE, PAGE_LOAD)).script).toEqual([
+        ["fill_by_opid", "__1", "alice"],
+      ]);
+      expect((await run(cipher, [member, pw], PAGE, PAGE_LOAD)).script).toEqual([
+        ["fill_by_opid", "__1", "alice"],
+        ["fill_by_opid", "__3", "correct-password"],
+      ]);
+      // A code only where the account may use one.
+      expect(
+        (await run(cipher, [otp], PAGE, { ...STARTED, allowTotp: false })).script,
+      ).toEqual([]);
+    });
 
     it("fills only on the host the rule was made on", async () => {
       const cipher = loginItem([customField("Customer ID", "C-12345")]);
@@ -371,6 +486,7 @@ describe("Keykeeper fill rules", () => {
         {},
         valueForSpy,
         fill,
+        STARTED,
       );
 
       expect(valueForSpy).not.toHaveBeenCalled();

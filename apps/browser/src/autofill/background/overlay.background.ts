@@ -71,6 +71,7 @@ import { BrowserApi } from "../../platform/browser/browser-api";
 // eslint-disable-next-line no-restricted-imports
 import {
   openAddEditVaultItemPopout,
+  openVaultItemPasswordRepromptPopout,
   openViewVaultItemPopout,
 } from "../../vault/popup/utils/vault-popout-window";
 import {
@@ -82,7 +83,11 @@ import {
   InlineMenuFillTypes,
   MAX_SUB_FRAME_DEPTH,
 } from "../enums/autofill-overlay.enum";
-import { choicesFor, fillFieldWith } from "../keykeeper/fill-field-menu";
+import {
+  choicesFor,
+  FILL_FIELD_REPROMPT_ACTION,
+  fillFieldWith,
+} from "../keykeeper/fill-field-menu";
 import { inlineMenuTotp } from "../keykeeper/inline-menu-totp";
 import AutofillField from "../models/autofill-field";
 import { AutofillService, PageDetail } from "../services/abstractions/autofill.service";
@@ -2273,13 +2278,14 @@ export class OverlayBackground implements OverlayBackgroundInterface {
       {
         cipherService: this.cipherService,
         totpService: this.totpService,
-        // An item that asks for the master password: the rule is saved
-        // first, then upstream's prompt opens, and the fill after it uses
-        // the rule.
+        // An item that asks for the master password: the pick waits for
+        // the prompt, and nothing fills or is saved unless it succeeds.
         passwordRepromptRequired: async (c) => c.reprompt === CipherRepromptType.Password,
-        fillAfterReprompt: async (t, c) => {
-          await this.autofillService.isPasswordRepromptRequired(c, t);
-        },
+        openReprompt: (t, c) =>
+          openVaultItemPasswordRepromptPopout(t, {
+            cipherId: c.id,
+            action: FILL_FIELD_REPROMPT_ACTION,
+          }),
       },
     );
     if (filled) {

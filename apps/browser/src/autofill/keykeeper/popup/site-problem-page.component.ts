@@ -16,6 +16,7 @@ import { PopupHeaderComponent } from "../../../platform/popup/layout/popup-heade
 import { PopupPageComponent } from "../../../platform/popup/layout/popup-page.component";
 import { AutofillTriageResponse } from "../../types/autofill-triage";
 import { hostOf } from "../fill-rules";
+import { scrubPersonal } from "../site-fixes";
 
 /** One field as a report describes it: its shape, never its value. */
 export type ReportedField = {
@@ -107,10 +108,11 @@ export class KeykeeperSiteProblemPageComponent implements OnInit {
       { frameId: 0 },
     ).catch((): null => null);
     this.fields.set(
+      // A label or placeholder can name the person ("Code sent to ..."): never their email address or number.
       (response?.pageDetails?.fields ?? []).slice(0, 50).map((f) => ({
-        id: f.htmlID ?? "",
-        name: f.htmlName ?? "",
-        label: f["label-tag"] || f["label-aria"] || f.placeholder || "",
+        id: scrubPersonal(f.htmlID ?? "", "id"),
+        name: scrubPersonal(f.htmlName ?? "", "id"),
+        label: scrubPersonal(f["label-tag"] || f["label-aria"] || f.placeholder || "", "label"),
         type: f.type ?? "",
         autocomplete: f.autoCompleteType ?? "",
       })),

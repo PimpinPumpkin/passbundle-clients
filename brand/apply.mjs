@@ -218,13 +218,39 @@ function apply() {
     "apps/cli/src/locales/*/messages.json",
   );
   if (locales.length < 150) fail(`found only ${locales.length} locale files. Upstream moved them?`);
+  // A language that inflects the name ("Bitwardenu", "Bitwardenin") would
+  // keep upstream's name in the ending, or get ours with a foreign one: that
+  // message is English instead, like a message nobody translated. An ending
+  // in another script (Korean particles) follows our name as it did theirs.
+  const english = new Map();
+  const englishFor = (rel) => {
+    const enRel = rel.replace(/\/[^/]+\/messages\.json$/, "/en/messages.json");
+    if (!english.has(enRel)) english.set(enRel, JSON.parse(read(enRel).replace(/^﻿/, "")));
+    return english.get(enRel);
+  };
+  let inflected = 0;
+  for (const rel of locales) {
+    if (/\/en\/messages\.json$/.test(rel)) englishFor(rel);
+  }
   for (const rel of locales) {
     const data = JSON.parse(read(rel).replace(/^﻿/, ""));
-    for (const entry of Object.values(data)) {
-      if (typeof entry?.message === "string") entry.message = brandMessage(entry.message);
+    const en = /\/en\/messages\.json$/.test(rel) ? null : englishFor(rel);
+    for (const [key, entry] of Object.entries(data)) {
+      if (typeof entry?.message !== "string") continue;
+      if (en && /bitwarden(?=[a-z\u00c0-\u024f])/i.test(entry.message)) {
+        inflected++;
+        if (typeof en[key]?.message !== "string") {
+          // No app shows a message English doesn't have.
+          delete data[key];
+          continue;
+        }
+        entry.message = en[key].message;
+      }
+      entry.message = brandMessage(entry.message).replace(/\bBitwarden(?=\p{L})/gu, BRAND.name);
     }
     write(rel, JSON.stringify(data, null, 2) + "\n");
   }
+  if (inflected < 100) fail(`found only ${inflected} inflected names. Upstream's translations changed?`);
 
   // 1b. Keykeeper's own strings, added to every app's English translations.
   //     Other languages fall back to English until they are translated.
@@ -509,6 +535,43 @@ function apply() {
   }
   if (codeFiles < 10)
     fail(`rewrote website links in only ${codeFiles} code files. Upstream changed?`);
+
+  // 7b. Upstream's store listings and download sections (its extension in
+  //     each browser's store, its mobile and desktop apps) become our
+  //     website's Download page, which links ours.
+  const download = `${BRAND.urls.website}/download/`;
+  const storeLink =
+    /https:\/\/(?:(?:chromewebstore\.google\.com\/detail|chrome\.google\.com\/webstore\/detail)\/bitwarden[^"'`\s]*|addons\.mozilla\.org\/[^"'`\s]*bitwarden[^"'`\s]*|addons\.opera\.com\/[^"'`\s]*bitwarden[^"'`\s]*|microsoftedge\.microsoft\.com\/addons\/detail\/jbkfoedolllekgbhcbcoahefnbanhhlh[^"'`\s]*|apps\.apple\.com\/[^"'`\s]*\/id(?:1352778147|1137397744)[^"'`\s]*|play\.google\.com\/store\/apps\/details\?id=com\.x8bit\.bitwarden[^"'`\s]*)/g;
+  const ourSection = new RegExp(
+    `${BRAND.urls.website.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/download/?#downloads-([a-z-]+)`,
+    "g",
+  );
+  let storeLinks = 0;
+  for (const rel of trackedFiles("apps/**/*.ts", "libs/**/*.ts", "apps/**/*.html", "libs/**/*.html")) {
+    if (/\.spec\.ts$|\.stories\.ts$|\/spec-data\/|\/spec\/|\/test\//.test(rel)) continue;
+    const source = read(rel);
+    const branded = source
+      .replace(storeLink, () => (storeLinks++, download))
+      .replace(ourSection, (_, section) => (section === "web-browser" ? download : `${download}#apps`));
+    if (branded !== source) write(rel, branded);
+  }
+  if (storeLinks < 6) fail(`rewrote only ${storeLinks} store links. Upstream changed?`);
+  // The extension's Download page: no QR code or store badges for upstream's
+  // mobile apps, just our Download page's apps section.
+  replaceAnchored(
+    "apps/browser/src/vault/popup/settings/download-bitwarden.component.html",
+    /<div class="tw-flex tw-items-center tw-justify-center tw-my-4">[\s\S]*?download-qr\.png[\s\S]*?<\/div>\s*<div class="tw-flex tw-justify-center tw-gap-4">[\s\S]*?<\/div>/,
+    `<br />
+    <a
+      class="tw-text-primary-600 tw-mt-4 tw-flex tw-no-underline tw-gap-2 tw-items-center"
+      href="${download}#apps"
+      bitLink
+      target="_blank"
+      endIcon="bwi-external-link"
+    >
+      {{ "downloadFromBitwardenNow" | i18n }}
+    </a>`,
+  );
   checkAddresses();
 
   // 8. Theme colors: a brand scale generated from brand.json's color replaces

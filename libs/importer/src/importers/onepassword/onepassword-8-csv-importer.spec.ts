@@ -13,6 +13,20 @@ describe("1Password 8 CSV Importer", () => {
     importer = new OnePassword8CsvImporter();
   });
 
+  it("refuses a file with a quote that's never closed, which would merge the rows after it", async () => {
+    const result = await new OnePassword8CsvImporter().parse(
+      [
+        "Title,Url,Username,Password,OTPAuth,Favorite,Archived,Tags,Notes",
+        'Example Bank,https://bank.example.test/,ana,"Fake-1,,false,false,,',
+        "Example Mail,https://mail.example.test/,ana,Fake-2,,false,false,,",
+        "Example Shop,https://shop.example.test/,ana,Fake-3,,false,false,,",
+      ].join("\n"),
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.ciphers).toEqual([]);
+  });
+
   it("should import a login with its website, TOTP, favorite, and notes", async () => {
     const result = await importer.parse(
       [

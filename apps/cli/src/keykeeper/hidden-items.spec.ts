@@ -231,6 +231,27 @@ describe("keepHiddenSecrets", () => {
       (r: any) => ((r.type = CipherType.SecureNote), (r.secureNote = { type: 0 })),
       "change its type",
     ],
+    [
+      "a website, where autofill sends the password",
+      (r: any) => {
+        r.login.uris = [{ uri: "https://evil.example", match: null as number | null }];
+      },
+      "change its websites",
+    ],
+    [
+      "its websites, by leaving them out",
+      (r: any) => {
+        r.login.uris = null;
+      },
+      "change its websites",
+    ],
+    [
+      "how a website is matched",
+      (r: any) => {
+        r.login.uris[0].match = 3;
+      },
+      "change its websites",
+    ],
   ])("refuses changing %s", (_, change, why) => {
     const { refused } = edit(login(false), change);
     expect(refused).toContain(`so you can't ${why}`);

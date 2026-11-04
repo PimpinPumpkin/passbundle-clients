@@ -40,7 +40,7 @@ import {
   openAddEditVaultItemPopout,
   openVaultItemPasswordRepromptPopout,
 } from "../../vault/popup/utils/vault-popout-window";
-import { handleFillFieldMenuClick } from "../keykeeper/fill-field-menu";
+import { FILL_FIELD_REPROMPT_ACTION, handleFillFieldMenuClick } from "../keykeeper/fill-field-menu";
 import { AutofillTriageService } from "../services/abstractions/autofill-triage.service";
 import { AutofillCipherTypeId } from "../types";
 import {
@@ -118,10 +118,10 @@ export class ContextMenuClickedHandler {
             cipherService: this.cipherService,
             totpService: this.totpService,
             passwordRepromptRequired: (cipher) => this.isPasswordRepromptRequired(cipher),
-            fillAfterReprompt: (tab, cipher) =>
+            openReprompt: (tab, cipher) =>
               openVaultItemPasswordRepromptPopout(tab, {
                 cipherId: cipher.id,
-                action: AUTOFILL_ID,
+                action: FILL_FIELD_REPROMPT_ACTION,
               }),
           })
         ) {

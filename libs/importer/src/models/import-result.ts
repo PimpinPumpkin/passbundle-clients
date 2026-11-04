@@ -22,4 +22,10 @@ export class ImportResult {
    * valid items were still imported; the UI/CLI surface these to the user.
    */
   errors: ImportRecordError[] = [];
+  /**
+   * Keykeeper: what the file had that was left out on purpose, each as a line
+   * the summary shows ("Left out 2 items in KeePass's Recycle Bin."), so
+   * nothing goes missing without a count.
+   */
+  leftOut?: string[] = [];
 }

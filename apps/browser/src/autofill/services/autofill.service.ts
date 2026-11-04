@@ -506,6 +506,7 @@ export default class AutofillService implements AutofillServiceInterface {
           defaultUriMatch: defaultUriMatch,
           focusedFieldOpid: options.focusedFieldOpid,
           inlineMenuFillType: options.inlineMenuFillType,
+          onPageLoad: options.onPageLoad || false,
         });
 
         if (!fillScript || !fillScript.script || !fillScript.script.length) {
@@ -650,6 +651,7 @@ export default class AutofillService implements AutofillServiceInterface {
       allowUntrustedIframe: fromCommand,
       allowTotpAutofill: fromCommand,
       autoSubmitLogin,
+      onPageLoad: !fromCommand,
     });
 
     // Update last used index as autofill has succeeded
@@ -753,6 +755,7 @@ export default class AutofillService implements AutofillServiceInterface {
       fillNewPassword: false,
       allowUntrustedIframe: fromCommand,
       allowTotpAutofill: false,
+      onPageLoad: !fromCommand,
     });
 
     if (fromCommand && result.didAutofill) {
@@ -826,7 +829,8 @@ export default class AutofillService implements AutofillServiceInterface {
 
     const fillScript = new AutofillScript();
     const filledFields: { [id: string]: AutofillField } = {};
-    // Keykeeper: the item's own fill rules come first (see keykeeper/fill-rules.ts).
+    // Keykeeper: the item's own fill rules come first (see keykeeper/fill-rules.ts),
+    // within upstream's limits for this fill.
     const neverFill = await applyFillRules(
       options.cipher,
       pageDetails,
@@ -834,6 +838,13 @@ export default class AutofillService implements AutofillServiceInterface {
       filledFields,
       (source) => this.keykeeperFillRuleValue(options.cipher, source),
       AutofillService.fillByOpid,
+      {
+        userStarted: !options.onPageLoad,
+        onlyEmptyFields: options.onlyEmptyFields,
+        skipUsernameOnlyFill: options.skipUsernameOnlyFill,
+        allowTotp: options.allowTotpAutofill && options.canAccessTotp,
+        excluded: AutofillService.isExcludedFromFillRules,
+      },
     );
     if (neverFill.size) {
       pageDetails = {
@@ -2526,6 +2537,19 @@ export default class AutofillService implements AutofillServiceInterface {
     }
 
     return false;
+  }
+
+  /**
+   * Keykeeper: the fields a fill rule or site fix never fills, as upstream's
+   * matching never would: the field types autofill skips, search boxes,
+   * captchas and "forgot" fields, and fields in a newsletter form.
+   */
+  static isExcludedFromFillRules(field: AutofillField, pageDetails: AutofillPageDetails) {
+    return (
+      AutofillService.isExcludedFieldType(field, AutoFillConstants.ExcludedAutofillTypes) ||
+      AutofillService.fieldHasDisqualifyingAttributeValue(field) ||
+      isNonLoginUsernameField(field, pageDetails)
+    );
   }
 
   static isExcludedFieldType(field: AutofillField, excludedTypes: string[]) {

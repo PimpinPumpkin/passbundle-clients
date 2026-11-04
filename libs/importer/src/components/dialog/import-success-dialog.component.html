@@ -5,6 +5,10 @@
 
   <div bitDialogContent>
     <span>{{ "importSuccessNumberOfItems" | i18n: totalImported }}</span>
+    <!-- Keykeeper: what the file had that was left out on purpose, counted. -->
+    @for (line of data.importResult?.leftOut ?? []; track line) {
+      <p class="tw-mt-2 tw-mb-0" data-testid="import-left-out">{{ line }}</p>
+    }
     <bit-table [dataSource]="dataSource">
       <ng-container header>
         <tr>

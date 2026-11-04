@@ -1,7 +1,9 @@
 // Keykeeper fill picker: right-click any field, then "Fill this field with",
 // an item, and one of its values (or "Never fill this field"). It fills the
 // field now and saves the choice as a fill rule on the item (fill-rules.ts),
-// so every later autofill on that site does the same.
+// so every later autofill on that site does the same. An item that asks for
+// the master password asks first, for any choice, and nothing fills or is
+// saved unless the prompt succeeds.
 
 import { firstValueFrom } from "rxjs";
 
@@ -10,7 +12,7 @@ import { AuthService } from "@bitwarden/common/auth/abstractions/auth.service";
 import { AuthenticationStatus } from "@bitwarden/common/auth/enums/authentication-status";
 import { getOptionalUserId } from "@bitwarden/common/auth/services/account.service";
 import { ROOT_ID } from "@bitwarden/common/autofill/constants";
-import { Utils } from "@bitwarden/common/platform/misc/utils";
+import { UriMatchStrategy } from "@bitwarden/common/models/domain/domain-service";
 import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
@@ -29,6 +31,7 @@ import {
   fingerprintField,
   hostOf,
   isSecretSource,
+  schemeOfUrl,
   keykeeperSiteFixes,
   staticValueFor,
   upsertFillRule,
@@ -38,6 +41,17 @@ import { noteFill } from "./hidden-fills";
 
 // No underscores: menu ids are split on "_".
 export const FILL_FIELD_ID = "kkfill";
+
+export { FILL_FIELD_REPROMPT_ACTION, FILL_FIELD_REPROMPTED } from "./fill-field-reprompt";
+
+/**
+ * What the picker asks of the background, set by main.background: whether an
+ * item is for a page, by its websites and the person's match settings, as
+ * upstream's autofill decides it. Until then, nothing is.
+ */
+export const keykeeperFillPicker = {
+  itemMatches: async (_cipher: CipherView, _url: string): Promise<boolean> => false,
+};
 
 // English until Keykeeper's own strings are translated.
 const STRINGS = {
@@ -109,6 +123,20 @@ export async function initFillFieldMenu(): Promise<void> {
   createdFillFieldMenuIds.add(FILL_FIELD_ID);
 }
 
+/** Takes "Fill this field with" away, with every item under it: on a blocked domain, say. */
+export async function removeFillFieldMenu(): Promise<void> {
+  createdFillFieldMenuIds.clear();
+  if (!chrome.contextMenus) {
+    return;
+  }
+  await new Promise<void>((resolve) => {
+    chrome.contextMenus.remove(FILL_FIELD_ID, () => {
+      void chrome.runtime.lastError;
+      resolve();
+    });
+  });
+}
+
 /** Adds an item, with its values, under "Fill this field with". */
 export async function addCipherToFillFieldMenu(cipher: CipherView | undefined): Promise<void> {
   if (!cipher?.id || cipher.type !== CipherType.Login) {
@@ -135,16 +163,26 @@ export type FillFieldMenuDependencies = {
   accountService: AccountService;
   cipherService: CipherService;
   totpService: TotpService;
-  /** Whether the item asks for the master password before its secrets are used. */
+  /** Whether the item asks for the master password before anything of it is used. */
   passwordRepromptRequired: (cipher: CipherView) => Promise<boolean>;
-  /** Asks for the master password, then fills the item into the page, rules first. */
-  fillAfterReprompt: (tab: chrome.tabs.Tab, cipher: CipherView) => Promise<void>;
+  /**
+   * Opens the master password prompt for a pick (FILL_FIELD_REPROMPT_ACTION),
+   * whose answer comes back through `finishPickAfterReprompt`.
+   */
+  openReprompt: (tab: chrome.tabs.Tab, cipher: CipherView) => Promise<void>;
 };
 
-/** Whether a frame belongs to the same site as the tab it's in. */
-export function sameSite(frameUrl: string, tabUrl: string | undefined): boolean {
-  const frame = Utils.getDomain(frameUrl);
-  return frame != null && frame !== "" && frame === Utils.getDomain(tabUrl ?? "");
+/** What filling a pick needs. */
+export type PickDependencies = Pick<
+  FillFieldMenuDependencies,
+  "cipherService" | "totpService" | "passwordRepromptRequired" | "openReprompt"
+>;
+
+/** The item's websites, for upstream's warning before filling an http page. */
+function savedUrls(cipher: CipherView): string[] {
+  return (cipher.login?.uris ?? []).flatMap((u) =>
+    u.match != UriMatchStrategy.Never && u.uri != null ? [u.uri] : [],
+  );
 }
 
 /** Asks the page which field was right-clicked, with the page details it belongs to. */
@@ -205,22 +243,78 @@ export type FillFieldTarget = {
   userId: UserId;
 };
 
+/** How long a pick waits for the master password before it's dropped. */
+const PICK_WAITS_MS = 5 * 60 * 1000;
+
+/** Picks waiting for the master password, by item. */
+const waitingPicks = new Map<
+  string,
+  { pick: FillFieldTarget; deps: PickDependencies; at: number }
+>();
+
 /**
  * Fills one of an item's values into one field now, and remembers it as a
  * fill rule on the item: the picker's work, from the right-click menu or the
  * inline menu (DESIGN.md, "Choosing what fills where"). Answers whether it
- * filled the field now.
+ * filled the field now. For an item that asks for the master password, the
+ * pick waits for the prompt (`finishPickAfterReprompt`): nothing fills, is
+ * saved, or is shared before it succeeds.
  */
 export async function fillFieldWith(
+  pick: FillFieldTarget,
+  deps: PickDependencies,
+): Promise<boolean> {
+  if (await deps.passwordRepromptRequired(pick.cipher)) {
+    if (pick.cipher.id != null) {
+      waitingPicks.set(pick.cipher.id, { pick, deps, at: Date.now() });
+      await deps.openReprompt(pick.tab, pick.cipher);
+    }
+    return false;
+  }
+  return pickNow(pick, deps);
+}
+
+/**
+ * The prompt's answer for a waiting pick. Only when it succeeded, and within
+ * a few minutes, does the pick go ahead, with the item as it is now.
+ */
+export async function finishPickAfterReprompt(
+  cipherId: string,
+  success: boolean,
+  now = Date.now(),
+): Promise<boolean> {
+  const waiting = waitingPicks.get(cipherId);
+  waitingPicks.delete(cipherId);
+  if (waiting == null || !success || now - waiting.at > PICK_WAITS_MS) {
+    return false;
+  }
+  const { pick, deps } = waiting;
+  const cipher = (await deps.cipherService.getAllDecrypted(pick.userId)).find(
+    (c) => c.id === cipherId,
+  );
+  const choice = cipher
+    ? choicesFor(cipher).find(
+        (c) =>
+          c.key === pick.choice.key &&
+          JSON.stringify(c.source) === JSON.stringify(pick.choice.source),
+      )
+    : undefined;
+  if (!cipher || !choice) {
+    return false;
+  }
+  return pickNow({ ...pick, cipher, choice }, deps);
+}
+
+async function pickNow(
   { tab, frameId, target, cipher, choice, userId }: FillFieldTarget,
-  deps: Pick<
-    FillFieldMenuDependencies,
-    "cipherService" | "totpService" | "passwordRepromptRequired" | "fillAfterReprompt"
-  >,
+  deps: PickDependencies,
 ): Promise<boolean> {
   const secret = isSecretSource(cipher, choice.source);
-  // A secret never goes into a frame from another site, such as an ad.
-  if (secret && !sameSite(target.url, tab.url)) {
+  // Upstream's matching: the item is for the page (or frame) the field is in.
+  // A secret goes nowhere else, such as an ad's frame; anything else asks
+  // first, as upstream's warning about a frame from another site does.
+  const itemMatches = await keykeeperFillPicker.itemMatches(cipher, target.url);
+  if (secret && !itemMatches) {
     return false;
   }
   // For someone who can't see the item's passwords, a secret goes only into
@@ -228,22 +322,14 @@ export async function fillFieldWith(
   if (secret && !maySeeSecrets(cipher) && target.field.type !== "password") {
     return false;
   }
+  const scheme = schemeOfUrl(target.url);
   const rule: FillRule = {
     v: 1,
     host: hostOf(target.url),
+    ...(scheme ? { scheme } : {}),
     field: fingerprintField(target.field),
     fill: choice.source,
   };
-
-  // Like upstream's menu: secrets of an item that asks for the master password
-  // wait for it. The rule is saved now, and the fill after the prompt uses it.
-  if (secret && (await deps.passwordRepromptRequired(cipher))) {
-    upsertFillRule(cipher, rule);
-    await deps.cipherService.updateWithServer(cipher, userId);
-    void keykeeperSiteFixes.share(rule).catch(() => {});
-    await deps.fillAfterReprompt(tab, cipher);
-    return false;
-  }
 
   let filled = false;
   if (choice.source.from !== "never") {
@@ -253,6 +339,8 @@ export async function fillFieldWith(
         : staticValueFor(cipher, choice.source);
     if (value) {
       const fillScript = new AutofillScript();
+      fillScript.savedUrls = savedUrls(cipher);
+      fillScript.untrustedIframe = target.url !== tab.url && !itemMatches;
       fillScript.script.push(["click_on_opid", target.field.opid]);
       fillScript.script.push(["focus_by_opid", target.field.opid]);
       fillScript.script.push(["fill_by_opid", target.field.opid, value]);

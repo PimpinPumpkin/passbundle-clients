@@ -61,6 +61,11 @@ describe("KeePass2 Xml Importer", () => {
         <UUID>cmVjeWNsZS1iaW4tMDAwMQ==</UUID>
         <Name>Recycle Bin</Name>
         ${entry("Deleted")}
+        <Group>
+          <UUID>b2xkLWdyb3VwLTAwMDAwMQ==</UUID>
+          <Name>Old group</Name>
+          ${entry("Deleted with its group")}
+        </Group>
       </Group>
     </Group>
   </Root>
@@ -70,6 +75,8 @@ describe("KeePass2 Xml Importer", () => {
     expect(result.success).toBe(true);
     expect(result.ciphers.map((c) => c.name)).toEqual(["At the top", "At work"]);
     expect(result.folders.map((f) => f.name)).toEqual(["Work"]);
+    // Counted, so the summary says what was left out.
+    expect(result.leftOut).toEqual(["Left out 2 items in KeePass's Recycle Bin."]);
   });
 
   // Keykeeper: one entry in a database, from its strings ([key, value, protected?]).
@@ -216,6 +223,35 @@ describe("KeePass2 Xml Importer", () => {
         ["TimeOtp-Algorithm", "HMAC-MD5", FieldType.Text],
         ["TimeOtp-Secret-Base32", "JBSWY3DPEHPK3PXP", FieldType.Hidden],
       ]);
+    });
+
+    it("should keep the fields as they were when the digits or period are out of bounds", async () => {
+      for (const [length, period] of [
+        ["99999999999", "30"],
+        ["3", "30"],
+        ["11", "30"],
+        ["6", "0"],
+        ["6", "301"],
+        ["6", "1e3"],
+      ]) {
+        const cipher = await parseOne([
+          ...login,
+          ["TimeOtp-Length", length],
+          ["TimeOtp-Period", period],
+          ["TimeOtp-Secret-Base32", "JBSWY3DPEHPK3PXP", true],
+        ]);
+        expect(cipher.login.totp).toBeUndefined();
+        expect(cipher.fields.map((f) => f.name)).toEqual([
+          "TimeOtp-Length",
+          "TimeOtp-Period",
+          "TimeOtp-Secret-Base32",
+        ]);
+      }
+      const otp = await parseOne([
+        ...login,
+        ["otp", "key=JBSWY3DPEHPK3PXP&amp;step=30&amp;size=500", true],
+      ]);
+      expect(otp.login.totp).toBeUndefined();
     });
 
     it("should leave a counter-based HOTP as fields", async () => {
