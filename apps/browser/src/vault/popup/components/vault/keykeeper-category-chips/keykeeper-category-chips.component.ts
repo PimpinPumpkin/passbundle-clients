@@ -29,9 +29,9 @@ const PLURAL_KEYS: Partial<Record<CipherType, string>> = {
 
 /**
  * Keykeeper: the row of category chips under the vault's search (DESIGN.md,
- * "The look"): All, then each kind of item the vault has, each with its jewel
- * tile. Picking one filters the list by that kind, the same filter as
- * upstream's Type menu, which it replaces.
+ * "The look"): All, then each kind of item the vault has, each with its tile.
+ * Picking one filters the list by that kind, the same filter as upstream's
+ * Type menu, which it replaces.
  */
 @Component({
   selector: "app-keykeeper-category-chips",
@@ -49,7 +49,7 @@ const PLURAL_KEYS: Partial<Record<CipherType, string>> = {
             data-testid="category-chip"
             (click)="pick(chip.type)"
           >
-            <vault-keykeeper-category-tile [category]="chip.category" [size]="20" flat />
+            <vault-keykeeper-category-tile [category]="chip.category" [size]="20" />
             {{ chip.label }}
           </button>
         }

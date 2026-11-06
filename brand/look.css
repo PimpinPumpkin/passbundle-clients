@@ -5,9 +5,10 @@
    extension's popup (html.pb-popup, set in popup/index.ejs) have the same
    design language, in System, Light, and Dark alike: a calm ground, cards at
    three depths (resting lists and panels, raised for what's selected or
-   suggested, floating menus and dialogs), jewel-toned category tiles, and the
-   brand's green for what you act on. Dark mode is graphite glass: a neutral
-   graphite ground with faint jewel washes and translucent cards, never green.
+   suggested, floating menus and dialogs), flat category tiles tinted with
+   their jewel tones (only the logo's tile is glossy), and the brand's green
+   for what you act on. Dark mode is graphite glass: a neutral graphite
+   ground with faint jewel washes and translucent cards, never green.
 
    The palette is the --pb-* tokens below, one block for light and one for
    dark; upstream's tokens are mapped onto them, so upstream's components
@@ -575,7 +576,8 @@ html.pb-web,
   margin-inline: -4px 2px;
 }
 
-/* The logo: the jewel tile and the two-tone name, at the top of the menu. */
+/* The logo: its glossy jewel tile and the two-tone name, at the top of the
+   menu. */
 .pb-web bit-nav-logo > div {
   padding-top: 0.25rem;
 }
@@ -716,7 +718,7 @@ html.pb-web,
   margin: 0;
   padding: 10px 14px 4px;
 }
-/* The Health reports' cards: each report's jewel tile on a resting card
+/* The Health reports' cards: each report's flat tile on a resting card
    (report-card.component.html), like the menu's and the list's. */
 .pb-web app-report-card bit-card-content h3 {
   font-size: 1.0625rem !important;

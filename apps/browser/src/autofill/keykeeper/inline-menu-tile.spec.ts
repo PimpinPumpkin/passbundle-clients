@@ -1,5 +1,5 @@
 import { CipherType } from "@bitwarden/common/vault/enums";
-import { KEYKEEPER_CATEGORY_LOOKS } from "@bitwarden/common/vault/keykeeper/categories";
+import { KEYKEEPER_CATEGORY_LOOKS, tileTint } from "@bitwarden/common/vault/keykeeper/categories";
 
 import { buildKeykeeperTile } from "./inline-menu-tile";
 
@@ -42,7 +42,7 @@ describe("buildKeykeeperTile", () => {
     spy.mockRestore();
   });
 
-  it("shows a card's and an identity's category tile, in the category's colors", () => {
+  it("shows a card's and an identity's flat category tile, in the category's colors", () => {
     for (const [type, category] of [
       [CipherType.Card, "card"],
       [CipherType.Identity, "identity"],
@@ -56,6 +56,12 @@ describe("buildKeykeeperTile", () => {
       );
       expect(tile.style.getPropertyValue("--pb-jewel-dark")).toBe(
         KEYKEEPER_CATEGORY_LOOKS[category].dark,
+      );
+      expect(tile.style.getPropertyValue("--pb-jewel-tint")).toBe(
+        tileTint(KEYKEEPER_CATEGORY_LOOKS[category], "light"),
+      );
+      expect(tile.style.getPropertyValue("--pb-jewel-tint-dark")).toBe(
+        tileTint(KEYKEEPER_CATEGORY_LOOKS[category], "dark"),
       );
       expect(tile.querySelector("path")?.getAttribute("d")).toBe(
         KEYKEEPER_CATEGORY_LOOKS[category].glyph,

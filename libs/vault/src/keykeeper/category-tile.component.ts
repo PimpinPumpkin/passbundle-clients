@@ -1,21 +1,17 @@
-import {
-  booleanAttribute,
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  input,
-} from "@angular/core";
+import { ChangeDetectionStrategy, Component, computed, input } from "@angular/core";
 
 import {
   KEYKEEPER_CATEGORY_LOOKS,
   KeykeeperCategory,
   KeykeeperCategoryLook,
+  tileTint,
 } from "@bitwarden/common/vault/keykeeper/categories";
 
 /**
- * Keykeeper: a category's jewel tile, a rounded square in the category's
- * color with its glyph in white and a little sheen (DESIGN.md, "The look"),
- * or a tile with a look of its own, such as a Health report's. Decorative:
+ * Keykeeper: a category's tile, flat: a rounded square tinted with the
+ * category's tone and its glyph in the tone itself, lighter in dark mode, with
+ * no sheen or shadow (DESIGN.md, "The look"); or a tile with a look of its
+ * own, such as a Health report's. Only the logo's tile is glossy. Decorative:
  * what it stands for is always written beside it.
  */
 @Component({
@@ -24,12 +20,13 @@ import {
   template: `
     <span
       data-jewel
-      [attr.data-flat]="flat() || null"
       [style.width.px]="size()"
       [style.height.px]="size()"
       [style.border-radius.px]="radius()"
       [style.--pb-jewel]="drawn().light"
       [style.--pb-jewel-dark]="drawn().dark"
+      [style.--pb-jewel-tint]="tint().light"
+      [style.--pb-jewel-tint-dark]="tint().dark"
       [attr.data-category]="category() ?? null"
       aria-hidden="true"
     >
@@ -38,7 +35,7 @@ import {
         [attr.height]="glyphSize()"
         viewBox="0 0 24 24"
         fill="none"
-        stroke="#FFFFFF"
+        stroke="currentColor"
         [attr.stroke-width]="strokeWidth()"
         stroke-linecap="round"
         stroke-linejoin="round"
@@ -53,33 +50,16 @@ import {
       flex: none;
     }
     [data-jewel] {
-      --pb-jewel-shine: rgb(255 255 255 / 0.32);
       display: flex;
       align-items: center;
       justify-content: center;
       box-sizing: border-box;
-      background:
-        radial-gradient(120% 90% at 28% 18%, var(--pb-jewel-shine), rgb(255 255 255 / 0) 58%),
-        var(--pb-jewel);
-      box-shadow:
-        inset 0 1px 0 rgb(255 255 255 / 0.35),
-        inset 0 -2px 3px rgb(0 0 0 / 0.2),
-        0 1px 2px rgb(16 32 27 / 0.22);
-    }
-    [data-jewel][data-flat] {
-      box-shadow: none;
+      color: var(--pb-jewel);
+      background: var(--pb-jewel-tint);
     }
     :host-context(.theme_dark) [data-jewel] {
-      --pb-jewel-shine: rgb(255 255 255 / 0.3);
-      background:
-        radial-gradient(120% 90% at 28% 18%, var(--pb-jewel-shine), rgb(255 255 255 / 0) 58%),
-        var(--pb-jewel-dark);
-      box-shadow:
-        inset 0 1px 0 rgb(255 255 255 / 0.32),
-        inset 0 -2px 3px rgb(0 0 0 / 0.25);
-    }
-    :host-context(.theme_dark) [data-jewel][data-flat] {
-      box-shadow: none;
+      color: var(--pb-jewel-dark);
+      background: var(--pb-jewel-tint-dark);
     }
     svg {
       display: block;
@@ -92,12 +72,14 @@ export class KeykeeperCategoryTileComponent {
   readonly look = input<KeykeeperCategoryLook>();
   /** The tile's width and height, in pixels. */
   readonly size = input<number>(36);
-  /** No shadows: for the tiny tiles inside chips and lines of text. */
-  readonly flat = input(false, { transform: booleanAttribute });
 
   protected readonly drawn = computed(
     () => this.look() ?? KEYKEEPER_CATEGORY_LOOKS[this.category() ?? "all"],
   );
+  protected readonly tint = computed(() => ({
+    light: tileTint(this.drawn(), "light"),
+    dark: tileTint(this.drawn(), "dark"),
+  }));
   protected readonly radius = computed(() => Math.round(this.size() * 0.28));
   protected readonly glyphSize = computed(() => Math.round(this.size() * 0.58));
   protected readonly strokeWidth = computed(() => (this.size() <= 20 ? 2.4 : 1.9));

@@ -196,7 +196,7 @@ describe("buildVaultMenu", () => {
     expect(menu.trash?.count).toBe(1);
   });
 
-  it("gives All items, Favorites, and each category its jewel tile, and Archive and Trash their icons", () => {
+  it("gives All items, Favorites, and each category its tile, and Archive and Trash their icons", () => {
     const menu = buildVaultMenu(state(), actions());
 
     expect(menu.all.tile).toBe("all");

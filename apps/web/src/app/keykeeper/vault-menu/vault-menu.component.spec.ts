@@ -305,7 +305,7 @@ describe("KeykeeperVaultMenuComponent", () => {
     ]);
   });
 
-  it("shows jewel tiles for All items, Favorites, Health, and the categories, and marks the folders' owners", async () => {
+  it("shows tiles for All items, Favorites, Health, and the categories, and marks the folders' owners", async () => {
     const tiles = () =>
       Array.from(el().querySelectorAll<HTMLElement>("bit-nav-item")).flatMap((row) => {
         const tile = row.querySelector("vault-keykeeper-category-tile [data-jewel]");

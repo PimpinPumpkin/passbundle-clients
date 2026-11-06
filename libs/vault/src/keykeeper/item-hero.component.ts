@@ -44,7 +44,7 @@ const KIND_KEYS: Record<CipherType, string> = {
           <h1 data-part="name" data-testid="item-name">{{ cipher().name }}</h1>
         }
         <span data-part="where" data-testid="keykeeper-item-where">
-          <vault-keykeeper-category-tile [category]="category()" [size]="16" flat />
+          <vault-keykeeper-category-tile [category]="category()" [size]="16" />
           <span data-part="where-text">{{ where() }}</span>
         </span>
       </div>

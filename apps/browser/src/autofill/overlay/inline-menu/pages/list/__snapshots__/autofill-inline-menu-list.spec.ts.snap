@@ -184,7 +184,7 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
             aria-hidden="true"
             class="cipher-icon keykeeper-tile keykeeper-tile-jewel"
             data-category="identity"
-            style="--pb-jewel: #08788A; --pb-jewel-dark: #0A8599;"
+            style="--pb-jewel: #08788A; --pb-jewel-dark: #62D3E3; --pb-jewel-tint: rgb(8 120 138 / 0.11); --pb-jewel-tint-dark: rgb(98 211 227 / 0.14);"
           >
             <svg
               aria-hidden="true"
@@ -423,7 +423,7 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
             aria-hidden="true"
             class="cipher-icon keykeeper-tile keykeeper-tile-jewel"
             data-category="login"
-            style="--pb-jewel: #2448B8; --pb-jewel-dark: #2E55C9;"
+            style="--pb-jewel: #2448B8; --pb-jewel-dark: #93ADFF; --pb-jewel-tint: rgb(36 72 184 / 0.11); --pb-jewel-tint-dark: rgb(147 173 255 / 0.14);"
           >
             <svg
               aria-hidden="true"
@@ -937,7 +937,7 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
             aria-hidden="true"
             class="cipher-icon keykeeper-tile keykeeper-tile-jewel"
             data-category="login"
-            style="--pb-jewel: #2448B8; --pb-jewel-dark: #2E55C9;"
+            style="--pb-jewel: #2448B8; --pb-jewel-dark: #93ADFF; --pb-jewel-tint: rgb(36 72 184 / 0.11); --pb-jewel-tint-dark: rgb(147 173 255 / 0.14);"
           >
             <svg
               aria-hidden="true"
@@ -1334,7 +1334,7 @@ exports[`AutofillInlineMenuList initAutofillInlineMenuList the list of ciphers f
             aria-hidden="true"
             class="cipher-icon keykeeper-tile keykeeper-tile-jewel"
             data-category="login"
-            style="--pb-jewel: #2448B8; --pb-jewel-dark: #2E55C9;"
+            style="--pb-jewel: #2448B8; --pb-jewel-dark: #93ADFF; --pb-jewel-tint: rgb(36 72 184 / 0.11); --pb-jewel-tint-dark: rgb(147 173 255 / 0.14);"
           >
             <svg
               aria-hidden="true"

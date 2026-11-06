@@ -52,13 +52,12 @@
   <bit-menu #itemOptions>
     @for (menuItem of cipherMenuItems$ | async; track menuItem.type) {
       <a bitMenuItem [routerLink]="['/add-cipher']" [queryParams]="buildQueryParams(menuItem.type)">
-        <!-- Keykeeper: each kind's jewel tile, as in the list -->
+        <!-- Keykeeper: each kind's tile, as in the list -->
         <vault-keykeeper-category-tile
           slot="start"
           class="tw-me-1"
           [category]="categoryOf(menuItem.type)"
           [size]="22"
-          flat
         />
         {{ menuItem.labelKey | i18n }}
       </a>

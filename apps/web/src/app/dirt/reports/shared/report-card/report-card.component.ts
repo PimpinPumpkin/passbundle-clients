@@ -31,7 +31,7 @@ export class ReportCardComponent {
   // eslint-disable-next-line @angular-eslint/prefer-signals
   @Input() variant: ReportVariant;
 
-  /** Keykeeper: the report's jewel tile, by its route, in place of the illustration. */
+  /** Keykeeper: the report's tile, by its route, in place of the illustration. */
   protected get keykeeperTile() {
     return KEYKEEPER_REPORT_TILES[this.route];
   }

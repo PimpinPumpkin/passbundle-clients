@@ -31,7 +31,7 @@ import { KeykeeperCategoryTileComponent } from "./category-tile.component";
  * "The look"). A login shows its site's icon on a white tile when the server
  * has one, otherwise its first letter on a tint of the login color, so a list
  * is never a column of identical keys. Everything else, and items made from a
- * template with its own color, shows its category's jewel tile. Decorative:
+ * template with its own color, shows its category's flat tile. Decorative:
  * the item's name is always beside it.
  */
 @Component({
