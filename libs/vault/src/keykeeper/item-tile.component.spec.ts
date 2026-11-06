@@ -100,13 +100,20 @@ describe("KeykeeperItemTileComponent", () => {
     expect(tile().textContent?.trim()).toBe("F");
   });
 
-  it("shows a card's, a note's, and a template's jewel tile", async () => {
+  it("shows a card's, a note's, and a template's flat tile", async () => {
     const card = new CipherView();
     card.type = CipherType.Card;
     card.name = "Visa ending 4242";
     await render(card);
     expect(tile().dataset.tile).toBe("category");
     expect(el().querySelector("[data-category]")?.getAttribute("data-category")).toBe("card");
+    // Flat: a tint of the card's amethyst, and the glyph in the tone, not white.
+    const flat = el().querySelector<HTMLElement>("[data-jewel]")!;
+    expect(flat.style.getPropertyValue("--pb-jewel")).toBe("#6B30B8");
+    expect(flat.style.getPropertyValue("--pb-jewel-dark")).toBe("#C6A3FF");
+    expect(flat.style.getPropertyValue("--pb-jewel-tint")).toBe("rgb(107 48 184 / 0.11)");
+    expect(flat.style.getPropertyValue("--pb-jewel-tint-dark")).toBe("rgb(198 163 255 / 0.14)");
+    expect(flat.querySelector("svg")?.getAttribute("stroke")).toBe("currentColor");
 
     const wifi = new CipherView();
     wifi.type = CipherType.SecureNote;

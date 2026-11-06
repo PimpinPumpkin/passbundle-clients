@@ -6,16 +6,12 @@ import {
   categoryOfType,
   isServerFallbackIcon,
   KEYKEEPER_CATEGORY_LOOKS,
+  KEYKEEPER_TILE_TINT,
   tileLetter,
+  tileTint,
 } from "./categories";
+import { flatTileFailures } from "./flat-tile-contrast.spec-util";
 import { BUILT_IN_TEMPLATES, templateFields } from "./templates";
-
-function lum(hex: string) {
-  const channels = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
-  const [r, g, b] = channels.map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-const contrastWithWhite = (hex: string) => 1.05 / (lum(hex) + 0.05);
 
 describe("categories", () => {
   it("gives every kind of item its category", () => {
@@ -54,11 +50,18 @@ describe("categories", () => {
     expect(categoryOfItem({ type: CipherType.Card })).toBe("card");
   });
 
-  it("keeps a white glyph readable on every tile, light and dark (3:1 or more)", () => {
-    for (const look of Object.values(KEYKEEPER_CATEGORY_LOOKS)) {
-      expect(contrastWithWhite(look.light)).toBeGreaterThanOrEqual(3);
-      expect(contrastWithWhite(look.dark)).toBeGreaterThanOrEqual(3);
-    }
+  it("keeps every tile's glyph readable on its tint, on every surface, light and dark (3:1 or more)", () => {
+    expect(flatTileFailures(KEYKEEPER_CATEGORY_LOOKS)).toEqual([]);
+    // The check catches a tone too light for its tint: the star's own gold.
+    const gold = flatTileFailures({ gold: { light: "#B98310", dark: "#ECC25E", glyph: "" } });
+    expect(gold).toContain("gold (light) on the ground: 2.65");
+    expect(gold.every((failure) => failure.startsWith("gold (light) on "))).toBe(true);
+  });
+
+  it("tints a tile with its tone: 11% in light mode, 14% of the lighter tone in dark mode", () => {
+    expect(KEYKEEPER_TILE_TINT).toEqual({ light: 0.11, dark: 0.14 });
+    expect(tileTint(KEYKEEPER_CATEGORY_LOOKS.login, "light")).toBe("rgb(36 72 184 / 0.11)");
+    expect(tileTint(KEYKEEPER_CATEGORY_LOOKS.login, "dark")).toBe("rgb(147 173 255 / 0.14)");
   });
 
   it("puts a name's first letter or digit on a tile, in upper case", () => {

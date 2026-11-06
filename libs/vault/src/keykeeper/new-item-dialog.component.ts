@@ -71,8 +71,8 @@ type Choice = { key: string; name: string; category: KeykeeperCategory; result: 
  * people save most first, as big tiles; "More categories" opens the rest of
  * the item types and the templates (built-in, the person's, and their
  * organizations'), with a search. Folders and collections, which aren't
- * items, are buttons at the bottom. Every kind and template shows its jewel
- * tile, as in the menu and the list (DESIGN.md, "The look").
+ * items, are buttons at the bottom. Every kind and template shows its tile,
+ * as in the menu and the list (DESIGN.md, "The look").
  */
 @Component({
   selector: "vault-keykeeper-new-item-dialog",

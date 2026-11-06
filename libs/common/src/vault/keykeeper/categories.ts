@@ -1,8 +1,10 @@
 // Keykeeper: every kind of item has a color and a glyph, the same wherever it
 // shows (DESIGN.md, "The look", in the keykeeper repo). The colors are jewel
-// tones, deep enough for a white glyph on them (3:1 or more, light and dark),
-// drawn as a rounded tile with a little sheen. The extension's popup and the
-// fill menu it draws inside websites both read them from here.
+// tones, drawn as a flat tile: a soft tint of the tone with the glyph in the
+// tone itself, and in dark mode a lighter tone for both, as on passbundle.com.
+// The glyph keeps 3:1 or more on its tile, light and dark. Only the logo's
+// tile is glossy. The extension's popup and the fill menu it draws inside
+// websites both read them from here.
 //
 // Templates bring their own color where one fits (Wi-Fi, servers, licenses);
 // the rest show the kind of item they're based on.
@@ -31,13 +33,26 @@ export type KeykeeperCategory =
   | "health";
 
 export type KeykeeperCategoryLook = {
-  /** The tile's color on light backgrounds. */
+  /** The tone on light backgrounds: the glyph's color, and the tile's tint. */
   light: string;
-  /** On dark backgrounds, a step lighter, so the tile still reads as a stone. */
+  /** On dark backgrounds, a lighter, softer tone for the glyph and the tint. */
   dark: string;
-  /** The glyph: SVG path data on a 24 by 24 grid, stroked in white. */
+  /** The glyph: SVG path data on a 24 by 24 grid, stroked in the tone. */
   glyph: string;
 };
+
+/**
+ * How much of its tone tints a tile, over whatever the tile sits on: 11% in
+ * light mode, 14% of the lighter tone in dark mode (passbundle.com's too).
+ */
+export const KEYKEEPER_TILE_TINT = { light: 0.11, dark: 0.14 } as const;
+
+/** A tile's background in a theme: its tone at the theme's tint, as a CSS color. */
+export function tileTint(look: KeykeeperCategoryLook, theme: "light" | "dark"): string {
+  const tone = look[theme];
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(tone.slice(i, i + 2), 16));
+  return `rgb(${r} ${g} ${b} / ${KEYKEEPER_TILE_TINT[theme]})`;
+}
 
 const glyphs = {
   grid: "M4 4h7v7H4Z M13 4h7v7h-7Z M4 13h7v7H4Z M13 13h7v7h-7Z",
@@ -62,33 +77,33 @@ const glyphs = {
 export const KEYKEEPER_CATEGORY_LOOKS: Readonly<Record<KeykeeperCategory, KeykeeperCategoryLook>> =
   {
     // Emerald, the logo's color: "everything".
-    all: { light: "#0E7A5A", dark: "#0E7A5A", glyph: glyphs.grid },
+    all: { light: "#0E7A5A", dark: "#5FD6AE", glyph: glyphs.grid },
     // Sapphire.
-    login: { light: "#2448B8", dark: "#2E55C9", glyph: glyphs.key },
+    login: { light: "#2448B8", dark: "#93ADFF", glyph: glyphs.key },
     // Topaz.
-    note: { light: "#A9600C", dark: "#B4690F", glyph: glyphs.note },
+    note: { light: "#A9600C", dark: "#F2B766", glyph: glyphs.note },
     // Amethyst.
-    card: { light: "#6B30B8", dark: "#7A42CC", glyph: glyphs.card },
+    card: { light: "#6B30B8", dark: "#C6A3FF", glyph: glyphs.card },
     // Turquoise.
-    identity: { light: "#08788A", dark: "#0A8599", glyph: glyphs.identity },
+    identity: { light: "#08788A", dark: "#62D3E3", glyph: glyphs.identity },
     // Onyx.
-    sshKey: { light: "#353B4A", dark: "#4A5266", glyph: glyphs.terminal },
+    sshKey: { light: "#353B4A", dark: "#C3C9D6", glyph: glyphs.terminal },
     // Emerald, a bank's.
-    bank: { light: "#0E7A47", dark: "#128752", glyph: glyphs.bank },
+    bank: { light: "#0E7A47", dark: "#6FDBA0", glyph: glyphs.bank },
     // Aquamarine.
-    wifi: { light: "#1C7FB8", dark: "#1F86C2", glyph: glyphs.wifi },
+    wifi: { light: "#1C7FB8", dark: "#7CC4EF", glyph: glyphs.wifi },
     // Garnet.
-    server: { light: "#A8291F", dark: "#B83328", glyph: glyphs.server },
+    server: { light: "#A8291F", dark: "#FF9D92", glyph: glyphs.server },
     // Ruby.
-    license: { light: "#B01E54", dark: "#C0275F", glyph: glyphs.license },
-    apiKey: { light: "#353B4A", dark: "#4A5266", glyph: glyphs.key },
-    domain: { light: "#1C7FB8", dark: "#1F86C2", glyph: glyphs.globe },
-    email: { light: "#2448B8", dark: "#2E55C9", glyph: glyphs.envelope },
-    certificate: { light: "#B01E54", dark: "#C0275F", glyph: glyphs.badge },
-    // The menu's Favorites, in gold, and Health, in a bank's emerald. Gold
-    // can't go a step lighter and keep a white glyph at 3:1, so it stays.
-    favorites: { light: "#B98310", dark: "#B98310", glyph: glyphs.star },
-    health: { light: "#0E7A47", dark: "#128752", glyph: glyphs.shield },
+    license: { light: "#B01E54", dark: "#FF92B8", glyph: glyphs.license },
+    apiKey: { light: "#353B4A", dark: "#C3C9D6", glyph: glyphs.key },
+    domain: { light: "#1C7FB8", dark: "#7CC4EF", glyph: glyphs.globe },
+    email: { light: "#2448B8", dark: "#93ADFF", glyph: glyphs.envelope },
+    certificate: { light: "#B01E54", dark: "#FF92B8", glyph: glyphs.badge },
+    // The menu's Favorites, in gold, and Health, in a bank's emerald. Gold is
+    // a shade deeper than the star's, so its glyph keeps 3:1 on its tint.
+    favorites: { light: "#946A0C", dark: "#ECC25E", glyph: glyphs.star },
+    health: { light: "#0E7A47", dark: "#6FDBA0", glyph: glyphs.shield },
   };
 
 /** A login without a site icon shows its first letter on a tint of the login color. */

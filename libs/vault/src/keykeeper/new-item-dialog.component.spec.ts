@@ -96,7 +96,7 @@ describe("KeykeeperNewItemDialogComponent", () => {
       "typeCard typeCardSubtitle",
       "typeIdentity typeIdentitySubtitle",
     ]);
-    // Each with its category's jewel tile, as in the menu and the list.
+    // Each with its category's tile, as in the menu and the list.
     expect(
       Array.from(el().querySelectorAll("[data-testid=new-item-main] [data-jewel]")).map((t) =>
         t.getAttribute("data-category"),

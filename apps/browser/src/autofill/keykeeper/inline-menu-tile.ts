@@ -1,15 +1,17 @@
 // Keykeeper: the fill menu's item tiles, the same as the popup's (DESIGN.md,
 // "The look", in the keykeeper repo): a login shows its site's icon on a
 // white tile, or its first letter on a tint of the login color while there's
-// no icon; cards, identities, and the rest show their category's jewel tile.
-// Colors and glyphs come from libs/common/src/vault/keykeeper/categories.ts;
-// the inline menu's list.scss draws them.
+// no icon; cards, identities, and the rest show their category's flat tile, a
+// tint of its tone with the glyph in the tone. Colors and glyphs come from
+// libs/common/src/vault/keykeeper/categories.ts; the inline menu's list.scss
+// draws them.
 import { CipherType } from "@bitwarden/common/vault/enums";
 import {
   categoryOfType,
   isServerFallbackIcon,
   KEYKEEPER_CATEGORY_LOOKS,
   tileLetter,
+  tileTint,
 } from "@bitwarden/common/vault/keykeeper/categories";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -54,6 +56,8 @@ export function buildKeykeeperTile(cipher: KeykeeperTileCipher): HTMLElement {
   tile.dataset.category = category;
   tile.style.setProperty("--pb-jewel", look.light);
   tile.style.setProperty("--pb-jewel-dark", look.dark);
+  tile.style.setProperty("--pb-jewel-tint", tileTint(look, "light"));
+  tile.style.setProperty("--pb-jewel-tint-dark", tileTint(look, "dark"));
   const svg = globalThis.document.createElementNS(SVG_NS, "svg");
   svg.setAttribute("viewBox", "0 0 24 24");
   svg.setAttribute("aria-hidden", "true");

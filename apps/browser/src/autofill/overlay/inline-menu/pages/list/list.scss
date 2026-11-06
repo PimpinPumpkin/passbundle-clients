@@ -665,7 +665,8 @@ body * {
 
 // Keykeeper: items' tiles, as in the popup (keykeeper/inline-menu-tile.ts and
 // DESIGN.md, "The look"): the site's icon on white, the login's letter on its
-// tint, or the category's jewel tile.
+// tint, or the category's flat tile, a tint of its tone with the glyph in the
+// tone, lighter in dark mode. No sheen, no shadow.
 .inline-menu-list-actions-item .cipher-icon.keykeeper-tile {
   width: 3.2rem;
   height: 3.2rem;
@@ -693,12 +694,7 @@ body * {
 }
 .inline-menu-list-actions-item .cipher-icon.keykeeper-tile-jewel {
   border: 0;
-  background:
-    radial-gradient(120% 90% at 28% 18%, rgb(255 255 255 / 0.32), rgb(255 255 255 / 0) 58%),
-    var(--pb-jewel);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.35),
-    inset 0 -2px 3px rgb(0 0 0 / 0.2);
+  background: var(--pb-jewel-tint);
 
   svg {
     width: 1.9rem;
@@ -706,7 +702,7 @@ body * {
 
     path {
       fill: none !important;
-      stroke: #ffffff;
+      stroke: var(--pb-jewel);
       stroke-width: 1.9;
       stroke-linecap: round;
       stroke-linejoin: round;
@@ -723,7 +719,9 @@ body * {
   border-color: #f4f7f6;
 }
 .theme_dark .inline-menu-list-actions-item .cipher-icon.keykeeper-tile-jewel {
-  background:
-    radial-gradient(120% 90% at 28% 18%, rgb(255 255 255 / 0.3), rgb(255 255 255 / 0) 58%),
-    var(--pb-jewel-dark);
+  background: var(--pb-jewel-tint-dark);
+
+  svg path {
+    stroke: var(--pb-jewel-dark);
+  }
 }

@@ -31,8 +31,8 @@ export interface VaultMenuEntry {
   label: string;
   icon?: BitwardenIcon;
   /**
-   * The jewel tile it shows in the open menu, in place of its icon: All
-   * items, Favorites, and the categories (DESIGN.md, "The look").
+   * The tile it shows in the open menu, in place of its icon: All items,
+   * Favorites, and the categories (DESIGN.md, "The look").
    */
   tile?: KeykeeperCategory;
   /** How many items the list shows once this is picked, as things are now. */
