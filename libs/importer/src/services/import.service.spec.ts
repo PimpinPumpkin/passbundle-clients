@@ -38,12 +38,7 @@ import { BitwardenPasswordProtectedImporter } from "../importers";
 import { Importer } from "../importers/importer";
 import { ImportType } from "../models/import-options";
 import { ImportResult } from "../models/import-result";
-import {
-  buildSdkImporterRegistry,
-  CredentialKind,
-  SdkImportCredentials,
-  SdkVaultImporter,
-} from "../sdk";
+import { buildSdkImporterRegistry, SdkImportCredentials, SdkVaultImporter } from "../sdk";
 import { toSdkCollectionType } from "../sdk/sdk-collection-type";
 
 import { ImportApiServiceAbstraction } from "./import-api.service.abstraction";
@@ -649,7 +644,6 @@ describe("ImportService", () => {
       fill.type = FieldType.Hidden;
       planted.fields = [fill];
       const newImporter: SdkVaultImporter = {
-        credentialKind: CredentialKind.none,
         import: jest.fn().mockImplementation(async () => {
           cipherService.ciphers$.mockReturnValue(
             of({ "planted-1": { id: "planted-1", organizationId: null, type: 1 } } as any),
