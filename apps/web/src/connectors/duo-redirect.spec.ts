@@ -1,4 +1,4 @@
-import { redirectToDuoFrameless } from "./duo-redirect";
+import { appLink, redirectToDuoFrameless } from "./duo-redirect";
 
 describe("duo-redirect", () => {
   describe("redirectToDuoFrameless", () => {
@@ -86,6 +86,19 @@ describe("duo-redirect", () => {
       expect(() => redirectToDuoFrameless(UrlWithCredentials)).toThrow(
         "Invalid redirect URL: embedded credentials not allowed",
       );
+    });
+  });
+
+  // PassBundle's own apps get Duo's answer through their link.
+  describe("appLink", () => {
+    it("hands the code and state to PassBundle's apps, encoded", () => {
+      expect(appLink("c0de+/=&x", "Q1w2E3r4T5y6U7i8")).toBe(
+        "passbundle://duo-callback?code=c0de%2B%2F%3D%26x&state=Q1w2E3r4T5y6U7i8",
+      );
+    });
+
+    it("never names upstream's apps", () => {
+      expect(appLink("a", "b")).not.toMatch(/bitwarden/i);
     });
   });
 });
