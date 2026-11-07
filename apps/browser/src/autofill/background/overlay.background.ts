@@ -87,6 +87,7 @@ import {
   choicesFor,
   FILL_FIELD_REPROMPT_ACTION,
   fillFieldWith,
+  fillPickerWords,
 } from "../keykeeper/fill-field-menu";
 import { inlineMenuTotp } from "../keykeeper/inline-menu-totp";
 import AutofillField from "../models/autofill-field";
@@ -903,7 +904,10 @@ export class OverlayBackground implements OverlayBackgroundInterface {
       // Keykeeper: the fill picker's choices, names only. The menu shows
       // without them if an item's fields can't be read.
       try {
-        inlineMenuData.keykeeperFillChoices = choicesFor(cipher).map(({ key, title }) => ({
+        inlineMenuData.keykeeperFillChoices = choicesFor(
+          cipher,
+          fillPickerWords(this.i18nService),
+        ).map(({ key, title }) => ({
           key,
           title,
         }));

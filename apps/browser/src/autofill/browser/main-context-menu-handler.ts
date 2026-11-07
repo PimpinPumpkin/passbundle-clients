@@ -33,6 +33,7 @@ import { RestrictedItemTypesService } from "@bitwarden/common/vault/services/res
 
 import {
   addCipherToFillFieldMenu,
+  fillPickerWords,
   initFillFieldMenu,
   removeFillFieldMenu,
 } from "../keykeeper/fill-field-menu";
@@ -255,7 +256,7 @@ export class MainContextMenuHandler {
         await MainContextMenuHandler.create({ ...otherOptions, contexts: ["all"] });
       }
       // Keykeeper: "Fill this field with" (see keykeeper/fill-field-menu.ts).
-      await initFillFieldMenu();
+      await initFillFieldMenu(fillPickerWords(this.i18nService));
     } catch (error) {
       if (error instanceof Error) {
         this.logService.warning(error.message);
@@ -326,7 +327,7 @@ export class MainContextMenuHandler {
 
   async loadOptions(title: string, optionId: string, cipher?: CipherView) {
     try {
-      await addCipherToFillFieldMenu(cipher);
+      await addCipherToFillFieldMenu(cipher, fillPickerWords(this.i18nService));
 
       const sanitizedTitle = MainContextMenuHandler.sanitizeContextMenuTitle(title);
 

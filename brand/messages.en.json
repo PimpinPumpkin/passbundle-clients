@@ -708,6 +708,12 @@
   "keykeeperFillOnThisPage": {
     "message": "Fill on this page"
   },
+  "keykeeperFillThisFieldWith": {
+    "message": "Fill this field with"
+  },
+  "keykeeperNeverFillThisField": {
+    "message": "Never fill this field"
+  },
   "keykeeperItemInVault": {
     "message": "$KIND$ in $VAULT$",
     "placeholders": {
