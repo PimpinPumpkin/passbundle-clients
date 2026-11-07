@@ -201,7 +201,11 @@ export class SdkImportCheck {
         items: async (ids) => all.filter((item) => ids.has(item.id)),
       };
     }
-    await this.syncService.fullSync(true, { allowThrowOnError: true });
+    // A sync that didn't finish leaves the stored items as they were, which
+    // would make items added elsewhere since look like the import's.
+    if (!(await this.syncService.fullSync(true, { allowThrowOnError: true }))) {
+      throw new Error("The sync didn't finish.");
+    }
     const stored = Object.values(
       (await firstValueFrom(this.cipherService.ciphers$(userId))) ?? {},
     ).filter((data) => (data.organizationId ?? null) === organizationId);

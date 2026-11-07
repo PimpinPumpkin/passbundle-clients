@@ -149,6 +149,12 @@ describe("SdkImportCheck", () => {
     await expect(check.before(personal)).rejects.toThrow("keykeeperImportCheckNotStarted");
   });
 
+  it("imports nothing when the sync before doesn't finish", async () => {
+    syncService.fullSync.mockResolvedValue(false);
+
+    await expect(check.before(personal)).rejects.toThrow("keykeeperImportCheckNotStarted");
+  });
+
   it("says so when the items can't be read back", async () => {
     const baseline = await check.before(personal);
     syncService.fullSync.mockRejectedValue(new Error("offline"));
