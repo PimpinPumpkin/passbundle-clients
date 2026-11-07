@@ -182,27 +182,59 @@ export type ClientMsp = {
   ownPolicies?: { type: number; name: string }[];
 };
 
-/** A policy: on or off, with its options as upstream stores them. */
-export type MspPolicy = { type: number; enabled: boolean; data: any };
+/**
+ * A policy: on or off, with its options as upstream stores them. One of the
+ * MSP's defaults can be `required` for every client (DESIGN.md, "Required for
+ * every client"): then `hadOwn` names the clients the caller reaches that had
+ * their own setting when the requirement changed them. Older servers leave
+ * both out.
+ */
+export type MspPolicy = {
+  type: number;
+  enabled: boolean;
+  data: any;
+  required?: boolean;
+  hadOwn?: NamedClient[];
+};
 
 /**
  * The MSP's default policies, and for each client the caller reaches, the
- * policies where it has its own setting. `types` are the policies this server
- * offers, in order.
+ * policies where it has its own setting, and the required ones where it isn't
+ * in step yet (it refused the requirement). `types` are the policies this
+ * server offers, in order; `prerequisites`, the ones a policy needs on in the
+ * same client, which a required policy keeps on.
  */
 export type MspPolicies = {
   types: number[];
   defaults: MspPolicy[];
-  clients: { id: string; name: string; own: MspPolicy[] }[];
+  prerequisites?: { type: number; needs: number[] }[];
+  clients: { id: string; name: string; own: MspPolicy[]; notInStep?: MspPolicy[] }[];
 };
 
 type NamedClient = { id: string; name: string };
 
-/** What changing a default did: clients that changed, kept their own setting, or refused it. */
+/**
+ * What changing a default did: clients that changed, kept their own setting,
+ * or refused it. After it stops being required, `hadOwn` names the clients
+ * that had their own setting before it was.
+ */
 export type DefaultPolicyResult = {
   changed: NamedClient[];
   kept: NamedClient[];
   refused: (NamedClient & { error: string })[];
+  hadOwn?: NamedClient[];
+};
+
+/**
+ * For a client's Policies page: its MSP, the policies the MSP requires for
+ * every client, which nobody changes there (`neededBy` names the required
+ * policy one is needed by, when it isn't required itself), and the policies
+ * where the organization has its own setting.
+ */
+export type ClientMspPolicies = {
+  msp: { id: string; name: string } | null;
+  required: { type: number; name: string; neededBy: string | null }[];
+  own: { type: number; name: string }[];
 };
 
 /**
@@ -509,6 +541,8 @@ export type OrgAdminTwoStep = {
   required: boolean;
   /** The MSP that manages the organization, if one does. */
   msp: { id: string; name: string } | null;
+  /** The MSP requires it for every client, so it can't be changed here. Older servers leave it out. */
+  requiredByMsp?: boolean;
   /** Who it covers (or would) without a method that counts. */
   notSetUp: TwoStepNotSetUp[];
 };
