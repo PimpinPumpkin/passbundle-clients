@@ -45,7 +45,15 @@ export function twoStepRoleLabel(person: TwoStepNotSetUp): string {
           Anyone without one sets it up the next time they sign in, before anything else. Admins who
           sign in with this organization's single sign-on are covered by it there.
         </p>
-        @if (s.msp) {
+        @if (s.msp && s.requiredByMsp) {
+          <p bitTypography="body2" data-testid="admin-two-step-msp">
+            <span bitBadge variant="primary" startIcon="bwi-lock" [truncate]="false"
+              >Required by {{ s.msp.name }}</span
+            >
+            {{ s.msp.name }} requires this for every client, so only {{ s.msp.name }}'s console
+            changes it.
+          </p>
+        } @else if (s.msp) {
           <p bitTypography="body2" data-testid="admin-two-step-msp">
             {{ s.msp.name }} turns this on by default. Changing it here makes it this organization's
             own setting.
@@ -56,7 +64,9 @@ export function twoStepRoleLabel(person: TwoStepNotSetUp): string {
             <input type="checkbox" bitCheckbox formControlName="required" />
             <bit-label>Require two-step login for admins</bit-label>
           </bit-form-control>
-          <button bitButton bitFormButton buttonType="primary" type="submit">Save</button>
+          @if (!s.requiredByMsp) {
+            <button bitButton bitFormButton buttonType="primary" type="submit">Save</button>
+          }
         </form>
         <h2 bitTypography="h3" class="tw-mt-6">Not set up yet</h2>
         @if (meNotSetUp()) {
@@ -130,6 +140,12 @@ export class KeykeeperAdminTwoStepComponent {
   private show(setting: OrgAdminTwoStep) {
     this.setting.set(setting);
     this.form.controls.required.setValue(setting.required);
+    // Keykeeper: the MSP requires it for every client, so it's not this page's to change.
+    if (setting.requiredByMsp) {
+      this.form.controls.required.disable();
+    } else {
+      this.form.controls.required.enable();
+    }
   }
 
   protected readonly save = async () => {

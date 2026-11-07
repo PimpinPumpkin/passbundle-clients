@@ -62,6 +62,11 @@ export function describeEvent(
       return `${actor} removed ${theTemplate}`;
     case "client_policy_default":
       return `${actor} put ${org} back on the default ${e.detail ?? "policy"}`;
+    // A default required for every client (DESIGN.md, "Required for every client").
+    case "default_policy_required":
+      return `${actor} required ${e.detail ?? "a policy for every client"}`;
+    case "default_policy_unrequired":
+      return `${actor} stopped requiring ${e.detail ?? "a policy for every client"}`;
     case "joining_default_set":
       return `${actor} set how people join clients: ${e.detail ?? "updated"}`;
     case "client_joining_set":

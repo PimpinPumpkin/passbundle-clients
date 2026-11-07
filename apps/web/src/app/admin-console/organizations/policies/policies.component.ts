@@ -12,6 +12,7 @@ import {
   shareReplay,
 } from "rxjs";
 
+import { ClientMspPolicies } from "@bitwarden/admin-console/common";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { PolicyApiServiceAbstraction } from "@bitwarden/common/admin-console/abstractions/policy/policy-api.service.abstraction";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
@@ -32,7 +33,10 @@ import {
 } from "@bitwarden/components";
 import { safeProvider } from "@bitwarden/ui-common";
 
-import { KeykeeperClientMspPoliciesComponent } from "../../../keykeeper/msp/client-msp-policies.component";
+import {
+  KeykeeperClientMspPoliciesComponent,
+  requiredBy,
+} from "../../../keykeeper/msp/client-msp-policies.component";
 import { HeaderModule } from "../../../layouts/header/header.module";
 import { SharedModule } from "../../../shared";
 
@@ -43,7 +47,8 @@ import { POLICY_EDIT_REGISTER } from "./policy-register-token";
 
 @Component({
   templateUrl: "policies.component.html",
-  // Keykeeper: plus the note about an MSP's default policies.
+  // Keykeeper: plus the note about an MSP's default policies, and the policies
+  // it requires for every client, which can't be edited here.
   imports: [
     SharedModule,
     HeaderModule,
@@ -84,6 +89,10 @@ export class PoliciesComponent {
       ),
     ),
   );
+
+  /** Keykeeper: what the organization's MSP sets for it, if an MSP manages it (the note loads it). */
+  protected readonly keykeeperMsp = signal<ClientMspPolicies | null>(null);
+  protected readonly keykeeperRequiredBy = requiredBy;
 
   protected readonly policies$: Observable<readonly BasePolicyEditDefinition[]> = of(
     this.policyListService.getPolicies(),
