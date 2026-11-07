@@ -72,7 +72,13 @@ import { OptionsInput } from "../../vault/individual-vault/vault-filter/shared/c
 import { KeykeeperHealthCountService } from "../health/health-count.service";
 
 import { KeykeeperPickedLabelService } from "./picked-label.service";
-import { buildVaultMenu, folderPick, pickedLabel, VaultMenuActions } from "./vault-menu";
+import {
+  buildVaultMenu,
+  expiringPick,
+  folderPick,
+  pickedLabel,
+  VaultMenuActions,
+} from "./vault-menu";
 
 /** The vault's own page, whatever its filters. */
 export function isVaultUrl(router: Router): boolean {
@@ -292,6 +298,7 @@ export class KeykeeperVaultMenuComponent extends VaultFilterComponent implements
       }
       await this.pick(() => this.applyTypeFilter(node));
     },
+    expiring: () => this.pick(() => this.bridgeService.navigate(expiringPick(this.routed()))),
   };
 
   protected readonly menu = computed(() => {
@@ -302,6 +309,7 @@ export class KeykeeperVaultMenuComponent extends VaultFilterComponent implements
         routed: this.routed(),
         ciphers: this.ciphers(),
         allItemsLabel: this.i18nService.t("allItems"),
+        expiringLabel: this.i18nService.t("keykeeperExpiringSoon"),
         typeTree: this.typeTree(),
         organizationTree: this.organizationTree(),
         collectionTree: this.collectionTree(),

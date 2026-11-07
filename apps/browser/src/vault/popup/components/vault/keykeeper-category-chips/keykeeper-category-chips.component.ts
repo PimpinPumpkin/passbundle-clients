@@ -11,8 +11,11 @@ import { KeykeeperCategoryTileComponent } from "@bitwarden/vault";
 import { VaultPopupItemsService } from "../../../services/vault-popup-items.service";
 import { VaultPopupListFiltersService } from "../../../services/vault-popup-list-filters.service";
 
+/** The chip for items expired or expiring within 30 days, after the kinds. */
+export const EXPIRING_CHIP = "expiring" as const;
+
 export type KeykeeperCategoryChip = {
-  type: CipherType | null;
+  type: CipherType | null | typeof EXPIRING_CHIP;
   category: KeykeeperCategory;
   label: string;
   selected: boolean;
@@ -31,7 +34,8 @@ const PLURAL_KEYS: Partial<Record<CipherType, string>> = {
  * Keykeeper: the row of category chips under the vault's search (DESIGN.md,
  * "The look"): All, then each kind of item the vault has, each with its tile.
  * Picking one filters the list by that kind, the same filter as upstream's
- * Type menu, which it replaces.
+ * Type menu, which it replaces. Last, while anything has expired or expires
+ * within 30 days, "Expiring soon" (DESIGN.md, "Expiration dates").
  */
 @Component({
   selector: "app-keykeeper-category-chips",
@@ -115,29 +119,52 @@ export class KeykeeperCategoryChipsComponent {
   protected readonly chips$ = combineLatest([
     this.filtersService.cipherTypes$,
     this.itemsService.keykeeperTypesWithItems$,
+    this.itemsService.keykeeperExpiringCount$,
     this.filtersService.filters$,
   ]).pipe(
-    map(([options, present, filters]): KeykeeperCategoryChip[] => {
+    map(([options, present, expiring, filters]): KeykeeperCategoryChip[] => {
       const picked = filters.cipherType ?? null;
+      const expiringPicked = filters.keykeeperExpiring === true;
       const kinds = options.filter((o) => present.includes(o.value) || o.value === picked);
-      if (kinds.length < 2 && picked == null) {
+      const showExpiring = expiring > 0 || expiringPicked;
+      if (kinds.length < 2 && picked == null && !showExpiring) {
         return [];
       }
       return [
-        { type: null, category: "all", label: this.i18nService.t("all"), selected: picked == null },
+        {
+          type: null,
+          category: "all",
+          label: this.i18nService.t("all"),
+          selected: picked == null && !expiringPicked,
+        },
         ...kinds.map((option) => ({
           type: option.value,
           category: categoryOfType(option.value),
           label: PLURAL_KEYS[option.value]
             ? this.i18nService.t(PLURAL_KEYS[option.value]!)
             : option.label,
-          selected: option.value === picked,
+          selected: option.value === picked && !expiringPicked,
         })),
+        ...(showExpiring ? [this.expiringChip(expiringPicked)] : []),
       ];
     }),
   );
 
-  protected pick(type: CipherType | null) {
-    this.filtersService.filterForm.patchValue({ cipherType: type });
+  private expiringChip(selected: boolean): KeykeeperCategoryChip {
+    return {
+      type: EXPIRING_CHIP,
+      category: "expiring",
+      label: this.i18nService.t("keykeeperExpiringSoon"),
+      selected,
+    };
+  }
+
+  /** One chip at a time: a kind, All, or Expiring soon. */
+  protected pick(type: KeykeeperCategoryChip["type"]) {
+    this.filtersService.filterForm.patchValue(
+      type === EXPIRING_CHIP
+        ? { cipherType: null, keykeeperExpiring: true }
+        : { cipherType: type, keykeeperExpiring: false },
+    );
   }
 }

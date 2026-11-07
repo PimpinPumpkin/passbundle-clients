@@ -94,8 +94,72 @@
   "keykeeperExpiringItemsFoundDesc": {
     "message": "These items have expired or expire in the next 30 days. Renew or rotate them, then update their expiration dates."
   },
+  "keykeeperMemberHealthReport": {
+    "message": "Members' own passwords"
+  },
+  "keykeeperMemberHealthReportDesc": {
+    "message": "How many of each member's own logins, in their Personal items, have weak, reused, or exposed passwords."
+  },
+  "keykeeperMemberHealthPrivacy": {
+    "message": "Each member's apps count their own logins and send only these numbers. Neither you nor the server sees which logins, their names, or their passwords. This organization's items are in the other reports."
+  },
+  "keykeeperMemberHealthCouldntLoad": {
+    "message": "The numbers couldn't be loaded. Try again later."
+  },
+  "keykeeperMemberHealthLogins": {
+    "message": "Logins"
+  },
+  "keykeeperMemberHealthWeak": {
+    "message": "Weak"
+  },
+  "keykeeperMemberHealthReused": {
+    "message": "Reused"
+  },
+  "keykeeperMemberHealthExposed": {
+    "message": "Exposed"
+  },
+  "keykeeperMemberHealthReported": {
+    "message": "Reported"
+  },
+  "keykeeperMemberHealthNotReported": {
+    "message": "Not reported yet: their apps send the numbers after they next unlock."
+  },
+  "keykeeperMemberHealthNotChecked": {
+    "message": "Not checked"
+  },
+  "keykeeperMemberHealthExposedNote": {
+    "message": "Exposed passwords are counted only by the web vault, while its breach check is on. Members who use only the browser extension or the apps show Not checked."
+  },
+  "keykeeperMemberHealthSummary": {
+    "message": "$REPORTED$ of $MEMBERS$ members reported.",
+    "placeholders": {
+      "reported": {
+        "content": "$1"
+      },
+      "members": {
+        "content": "$2"
+      }
+    }
+  },
+  "keykeeperMemberHealthTotals": {
+    "message": "In their own items: $WEAK$ weak and $REUSED$ reused passwords.",
+    "placeholders": {
+      "weak": {
+        "content": "$1"
+      },
+      "reused": {
+        "content": "$2"
+      }
+    }
+  },
+  "keykeeperOwnHealthSeenBy": {
+    "message": "Owners and admins of the organizations you're a member of see how many of your own passwords are weak, reused, or exposed. Never which ones."
+  },
   "keykeeperExpires": {
     "message": "Expires"
+  },
+  "keykeeperExpiringSoon": {
+    "message": "Expiring soon"
   },
   "keykeeperVersionHistory": {
     "message": "Version history"

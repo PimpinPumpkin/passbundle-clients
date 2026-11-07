@@ -5,8 +5,10 @@
 import { ChangeDetectionStrategy, Component, OnInit, signal } from "@angular/core";
 import { firstValueFrom } from "rxjs";
 
+import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions/account/billing-account-profile-state.service";
+import { confirmedMemberOfAny } from "@bitwarden/common/dirt/keykeeper/own-health";
 import { FeatureFlag } from "@bitwarden/common/enums/feature-flag.enum";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 
@@ -21,15 +23,21 @@ import { ReportEntry, ReportVariant } from "../shared";
 })
 export class ReportsHomeComponent implements OnInit {
   readonly reports = signal<ReportEntry[]>([]);
+  /** Keykeeper: whether their organizations' admins see their own passwords' numbers. */
+  readonly keykeeperSeenByAdmins = signal(false);
 
   constructor(
     private billingAccountProfileStateService: BillingAccountProfileStateService,
     private accountService: AccountService,
     private configService: ConfigService,
+    private organizationService: OrganizationService,
   ) {}
 
   async ngOnInit(): Promise<void> {
     const account = await firstValueFrom(this.accountService.activeAccount$);
+    this.keykeeperSeenByAdmins.set(
+      await firstValueFrom(confirmedMemberOfAny(this.organizationService, account.id)),
+    );
     const userHasPremium = await firstValueFrom(
       this.billingAccountProfileStateService.hasPremiumFromAnySource$(account.id),
     );

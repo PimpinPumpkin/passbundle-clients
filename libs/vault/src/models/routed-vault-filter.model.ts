@@ -20,6 +20,8 @@ const itemTypes = [
   "passport",
   "archive",
   "trash",
+  // Keykeeper: items expired or expiring within 30 days (DESIGN.md, "Expiration dates").
+  "expiring",
   All,
 ] as const;
 

@@ -86,7 +86,8 @@ describe("Keykeeper: imports never plant our own fields", () => {
   });
 
   it("KeePass 2: a string named like ours, protected or not", async () => {
-    const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    const escape = (s: string) =>
+      s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
     const xml = `<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <KeePassFile><Root><Group><Name>Database</Name><Entry>
   <String><Key>Title</Key><Value>Example Bank</Value></String>
@@ -124,10 +125,10 @@ describe("Keykeeper: imports never plant our own fields", () => {
       { fieldName: "keykeeper.template-definition", type: "text", data: { content: PLANTED_COPY } },
     );
 
-    expectDefused(await new ProtonPassJsonImporter(mock<I18nService>()).parse(JSON.stringify(data)), [
-      "keykeeper.fill",
-      "keykeeper.template-definition",
-    ]);
+    expectDefused(
+      await new ProtonPassJsonImporter(mock<I18nService>()).parse(JSON.stringify(data)),
+      ["keykeeper.fill", "keykeeper.template-definition"],
+    );
   });
 
   it("someone else's Bitwarden-format file, read as a browser's: nothing of ours comes in", async () => {
@@ -148,6 +149,7 @@ describe("Keykeeper: imports never plant our own fields", () => {
         bitwardenExport([
           { name: "keykeeper.fill", value: PLANTED_RULE, type: FieldType.Hidden },
           { name: "keykeeper.expires", value: "2027-01-31", type: FieldType.Text },
+          { name: "keykeeper.remind", value: " 7, 90 ", type: FieldType.Text },
           {
             name: "keykeeper.template",
             value: JSON.stringify({ id: "api-key", name: "API key", v: 1, extra: "x" }),
@@ -160,6 +162,8 @@ describe("Keykeeper: imports never plant our own fields", () => {
       expect(cipher.fields.map((f: FieldView) => [f.name, f.value])).toEqual([
         ["keykeeper.fill", PLANTED_RULE],
         ["keykeeper.expires", "2027-01-31"],
+        // Reminder days, rewritten as the editor stores them.
+        ["keykeeper.remind", "90,7"],
         ["keykeeper.template", JSON.stringify({ id: "api-key", name: "API key", v: 1 })],
       ]);
     });
@@ -188,10 +192,15 @@ describe("Keykeeper: imports never plant our own fields", () => {
           // A rule shown as text was never ours.
           { name: "keykeeper.fill", value: PLANTED_RULE, type: FieldType.Text },
           { name: "keykeeper.expires", value: "someday", type: FieldType.Text },
+          { name: "keykeeper.remind", value: "every day", type: FieldType.Text },
           { name: "keykeeper.surprise", value: "x", type: FieldType.Text },
           {
             name: "keykeeper.fill",
-            value: JSON.stringify({ v: 1, field: { id: "a" }, fill: { from: "field", name: "keykeeper.fill" } }),
+            value: JSON.stringify({
+              v: 1,
+              field: { id: "a" },
+              fill: { from: "field", name: "keykeeper.fill" },
+            }),
             type: FieldType.Hidden,
           },
         ]),
@@ -202,6 +211,7 @@ describe("Keykeeper: imports never plant our own fields", () => {
         "Imported keykeeper.fill",
         "Imported keykeeper.fill",
         "Imported keykeeper.expires",
+        "Imported keykeeper.remind",
         "Imported keykeeper.surprise",
         "Imported keykeeper.fill",
       ]);
