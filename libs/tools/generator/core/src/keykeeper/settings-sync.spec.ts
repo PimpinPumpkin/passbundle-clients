@@ -1,5 +1,5 @@
 import { mock } from "jest-mock-extended";
-import { BehaviorSubject, firstValueFrom, of, Subscription } from "rxjs";
+import { BehaviorSubject, firstValueFrom, map, of, Subscription } from "rxjs";
 
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { AuthService } from "@bitwarden/common/auth/abstractions/auth.service";
@@ -18,7 +18,8 @@ import { awaitAsync, FakeStateProvider, mockAccountServiceWith } from "../../../
 import { PREFERENCES } from "../providers/credential-preferences";
 import { PassphraseGenerationOptions, PasswordGeneratorSettings } from "../types";
 
-import { KeykeeperGeneratorSettingsSync } from "./settings-sync";
+import { KeykeeperGeneratorSettingsSync, KeykeeperSyncedPart } from "./settings-sync";
+import { settingsText } from "./synced-settings";
 
 const userId = "user" as UserId;
 const PASSWORD = new UserKeyDefinition<PasswordGeneratorSettings>(
@@ -58,7 +59,33 @@ describe("KeykeeperGeneratorSettingsSync", () => {
   let api: ApiService;
   let running: Subscription | undefined;
 
-  function sync(saveAfterMs = 5) {
+  /** Another part of the document, as the web vault's breach check switch is: on, off, or never set. */
+  let switchHere: BehaviorSubject<boolean | null>;
+  const healthPart: KeykeeperSyncedPart = {
+    name: "health",
+    here$: () =>
+      switchHere.pipe(
+        map((on) => ({ value: { checkAfterUnlock: on !== false }, chosen: on != null })),
+      ),
+    take: async (_userId, part, seen) => {
+      const remote = (part as { checkAfterUnlock?: unknown } | undefined)?.checkAfterUnlock;
+      const current = switchHere.value;
+      if (typeof remote !== "boolean" || (current != null && (current !== false) === remote)) {
+        return true;
+      }
+      if (
+        current != null &&
+        seen !== undefined &&
+        settingsText({ checkAfterUnlock: current !== false }) !== seen
+      ) {
+        return false;
+      }
+      switchHere.next(remote);
+      return true;
+    },
+  };
+
+  function sync(saveAfterMs = 5, parts: KeykeeperSyncedPart[] = []) {
     const accountService = mockAccountServiceWith(userId);
     state ??= new FakeStateProvider(accountService);
     const syncService = mock<SyncService>({ lastSync$: () => lastSync });
@@ -77,6 +104,7 @@ describe("KeykeeperGeneratorSettingsSync", () => {
       mock<LogService>(),
       saveAfterMs,
       1,
+      parts,
     );
   }
 
@@ -86,6 +114,7 @@ describe("KeykeeperGeneratorSettingsSync", () => {
     state.getUser(userId, PASSWORD).update(() => settings);
 
   beforeEach(() => {
+    switchHere = new BehaviorSubject<boolean | null>(null);
     state = undefined!;
     lastSync = new BehaviorSubject<Date | null>(new Date(1000));
     server = { data: null };
@@ -329,6 +358,117 @@ describe("KeykeeperGeneratorSettingsSync", () => {
     expect((await password()).length).toBe(40);
     expect(puts).toHaveLength(1);
     expect(puts[0]).toMatchObject({ generator: { length: 40 } });
+  });
+
+  describe("another part, synced on its own (the breach check's switch)", () => {
+    it("takes the server's, then saves a change made here, keeping the generator's settings", async () => {
+      server.data = sealed({
+        rev: 100,
+        generator: { length: 24 },
+        health: { checkAfterUnlock: false },
+      });
+      running = sync(5, [healthPart]).start();
+      await awaitAsync(30);
+
+      expect(switchHere.value).toBe(false);
+      expect(puts).toEqual([]);
+
+      switchHere.next(true);
+      await awaitAsync(30);
+
+      expect(puts).toHaveLength(1);
+      expect(puts[0]).toMatchObject({
+        generator: { length: 24 },
+        health: { checkAfterUnlock: true },
+      });
+      expect((puts[0] as { rev: number }).rev).toBeGreaterThan(100);
+    });
+
+    it("sends a change made here before the sync without undoing another device's generator settings", async () => {
+      server.data = sealed({
+        rev: 100,
+        generator: { length: 24 },
+        health: { checkAfterUnlock: true },
+      });
+      running = sync(10_000, [healthPart]).start();
+      await awaitAsync(30);
+      running.unsubscribe();
+
+      // Turned off here while the vault was locked; meanwhile another device
+      // changed the generator's length.
+      switchHere.next(false);
+      server.data = sealed({
+        rev: 200,
+        generator: { length: 64 },
+        health: { checkAfterUnlock: true },
+      });
+      running = sync(10_000, [healthPart]).start();
+      await awaitAsync(30);
+
+      expect((await password()).length).toBe(64);
+      expect(switchHere.value).toBe(false);
+      expect(puts).toHaveLength(1);
+      expect(puts[0]).toMatchObject({
+        generator: { length: 64 },
+        health: { checkAfterUnlock: false },
+      });
+    });
+
+    it("takes another device's change to it at the next sync, and sends nothing back", async () => {
+      server.data = sealed({
+        rev: 100,
+        generator: { length: 24 },
+        health: { checkAfterUnlock: true },
+      });
+      switchHere.next(true);
+      running = sync(5, [healthPart]).start();
+      await awaitAsync(30);
+      const before = puts.length;
+
+      // Saved after this device's own save, so numbered after it.
+      server.data = sealed({
+        rev: Date.now() + 60_000,
+        generator: { length: 24 },
+        health: { checkAfterUnlock: false },
+      });
+      lastSync.next(new Date(2000));
+      await awaitAsync(30);
+
+      expect(switchHere.value).toBe(false);
+      expect(puts.length).toBe(before);
+    });
+
+    it("gives a server without it this device's switch, set here before syncing ever was", async () => {
+      server.data = sealed({ rev: 100, generator: { length: 24 } });
+      switchHere.next(false);
+      running = sync(5, [healthPart]).start();
+      await awaitAsync(30);
+
+      expect(puts).toHaveLength(1);
+      expect(puts[0]).toMatchObject({
+        generator: { length: 24 },
+        health: { checkAfterUnlock: false },
+      });
+    });
+
+    it("leaves a part it doesn't know alone, as the extension does with the switch", async () => {
+      server.data = sealed({
+        rev: 100,
+        generator: { length: 24 },
+        health: { checkAfterUnlock: false },
+      });
+      running = sync().start();
+      await awaitAsync(30);
+
+      await setPassword({ ...(await password()), length: 40 });
+      await awaitAsync(30);
+
+      expect(puts).toHaveLength(1);
+      expect(puts[0]).toMatchObject({
+        generator: { length: 40 },
+        health: { checkAfterUnlock: false },
+      });
+    });
   });
 
   it("writes nothing from a read still running when the app locks", async () => {
