@@ -449,7 +449,7 @@ const routes: Routes = [
             key: "twoStepLogin",
           },
           titleId: "twoStepLogin",
-          pageIcon: TwoFactorAuthSecurityKeyIcon,
+          pageIcon: SecurityKeyIcon,
         } satisfies RouteDataProperties & AnonLayoutWrapperData,
         children: [
           {

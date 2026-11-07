@@ -422,7 +422,7 @@ draw(
   pad(38, 40, 34) + envelope(6, 28, 64, 40) + sparkle(66, 14, 0.7),
 );
 draw(
-  "TwoFactorAuthEmailIcon",
+  "EmailCodeSentIcon",
   "3.33 0.46 73.33 76.8",
   pad(36, 40, 33) + envelope(4, 28, 64, 40, { code: true }),
 );
@@ -465,7 +465,7 @@ draw(
     rect(61, 17, 5, 2, 1, C.ink),
 );
 draw(
-  "TwoFactorAuthSecurityKeyIcon",
+  "SecurityKeyIcon",
   "3.33 10 71.27 66.67",
   padRect(2, 2, 68, 62) +
     rect(24, 8, 22, 12, 3, C.mint) +
@@ -474,7 +474,7 @@ draw(
     rect(29, 52, 12, 3, 1.5, C.white, op(0.7)),
 );
 draw(
-  "TwoFactorAuthSecurityKeyFailedIcon",
+  "SecurityKeyWarningIcon",
   "4.72 12.85 92 80",
   padRect(4, 2, 84, 74) +
     rect(30, 10, 22, 12, 3, C.mint) +
@@ -491,7 +491,7 @@ draw(
     key(52, 56, 0.6, C.amber, -30),
 );
 draw(
-  "TwoFactorTimeoutIcon",
+  "ExpiredIcon",
   "5 4 87 87",
   pad(43, 44, 38) + clock(42, 44, 24) + badge(66, 22, 10, "x", C.ink),
 );
