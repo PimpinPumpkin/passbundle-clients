@@ -10,8 +10,10 @@ import { KeykeeperMspApiService } from "../msp/msp-api.service";
  * on a server that sends no email, which joined them without asking, where
  * the organization requires two-step login for it. Two-step login for admins
  * doesn't count the role until they accept it here; accepting without a
- * method that counts signs them out, to set one up as they sign in again.
- * Nothing shows otherwise. See DESIGN.md, "Two-step login for admins".
+ * method that counts signs them out, to set one up as they sign in again. A
+ * role they held before the organization required it is revoked until they
+ * accept it, and accepting restores it. Nothing shows otherwise. See
+ * DESIGN.md, "Two-step login for admins".
  */
 @Component({
   selector: "app-keykeeper-accept-role",
@@ -26,9 +28,15 @@ import { KeykeeperMspApiService } from "../msp/msp-api.service";
         data-testid="accept-role"
       >
         <p class="tw-mb-2">
-          {{ role.name }} made you {{ roleWords(role) }}, which requires two-step login. Accept the
-          role to take it on. If you haven't set up two-step login, accepting signs you out, and you
-          set it up as you sign in again.
+          @if (role.revoked) {
+            {{ role.name }} made you {{ roleWords(role) }}, and your access there is on hold until
+            you accept the role. Accepting gives it back. If the role requires two-step login and
+            you haven't set it up, accepting signs you out, and you set it up as you sign in again.
+          } @else {
+            {{ role.name }} made you {{ roleWords(role) }}, which requires two-step login. Accept
+            the role to take it on. If you haven't set up two-step login, accepting signs you out,
+            and you set it up as you sign in again.
+          }
         </p>
         <button
           bitButton
@@ -68,7 +76,7 @@ export class KeykeeperAcceptRoleComponent implements OnInit {
   protected async accept(role: UnacceptedRole) {
     this.busy.set(true);
     try {
-      await this.api.acceptRole(role.organizationId);
+      await this.api.acceptRole(role);
       this.roles.update((all) => all.filter((r) => r.organizationId !== role.organizationId));
       this.toastService.showToast({
         variant: "success",

@@ -297,8 +297,15 @@ export const SHARED_UNLOCK_DISK = new StateDefinition("sharedUnlock", "disk");
 
 /** Which expiry reminders the extension already showed, per account. */
 export const KEYKEEPER_REMINDERS_DISK = new StateDefinition("keykeeperReminders", "disk");
-/** How many people an app let into each organization on its own today, per account. */
-export const KEYKEEPER_JOINS_DISK = new StateDefinition("keykeeperJoins", "disk");
+/**
+ * How many people an app let into each organization on its own today, the
+ * seals it let them in on, and the newest joining seal it has seen for each
+ * organization, per account. In the web vault in localStorage, so closing
+ * the tab doesn't forget them (DESIGN.md, "Joins a hacked server can't forge").
+ */
+export const KEYKEEPER_JOINS_DISK = new StateDefinition("keykeeperJoins", "disk", {
+  web: "disk-local",
+});
 /** Whether someone shares site fixes, and the fixes that apply on their server. */
 export const KEYKEEPER_SITE_FIXES_DISK = new StateDefinition("keykeeperSiteFixes", "disk");
 /**

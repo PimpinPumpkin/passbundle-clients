@@ -20,6 +20,7 @@ import {
   DefaultPolicyResult,
   InvitationInfo,
   Joining,
+  joiningSealedAt,
   KeykeeperJoinSeals,
   KeykeeperMspRequests,
   MspDetails,
@@ -203,7 +204,15 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     return {
       client: mspId == null ? undefined : await seals.clientSeal(joinKey, orgId, mspId),
       // It follows the default: its MSP's, or the server's outside an MSP.
-      joining: await seals.joiningSeal(joinKey, orgId, autoConfirm, [], "default"),
+      // Nothing has been seen for a new organization, so it's sealed now.
+      joining: await seals.joiningSeal(
+        joinKey,
+        orgId,
+        autoConfirm,
+        [],
+        "default",
+        joiningSealedAt(new Date(), null),
+      ),
       secret: withSecret
         ? (await this.encryptService.encryptString(seals.newJoinSecret(), key)).encryptedString
         : undefined,
@@ -226,7 +235,9 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
       reported(current),
       "own",
     );
-    return super.setOrgJoining(orgId, joining, seal);
+    const saved = await super.setOrgJoining(orgId, joining, seal);
+    await this.sealer.remember({ [orgId]: seal });
+    return saved;
   }
 
   /**
@@ -248,7 +259,9 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
       throw new Error("The default changed since this page loaded. Reload and try again.");
     }
     const seal = await this.sealer.resealJoining(orgId, seenDefault, reported(current), "default");
-    return super.resetOrgJoining(orgId, seal);
+    const saved = await super.resetOrgJoining(orgId, seal);
+    await this.sealer.remember({ [orgId]: seal });
+    return saved;
   }
 
   /**
@@ -294,7 +307,9 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
         seals[client.organizationId] = seal;
       }
     }
-    return super.setMspJoining(mspId, joining, seals);
+    const saved = await super.setMspJoining(mspId, joining, seals);
+    await this.sealer.remember(seals);
+    return saved;
   }
 
   async create(name: string): Promise<MspSummary> {
@@ -357,6 +372,7 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
       joining: [{ organizationId: created.id, seal: sealed.joining }],
       secrets: [{ organizationId: created.id, secret: sealed.secret! }],
     });
+    await this.sealer.remember({ [created.id]: sealed.joining });
     return created.id;
   }
 
@@ -407,6 +423,7 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
       true,
       false,
     );
+    await this.sealer.remember({ [created.id]: sealed.joining });
     return created.id;
   }
 
@@ -450,13 +467,16 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
 
   /** Limits a company's own install command to accounts at these email domains; none lets anyone join. */
   async setOrgEnrollmentDomains(orgId: string, domains: string[]): Promise<ClientEnrollment> {
-    return this.apiService.send(
+    const seal = await this.domainsSeal(orgId, domains);
+    const saved = await this.apiService.send(
       "PUT",
       `/keykeeper/organizations/${orgId}/enrollment/domains`,
-      { domains, seal: await this.domainsSeal(orgId, domains) },
+      { domains, seal },
       true,
       true,
     );
+    await this.sealer.remember({ [orgId]: seal });
+    return saved;
   }
 
   /** The seal for an organization's new email domains, as the server will keep them. */
@@ -590,15 +610,22 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     return (listed?.data ?? []) as UnacceptedRole[];
   }
 
-  /** Accepts a role the server joined the caller to without asking. */
-  async acceptRole(orgId: string): Promise<void> {
+  /**
+   * Accepts a role the server joined the caller to without asking. One that
+   * was revoked until they accept it comes back, so the vault syncs to show
+   * the organization again (unless accepting signed them out).
+   */
+  async acceptRole(role: UnacceptedRole): Promise<void> {
     await this.apiService.send(
       "POST",
-      `/keykeeper/organizations/${orgId}/accept`,
+      `/keykeeper/organizations/${role.organizationId}/accept`,
       null,
       true,
       true,
     );
+    if (role.revoked) {
+      await this.syncService.fullSync(true).catch((): boolean => false);
+    }
   }
 
   /** The MSP's two-step login: its staff, and each client's own admins. */
@@ -772,13 +799,16 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     orgId: string,
     domains: string[],
   ): Promise<ClientEnrollment> {
-    return this.apiService.send(
+    const seal = await this.domainsSeal(orgId, domains);
+    const saved = await this.apiService.send(
       "PUT",
       `/keykeeper/msp/${mspId}/clients/${orgId}/enrollment/domains`,
-      { domains, seal: await this.domainsSeal(orgId, domains) },
+      { domains, seal },
       true,
       true,
     );
+    await this.sealer.remember({ [orgId]: seal });
+    return saved;
   }
 
   /** For a client's owners and admins: the MSP that manages the organization, and its staff there. */

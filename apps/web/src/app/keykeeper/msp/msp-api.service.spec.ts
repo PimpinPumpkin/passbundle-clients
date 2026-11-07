@@ -3,12 +3,19 @@ import { webcrypto } from "node:crypto";
 import { mock } from "jest-mock-extended";
 import { BehaviorSubject } from "rxjs";
 
-import { KeykeeperJoinSeals, MspDetails, MspJoining } from "@bitwarden/admin-console/common";
+import {
+  KeykeeperJoiningMemory,
+  KeykeeperJoinSeals,
+  MspDetails,
+  MspJoining,
+  parseJoiningSeal,
+} from "@bitwarden/admin-console/common";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { SyncService } from "@bitwarden/common/platform/sync";
-import { OrganizationId } from "@bitwarden/common/types/guid";
+import { FakeStateProvider, mockAccountServiceWith } from "@bitwarden/common/spec";
+import { OrganizationId, UserId } from "@bitwarden/common/types/guid";
 import { OrgKey } from "@bitwarden/common/types/key";
 import { KeyService } from "@bitwarden/key-management";
 // eslint-disable-next-line no-restricted-imports
@@ -42,12 +49,27 @@ const keys: Record<string, OrgKey> = { [DENTAL]: keyOf(1), [LAW]: keyOf(2), [FAM
 const joinKey = (org: string) => seals.joinKey(keys[org].toEncoded());
 
 const clientSeal = async (org: string) => seals.clientSeal(await joinKey(org), org, MSP);
+/** When the seals in the server's answers were made: a while before these tests run. */
+const SEALED = 1_793_059_200;
 const joiningSeal = async (
   org: string,
   autoConfirm: boolean,
   domains: string[] = [],
   source: "own" | "default" = "default",
-) => seals.joiningSeal(await joinKey(org), org, autoConfirm, domains, source);
+  sealedAt = SEALED,
+) => seals.joiningSeal(await joinKey(org), org, autoConfirm, domains, source, sealedAt);
+/** Whether a joining seal the browser made says this, from this source, and when it was sealed. */
+const says = async (
+  seal: string | undefined,
+  org: string,
+  autoConfirm: boolean,
+  domains: string[] = [],
+  source: "own" | "default" = "default",
+) =>
+  seal != null &&
+  seals.checkJoiningSeal(seal, await joinKey(org), org, autoConfirm, domains, source);
+const sealedAt = (seal: string | undefined) => parseJoiningSeal(seal)?.sealedAt;
+const now = () => Math.floor(Date.now() / 1000);
 
 const client = (id: string, seal: string | null) => ({
   id,
@@ -79,6 +101,7 @@ function setUp(msp: MspDetails, mspJoining?: MspJoining) {
     return {};
   });
   const accountService = { activeAccount$: new BehaviorSubject({ id: "admin" }) } as any;
+  const stateProvider = new FakeStateProvider(mockAccountServiceWith("admin" as UserId));
   const keyService = mock<KeyService>();
   keyService.orgKeys$.mockReturnValue(
     new BehaviorSubject(keys as Record<OrganizationId, OrgKey>) as any,
@@ -89,10 +112,12 @@ function setUp(msp: MspDetails, mspJoining?: MspJoining) {
     mock<EncryptService>(),
     mock<CryptoFunctionService>(),
     apiService,
+    stateProvider,
     mock<LegacyCompatKeyService>(),
   );
   // The sealer's own seals use the browser's crypto; these use Node's, which is the same.
   (sealer as any).seals = seals;
+  const memory = new KeykeeperJoiningMemory(stateProvider, seals);
   const api = new KeykeeperMspApiService(
     apiService,
     accountService as AccountService,
@@ -102,7 +127,7 @@ function setUp(msp: MspDetails, mspJoining?: MspJoining) {
     mock<SyncService>(),
     sealer,
   );
-  return { api, sent };
+  return { api, sent, memory };
 }
 
 const mspWith = async (...clients: ReturnType<typeof client>[]): Promise<MspDetails> => ({
@@ -213,7 +238,56 @@ describe("Saving the MSP's default for how people join", () => {
 
     const body = joiningPut(sent);
     expect(Object.keys(body.seals)).toEqual([DENTAL]);
-    expect(body.seals[DENTAL]).toBe(await joiningSeal(DENTAL, true, ["acme.example"]));
+    expect(await says(body.seals[DENTAL], DENTAL, true, ["acme.example"])).toBe(true);
+    expect(sealedAt(body.seals[DENTAL])).toBeGreaterThanOrEqual(now() - 5);
+  });
+
+  it("never reseals a client on an older seal than this browser has seen for it", async () => {
+    const msp = await mspWith(client(DENTAL, await clientSeal(DENTAL)));
+    // Dental followed a default of approval, then chose approval as its own
+    // setting; the server shows the older seal again, as following.
+    const seen = { autoConfirm: false, inviteHours: 120 };
+    const { api, sent, memory } = setUp(msp, {
+      default: seen,
+      ownSettings: [],
+      following: [{ organizationId: DENTAL, domains: [], seal: await joiningSeal(DENTAL, false) }],
+    });
+    await memory.remember(
+      "admin" as UserId,
+      DENTAL,
+      await joiningSeal(DENTAL, false, [], "own", SEALED + 60),
+    );
+
+    await api.saveMspJoining(MSP, { autoConfirm: true, inviteHours: 120 }, seen);
+
+    expect(joiningPut(sent).seals).toEqual({});
+  });
+
+  it("seals just after the newest seal seen, and remembers what the server took", async () => {
+    const msp = await mspWith(client(DENTAL, await clientSeal(DENTAL)));
+    const seen = { autoConfirm: false, inviteHours: 120 };
+    // Sealed by a device whose clock runs an hour ahead of this one.
+    const ahead = now() + 3_600;
+    const { api, sent, memory } = setUp(msp, {
+      default: seen,
+      ownSettings: [],
+      following: [
+        {
+          organizationId: DENTAL,
+          domains: [],
+          seal: await joiningSeal(DENTAL, false, [], "default", ahead),
+        },
+      ],
+    });
+
+    await api.saveMspJoining(MSP, { autoConfirm: true, inviteHours: 120 }, seen);
+
+    const resealed = joiningPut(sent).seals[DENTAL];
+    expect(sealedAt(resealed)).toBe(ahead + 1);
+    expect((await memory.newest("admin" as UserId))[DENTAL]).toEqual({
+      sealedAt: ahead + 1,
+      nonce: parseJoiningSeal(resealed)!.nonce,
+    });
   });
 
   it("never reseals a client that chose approval when the server lists it as following", async () => {
@@ -293,18 +367,56 @@ describe("Use default", () => {
     const { api, sent } = withOrgJoining(true);
     await api.useDefaultJoining(DENTAL, true);
     const reset = sent.find((s) => s.method === "DELETE")!;
-    expect(reset.body.seal).toBe(await joiningSeal(DENTAL, true));
+    expect(await says(reset.body.seal, DENTAL, true)).toBe(true);
+    expect(sealedAt(reset.body.seal)).toBeGreaterThan(SEALED);
   });
 
   it("seals the organization's own setting as its own, and new domains as the old seal says", async () => {
     const { api, sent } = withOrgJoining(true);
     await api.setOrgJoining(DENTAL, { autoConfirm: true, inviteHours: 120 });
     const own = sent.find((s) => s.method === "PUT" && s.path.endsWith("/joining"))!;
-    expect(own.body.seal).toBe(await joiningSeal(DENTAL, true, [], "own"));
+    expect(await says(own.body.seal, DENTAL, true, [], "own")).toBe(true);
 
     await api.setOrgEnrollmentDomains(DENTAL, ["acme.example"]);
     const domains = sent.find((s) => s.path.endsWith("/enrollment/domains"))!;
-    expect(domains.body.seal).toBe(await joiningSeal(DENTAL, false, ["acme.example"], "own"));
+    expect(await says(domains.body.seal, DENTAL, false, ["acme.example"], "own")).toBe(true);
+    // Each change is sealed after the one before it, on this device.
+    expect(sealedAt(domains.body.seal)).toBeGreaterThan(sealedAt(own.body.seal)!);
+  });
+
+  it("keeps nothing from an older setting than this browser has seen", async () => {
+    // The server shows Dental's older setting, letting people in with domains,
+    // after this browser saw it choose approval.
+    const { api, sent, memory } = setUp({ clients: [] } as unknown as MspDetails);
+    const send = (api as any).apiService.send as jest.Mock;
+    const original = send.getMockImplementation()!;
+    send.mockImplementation(async (method: string, path: string, body: any) =>
+      method === "GET" && path === `/keykeeper/organizations/${DENTAL}/joining`
+        ? {
+            autoConfirm: true,
+            inviteHours: 120,
+            source: "own",
+            default: { autoConfirm: true, inviteHours: 120 },
+            domains: ["acme.example"],
+            seal: await joiningSeal(DENTAL, true, ["acme.example"], "own"),
+          }
+        : original(method, path, body),
+    );
+    await memory.remember(
+      "admin" as UserId,
+      DENTAL,
+      await joiningSeal(DENTAL, false, [], "own", SEALED + 60),
+    );
+
+    await api.setOrgJoining(DENTAL, { autoConfirm: true, inviteHours: 120 });
+    const own = sent.find((s) => s.method === "PUT" && s.path.endsWith("/joining"))!;
+    // The domains aren't kept: the older seal doesn't vouch for them.
+    expect(await says(own.body.seal, DENTAL, true, [], "own")).toBe(true);
+
+    await api.setOrgEnrollmentDomains(DENTAL, ["contoso.example"]);
+    const domains = sent.find((s) => s.path.endsWith("/enrollment/domains"))!;
+    // Nor "let people in": the new domains are sealed with approval.
+    expect(await says(domains.body.seal, DENTAL, false, ["contoso.example"], "own")).toBe(true);
   });
 
   it("changes nothing when the server's default isn't the one the person saw", async () => {

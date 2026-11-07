@@ -4,12 +4,15 @@ import { firstValueFrom } from "rxjs";
 import {
   joiningSealSource,
   JoiningSource,
+  KeykeeperJoiningMemory,
   KeykeeperJoinSeals,
+  ReportedJoining,
 } from "@bitwarden/admin-console/common";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
-import { OrganizationId } from "@bitwarden/common/types/guid";
+import { StateProvider } from "@bitwarden/common/platform/state";
+import { OrganizationId, UserId } from "@bitwarden/common/types/guid";
 import { OrgKey } from "@bitwarden/common/types/key";
 import { KeyService } from "@bitwarden/key-management";
 // eslint-disable-next-line no-restricted-imports
@@ -20,8 +23,7 @@ import {
   LegacyCompatKeyService,
 } from "@bitwarden/legacy-crypto";
 
-/** An organization's joining setting as the server reports it, with its seal. */
-export type ReportedJoining = { autoConfirm: boolean; domains: string[]; seal: string | null };
+export type { ReportedJoining };
 
 /**
  * Keykeeper: the seals and join secrets an owner's or admin's browser makes
@@ -29,8 +31,10 @@ export type ReportedJoining = { autoConfirm: boolean; domains: string[]; seal: s
  * command, so other apps can let people in on their own without trusting
  * the server. Made only on these actions, never from what the server lists
  * on its own, and for an MSP's clients only in those whose client seal
- * checks out (`trustedClients`). See DESIGN.md, "Joins a hacked server can't
- * forge".
+ * checks out (`trustedClients`). A joining seal is checked against, and
+ * sealed after, the newest this device has seen for the organization
+ * (KeykeeperJoiningMemory), so a change never builds on an older setting the
+ * server shows again. See DESIGN.md, "Joins a hacked server can't forge".
  */
 @Injectable({ providedIn: "root" })
 export class KeykeeperJoinSealer {
@@ -42,13 +46,22 @@ export class KeykeeperJoinSealer {
     private readonly encryptService: EncryptService,
     private readonly cryptoFunctionService: CryptoFunctionService,
     private readonly apiService: ApiService,
+    private readonly stateProvider: StateProvider,
     private readonly legacyCompatKeyService: LegacyCompatKeyService,
   ) {}
 
+  /** The newest joining seal this device has seen for each organization. */
+  private get memory(): KeykeeperJoiningMemory {
+    return new KeykeeperJoiningMemory(this.stateProvider, this.seals);
+  }
+
+  private userId(): Promise<UserId> {
+    return firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
+  }
+
   /** The organization's key, if this person holds it. */
   private async orgKey(organizationId: string): Promise<OrgKey | null> {
-    const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
-    const keys = await firstValueFrom(this.keyService.orgKeys$(userId));
+    const keys = await firstValueFrom(this.keyService.orgKeys$(await this.userId()));
     return keys?.[organizationId as OrganizationId] ?? null;
   }
 
@@ -119,19 +132,36 @@ export class KeykeeperJoinSealer {
 
   /**
    * The seal for a joining setting with these domains, from this source (the
-   * organization's own setting, or a default it follows). Without the
-   * organization's key, none: joins then wait for approval.
+   * organization's own setting, or a default it follows), sealed now or just
+   * after the newest seal this device has seen for the organization. Without
+   * the organization's key, none: joins then wait for approval. Once the
+   * server has taken it, `remember` it.
    */
   async joiningSeal(
     organizationId: string,
     autoConfirm: boolean,
-    domains: string[],
+    domains: readonly string[],
     source: JoiningSource,
   ): Promise<string | undefined> {
     const joinKey = await this.joinKey(organizationId);
-    return joinKey == null
-      ? undefined
-      : this.seals.joiningSeal(joinKey, organizationId, autoConfirm, domains, source);
+    if (joinKey == null) {
+      return undefined;
+    }
+    const sealedAt = await this.memory.sealedAt(await this.userId(), organizationId);
+    return this.seals.joiningSeal(joinKey, organizationId, autoConfirm, domains, source, sealedAt);
+  }
+
+  /**
+   * Remembers joining seals this browser made, by organization, once the
+   * server took them, so it never goes back to an older setting there.
+   */
+  async remember(seals: Record<string, string | null | undefined>): Promise<void> {
+    const userId = await this.userId();
+    for (const [organizationId, seal] of Object.entries(seals)) {
+      if (seal != null) {
+        await this.memory.remember(userId, organizationId, seal);
+      }
+    }
   }
 
   /**
@@ -168,7 +198,9 @@ export class KeykeeperJoinSealer {
 
   /**
    * Whether the reported setting, domains included, is what its seal says,
-   * and, with `source`, that the seal says it comes from there.
+   * with `source`, that the seal says it comes from there, and that it isn't
+   * older than the newest seal this device has seen for the organization
+   * (a newer one that checks out becomes the newest).
    */
   async vouches(
     organizationId: string,
@@ -179,14 +211,7 @@ export class KeykeeperJoinSealer {
     if (joinKey == null) {
       return false;
     }
-    return this.seals.checkJoiningSeal(
-      current.seal,
-      joinKey,
-      organizationId,
-      current.autoConfirm,
-      current.domains,
-      source,
-    );
+    return this.memory.vouches(await this.userId(), organizationId, joinKey, current, source);
   }
 
   /** A new join secret for an install command, encrypted with the organization's key. */

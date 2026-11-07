@@ -11,7 +11,8 @@ import { KeyService } from "@bitwarden/key-management";
 import { EncryptService, EncString, SymmetricCryptoKey } from "@bitwarden/legacy-crypto";
 
 import { KEYKEEPER_USED_SEALS, KeykeeperJoinChecks, MAX_ON_ITS_OWN_PER_DAY } from "./join-checks";
-import { KeykeeperJoinSeals, parseExpiringSeal } from "./join-seals";
+import { KeykeeperJoinSeals, parseExpiringSeal, parseJoiningSeal } from "./join-seals";
+import { KEYKEEPER_JOINING_SEEN, KeykeeperJoiningMemory } from "./joining-memory";
 import { PendingMember } from "./msp-types";
 
 const USER = "admin-user" as UserId;
@@ -44,11 +45,30 @@ function setUp() {
 
 const joinKey = () => seals.joinKey(orgKey.toEncoded());
 
-async function sealedJoining(autoConfirm = true, domains: string[] = []) {
+/**
+ * A joining setting as the server reports it, sealed when `sealedAt` says
+ * (by default, now). With one nonce, so the same setting sealed at the same
+ * time is the same seal, as the server would show it to every waiting person.
+ */
+async function sealedJoining(
+  autoConfirm = true,
+  domains: string[] = [],
+  sealedAt = Math.floor(NOW.getTime() / 1000),
+  source: "own" | "default" = "default",
+  org = ORG,
+) {
   return {
     autoConfirm,
     domains,
-    seal: await seals.joiningSeal(await joinKey(), ORG, autoConfirm, domains, "default"),
+    seal: await seals.joiningSeal(
+      await joinKey(),
+      org,
+      autoConfirm,
+      domains,
+      source,
+      sealedAt,
+      "AAAAAAAAAAAAAAAAAAAAAA",
+    ),
   };
 }
 
@@ -223,6 +243,111 @@ describe("Seals that end, and are used once", () => {
     const used = await firstValueFrom(stateProvider.getUser(USER, KEYKEEPER_USED_SEALS).state$);
     // Only ben's seal is still remembered: ana's ended after 14 days.
     expect(Object.keys(used ?? {})).toEqual([`${ORG}/${parseExpiringSeal(ben.inviteSeal)!.nonce}`]);
+  });
+});
+
+describe("An older joining setting than this device has seen", () => {
+  const at = (days: number) => Math.floor(NOW.getTime() / 1000) - 10 * 86_400 + days * 86_400;
+  const OTHER = "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e";
+  const listed = async (joining: Awaited<ReturnType<typeof sealedJoining>>, org = ORG) => ({
+    organizationId: org,
+    ...joining,
+    domains: [...joining.domains],
+  });
+
+  it("lets nobody in on the setting an organization had before it chose approval, once this device saw approval", async () => {
+    const { checks } = setUp();
+    const letIn = await sealedJoining(true, [], at(0));
+    const approval = await sealedJoining(false, [], at(1), "own");
+    const ana = await invited("ana@acmedental.example", { joining: letIn });
+    // Before this device sees anything newer, the older seal is all it has.
+    expect(emails(await checks.onItsOwn(USER, [ana], NOW))).toEqual(["ana@acmedental.example"]);
+    // Its background run sees the organization choose approval, with nobody waiting.
+    await checks.learnJoining(USER, [await listed(approval)]);
+    const ben = await invited("ben@acmedental.example", { joining: letIn });
+    expect(await checks.onItsOwn(USER, [ben], NOW)).toEqual([]);
+    // Letting people in again, sealed later, does.
+    const again = await sealedJoining(true, [], at(2), "own");
+    const cy = await invited("cy@acmedental.example", { joining: again });
+    expect(emails(await checks.onItsOwn(USER, [cy], NOW))).toEqual(["cy@acmedental.example"]);
+  });
+
+  it("learns the newer setting from a list of who's waiting too, even when it says approval", async () => {
+    const { checks } = setUp();
+    // The server says this person may be let in, but the newer seal says approval.
+    const approval = await invited("ana@acmedental.example", {
+      joining: await sealedJoining(false, [], at(1), "own"),
+    });
+    expect(await checks.onItsOwn(USER, [approval], NOW)).toEqual([]);
+    const ben = await invited("ben@acmedental.example", {
+      joining: await sealedJoining(true, [], at(0)),
+    });
+    expect(await checks.onItsOwn(USER, [ben], NOW)).toEqual([]);
+  });
+
+  it("never goes back to email domains the organization has since removed", async () => {
+    const { checks } = setUp();
+    const proof = await seals.joinProof(
+      SECRET,
+      ORG,
+      "user-frontdesk@acmedental.example",
+      Buffer.from(publicKey(1), "base64"),
+    );
+    await checks.learnJoining(USER, [await listed(await sealedJoining(true, [], at(1), "own"))]);
+    const join = waiting("frontdesk@acmedental.example", {
+      joining: await sealedJoining(true, ["acmedental.example"], at(0), "own"),
+      joinProof: proof,
+      enrollmentSecret: ENCRYPTED_SECRET,
+    });
+    expect(await checks.onItsOwn(USER, [join], NOW)).toEqual([]);
+  });
+
+  it("goes by a seal this device made, and remembers it past sign-out", async () => {
+    const { checks, stateProvider } = setUp();
+    const memory = new KeykeeperJoiningMemory(stateProvider, seals);
+    const approval = await sealedJoining(false, [], at(1), "own");
+    await memory.remember(USER, ORG, approval.seal);
+    expect(KEYKEEPER_JOINING_SEEN.clearOn).toEqual([]);
+    const ana = await invited("ana@acmedental.example", {
+      joining: await sealedJoining(true, [], at(0)),
+    });
+    expect(await checks.onItsOwn(USER, [ana], NOW)).toEqual([]);
+    // And seals the next change just after it, even if its clock is behind.
+    const behind = new Date((at(1) - 3_600) * 1000);
+    expect(await memory.sealedAt(USER, ORG, behind)).toBe(at(1) + 1);
+    expect(await memory.sealedAt(USER, ORG, NOW)).toBe(Math.floor(NOW.getTime() / 1000));
+  });
+
+  it("moves nothing on a seal that doesn't check out, or on another organization's", async () => {
+    const { checks, stateProvider, keyService } = setUp();
+    keyService.orgKeys$.mockReturnValue(
+      new BehaviorSubject({ [ORG]: orgKey, [OTHER]: orgKey } as Record<OrganizationId, OrgKey>),
+    );
+    // A seal from far ahead, for a setting it doesn't vouch for.
+    const later = await sealedJoining(false, [], at(30), "own");
+    await checks.learnJoining(USER, [{ ...(await listed(later)), autoConfirm: true }]);
+    // A newer seal, but for another organization.
+    await checks.learnJoining(USER, [
+      await listed(await sealedJoining(false, [], at(5), "own", OTHER), OTHER),
+    ]);
+    const seen = await firstValueFrom(stateProvider.getUser(USER, KEYKEEPER_JOINING_SEEN).state$);
+    expect(Object.keys(seen ?? {})).toEqual([OTHER]);
+    const ana = await invited("ana@acmedental.example", {
+      joining: await sealedJoining(true, [], at(0)),
+    });
+    expect(emails(await checks.onItsOwn(USER, [ana], NOW))).toEqual(["ana@acmedental.example"]);
+  });
+
+  it("keeps the newest, whatever order it sees them in", async () => {
+    const { checks, stateProvider } = setUp();
+    const newer = await sealedJoining(false, [], at(2), "own");
+    await checks.learnJoining(USER, [
+      await listed(newer),
+      await listed(await sealedJoining(true, [], at(1), "own")),
+    ]);
+    const seen = await firstValueFrom(stateProvider.getUser(USER, KEYKEEPER_JOINING_SEEN).state$);
+    const { sealedAt, nonce } = parseJoiningSeal(newer.seal)!;
+    expect(seen?.[ORG]).toEqual({ sealedAt, nonce });
   });
 });
 

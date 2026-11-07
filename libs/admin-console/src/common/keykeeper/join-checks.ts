@@ -2,9 +2,10 @@
 // trusting the server, and how many a day. The server says who is waiting and
 // with which public key; an app encrypts the organization's key to that key
 // only when something the server can't forge vouches for the person, and lets
-// someone in on an invitation's or staff member's seal only once. Also which
-// of the organizations the server calls an MSP's clients really are. See
-// DESIGN.md, "Joins a hacked server can't forge".
+// someone in on an invitation's or staff member's seal only once, and never
+// on an older joining setting than the newest it has seen (joining-memory.ts).
+// Also which of the organizations the server calls an MSP's clients really
+// are. See DESIGN.md, "Joins a hacked server can't forge".
 
 import { firstValueFrom } from "rxjs";
 
@@ -19,7 +20,8 @@ import { KeyService } from "@bitwarden/key-management";
 import { EncryptService, EncString, SymmetricCryptoKey } from "@bitwarden/legacy-crypto";
 
 import { KeykeeperJoinSeals, parseExpiringSeal } from "./join-seals";
-import { PendingMember } from "./msp-types";
+import { KeykeeperJoiningMemory } from "./joining-memory";
+import { OrganizationJoining, PendingMember } from "./msp-types";
 
 /** At most this many people a day per organization, on one device; past it, an admin confirms. */
 export const MAX_ON_ITS_OWN_PER_DAY = 20;
@@ -51,38 +53,41 @@ const seconds = (date: Date) => Math.floor(date.getTime() / 1000);
 const fromB64 = (value: string) => Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
 
 export class KeykeeperJoinChecks {
+  private readonly joiningMemory: KeykeeperJoiningMemory;
+
   constructor(
     private readonly keyService: KeyService,
     private readonly encryptService: EncryptService,
     private readonly stateProvider: StateProvider,
     private readonly seals = new KeykeeperJoinSeals(),
-  ) {}
+  ) {
+    this.joiningMemory = new KeykeeperJoiningMemory(stateProvider, seals);
+  }
 
   /**
    * Whether something the server can't forge vouches for letting this person
-   * in: the organization's joining setting must be sealed, with approval off,
-   * and then a staff seal for MSP staff, an invitation's seal, or, for an
-   * install command join with email domains set, a proof bound to this
-   * public key. Invitation and staff seals vouch only until they end.
+   * in: the organization's joining setting must be sealed, current on this
+   * device (not older than the newest joining seal it has seen there), with
+   * approval off, and then a staff seal for MSP staff, an invitation's seal,
+   * or, for an install command join with email domains set, a proof bound to
+   * this public key. Invitation and staff seals vouch only until they end.
    */
   async vouchedFor(
+    userId: UserId,
     p: PendingMember,
     organizationKey: SymmetricCryptoKey,
     now: Date = new Date(),
   ): Promise<boolean> {
     const joining = p.joining;
-    if (joining == null || !joining.autoConfirm) {
+    if (joining == null) {
       return false;
     }
     const joinKey = await this.seals.joinKey(organizationKey.toEncoded());
+    // Checked as the server reports it, so a newer seal is remembered even
+    // when it says approval; then it must let people in.
     if (
-      !(await this.seals.checkJoiningSeal(
-        joining.seal,
-        joinKey,
-        p.organizationId,
-        true,
-        joining.domains,
-      ))
+      !(await this.joiningMemory.vouches(userId, p.organizationId, joinKey, joining)) ||
+      !joining.autoConfirm
     ) {
       return false;
     }
@@ -138,7 +143,7 @@ export class KeykeeperJoinChecks {
         !p.autoConfirm ||
         key == null ||
         (seal != null && used[usedKey(p, seal.nonce)] != null) ||
-        !(await this.vouchedFor(p, key, now).catch(() => false))
+        !(await this.vouchedFor(userId, p, key, now).catch(() => false))
       ) {
         continue;
       }
@@ -153,6 +158,27 @@ export class KeykeeperJoinChecks {
       await state.update(() => counts);
     }
     return letIn;
+  }
+
+  /**
+   * Checks the joining setting the server reports for each organization
+   * this person holds the key of, whether or not anyone is waiting there,
+   * so this device remembers the newest seal of each and never goes back to
+   * an older one. Says nothing; a seal that doesn't check out is skipped.
+   */
+  async learnJoining(userId: UserId, organizations: OrganizationJoining[]): Promise<void> {
+    if (organizations.length === 0) {
+      return;
+    }
+    const organizationKeys = (await firstValueFrom(this.keyService.orgKeys$(userId))) ?? {};
+    for (const o of organizations) {
+      const key = organizationKeys[o.organizationId as OrganizationId];
+      if (key == null || o.seal == null) {
+        continue;
+      }
+      const joinKey = await this.seals.joinKey(key.toEncoded());
+      await this.joiningMemory.vouches(userId, o.organizationId, joinKey, o).catch(() => false);
+    }
   }
 
   /**
