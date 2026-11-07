@@ -164,15 +164,27 @@
             }
 
             @if (showLaunchButton() && CipherViewLikeUtils.canLaunch(cipher)) {
-              <!-- Keykeeper: shown with the row's pointer or focus on it, like More -->
+              <!-- Keykeeper: shown with the row's pointer or focus on it, like More.
+                   For a login it opens the website and fills that tab once (DESIGN.md, "Open and fill"). -->
               <bit-item-action data-keykeeper="row-more">
-                <button
-                  type="button"
-                  bitIconButton="bwi-external-link"
-                  size="small"
-                  (click)="launchCipher(cipher)"
-                  [label]="'launchWebsite' | i18n"
-                ></button>
+                @if (openAndFillUrl(cipher)) {
+                  <button
+                    type="button"
+                    bitIconButton="bwi-sign-in"
+                    size="small"
+                    data-keykeeper="open-and-fill"
+                    (click)="launchCipher(cipher)"
+                    [label]="'keykeeperOpenAndFillName' | i18n: cipher.name"
+                  ></button>
+                } @else {
+                  <button
+                    type="button"
+                    bitIconButton="bwi-external-link"
+                    size="small"
+                    (click)="launchCipher(cipher)"
+                    [label]="'launchWebsite' | i18n"
+                  ></button>
+                }
               </bit-item-action>
             }
             <app-item-copy-actions [cipher]="cipher"></app-item-copy-actions>

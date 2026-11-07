@@ -197,6 +197,7 @@ import {
 import {
   DefaultSshImportPromptService,
   DefaultVaultNavService,
+  KeykeeperOpenAndFillService,
   PasswordRepromptService,
   SshImportPromptService,
   VAULT_BASE_ROUTE,
@@ -257,6 +258,7 @@ import {
 } from "../../platform/system-notifications/browser-system-notification.service";
 import { fromChromeRuntimeMessaging } from "../../platform/utils/from-chrome-runtime-messaging";
 import { BrowserAutofillNudgeService } from "../../vault/popup/services/browser-autofill-nudge.service";
+import { BrowserOpenAndFillService } from "../../vault/popup/services/keykeeper-open-and-fill.service";
 import { Fido2UserVerificationService } from "../../vault/services/fido2-user-verification.service";
 import { ExtensionAnonLayoutWrapperDataService } from "../components/extension-anon-layout-wrapper/extension-anon-layout-wrapper-data.service";
 
@@ -833,6 +835,12 @@ const safeProviders: SafeProvider[] = [
     provide: SsoComponentService,
     useClass: ExtensionSsoComponentService,
     deps: [SyncService, AuthService, EnvironmentService, I18nServiceAbstraction, LogService],
+  }),
+  // Keykeeper: "Open and fill" for the item view's websites.
+  safeProvider({
+    provide: KeykeeperOpenAndFillService,
+    useClass: BrowserOpenAndFillService,
+    deps: [],
   }),
   safeProvider({
     provide: SshImportPromptService,
