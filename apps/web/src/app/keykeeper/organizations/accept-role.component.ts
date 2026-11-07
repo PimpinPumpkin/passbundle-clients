@@ -29,14 +29,14 @@ import { KeykeeperMspApiService } from "../msp/msp-api.service";
       >
         <p class="tw-mb-2">
           @if (role.revoked) {
-            {{ role.name }} made you {{ roleWords(role) }}, and now requires two-step login for it,
-            so your access there is on hold until you accept the role. Accepting gives it back.
+            {{ role.name }} made you {{ roleWords(role) }}, and your access there is on hold until
+            you accept the role. Accepting gives it back. If the role requires two-step login and
+            you haven't set it up, accepting signs you out, and you set it up as you sign in again.
           } @else {
             {{ role.name }} made you {{ roleWords(role) }}, which requires two-step login. Accept
-            the role to take it on.
+            the role to take it on. If you haven't set up two-step login, accepting signs you out,
+            and you set it up as you sign in again.
           }
-          If you haven't set up two-step login, accepting signs you out, and you set it up as you
-          sign in again.
         </p>
         <button
           bitButton
