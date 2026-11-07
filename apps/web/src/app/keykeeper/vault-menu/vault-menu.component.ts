@@ -97,7 +97,8 @@ export function isVaultUrl(router: Router): boolean {
  * did. It shows on every page of the user layout; off the vault's page,
  * picking an entry opens the vault with it. See DESIGN.md, "The left menu".
  */
-// FIXME(https://bitwarden.atlassian.net/browse/CL-764): Migrate to OnPush
+// Default change detection, as upstream's VaultFilterComponent it extends keeps
+// its state in plain fields, not signals, and OnPush wouldn't see them change.
 // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
 @Component({
   selector: "app-keykeeper-vault-menu",

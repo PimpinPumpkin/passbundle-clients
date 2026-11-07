@@ -21,6 +21,7 @@ import { PwnedPasswordsCancelledError } from "@bitwarden/common/dirt/keykeeper/p
 import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
+import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { PasswordStrengthServiceAbstraction } from "@bitwarden/common/tools/password-strength";
@@ -256,9 +257,14 @@ const CLIENT_FEATURES = {
                   <th bitCell title="Default policies, or how many policies are the client's own">
                     Policies
                   </th>
-                  <th bitCell>Members</th>
-                  <th bitCell>Waiting</th>
-                  <th bitCell>Invited</th>
+                  <th bitCell title="People who joined and are confirmed">Members</th>
+                  <th
+                    bitCell
+                    title="People who joined and are waiting for an owner or admin to confirm them"
+                  >
+                    Waiting
+                  </th>
+                  <th bitCell title="People invited who haven't joined yet">Invited</th>
                   <th bitCell title="Expired, or expiring within 30 days">Expiring</th>
                   <th bitCell title="Passwords with a strength of 2 or less out of 4">Weak</th>
                   <th bitCell title="Passwords used by more than one login">Reused</th>
@@ -1324,14 +1330,15 @@ export class KeykeeperMspComponent implements OnInit {
 
   protected readonly noConsoleHelp = noConsoleHelp;
 
+  /** The product's name, from brand.json (the brand step puts it in the messages). */
+  private readonly productName = inject(I18nService).t("keykeeperProductName");
+
   /** What each of a client's actions does: its tooltip, and its description for screen readers. */
   protected readonly clientActions = {
     console: "Opens this client's admin console, with its members, policies, and settings.",
-    install:
-      "Shows the one-line command your RMM runs on this client's computers to install PassBundle and join their people to this client.",
+    install: `Shows the one-line command your RMM runs on this client's computers to install ${this.productName} and join their people to this client.`,
     sync: "Opens this client's page for syncing its people from Microsoft Entra ID (SCIM).",
-    confirm:
-      "Confirms this organization is your client, so PassBundle copies your templates there and vouches for your staff joining it.",
+    confirm: `Confirms this organization is your client, so ${this.productName} copies your templates there and vouches for your staff joining it.`,
   } as const;
 
   /** Into a client's admin console: Members for owners and admins, otherwise wherever their role starts. */
@@ -1349,7 +1356,7 @@ export class KeykeeperMspComponent implements OnInit {
       await this.mspApi.cancelInvite(msp.id, invite.id);
       this.lastInvite.set(null);
       await this.reload(msp.id);
-      this.toast(`Cancelled the invitation for ${invite.email}`);
+      this.toast(`Canceled the invitation for ${invite.email}`);
     });
   }
 
@@ -1487,7 +1494,7 @@ export class KeykeeperMspComponent implements OnInit {
     }
     const confirmed = await this.dialogService.openSimpleDialog({
       title: `Is ${client.name} your client?`,
-      content: `Confirm only an organization ${msp.name} manages. Until a client is confirmed, PassBundle doesn't copy your templates there or vouch for your staff joining it, so a hacked server can't point that work at another organization you belong to.`,
+      content: `Confirm only an organization ${msp.name} manages. Until a client is confirmed, ${this.productName} doesn't copy your templates there or vouch for your staff joining it, so a hacked server can't point that work at another organization you belong to.`,
       acceptButtonText: "Confirm client",
       type: "warning",
     });

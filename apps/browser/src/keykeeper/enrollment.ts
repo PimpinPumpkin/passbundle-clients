@@ -225,14 +225,14 @@ function otherServerProblem(
     return {
       title: "Couldn't join your organization",
       message:
-        "Your IT's install command doesn't say which server it's for, so this browser can't join you to your organization. Ask your IT to run it again with the server's address.",
+        "Your IT admin's install command doesn't say which server it's for, so this browser can't join you to your organization. Ask your IT admin to run it again with the server's address.",
     };
   }
   const host = new URL(server).host;
   const yours = signedInTo == null ? "another server" : new URL(signedInTo).host;
   return {
     title: `Sign in to ${host} to join your organization`,
-    message: `Your IT set up this browser for ${host}, but you're signed in to ${yours}. To join your organization, sign in to ${host} instead.`,
+    message: `Your IT admin set up this browser for ${host}, but you're signed in to ${yours}. To join your organization, sign in to ${host} instead.`,
   };
 }
 
@@ -365,12 +365,12 @@ export class KeykeeperEnrollment {
             : await this.seals.fingerprint(Utils.fromB64ToArray(info.publicKey));
         if (fingerprint !== parts.orgKey) {
           throw new Error(
-            `${info.organizationName}'s key isn't the one your IT's install command names. Ask your IT before joining.`,
+            `${info.organizationName}'s key isn't the one your IT admin's install command names. Ask your IT admin before joining.`,
           );
         }
       } else if (info.accountRecovery) {
         throw new Error(
-          `Joining ${info.organizationName} needs a newer install command. Ask your IT to run it again.`,
+          `Joining ${info.organizationName} needs a newer install command. Ask your IT admin to run it again.`,
         );
       }
       const organizations = await firstValueFrom(this.organizationService.organizations$(userId));

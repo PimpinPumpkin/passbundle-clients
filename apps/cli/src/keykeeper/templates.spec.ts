@@ -1,5 +1,3 @@
-// FIXME: Update this file to be type safe and remove this and next line
-// @ts-strict-ignore
 // Keykeeper: see templates.ts.
 import { CipherType, FieldType } from "@bitwarden/common/vault/enums";
 import {
@@ -19,7 +17,8 @@ function customTemplate(name: string, organizationId: string | null, viewPasswor
   item.id = `${name}-item`;
   item.type = CipherType.SecureNote;
   item.name = name;
-  item.organizationId = organizationId;
+  // Null for a personal item, as the server sends it.
+  item.organizationId = organizationId as string | undefined;
   item.viewPassword = viewPassword;
   item.fields = [
     Object.assign(new FieldView(), { name: "Hostname", type: FieldType.Text, value: "" }),
@@ -83,7 +82,7 @@ describe("item templates in the command-line tool", () => {
     expect(item.type).toBe(CipherType.Login);
     expect(item.name).toBe("Workstation");
     expect(item.organizationId).toBeUndefined();
-    expect(item.fields.map((f) => [f.name, f.type, f.value])).toEqual([
+    expect(item.fields!.map((f) => [f.name, f.type, f.value])).toEqual([
       ["Hostname", FieldType.Text, ""],
       ["Local admin password", FieldType.Hidden, "default-secret"],
       [TEMPLATE_FIELD_NAME, FieldType.Text, expect.stringContaining('"id":"workstation-id"')],
@@ -102,7 +101,7 @@ describe("item templates in the command-line tool", () => {
     const item = itemFromTemplate((findTemplate(listed, "api-key") as any).template);
     expect(item.type).toBe(CipherType.SecureNote);
     expect(item.secureNote).toBeDefined();
-    expect(item.fields.map((f) => f.name)).toEqual([
+    expect(item.fields!.map((f) => f.name)).toEqual([
       "Key",
       "Secret",
       "Service URL",
