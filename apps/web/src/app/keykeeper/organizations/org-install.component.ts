@@ -37,11 +37,6 @@ type InstallState =
             {{ s.provider }} manages this organization's install command, in their MSP console.
           </p>
         } @else {
-          <p bitTypography="body1">
-            Run it on your organization's computers to turn off the browsers' own password saving,
-            and to install the extension, once it's in the Chrome and Edge stores, with this server
-            filled in. Anyone who then signs in joins the organization.
-          </p>
           @if (s.enrollment.token; as token) {
             <app-keykeeper-install-command
               [token]="token"
@@ -86,6 +81,12 @@ type InstallState =
               </button>
             </div>
           } @else {
+            <p bitTypography="body1">
+              A command to run on your organization's Windows, Mac, or Linux computers. It turns off
+              the browsers' own password saving, and installs the extension once it's in the Chrome
+              and Edge stores, with this server filled in. Anyone who then signs in joins the
+              organization.
+            </p>
             <button bitButton buttonType="primary" type="button" [bitAction]="replaceToken">
               Create install command
             </button>
