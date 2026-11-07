@@ -1,15 +1,19 @@
 import { webcrypto } from "node:crypto";
 
 import {
+  compareJoiningMarks,
+  joiningSealedAt,
   joiningSealSource,
   JoiningSource,
   KeykeeperJoinSeals,
   parseExpiringSeal,
+  parseJoiningSeal,
   SEAL_LIFETIME_SECONDS,
   SEAL_MAX_AHEAD_SECONDS,
 } from "./join-seals";
 import * as vectors from "./join-seals.vectors.json";
 import * as joining from "./joining-v2.vectors.json";
+import * as joiningV3 from "./joining-v3.vectors.json";
 import * as v2 from "./joins-v2.vectors.json";
 
 const seals = new KeykeeperJoinSeals(webcrypto.subtle as unknown as SubtleCrypto);
@@ -148,12 +152,52 @@ describe("Joining seals, version 2, against the vectors", () => {
     expect(Buffer.from(await joinKey()).toString("base64")).toBe(joining.joinKey);
   });
 
-  it("seals the setting with its domains, in any order, and where it comes from", async () => {
+  it("no longer takes version 2 joining seals, which say nothing of when they were sealed", async () => {
     for (const v of joining.seals) {
+      expect(joiningSealSource(v.seal)).toBeNull();
+      expect(
+        await seals.checkJoiningSeal(
+          v.seal,
+          await joinKey(),
+          org,
+          v.autoConfirm,
+          v.domains,
+          v.source as JoiningSource,
+        ),
+      ).toBe(false);
+    }
+    for (const c of joining.checks) {
+      expect(
+        await seals.checkJoiningSeal(c.seal, await joinKey(), org, c.autoConfirm, c.domains),
+      ).toBe(false);
+    }
+  });
+});
+
+describe("Joining seals, version 3, against the vectors", () => {
+  const org = joiningV3.inputs.organizationId;
+  const joinKey = () => seals.joinKey(bytes(joiningV3.inputs.organizationKey));
+  const mark = (m: { sealedAt: number; nonce: string } | null) => m;
+
+  it("makes the join key as version 1 does", async () => {
+    expect(Buffer.from(await joinKey()).toString("base64")).toBe(joiningV3.joinKey);
+  });
+
+  it("seals the setting with its domains, in any order, where it comes from, and when", async () => {
+    for (const v of joiningV3.seals) {
       const source = v.source as JoiningSource;
-      expect(await seals.joiningSeal(await joinKey(), org, v.autoConfirm, v.domains, source)).toBe(
-        v.seal,
-      );
+      expect(
+        await seals.joiningSeal(
+          await joinKey(),
+          org,
+          v.autoConfirm,
+          v.domains,
+          source,
+          v.sealedAt,
+          v.nonce,
+        ),
+      ).toBe(v.seal);
+      expect(parseJoiningSeal(v.seal)).toEqual({ source, sealedAt: v.sealedAt, nonce: v.nonce });
       expect(joiningSealSource(v.seal)).toBe(source);
       expect(
         await seals.checkJoiningSeal(
@@ -168,7 +212,21 @@ describe("Joining seals, version 2, against the vectors", () => {
     }
   });
 
-  it.each(joining.checks)("$why: vouches $vouches", async (c) => {
+  it("gives each new seal its own nonce", async () => {
+    const a = await seals.joiningSeal(await joinKey(), org, true, [], "own", 1_793_059_200);
+    const b = await seals.joiningSeal(await joinKey(), org, true, [], "own", 1_793_059_200);
+    expect(parseJoiningSeal(a)!.nonce).not.toBe(parseJoiningSeal(b)!.nonce);
+    expect(await seals.checkJoiningSeal(a, await joinKey(), org, true, [], "own")).toBe(true);
+    expect(await seals.checkJoiningSeal(b, await joinKey(), org, true, [], "own")).toBe(true);
+  });
+
+  it("refuses to seal a time it can't carry", async () => {
+    for (const at of [0, -1, 1.5, 1_000_000_000_000]) {
+      await expect(seals.joiningSeal(await joinKey(), org, true, [], "own", at)).rejects.toThrow();
+    }
+  });
+
+  it.each(joiningV3.checks)("$why: vouches $vouches", async (c) => {
     expect(
       await seals.checkJoiningSeal(
         c.seal,
@@ -181,9 +239,21 @@ describe("Joining seals, version 2, against the vectors", () => {
     ).toBe(c.vouches);
   });
 
-  it("reads no source from anything but a version 2 joining seal", () => {
-    expect(joiningSealSource(null)).toBeNull();
+  it.each(joiningV3.current)("current against the newest seen: $why", (c) => {
+    const newest = mark(c.newestSeen);
+    expect(newest == null || compareJoiningMarks(c.seal, newest) >= 0).toBe(c.current);
+  });
+
+  it.each(joiningV3.sealedAt)("sealed at: $why", (c) => {
+    expect(joiningSealedAt(new Date(c.now * 1000), c.newestSeen)).toBe(c.sealedAt);
+    // Part of a second on the clock doesn't count.
+    expect(joiningSealedAt(new Date(c.now * 1000 + 999), c.newestSeen)).toBe(c.sealedAt);
+  });
+
+  it("reads no source or time from anything but a version 3 joining seal", () => {
+    expect(parseJoiningSeal(null)).toBeNull();
     expect(joiningSealSource(vectors.joiningSeals[0].seal)).toBeNull();
+    expect(joiningSealSource(joining.seals[0].seal)).toBeNull();
     expect(joiningSealSource(v2.inviteSeal.seal)).toBeNull();
   });
 });

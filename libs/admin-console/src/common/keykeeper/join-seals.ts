@@ -5,9 +5,11 @@
 // for join proofs. The join key and join proofs are version 1 (the meta
 // repo's docs/vectors/joins-v1.json); invitation and staff seals are version
 // 2, which end and carry a nonce, and the client seal is new in the same
-// change (docs/vectors/joins-v2.json); joining seals are version 2, which say
-// where the setting comes from (docs/vectors/joining-v2.json). The unit tests
-// check every one against a copy of the vectors that sits next to them.
+// change (docs/vectors/joins-v2.json); joining seals are version 3, which say
+// where the setting comes from and when it was sealed
+// (docs/vectors/joining-v3.json), so a device can tell an older setting from
+// the newest it has seen (joining-memory.ts). The unit tests check every one
+// against a copy of the vectors that sits next to them.
 
 const encoder = new TextEncoder();
 
@@ -63,13 +65,54 @@ const EXPIRING_SEAL = /^v2\.([0-9]{1,12})\.([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{4
  */
 export type JoiningSource = "own" | "default";
 
-/** A joining seal, version 2: `v2.<source>.<mac>`. */
-const JOINING_SEAL = /^v2\.(own|default)\.([A-Za-z0-9_-]{43})$/;
+/**
+ * A joining seal, version 3: `v3.<source>.<sealedAt>.<nonce>.<mac>`, when it
+ * was sealed in Unix seconds (no leading zero, at most 12 digits), a 16-byte
+ * nonce, and the HMAC, both base64url without padding.
+ */
+const JOINING_SEAL =
+  /^v3\.(own|default)\.([1-9][0-9]{0,11})\.([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{43})$/;
+
+/** Which joining seal it is, besides what it vouches for: when it was sealed, and its nonce. */
+export type JoiningMark = { sealedAt: number; nonce: string };
+
+/** What a joining seal says besides its MAC. */
+export type JoiningSealParts = JoiningMark & { source: JoiningSource };
+
+/** The source, time, and nonce of a version 3 joining seal, or null for anything else. */
+export function parseJoiningSeal(seal: string | null | undefined): JoiningSealParts | null {
+  const match = seal == null ? null : JOINING_SEAL.exec(seal);
+  return match == null
+    ? null
+    : { source: match[1] as JoiningSource, sealedAt: Number(match[2]), nonce: match[3] };
+}
 
 /** Where a joining seal says the setting comes from, or null for anything else. */
 export function joiningSealSource(seal: string | null | undefined): JoiningSource | null {
-  const match = seal == null ? null : JOINING_SEAL.exec(seal);
-  return match == null ? null : (match[1] as JoiningSource);
+  return parseJoiningSeal(seal)?.source ?? null;
+}
+
+/**
+ * Which of two joining seals is newer: the later `sealedAt`, or, sealed in
+ * the same second, the greater nonce, compared as text. Negative when `a` is
+ * older, zero when they're the same seal, positive when `a` is newer.
+ */
+export function compareJoiningMarks(a: JoiningMark, b: JoiningMark): number {
+  if (a.sealedAt !== b.sealedAt) {
+    return a.sealedAt < b.sealedAt ? -1 : 1;
+  }
+  return a.nonce === b.nonce ? 0 : a.nonce < b.nonce ? -1 : 1;
+}
+
+/**
+ * When a browser seals a change to how people join: at its clock's now, or
+ * one second after the newest seal it has seen for the organization if
+ * that's later, so a new seal is newer than the one it replaces even when
+ * clocks disagree.
+ */
+export function joiningSealedAt(now: Date, newestSeen: number | null | undefined): number {
+  const at = Math.floor(now.getTime() / 1000);
+  return newestSeen == null || newestSeen < at ? at : newestSeen + 1;
 }
 
 /** What an expiring seal says besides its MAC: when it ends (Unix seconds) and its nonce. */
@@ -220,8 +263,9 @@ export class KeykeeperJoinSeals {
 
   /**
    * An organization's joining setting and email domains, as an owner or
-   * admin saved them, and where the setting comes from: the organization's
-   * own, or a default it follows.
+   * admin saved them, where the setting comes from (the organization's own,
+   * or a default it follows), and when it was sealed (Unix seconds; see
+   * `joiningSealedAt`). A new random nonce unless one is given (the vectors).
    */
   async joiningSeal(
     joinKey: Uint8Array,
@@ -229,18 +273,26 @@ export class KeykeeperJoinSeals {
     autoConfirm: boolean,
     domains: readonly string[],
     source: JoiningSource,
+    sealedAt: number,
+    nonce: string = toB64Url(globalThis.crypto.getRandomValues(new Uint8Array(16))),
   ): Promise<string> {
     const mac = await this.mac(
       joinKey,
-      this.joiningParts(organizationId, autoConfirm, domains, source),
+      this.joiningParts(organizationId, autoConfirm, domains, source, String(sealedAt), nonce),
     );
-    return `v2.${source}.${toB64Url(mac)}`;
+    const seal = `v3.${source}.${sealedAt}.${nonce}.${toB64Url(mac)}`;
+    if (parseJoiningSeal(seal) == null) {
+      throw new Error("That isn't a time or nonce a joining seal can carry.");
+    }
+    return seal;
   }
 
   /**
    * Whether a joining seal vouches for this setting and these domains, and,
-   * with `source`, that it comes from there. A version 1 seal, which says
-   * nothing of where the setting comes from, doesn't.
+   * with `source`, that it comes from there: the seal alone. Whether it's
+   * current on this device, not older than the newest it has seen, is
+   * KeykeeperJoiningMemory's. Earlier versions, which say nothing of where
+   * the setting comes from (1) or when it was sealed (2), don't vouch.
    */
   async checkJoiningSeal(
     seal: string | null | undefined,
@@ -250,8 +302,8 @@ export class KeykeeperJoinSeals {
     domains: readonly string[],
     source?: JoiningSource,
   ): Promise<boolean> {
-    const said = joiningSealSource(seal);
-    if (said == null || (source != null && said !== source)) {
+    const said = parseJoiningSeal(seal);
+    if (said == null || (source != null && said.source !== source)) {
       return false;
     }
     const mac = fromB64(seal!.slice(seal!.lastIndexOf(".") + 1));
@@ -262,7 +314,14 @@ export class KeykeeperJoinSeals {
       "HMAC",
       await this.hmacKey(joinKey, "verify"),
       mac,
-      this.joiningParts(organizationId, autoConfirm, domains, said),
+      this.joiningParts(
+        organizationId,
+        autoConfirm,
+        domains,
+        said.source,
+        String(said.sealedAt),
+        said.nonce,
+      ),
     );
   }
 
@@ -348,13 +407,17 @@ export class KeykeeperJoinSeals {
     autoConfirm: boolean,
     domains: readonly string[],
     source: JoiningSource,
+    sealedAt: string,
+    nonce: string,
   ) {
     return joinParts([
-      "passbundle joining v2",
+      "passbundle joining v3",
       organizationId,
       autoConfirm ? "1" : "0",
       [...domains].sort().join(","),
       source,
+      sealedAt,
+      nonce,
     ]);
   }
 
