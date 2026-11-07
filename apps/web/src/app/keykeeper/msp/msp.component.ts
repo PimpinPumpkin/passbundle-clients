@@ -13,10 +13,7 @@ import { ActivatedRoute, Router } from "@angular/router";
 import { firstValueFrom, switchMap } from "rxjs";
 
 import { InstallCommandParts } from "@bitwarden/admin-console/common";
-import {
-  canAccessOrgAdmin,
-  OrganizationService,
-} from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
+import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
@@ -54,6 +51,7 @@ import { KeykeeperInstallCommandComponent } from "../organizations/install-comma
 import { KeykeeperTwoStepDetour } from "../two-step-setup/two-step-detour";
 
 import { withAdminTwoStep } from "./admin-two-step-policy";
+import { clientConsoleWay, noConsoleHelp } from "./client-console";
 import {
   ClientHealth,
   clientHealth,
@@ -1308,21 +1306,20 @@ export class KeykeeperMspComponent implements OnInit {
   }
 
   /**
-   * Whether the person's role in a client opens its admin console, by
-   * upstream's own rule. A custom role with no admin permissions there gets
-   * a plain explanation instead of a link the admin console would refuse.
-   * A client not synced yet keeps the link: the admin console decides.
+   * Whether the person's role in a client opens its admin console. One that
+   * doesn't gets a plain explanation, and their items if they see them,
+   * instead of a link the admin console would refuse (client-console.ts).
    */
   protected opensAdminConsole(client: MspClient): boolean {
-    const organization = this.myOrganizations().find((o) => o.id === client.id);
-    return organization == null || canAccessOrgAdmin(organization);
+    return (
+      clientConsoleWay(
+        client,
+        this.myOrganizations().find((o) => o.id === client.id),
+      ) === "admin-console"
+    );
   }
 
-  protected noConsoleHelp(client: MspClient): string {
-    return client.you?.vaultItems !== false
-      ? `Your role in ${client.name} doesn't include its admin console. Its items are in your vault.`
-      : `Your role in ${client.name} doesn't include its admin console or its items. An MSP admin can change your access.`;
-  }
+  protected readonly noConsoleHelp = noConsoleHelp;
 
   /** What each of a client's actions does: its tooltip, and its description for screen readers. */
   protected readonly clientActions = {
