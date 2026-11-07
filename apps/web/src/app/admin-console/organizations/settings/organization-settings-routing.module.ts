@@ -30,6 +30,17 @@ const routes: Routes = [
           titleId: "organizationInfo",
         },
       },
+      // Keykeeper: two-step login for admins, joining, the install command, and
+      // script access, for owners and admins, as the server allows (DESIGN.md,
+      // "A company's own IT"). Organization info is owners-only.
+      {
+        path: "joining",
+        loadComponent: () =>
+          import("../../../keykeeper/organizations/joining-security.component").then(
+            (mod) => mod.KeykeeperJoiningSecurityComponent,
+          ),
+        canActivate: [organizationPermissionsGuard((org) => org.isAdmin)],
+      },
       {
         path: "two-factor",
         component: TwoFactorSetupComponent,

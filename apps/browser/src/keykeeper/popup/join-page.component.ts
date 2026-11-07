@@ -49,8 +49,16 @@ import { JOIN_ANSWER_KEY, JOIN_REQUEST_KEY, JoinAnswer, StoredJoinRequest } from
                   r.fingerprint.join("-")
                 }}</span>
               </p>
+              <p bitTypography="helper" data-testid="keykeeper-join-compare">
+                To be sure this is really {{ r.organizationName }}, ask your IT to read you the
+                phrase they see next to its install command. If it doesn't match, choose Not now and
+                tell them.
+              </p>
             }
           }
+          <p bitTypography="helper" data-testid="keykeeper-join-later">
+            Not now asks again in 7 days.
+          </p>
         </section>
       } @else if (loaded()) {
         <p bitTypography="body1" class="tw-px-1 tw-py-2">There's nothing to join right now.</p>

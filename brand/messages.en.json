@@ -260,10 +260,10 @@
     "message": "Can reset the master password of members in account recovery, and so sign in as them and see everything they can."
   },
   "keykeeperImportExportHint": {
-    "message": "Covers import. Exporting the organization's items needs access to all items, which custom roles can't have yet."
+    "message": "Covers import. Exporting the organization's items takes access to all of them, which owners and admins have and custom roles don't, so an owner or admin exports."
   },
   "keykeeperCustomRoleNoCollections": {
-    "message": "With these permissions, a custom role can't also manage all shared folders yet. Give them shared folders on the Shared folders tab."
+    "message": "A custom role with these permissions gets its shared folders one by one: choose them on the Shared folders tab. To reach every shared folder, make them an admin instead."
   },
   "keykeeperBiometricsNotEnrolled": {
     "message": "Unlock with biometrics is still off. It wasn't confirmed, or the desktop app isn't running."
