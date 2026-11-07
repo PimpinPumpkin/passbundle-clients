@@ -332,12 +332,12 @@ export class KeykeeperEnrollment {
             : await this.seals.fingerprint(Utils.fromB64ToArray(info.publicKey));
         if (fingerprint !== parts.orgKey) {
           throw new Error(
-            `${info.organizationName}'s key isn't the one your IT's install command names. Ask your IT before joining.`,
+            `${info.organizationName}'s key isn't the one your IT admin's install command names. Ask your IT admin before joining.`,
           );
         }
       } else if (info.accountRecovery) {
         throw new Error(
-          `Joining ${info.organizationName} needs a newer install command. Ask your IT to run it again.`,
+          `Joining ${info.organizationName} needs a newer install command. Ask your IT admin to run it again.`,
         );
       }
       const organizations = await firstValueFrom(this.organizationService.organizations$(userId));

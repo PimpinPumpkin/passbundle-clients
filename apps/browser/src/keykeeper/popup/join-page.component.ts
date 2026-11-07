@@ -30,8 +30,8 @@ import { JOIN_ANSWER_KEY, JOIN_REQUEST_KEY, JoinAnswer, StoredJoinRequest } from
       @if (request(); as r) {
         <section class="tw-px-1 tw-py-2" data-testid="keykeeper-join">
           <p bitTypography="body1">
-            Your IT set up this browser so you can join {{ r.organizationName }}. Once an admin
-            confirms you, you'll see what {{ r.organizationName }} shares with you.
+            Your IT admin set up this browser so you can join {{ r.organizationName }}. Once an
+            admin confirms you, you'll see what {{ r.organizationName }} shares with you.
           </p>
           @if (r.accountRecovery) {
             <bit-callout type="warning" title="Account recovery">

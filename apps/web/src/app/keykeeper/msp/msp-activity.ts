@@ -75,7 +75,7 @@ export function describeEvent(
     case "staff_invite_accepted":
       return `${target} accepted the invitation and joined as ${roleName(e.detail)}`;
     case "staff_invite_cancelled":
-      return `${actor} cancelled the invitation for ${target}`;
+      return `${actor} canceled the invitation for ${target}`;
     case "staff_role_changed":
       return `${actor} made ${target} ${roleName(e.detail)}`;
     case "staff_access_changed":
@@ -105,7 +105,7 @@ export function describeEvent(
     case "client_revoked_staff":
       return `${org} revoked ${target} (${e.actorEmail ?? "its directory"}); they stay out until ${org} restores them`;
     case "templates_collection_gone":
-      return `${org} deleted its Templates collection; the next template sent there makes a new one`;
+      return `${org} deleted its Templates folder; the next template sent there makes a new one`;
     case "script_token_created": {
       // "<token name>: <n> items"
       const split = detail.lastIndexOf(": ");

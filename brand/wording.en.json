@@ -24,11 +24,26 @@
     "sharedUnlockDesktopPermissionWarning": "Locking the store when the extension reloads."
   },
   "all": {
+    "aDeviceIs": {
+      "message": "A device is a unique installation of the {brand} app where you have signed in. Reinstalling, clearing app data, or clearing your cookies could result in a device appearing multiple times."
+    },
+    "acceptEmergencyAccess": {
+      "message": "You've been invited to become an emergency contact for the user listed above. To accept the invitation, you need to sign in or create a new {brand} account."
+    },
+    "acceptInviteWithMasterPassword": {
+      "message": "To finish accepting this invitation, sign in with your master password."
+    },
     "accessedClientVault": {
       "message": "Accessed the items of organization $ID$."
     },
     "accessedClientVaultWithName": {
       "message": "Accessed $ID$ in $ORGNAME$."
+    },
+    "accountLimitReached": {
+      "message": "Account limit reached. Sign out of an account to add another."
+    },
+    "accountNewDeviceLoginProtectionSaved": {
+      "message": "New device sign-in protection changes saved"
     },
     "addCollection": {
       "message": "Add shared folder"
@@ -78,8 +93,20 @@
     "assignToCollections": {
       "message": "Add to shared folders"
     },
+    "authenticationSessionTimedOut": {
+      "message": "The authentication session timed out. Please restart the sign-in process."
+    },
+    "awaitingSSODesc": {
+      "message": "Please continue to sign in using your company credentials."
+    },
     "bitWebVault": {
       "message": "{brand}"
+    },
+    "bitWebVaultApp": {
+      "message": "{brand} web vault"
+    },
+    "breachDesc": {
+      "message": "Breached accounts can expose your personal information. Secure breached accounts by turning on two-step login or creating a stronger password."
     },
     "bulkCollectionAssignmentDialogDescriptionPlural": {
       "message": "Only organization members with access to these shared folders will be able to see the items."
@@ -101,6 +128,15 @@
     },
     "cannotRemoveViewOnlyCollections": {
       "message": "You can't take items out of these shared folders: $COLLECTIONS$"
+    },
+    "changeMasterPasswordOnWebConfirmation": {
+      "message": "You can change your master password in the {brand} web vault."
+    },
+    "changePasswordWarning": {
+      "message": "After changing your password, you will need to sign in with your new password. Active sessions on other devices will be signed out within one hour."
+    },
+    "chooseCipherForPasskeyAuth": {
+      "message": "Choose a passkey to sign in with"
     },
     "clickedVaultBannerButton": {
       "message": "Clicked the banner button"
@@ -156,11 +192,26 @@
     "collectionsEdited": {
       "message": "Shared folders edited"
     },
+    "confirmKeyConnectorOrganizationUserDescription": {
+      "message": "To continue signing in, verify the organization and domain."
+    },
     "confirmVaultExport": {
       "message": "Confirm export"
     },
     "confirmVaultImport": {
       "message": "Confirm import"
+    },
+    "continueLoggingIn": {
+      "message": "Continue signing in"
+    },
+    "continueToWebApp": {
+      "message": "Continue to the web vault?"
+    },
+    "continueToWebAppDesc": {
+      "message": "Explore more features of your {brand} account in the web vault."
+    },
+    "continueWithLogIn": {
+      "message": "Continue signing in"
     },
     "couldNotDecryptVaultItemsBelow": {
       "message": "The items listed below could not be decrypted."
@@ -176,6 +227,12 @@
     },
     "createdOrganizationIdWithName": {
       "message": "Created organization $ORGNAME$ $ID$."
+    },
+    "deauthorizeSessionsDesc": {
+      "message": "Concerned your account is signed in on another device? Proceed below to deauthorize all computers or devices that you have previously used. This security step is recommended if you previously used a public computer or accidentally saved your password on a device that isn't yours. This step will also clear all previously remembered two-step login sessions."
+    },
+    "deauthorizeSessionsWarning": {
+      "message": "Proceeding will also sign you out of your current session, requiring you to sign in again. You will also be prompted for two-step login again, if set up. Active sessions on other devices may continue to remain active for up to one hour."
     },
     "defaultCollection": {
       "message": "Default shared folder"
@@ -222,6 +279,15 @@
     "deletingOrganizationContentWarning": {
       "message": "Enter the master password to confirm deletion of $ORGANIZATION$ and all associated data. Data in $ORGANIZATION$ includes:"
     },
+    "deviceListDescription": {
+      "message": "Your account was signed in on each of the devices below. If you do not recognize a device, remove it now."
+    },
+    "deviceListDescriptionTemp": {
+      "message": "Your account was signed in on each of the devices below."
+    },
+    "duoTwoFactorRequiredPageSubtitle": {
+      "message": "Duo two-step login is required for your account. Follow the steps below to finish signing in."
+    },
     "editCollection": {
       "message": "Edit shared folder"
     },
@@ -240,6 +306,9 @@
     "editedOrgSettingsWithName": {
       "message": "Edited the settings of $ORGNAME$."
     },
+    "emergencyAccessLoggedOutWarning": {
+      "message": "Proceeding will sign $NAME$ out of their current session, requiring them to sign in again. Active sessions on other devices may continue to remain active for up to one hour."
+    },
     "emptyVaultDescription": {
       "message": "{brand} protects more than just your passwords. Store logins, IDs, cards, and notes securely here."
     },
@@ -248,6 +317,9 @@
     },
     "errorImportingMyItemsMultiCollection": {
       "message": "You cannot import items into My Items that are part of more than one shared folder"
+    },
+    "errorRefreshingAccessTokenDesc": {
+      "message": "No refresh token or API keys found. Please try signing out and signing back in."
     },
     "exportError": {
       "message": "An error occurred while exporting your items"
@@ -291,14 +363,32 @@
     "exportingPersonalVaultTitle": {
       "message": "Exporting your personal items"
     },
+    "extensionPromptBody": {
+      "message": "With the browser extension installed, you'll take {brand} everywhere online. It'll fill in passwords, so you can sign in to your accounts with a single click."
+    },
     "extensionPromptHeading": {
       "message": "Get the extension for easy access to your items"
+    },
+    "failedLogin": {
+      "message": "Sign-in attempt failed with incorrect password."
+    },
+    "failedLogin2fa": {
+      "message": "Sign-in attempt failed with incorrect two-step login."
     },
     "familiesUnlimitedCollections": {
       "message": "Unlimited family shared folders"
     },
     "filterVault": {
       "message": "Filter items"
+    },
+    "firstLogin": {
+      "message": "First sign-in"
+    },
+    "followTheStepsBelowToFinishLoggingIn": {
+      "message": "Follow the steps below to finish signing in."
+    },
+    "followTheStepsBelowToFinishLoggingInWithSecurityKey": {
+      "message": "Follow the steps below to finish signing in with your security key."
     },
     "freeOrgMaxCollectionReachedManageBilling": {
       "message": "Free organizations may have up to $COLLECTIONCOUNT$ shared folders. Upgrade to a paid plan to add more shared folders."
@@ -351,8 +441,14 @@
     "itemsMovedToCollections": {
       "message": "Items moved to shared folders"
     },
+    "keeperEmailHint": {
+      "message": "Enter the email you use to sign in to Keeper"
+    },
     "languageDesc": {
-      "message": "Change the language used by the web app."
+      "message": "Change the language used by the web vault."
+    },
+    "lastPassOOBDesc": {
+      "message": "Approve the sign-in request in your authentication app or enter a one-time passcode."
     },
     "learnMoreAboutCollectionManagement": {
       "message": "Learn more about shared folders"
@@ -381,14 +477,92 @@
     "loadingVault": {
       "message": "Loading items"
     },
+    "logBackIn": {
+      "message": "Please sign in again."
+    },
+    "logIn": {
+      "message": "Sign in"
+    },
+    "logInBelowUsingYourSingleUseRecoveryCode": {
+      "message": "Sign in below using your single-use recovery code. This will turn off all two-step providers on your account."
+    },
+    "logInWithPasskey": {
+      "message": "Sign in with a passkey"
+    },
+    "logInWithPasskeyAriaLabel": {
+      "message": "Sign in with a passkey"
+    },
+    "logInWithPasskeyQuestion": {
+      "message": "Sign in with a passkey?"
+    },
+    "logOut": {
+      "message": "Sign out"
+    },
+    "logOutConfirmation": {
+      "message": "Are you sure you want to sign out?"
+    },
+    "loggedIn": {
+      "message": "Signed in"
+    },
+    "loggedInAs": {
+      "message": "Signed in as"
+    },
+    "loggedInExclamation": {
+      "message": "Signed in!"
+    },
+    "loggedOut": {
+      "message": "Signed out"
+    },
+    "loggedOutDesc": {
+      "message": "You have been signed out of your account."
+    },
+    "loggedOutWarning": {
+      "message": "Proceeding will sign you out of your current session, requiring you to sign in again. Active sessions on other devices may continue to remain active for up to one hour."
+    },
+    "loginApproved": {
+      "message": "Sign-in approved"
+    },
+    "loginExpired": {
+      "message": "Your sign-in session has expired."
+    },
+    "loginInitiated": {
+      "message": "Sign-in initiated"
+    },
+    "loginOnTrustedDeviceOrAskAdminToAssignPassword": {
+      "message": "You need to sign in on a trusted device or ask your administrator to assign you a password."
+    },
+    "loginOrCreateNewAccount": {
+      "message": "Sign in or create a new account to access your secure vault."
+    },
+    "loginRequest": {
+      "message": "Sign-in request"
+    },
+    "loginRequestApprovedForEmailOnDevice": {
+      "message": "Sign-in request approved for $EMAIL$ on $DEVICE$"
+    },
+    "loginRequestHasAlreadyExpired": {
+      "message": "Sign-in request has already expired."
+    },
+    "loginStatus": {
+      "message": "Sign-in status"
+    },
     "loginToVaultMenu": {
-      "message": "Log in"
+      "message": "Sign in"
+    },
+    "loginWithDevice": {
+      "message": "Sign in with a device"
+    },
+    "loginWithPasskeyEnabled": {
+      "message": "Sign in with a passkey turned on"
     },
     "manageAllCollections": {
       "message": "Manage all shared folders"
     },
     "manageCollection": {
       "message": "Can manage"
+    },
+    "mfaPushDesc": {
+      "message": "Approve the sign-in request in your authentication app. This dialog will close automatically."
     },
     "modifiedCollectionManagement": {
       "message": "Modified shared folder settings $ID$."
@@ -407,6 +581,9 @@
     },
     "newCollection": {
       "message": "New shared folder"
+    },
+    "newDeviceLoginProtection": {
+      "message": "New device sign-in"
     },
     "newOrganizationDesc": {
       "message": "Organizations let you share items with others through shared folders, and manage the people of a family, small team, or large company."
@@ -435,6 +612,12 @@
     "noPasskeyLogin": {
       "message": "No accounts were found that support passkeys without one configured."
     },
+    "noPermissionsViewPage": {
+      "message": "You do not have permissions to view this page. Try signing in with a different account."
+    },
+    "noPrfCredentialsAvailable": {
+      "message": "No PRF-enabled passkeys are available for unlock. Please sign in with a passkey first."
+    },
     "noReusedPasswords": {
       "message": "No logins have passwords that are being reused."
     },
@@ -444,11 +627,17 @@
     "noWeakPasswords": {
       "message": "No items have weak passwords."
     },
+    "notificationSentDeviceAnchor": {
+      "message": "web vault"
+    },
     "onboardingImportDataSubtitle": {
       "message": "Save time by importing data from another password manager. You can also add items by hand."
     },
+    "openExtensionToAutofill": {
+      "message": "Open the extension to sign in and start autofilling."
+    },
     "organizationUserNotificationPolicyDesc": {
-      "message": "Create and launch a customized banner that all organization members see after they log in."
+      "message": "Create and launch a customized banner that all organization members see after they sign in."
     },
     "organizationUserNotificationPolicyTitle": {
       "message": "Banner"
@@ -465,6 +654,9 @@
     "passkeyLoginReportDesc": {
       "message": "Passkeys are a secure, phishing-resistant alternative to passwords. See which of your accounts support passkeys for a simpler, passwordless sign-in experience. Learn"
     },
+    "passwordResetFor": {
+      "message": "Password reset for $USER$. You can now sign in using the new password."
+    },
     "personalItemVaultTransferWarningSingular": {
       "message": "1 item will be permanently moved to the organization. You will no longer own this item."
     },
@@ -477,11 +669,14 @@
     "personalVaultExportPolicyInEffect": {
       "message": "One or more organization policies prevent you from exporting your personal items."
     },
+    "pleaseRestartRegistrationOrTryLoggingIn": {
+      "message": "Please restart registration or try signing in."
+    },
     "premiumSignUpReports": {
       "message": "Password hygiene, account health, and data breach reports to keep your items safe."
     },
     "premiumSignUpTotp": {
-      "message": "TOTP verification code (2FA) generator for your logins."
+      "message": "Two-step login code (TOTP) generator for your logins."
     },
     "premiumSubscriptionEndedDesc": {
       "message": "To regain access to your archive, restart your Premium subscription. If you edit details for an archived item before restarting, it'll be moved back out of the archive."
@@ -510,8 +705,17 @@
     "purgedOrganizationVaultWithName": {
       "message": "Deleted all items of $ORGNAME$."
     },
+    "quickLogin": {
+      "message": "Quick and easy sign-in"
+    },
+    "quickLoginBody": {
+      "message": "Set up biometric unlock and autofill to sign in to your accounts without typing a single letter."
+    },
     "readOnlyCollectionAccess": {
       "message": "You do not have access to manage this shared folder."
+    },
+    "recoverAccountWarning": {
+      "message": "When you reset the password or two-step login for this member, they'll be notified of the change and signed out."
     },
     "recoveryDeleteCiphersDesc": {
       "message": "Some of your items could not be recovered. Do you want to delete these unrecoverable items?"
@@ -524,6 +728,9 @@
     },
     "recoveryStepCipherTitle": {
       "message": "Verifying item integrity"
+    },
+    "removePasskeyInfo": {
+      "message": "If all passkeys are removed, you will be unable to sign in on new devices without your master password."
     },
     "removedOrganizationIdWithName": {
       "message": "Removed organization $ORGNAME$ $ID$."
@@ -546,6 +753,9 @@
     "restrictedItemTypePolicyDescV2": {
       "message": "Do not allow members to create and store credit card items. When this policy is turned on, existing cards will be automatically hidden."
     },
+    "reviewLoginRequest": {
+      "message": "Review sign-in request"
+    },
     "revokedUserIdDeclinedTransferWithOrgName": {
       "message": "Revoked access for $ID$ for declining to move items to $ORGNAME$."
     },
@@ -557,6 +767,12 @@
     },
     "revokedUserIdWithOrgName": {
       "message": "Revoked access to $ORGNAME$ for $ID$."
+    },
+    "rotateAccountEncryptionCallout": {
+      "message": "You'll be signed out and prompted to re-authenticate. To avoid data corruption, do not close your browser until the process is complete."
+    },
+    "rotationCompletedDesc": {
+      "message": "Your master password and encryption keys have been updated. Your other devices have been signed out."
     },
     "searchCollection": {
       "message": "Search shared folder"
@@ -570,6 +786,9 @@
     "securityPrioritizedBody": {
       "message": "Save logins, cards, and identities securely. Zero-knowledge, end-to-end encryption protects what's important to you."
     },
+    "seeMessageEveryLogin": {
+      "message": "Users will see the message after every sign-in even if they dismiss it."
+    },
     "selectCollections": {
       "message": "Select shared folders"
     },
@@ -579,14 +798,26 @@
     "selectImportCollection": {
       "message": "Select a shared folder"
     },
+    "sessionTimeout": {
+      "message": "Your session has timed out. Please go back and try signing in again."
+    },
+    "setPinCode": {
+      "message": "You can use this PIN to unlock {brand}. Your PIN will be reset if you ever fully sign out of the application."
+    },
     "settingsVaultOptions": {
       "message": "Item options"
     },
     "sharedFolderManagementDescription": {
       "message": "Configure how shared folders behave in the organization."
     },
+    "sharedUnlockUnavailableUntrustedDevice": {
+      "message": "Shared unlock is not available because you chose not to remember this device. To enable this setting, try signing in again."
+    },
     "sharedUnlockWithWeb": {
-      "message": "Share unlock with the web app"
+      "message": "Share unlock with the web vault"
+    },
+    "showAfterEveryLogin": {
+      "message": "Show after every sign-in"
     },
     "showCardsInVaultViewV2": {
       "message": "Always show cards as Autofill suggestions on the items view"
@@ -594,26 +825,86 @@
     "showIdentitiesInVaultViewV2": {
       "message": "Always show identities as Autofill suggestions on the items view"
     },
+    "showInlineMenuOnFormFieldsDescAlt": {
+      "message": "Applies to all signed-in accounts."
+    },
     "showQuickCopyActionsInVault": {
       "message": "Show quick copy actions in lists"
+    },
+    "singleSignOnEnterOrgIdentifierText": {
+      "message": "To sign in with your SSO provider, enter your organization's SSO identifier to begin. You may need to enter this SSO identifier when you sign in from a new device."
+    },
+    "skipToWebApp": {
+      "message": "Skip to web vault"
     },
     "sponsoredFamiliesSharedCollectionsForFamilyMembers": {
       "message": "Shared folders for family members"
     },
+    "ssoLoginIsRequired": {
+      "message": "Single sign-on is required"
+    },
+    "ssoLoginRequiresInviteAcceptance": {
+      "message": "You cannot sign in with SSO until you have accepted an invitation to join $ORGANIZATION_NAME$."
+    },
     "successfullyAssignedCollections": {
       "message": "Successfully added to shared folders"
     },
+    "tooManyInvalidPinEntryAttemptsLoggingOut": {
+      "message": "Too many invalid PIN entry attempts. Signing out."
+    },
+    "troubleLoggingIn": {
+      "message": "Trouble signing in?"
+    },
+    "turnOffNewDeviceLoginProtection": {
+      "message": "Turn off new device sign-in protection"
+    },
+    "turnOffNewDeviceLoginProtectionModalDesc": {
+      "message": "Proceed below to turn off the verification emails {brand} sends when you sign in from a new device."
+    },
+    "turnOffNewDeviceLoginProtectionWarning": {
+      "message": "With new device sign-in protection turned off, anyone with your master password can access your account from any device. To protect your account without verification emails, set up two-step login."
+    },
+    "turnOnNewDeviceLoginProtection": {
+      "message": "Turn on new device sign-in protection"
+    },
+    "turnOnNewDeviceLoginProtectionModalDesc": {
+      "message": "Proceed below to have {brand} send you verification emails when you sign in from a new device."
+    },
+    "twoFactorForPasskeysNotSupportedOnClientUpdateToLogIn": {
+      "message": "Two-step login for passkeys isn't supported. Update the app to sign in."
+    },
     "twoFactorYubikeySupportUsb": {
-      "message": "The web app, desktop application, CLI, and all browser extensions on a device with a USB port that can accept your YubiKey."
+      "message": "The web vault, desktop application, CLI, and all browser extensions on a device with a USB port that can accept your YubiKey."
+    },
+    "twoStepLoginConfirmationContent": {
+      "message": "Make your account more secure by setting up two-step login in the {brand} web vault."
+    },
+    "twoStepLoginConfirmationTitle": {
+      "message": "Continue to the web vault?"
+    },
+    "twoStepLoginDesc": {
+      "message": "Secure your account by requiring an additional step when signing in."
+    },
+    "unableToCompleteLogin": {
+      "message": "Unable to complete sign-in"
     },
     "unlimitedCollections": {
       "message": "Unlimited shared folders"
     },
     "updateBrowserDesc": {
-      "message": "You are using an unsupported web browser. The web app may not work properly."
+      "message": "You are using an unsupported web browser. The web vault may not work properly."
+    },
+    "updateEncryptionKeyWarning": {
+      "message": "After updating your encryption key, you are required to sign out and back in to all {brand} applications that you are currently using (such as the mobile app or browser extensions). Failure to sign out and back in (which downloads your new encryption key) may result in data corruption. We will attempt to sign you out automatically, however, it may be delayed."
     },
     "updatedCollectionManagement": {
       "message": "Updated shared folder settings"
+    },
+    "useDifferentLoginMethod": {
+      "message": "Use a different sign-in method"
+    },
+    "useForVaultEncryptionInfo": {
+      "message": "Sign in and unlock on supported devices without your master password. Follow the prompts from your browser to finalize setup."
     },
     "userAcceptedTransferWithOrgName": {
       "message": "Accepted moving items to $ORGNAME$."
@@ -657,8 +948,26 @@
     "vaultSaveOptionsTitle": {
       "message": "Save options"
     },
+    "vaultTimeoutLogOutConfirmation": {
+      "message": "Signing out will remove all access to your vault and requires online authentication after the timeout period. Are you sure you want to use this setting?"
+    },
     "vaultWelcomeDialogDescription": {
       "message": "Store all your passwords and personal info in {brand}. We'll show you around."
+    },
+    "verifyYourDomainDescription": {
+      "message": "To continue signing in, verify this domain."
+    },
+    "verifyYourDomainToLogin": {
+      "message": "Verify your domain to sign in"
+    },
+    "verifyYourOrganization": {
+      "message": "Verify your organization to sign in"
+    },
+    "viewAllLogInOptions": {
+      "message": "View all sign-in options"
+    },
+    "viewAllLoginOptions": {
+      "message": "View all sign-in options"
     },
     "viewCollection": {
       "message": "View shared folder"
@@ -678,8 +987,20 @@
     "welcomeDialogGraphicAlt": {
       "message": "Illustration of the layout of the items page."
     },
+    "youDeniedLoginAttemptFromAnotherDevice": {
+      "message": "You denied a sign-in attempt from another device. If this was you, try to sign in with the device again."
+    },
     "youDoNotHavePermissions": {
       "message": "You do not have permissions to this shared folder"
+    },
+    "youHaveAPendingLoginRequest": {
+      "message": "You have a pending sign-in request from another device."
+    },
+    "youHaveBeenLoggedIn": {
+      "message": "You have been signed in!"
+    },
+    "youSuccessfullyLoggedIn": {
+      "message": "You successfully signed in"
     },
     "yourVaultIsEmpty": {
       "message": "You don't have any items yet"
@@ -708,7 +1029,7 @@
       "message": "We found $COUNT$ passwords that are being reused. You should change them to a unique value."
     },
     "themeDesc": {
-      "message": "Choose a theme for the web app."
+      "message": "Choose a theme for the web vault."
     },
     "unsecuredWebsitesFoundReportDesc": {
       "message": "We found $COUNT$ items with unsecured URIs. You should change their URI scheme to https:// if the website allows it."
@@ -742,6 +1063,9 @@
     },
     "firstSsoLogin": {
       "message": "$ID$ linked their Microsoft account and signed in with single sign-on for the first time."
+    },
+    "loginPageEmailEntryScreenTitle": {
+      "message": "Sign in to {brand}"
     }
   },
   "browser": {
@@ -749,13 +1073,19 @@
       "message": "Business organizations let you share items with others through shared folders. Learn more on the website."
     },
     "emailVerificationRequiredDesc": {
-      "message": "You must verify your email to use this feature. You can verify your email in the web app."
+      "message": "You must verify your email to use this feature. You can verify your email in the web vault."
+    },
+    "loginPageEmailEntryScreenTitle": {
+      "message": "Sign in"
+    },
+    "loginPageMasterPasswordEntryScreenTitle": {
+      "message": "Sign in"
     },
     "premiumManageAlert": {
-      "message": "You can manage your membership in the web app. Do you want to visit the website now?"
+      "message": "You can manage your membership in the web vault. Do you want to visit the website now?"
     },
     "sharedUnlockWithWebDescription": {
-      "message": "When enabled, unlock state will be shared with the web app."
+      "message": "When enabled, unlock state will be shared with the web vault."
     },
     "vault": {
       "message": "Items"
