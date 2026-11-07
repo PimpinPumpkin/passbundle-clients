@@ -627,6 +627,33 @@
       }
     }
   },
+  "keykeeperSeenPasswordsTitleMany": {
+    "message": "Passwords these $COUNT$ people could see",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "keykeeperSeenPasswordsIntroMany": {
+    "message": "$NAMES$ could see these logins' passwords in the shared folders they could open. They may still know them, so change them.",
+    "placeholders": {
+      "names": {
+        "content": "$1"
+      }
+    }
+  },
+  "keykeeperSeenPasswordsEveryItemMany": {
+    "message": "$NAMES$ could see every item in this organization, so they may know any of its passwords.",
+    "placeholders": {
+      "names": {
+        "content": "$1"
+      }
+    }
+  },
+  "keykeeperSeenPasswordsWho": {
+    "message": "Who could see it"
+  },
   "keykeeperExposedPrivacy": {
     "message": "Each password is checked against Have I Been Pwned's list of breached passwords without sending it: only the first 5 characters of its SHA-1 hash leave your browser, the answer lists hundreds of possible matches, and the match is made here."
   },

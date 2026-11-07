@@ -34,6 +34,8 @@ type BulkRestoreDialogParams = {
   organizationId: string;
   users: BulkUserDetails[];
   isRevoking: boolean;
+  /** Keykeeper: what each of them can open, by member id (DESIGN.md, "Access and offboarding"). */
+  keykeeperReach?: Map<string, string>;
 };
 
 @Component({
@@ -64,6 +66,7 @@ export class BulkRestoreRevokeComponent {
   protected readonly isRevoking = this.data.isRevoking;
   protected readonly organizationId = this.data.organizationId;
   protected readonly users = signal(this.data.users);
+  protected readonly keykeeperReach = this.data.keykeeperReach ?? new Map<string, string>();
 
   protected readonly statuses = signal(new Map<string, string>());
   protected readonly loading = signal(false);
