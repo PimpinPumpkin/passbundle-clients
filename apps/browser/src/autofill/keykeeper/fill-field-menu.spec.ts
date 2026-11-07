@@ -21,6 +21,7 @@ import {
   choicesFor,
   createdFillFieldMenuIds,
   FILL_FIELD_ID,
+  fillPickerWords,
   finishPickAfterReprompt,
   handleFillFieldMenuClick,
   initFillFieldMenu,
@@ -63,6 +64,31 @@ describe("Keykeeper fill picker menu", () => {
         ["f0", "Customer ID"],
         ["n", "Never fill this field"],
       ]);
+    });
+
+    // C14: the menu's words come from the translations, upstream's for the
+    // values and ours for the rest, and English for a word that has none.
+    it("names the choices in the person's language", () => {
+      const german: Record<string, string> = {
+        username: "Benutzername",
+        password: "Passwort",
+        verificationCode: "Verifizierungscode",
+      };
+      const words = fillPickerWords({ t: (key: string) => german[key] ?? "" });
+      const cipher = bankItem();
+      cipher.login.totp = "JBSWY3DPEHPK3PXP";
+
+      expect(choicesFor(cipher, words).map((c) => c.title)).toEqual([
+        "Benutzername",
+        "Passwort",
+        "Verifizierungscode",
+        "Customer ID",
+        "Never fill this field",
+      ]);
+      // The keys stay the same, so a pick means the same in any language.
+      expect(choicesFor(cipher, words).map((c) => c.key)).toEqual(
+        choicesFor(cipher).map((c) => c.key),
+      );
     });
 
     it("hides the password and hidden fields when the item doesn't allow viewing them", () => {
@@ -125,6 +151,31 @@ describe("Keykeeper fill picker menu", () => {
         true,
       );
       expect(createdFillFieldMenuIds.has(`${FILL_FIELD_ID}_${cipherId}_f0`)).toBe(true);
+    });
+
+    it("titles the menu in the person's language", async () => {
+      const words = fillPickerWords({
+        t: (key: string) =>
+          ({
+            keykeeperFillThisFieldWith: "Dieses Feld füllen mit",
+            keykeeperNeverFillThisField: "Dieses Feld nie füllen",
+            username: "Benutzername",
+          })[key] ?? "",
+      });
+
+      await initFillFieldMenu(words);
+      await addCipherToFillFieldMenu(bankItem(), words);
+
+      const titles = createSpy.mock.calls.map(([props]) => props.title);
+      expect(titles).toEqual([
+        "Dieses Feld füllen mit",
+        "Example Bank",
+        "Benutzername",
+        "Password",
+        "Customer ID",
+        undefined,
+        "Dieses Feld nie füllen",
+      ]);
     });
 
     it("ignores items that aren't logins", async () => {

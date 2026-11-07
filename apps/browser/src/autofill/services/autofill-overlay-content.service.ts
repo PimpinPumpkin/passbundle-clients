@@ -846,11 +846,31 @@ export class AutofillOverlayContentService implements AutofillOverlayContentServ
    * @param formFieldElement - The form field element that triggered the input event.
    */
   private handleFormFieldInputEvent = (formFieldElement: ElementWithOpId<FormFieldElement>) => {
+    const debounced = debounce(() => this.triggerFormFieldInput(formFieldElement), 100, true);
     return this.useEventHandlersMemo(
-      debounce(() => this.triggerFormFieldInput(formFieldElement), 100, true),
+      // Keykeeper: what was typed is kept at once, keystroke by keystroke, and
+      // only the menu waits. Kept only after the pause, the last characters
+      // typed before Enter were missing from what the save and update prompts
+      // offered, and a prompt offered a password without them (DESIGN.md,
+      // "Missed save prompts on fast sites").
+      () => {
+        this.keepTypedValue(formFieldElement);
+        debounced();
+      },
       this.getFormFieldHandlerMemoIndex(formFieldElement, EVENTS.INPUT),
     );
   };
+
+  /** Keeps a field's value as it is now, for the save and update prompts. */
+  private keepTypedValue(formFieldElement: ElementWithOpId<FormFieldElement>) {
+    if (
+      !elementIsFillableFormField(formFieldElement) ||
+      isReadonlyOrDisabledFormFieldElement(formFieldElement)
+    ) {
+      return;
+    }
+    this.storeModifiedFormElement(formFieldElement);
+  }
 
   /**
    * Triggers when the form field element receives an input event. This method will

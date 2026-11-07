@@ -4,6 +4,7 @@ import { CLEAR_NOTIFICATION_LOGIN_DATA_DURATION } from "@bitwarden/common/autofi
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 
 import { BrowserApi } from "../../platform/browser/browser-api";
+import { whenTabLoaded } from "../keykeeper/when-tab-loaded";
 import { generateDomainMatchPatterns, isInvalidResponseStatusCode } from "../utils";
 
 import {
@@ -439,14 +440,15 @@ export class OverlayNotificationsBackground implements OverlayNotificationsBackg
     requestId: chrome.webRequest.WebRequestDetails["requestId"],
     modifyLoginData: ModifyLoginCipherFormData,
   ) => {
-    const handleWebNavigationOnCompleted = async () => {
-      chrome.webNavigation.onCompleted.removeListener(handleWebNavigationOnCompleted);
-      const tab = await BrowserApi.getTab(tabId);
-      if (tab) {
-        await this.processNotifications(requestId, modifyLoginData, tab);
-      }
-    };
-    chrome.webNavigation.onCompleted.addListener(handleWebNavigationOnCompleted);
+    // Keykeeper: a page that loads at once could finish before a listener
+    // added now heard of it, and the prompt was lost (keykeeper/when-tab-loaded.ts).
+    // It runs once, and not at all if this submission was already handled.
+    whenTabLoaded(
+      tabId,
+      () => this.modifyLoginCipherFormData.get(tabId) === modifyLoginData,
+      (tab) => this.processNotifications(requestId, modifyLoginData, tab),
+      (error) => this.logService.error(error),
+    );
   };
 
   /**
