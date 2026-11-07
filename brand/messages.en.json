@@ -886,5 +886,20 @@
   },
   "keykeeperSsoForCommandLine": {
     "message": "This signs in the command-line tool on this computer. Continue only if you started that sign-in yourself, just now."
+  },
+  "keykeeperOpenAndFill": {
+    "message": "Open and fill"
+  },
+  "keykeeperOpenAndFillName": {
+    "message": "Open and fill $ITEMNAME$",
+    "placeholders": {
+      "itemname": {
+        "content": "$1",
+        "example": "Secret item"
+      }
+    }
+  },
+  "keykeeperOpenAndFillHint": {
+    "message": "Open and fill doesn't need this setting: the open button beside a login opens its website in a new tab and fills it there, once, and only on that site. It never submits the form."
   }
 }

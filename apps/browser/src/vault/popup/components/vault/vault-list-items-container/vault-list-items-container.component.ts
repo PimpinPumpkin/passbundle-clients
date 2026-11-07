@@ -31,6 +31,7 @@ import { uuidAsString } from "@bitwarden/common/platform/abstractions/sdk/sdk.se
 import { CipherId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
+import { firstOpenAndFillUrl } from "@bitwarden/common/vault/keykeeper/open-and-fill";
 import {
   CipherViewLike,
   CipherViewLikeUtils,
@@ -53,6 +54,7 @@ import {
   DecryptionFailureDialogComponent,
   KeykeeperExpirationBadgeComponent,
   KeykeeperItemTileComponent,
+  KeykeeperOpenAndFillService,
   KeykeeperTemplateBadgeComponent,
   OrgIconDirective,
   PasswordRepromptService,
@@ -99,6 +101,7 @@ export class VaultListItemsContainerComponent implements AfterViewInit {
   private compactModeService = inject(CompactModeService);
   private vaultPopupSectionService = inject(VaultPopupSectionService);
   private configService = inject(ConfigService);
+  private openAndFillService = inject(KeykeeperOpenAndFillService, { optional: true });
   protected CipherViewLikeUtils = CipherViewLikeUtils;
 
   /** Signal for the feature flag that controls simplified item action behavior */
@@ -404,6 +407,20 @@ export class VaultListItemsContainerComponent implements AfterViewInit {
   }
 
   /**
+   * Keykeeper: the address "Open and fill" opens for a login, or null when its
+   * open button only opens (DESIGN.md, "Open and fill").
+   */
+  protected openAndFillUrl(cipher: CipherViewLike): string | null {
+    if (
+      this.openAndFillService == null ||
+      CipherViewLikeUtils.getType(cipher) !== CipherType.Login
+    ) {
+      return null;
+    }
+    return firstOpenAndFillUrl(CipherViewLikeUtils.getLogin(cipher)?.uris);
+  }
+
+  /**
    * Launches the login cipher in a new browser tab.
    */
   async launchCipher(cipher: CipherViewLike) {
@@ -418,8 +435,25 @@ export class VaultListItemsContainerComponent implements AfterViewInit {
       this.viewCipherTimeout = undefined;
     }
 
+    // Keykeeper: a login opens and fills that tab once. An item that asks for
+    // the master password asks before the tab opens.
+    const openAndFillUrl = this.openAndFillUrl(cipher);
+    if (openAndFillUrl != null) {
+      if (
+        CipherViewLikeUtils.decryptionFailure(cipher) ||
+        !(await this.passwordRepromptService.passwordRepromptCheck(cipher))
+      ) {
+        return;
+      }
+    }
+
     const activeUserId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
     await this.cipherService.updateLastLaunchedDate(uuidAsString(cipher.id!), activeUserId);
+
+    if (openAndFillUrl != null && this.openAndFillService != null) {
+      await this.openAndFillService.open(uuidAsString(cipher.id!), openAndFillUrl);
+      return;
+    }
 
     await BrowserApi.createNewTab(launchURI);
 

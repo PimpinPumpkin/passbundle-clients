@@ -17,6 +17,17 @@
             aria-readonly="true"
             data-testid="login-website"
           />
+          <!-- Keykeeper: "Open and fill" beside the plain open, where the app has it -->
+          @if (openAndFillUrl(login)) {
+            <button
+              bitIconButton="bwi-sign-in"
+              bitSuffix
+              type="button"
+              (click)="openAndFillWebsite(login)"
+              data-testid="open-and-fill-website"
+              [label]="('keykeeperOpenAndFill' | i18n) + ' ' + login.hostOrUri"
+            ></button>
+          }
           <button
             bitIconButton="bwi-external-link"
             bitSuffix
