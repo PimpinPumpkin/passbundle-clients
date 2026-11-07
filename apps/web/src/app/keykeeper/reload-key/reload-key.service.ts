@@ -1,16 +1,17 @@
 import { Injectable } from "@angular/core";
 
-import { LockService } from "@bitwarden/auth/common";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { TokenService } from "@bitwarden/common/auth/abstractions/token.service";
-import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
 import { VaultTimeoutSettingsService } from "@bitwarden/common/key-management/vault-timeout";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { StateProvider } from "@bitwarden/common/platform/state";
 import { KeyService } from "@bitwarden/key-management";
+// eslint-disable-next-line no-restricted-imports
+import { EncryptService } from "@bitwarden/legacy-crypto";
+import { LockService, LockSource, UnlockService } from "@bitwarden/unlock";
 
 import { browserPage, KeykeeperReloadKey } from "./reload-key";
 
@@ -32,6 +33,7 @@ export class KeykeeperReloadKeyService extends KeykeeperReloadKey {
     environmentService: EnvironmentService,
     logService: LogService,
     lockService: LockService,
+    unlockService: UnlockService,
   ) {
     super({
       api,
@@ -45,7 +47,11 @@ export class KeykeeperReloadKeyService extends KeykeeperReloadKey {
       environmentService,
       logService,
       registerOnLockAction: (action) => lockService.registerOnLockAction(action),
-      lock: (userId) => lockService.lock(userId),
+      // Not the person's own lock: the page came back from the back-forward
+      // cache, which locks the way a lapsed timeout does.
+      lock: (userId) => lockService.lock(userId, LockSource.VaultTimeout),
+      unlockWithUserKey: (userId, userKey) =>
+        unlockService.unlockWithDecryptedUserKey(userId, userKey),
       ...browserPage,
     });
   }

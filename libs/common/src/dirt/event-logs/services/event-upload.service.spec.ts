@@ -1,83 +1,140 @@
-// Keykeeper: uploads go in batches the server takes (at most 500 events
-// each), and what doesn't go is kept for the next try.
-import { mock } from "jest-mock-extended";
-import { BehaviorSubject, firstValueFrom } from "rxjs";
+import { mock, MockProxy } from "jest-mock-extended";
+import { firstValueFrom, of } from "rxjs";
 
-import { FakeStateProvider, mockAccountServiceWith } from "../../../../spec";
+import { FakeAccountService, FakeStateProvider, mockAccountServiceWith } from "../../../../spec";
 import { ApiService } from "../../../abstractions/api.service";
 import { AuthService } from "../../../auth/abstractions/auth.service";
 import { AuthenticationStatus } from "../../../auth/enums/authentication-status";
 import { LogService } from "../../../platform/abstractions/log.service";
-import { Utils } from "../../../platform/misc/utils";
-import { TaskSchedulerService } from "../../../platform/scheduling/task-scheduler.service";
+import { TaskSchedulerService } from "../../../platform/scheduling";
 import { UserId } from "../../../types/guid";
 import { EventType } from "../enums/event-type.enum";
 import { EventData } from "../models/data/event.data";
-import { EventRequest } from "../models/request/event.request";
 
-import { MAX_EVENTS_PER_UPLOAD, EventUploadService } from "./event-upload.service";
+import { EventUploadService } from "./event-upload.service";
 import { EVENT_COLLECTION } from "./key-definitions";
 
-describe("EventUploadService", () => {
-  const userId = Utils.newGuid() as UserId;
+describe("event upload service", () => {
+  let eventUploadService: EventUploadService;
+  let apiService: MockProxy<ApiService>;
   let stateProvider: FakeStateProvider;
-  const apiService = mock<ApiService>();
-  const authService = mock<AuthService>();
-  let service: EventUploadService;
+  let logService: MockProxy<LogService>;
+  let authService: MockProxy<AuthService>;
+  let taskSchedulerService: MockProxy<TaskSchedulerService>;
+  const userId = "00000000-0000-0000-0000-000000000001" as UserId;
+  let accountService: FakeAccountService;
 
-  const events = (count: number, offset = 0) =>
-    Array.from({ length: count }, (_, i) => {
-      const e = new EventData();
-      e.type = EventType.Cipher_ClientViewed;
-      e.cipherId = `cipher-${offset + i}`;
-      e.date = new Date(0).toISOString();
-      return e;
-    });
-  const stored = () => firstValueFrom(stateProvider.getUser(userId, EVENT_COLLECTION).state$);
+  beforeEach(() => {
+    apiService = mock();
+    accountService = mockAccountServiceWith(userId);
+    stateProvider = new FakeStateProvider(accountService);
+    logService = mock();
+    authService = mock();
+    taskSchedulerService = mock();
 
-  beforeEach(async () => {
-    jest.resetAllMocks();
-    stateProvider = new FakeStateProvider(mockAccountServiceWith(userId));
-    authService.authStatusFor$.mockReturnValue(new BehaviorSubject(AuthenticationStatus.Unlocked));
-    service = new EventUploadService(
+    eventUploadService = new EventUploadService(
       apiService,
       stateProvider,
-      mock<LogService>(),
+      logService,
       authService,
-      mock<TaskSchedulerService>(),
+      taskSchedulerService,
     );
   });
 
-  it("uploads a backlog in batches of at most 500", async () => {
-    await stateProvider.setUserState(EVENT_COLLECTION, events(1201), userId);
-    apiService.postEventsCollect.mockResolvedValue(undefined);
-
-    await service.uploadEvents(userId);
-
-    const sizes = apiService.postEventsCollect.mock.calls.map(
-      ([request]) => (request as EventRequest[]).length,
-    );
-    expect(sizes).toEqual([MAX_EVENTS_PER_UPLOAD, MAX_EVENTS_PER_UPLOAD, 201]);
-    expect(await stored()).toEqual([]);
+  afterEach(() => {
+    jest.resetAllMocks();
   });
 
-  it("keeps the batch that failed and the ones after it, ahead of newer events", async () => {
-    await stateProvider.setUserState(EVENT_COLLECTION, events(1200), userId);
-    apiService.postEventsCollect
-      .mockResolvedValueOnce(undefined)
-      .mockImplementationOnce(async () => {
-        // Something is collected while the upload is under way.
-        await stateProvider.setUserState(EVENT_COLLECTION, events(1, 5000), userId);
-        throw new Error("429");
+  describe("uploadEvents", () => {
+    describe("unlocked user", () => {
+      beforeEach(() => {
+        authService.authStatusFor$.mockReturnValue(of(AuthenticationStatus.Unlocked));
       });
 
-    await service.uploadEvents(userId);
+      it("attempts upload of all existing events", async () => {
+        const events = makeEventData(3);
+        await stateProvider.setUserState(EVENT_COLLECTION, events, userId);
 
-    expect(apiService.postEventsCollect).toHaveBeenCalledTimes(2);
-    const left = await stored();
-    expect(left.map((e) => e.cipherId)).toEqual([
-      ...events(700, 500).map((e) => e.cipherId),
-      "cipher-5000",
-    ]);
+        await eventUploadService.uploadEvents(userId);
+
+        expect(apiService.postEventsCollect).toHaveBeenCalledWith(
+          events.map((e) => eventUploadService.eventDataToEventRequest(e)),
+          userId,
+        );
+      });
+
+      it("re-stores events returned from api upload", async () => {
+        const events = makeEventData(3);
+        await stateProvider.setUserState(EVENT_COLLECTION, events, userId);
+
+        const response = events.slice(1);
+        apiService.postEventsCollect.mockResolvedValueOnce(response);
+
+        await eventUploadService.uploadEvents(userId);
+
+        // Keykeeper: stored back by updating the state (see below).
+        expect(
+          await firstValueFrom(stateProvider.getUser(userId, EVENT_COLLECTION).state$),
+        ).toEqual(response);
+      });
+
+      it("re-stores all events if api upload throws", async () => {
+        const events = makeEventData(3);
+        await stateProvider.setUserState(EVENT_COLLECTION, events, userId);
+
+        apiService.postEventsCollect.mockRejectedValueOnce(new Error("API error"));
+
+        await eventUploadService.uploadEvents(userId);
+
+        expect(
+          await firstValueFrom(stateProvider.getUser(userId, EVENT_COLLECTION).state$),
+        ).toEqual(events);
+      });
+
+      it("Keykeeper: stores events that failed to upload ahead of ones collected meanwhile", async () => {
+        const events = makeEventData(3);
+        const collectedMeanwhile = makeEventData(1);
+        await stateProvider.setUserState(EVENT_COLLECTION, events, userId);
+
+        apiService.postEventsCollect.mockImplementationOnce(async () => {
+          await stateProvider.setUserState(EVENT_COLLECTION, collectedMeanwhile, userId);
+          throw new Error("API error");
+        });
+
+        await eventUploadService.uploadEvents(userId);
+
+        expect(
+          await firstValueFrom(stateProvider.getUser(userId, EVENT_COLLECTION).state$),
+        ).toEqual([...events, ...collectedMeanwhile]);
+      });
+
+      it("does not store events if api upload is successful and no events are returned", async () => {
+        const events = makeEventData(3);
+        await stateProvider.setUserState(EVENT_COLLECTION, events, userId);
+        // remove the above call to the mock
+        stateProvider.mock.setUserState.mockClear();
+
+        apiService.postEventsCollect.mockResolvedValueOnce([]);
+
+        await eventUploadService.uploadEvents(userId);
+
+        expect(stateProvider.mock.setUserState).not.toHaveBeenCalled();
+      });
+    });
   });
 });
+
+function makeEventData(count: number): EventData[] {
+  const events: EventData[] = [];
+  for (let i = 0; i < count; i++) {
+    events.push(
+      EventData.fromJSON({
+        type: EventType.Cipher_ClientViewed,
+        date: new Date().toISOString(),
+        cipherId: "00000000-0000-0000-0000-000000000001",
+        organizationId: null!,
+      }),
+    );
+  }
+  return events;
+}

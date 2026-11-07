@@ -5,12 +5,10 @@ import { mock } from "jest-mock-extended";
 import { BehaviorSubject, of } from "rxjs";
 
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
-import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { GlobalStateProvider } from "@bitwarden/common/platform/state";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
-import { VaultSettingsService } from "@bitwarden/common/vault/abstractions/vault-settings/vault-settings.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
 import { CompactModeService, DialogService, ToastService } from "@bitwarden/components";
 import { StateProvider } from "@bitwarden/state";
@@ -33,7 +31,6 @@ describe("AutofillVaultListItemsComponent", () => {
   const hasFilterApplied$ = new BehaviorSubject<boolean>(false);
   const autofillAllowed$ = new BehaviorSubject<boolean>(true);
   const currentTabIsOnBlocklist$ = new BehaviorSubject<boolean>(false);
-  const clickItemsToAutofillVaultView$ = new BehaviorSubject<boolean>(true);
   const currentAutofillTab$ = new BehaviorSubject<chrome.tabs.Tab | null>(null);
 
   beforeEach(async () => {
@@ -63,7 +60,6 @@ describe("AutofillVaultListItemsComponent", () => {
           useValue: { t: (key: string, ...args: string[]) => [key, ...args].join(" ") },
         },
         { provide: CompactModeService, useValue: { enabled$: new BehaviorSubject(false) } },
-        { provide: ConfigService, useValue: { getFeatureFlag$: () => new BehaviorSubject(true) } },
         {
           provide: StateProvider,
           useValue: {
@@ -87,10 +83,6 @@ describe("AutofillVaultListItemsComponent", () => {
             refreshCurrentTab: jest.fn(),
             currentAutofillTab$,
           },
-        },
-        {
-          provide: VaultSettingsService,
-          useValue: { clickItemsToAutofillVaultView$ },
         },
       ],
       schemas: [NO_ERRORS_SCHEMA],

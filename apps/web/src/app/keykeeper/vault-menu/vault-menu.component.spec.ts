@@ -29,10 +29,10 @@ import {
   OrganizationFilter,
   VaultFilterServiceAbstraction,
   Vfo1TerminologyService,
+  CoachmarkService,
 } from "@bitwarden/vault";
 import { OrganizationWarningsService } from "@bitwarden/web-vault/app/billing/organizations/warnings/services";
 
-import { CoachmarkService } from "../../vault/components/coachmark";
 import { HealthCount, KeykeeperHealthCountService } from "../health/health-count.service";
 
 import { KeykeeperPickedLabelService } from "./picked-label.service";
@@ -118,7 +118,7 @@ describe("KeykeeperVaultMenuComponent", () => {
   let router: Router;
   let dialogService: ReturnType<typeof mock<DialogService>>;
   let vaultFilterService: ReturnType<typeof mock<VaultFilterServiceAbstraction>>;
-  const sideNav = { open: signal(true), isOverlay: signal(false) };
+  const sideNav = { open: signal(true), isOverlay: signal(false), version: signal("default") };
   const ciphers$ = new BehaviorSubject<CipherViewLike[]>([]);
   const healthCount$ = new BehaviorSubject<HealthCount | undefined>(undefined);
 
@@ -148,6 +148,7 @@ describe("KeykeeperVaultMenuComponent", () => {
 
     const cipherService = mock<CipherService>();
     cipherService.cipherListViews$.mockReturnValue(ciphers$ as never);
+    cipherService.cipherListViewsWithPartials$.mockReturnValue(ciphers$ as never);
 
     const cipherArchiveService = mock<CipherArchiveService>();
     cipherArchiveService.archivedCiphers$.mockReturnValue(of([]));
@@ -183,7 +184,16 @@ describe("KeykeeperVaultMenuComponent", () => {
         { provide: CipherArchiveService, useValue: cipherArchiveService },
         { provide: PremiumUpgradePromptService, useValue: mock<PremiumUpgradePromptService>() },
         { provide: OrganizationWarningsService, useValue: mock<OrganizationWarningsService>() },
-        { provide: Vfo1TerminologyService, useValue: { enabled: () => false } },
+        {
+          provide: Vfo1TerminologyService,
+          useValue: {
+            enabled: () => false,
+            collectionQueryParams: (collectionId: string | null | undefined) => ({
+              collectionId: collectionId ?? null,
+              sharedFolderId: null,
+            }),
+          },
+        },
         { provide: SideNavService, useValue: sideNav },
         { provide: KeykeeperHealthCountService, useValue: { count$: healthCount$ } },
         {

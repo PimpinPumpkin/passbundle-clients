@@ -1,8 +1,10 @@
 import { createHash } from "crypto";
 
+// eslint-disable-next-line no-restricted-imports
+import { CryptoFunctionService } from "@bitwarden/legacy-crypto";
+
 import { ApiService } from "../abstractions/api.service";
 import { HibpApiService } from "../dirt/services/hibp-api.service";
-import { CryptoFunctionService } from "../key-management/crypto/abstractions/crypto-function.service";
 
 import { AuditService } from "./audit.service";
 

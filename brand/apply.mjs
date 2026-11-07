@@ -250,7 +250,8 @@ function apply() {
     }
     write(rel, JSON.stringify(data, null, 2) + "\n");
   }
-  if (inflected < 100) fail(`found only ${inflected} inflected names. Upstream's translations changed?`);
+  if (inflected < 100)
+    fail(`found only ${inflected} inflected names. Upstream's translations changed?`);
 
   // 1b. Keykeeper's own strings, added to every app's English translations.
   //     Other languages fall back to English until they are translated.
@@ -547,12 +548,19 @@ function apply() {
     "g",
   );
   let storeLinks = 0;
-  for (const rel of trackedFiles("apps/**/*.ts", "libs/**/*.ts", "apps/**/*.html", "libs/**/*.html")) {
+  for (const rel of trackedFiles(
+    "apps/**/*.ts",
+    "libs/**/*.ts",
+    "apps/**/*.html",
+    "libs/**/*.html",
+  )) {
     if (/\.spec\.ts$|\.stories\.ts$|\/spec-data\/|\/spec\/|\/test\//.test(rel)) continue;
     const source = read(rel);
     const branded = source
       .replace(storeLink, () => (storeLinks++, download))
-      .replace(ourSection, (_, section) => (section === "web-browser" ? download : `${download}#apps`));
+      .replace(ourSection, (_, section) =>
+        section === "web-browser" ? download : `${download}#apps`,
+      );
     if (branded !== source) write(rel, branded);
   }
   if (storeLinks < 6) fail(`rewrote only ${storeLinks} store links. Upstream changed?`);
@@ -818,11 +826,6 @@ function brandCli() {
       "apps/cli/src/tools/send/models/send.response.ts",
       /"https:\/\/send\.bitwarden\.com\/#"/,
       JSON.stringify(u.send),
-    ],
-    [
-      "apps/cli/src/vault/create.command.ts",
-      /https:\/\/help\.bitwarden\.com\/article\/update-encryption-key\//,
-      u.help,
     ],
   ];
   for (const [rel, pattern, replacement] of examples) {

@@ -11,10 +11,13 @@ import { Organization } from "@bitwarden/common/admin-console/models/domain/orga
 import { Guid, OrganizationId } from "@bitwarden/common/types/guid";
 
 import { KeykeeperJoinSealer } from "../../../../keykeeper/joining/join-sealer.service";
-import { CoreOrganizationModule } from "../core-organization.module";
 import { OrganizationUserAdminView } from "../views/organization-user-admin-view";
 
-@Injectable({ providedIn: CoreOrganizationModule })
+// Provided in root, not CoreOrganizationModule: standalone components (EditMemberDialogComponent)
+// resolve against the root injector, not the organization module's, so a module-scoped provider is
+// not visible to them. Matches GroupApiService in this folder. Both dependencies below are
+// provided by the eager CoreModule.
+@Injectable({ providedIn: "root" })
 export class UserAdminService {
   constructor(
     private organizationUserApiService: OrganizationUserApiService,
@@ -39,20 +42,6 @@ export class UserAdminService {
     }
 
     return OrganizationUserAdminView.fromResponse(organizationId, userResponse);
-  }
-
-  // TODO: Remove this wrapper once MemberDialogComponent (the old dialog) is deleted.
-  // Callers should use saveV2() directly with an OrganizationUserUpdateRequest.
-  async save(userView: OrganizationUserAdminView, organization: Organization): Promise<void> {
-    const request = new OrganizationUserUpdateRequest({
-      type: userView.type,
-      permissions: userView.permissions,
-      collections: userView.collections,
-      groups: userView.groups,
-      accessSecretsManager: userView.accessSecretsManager,
-    });
-
-    await this.saveV2(request, userView.id, organization);
   }
 
   async saveV2(

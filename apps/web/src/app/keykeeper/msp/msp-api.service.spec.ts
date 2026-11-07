@@ -6,14 +6,18 @@ import { BehaviorSubject } from "rxjs";
 import { KeykeeperJoinSeals, MspDetails, MspJoining } from "@bitwarden/admin-console/common";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
-import { CryptoFunctionService } from "@bitwarden/common/key-management/crypto/abstractions/crypto-function.service";
-import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
-import { SymmetricCryptoKey } from "@bitwarden/common/platform/models/domain/symmetric-crypto-key";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { OrganizationId } from "@bitwarden/common/types/guid";
 import { OrgKey } from "@bitwarden/common/types/key";
 import { KeyService } from "@bitwarden/key-management";
+// eslint-disable-next-line no-restricted-imports
+import {
+  CryptoFunctionService,
+  EncryptService,
+  LegacyCompatKeyService,
+  SymmetricCryptoKey,
+} from "@bitwarden/legacy-crypto";
 
 import { KeykeeperJoinSealer } from "../joining/join-sealer.service";
 
@@ -91,7 +95,7 @@ function setUp(msp: MspDetails, mspJoining?: MspJoining) {
   const api = new KeykeeperMspApiService(
     apiService,
     accountService as AccountService,
-    keyService,
+    mock<LegacyCompatKeyService>(),
     mock<EncryptService>(),
     mock<I18nService>(),
     mock<SyncService>(),

@@ -41,12 +41,14 @@ import {
   BadgeModule,
   ButtonModule,
   CheckboxModule,
+  CopyClickDirective,
   DIALOG_DATA,
   DialogConfig,
   DialogModule,
   DialogRef,
   DialogService,
   FormFieldModule,
+  IconButtonModule,
   IconComponent,
   LinkModule,
   MenuModule,
@@ -102,10 +104,12 @@ import { NestedCheckboxComponent } from "../member-dialog/nested-checkbox.compon
     BadgeModule,
     ButtonModule,
     CheckboxModule,
+    CopyClickDirective,
     DatePipe,
     DialogModule,
     FormFieldModule,
     I18nPipe,
+    IconButtonModule,
     IconComponent,
     LinkModule,
     MenuModule,
@@ -150,8 +154,9 @@ export class EditMemberDialogComponent {
   readonly isRevoked = signal(false);
   readonly showNoMasterPasswordWarning = signal(false);
   protected readonly tabIndex = signal<number>(this.params.initialTab);
-  protected readonly detailsTabEnabled = toSignal(
-    from(this.configService.getFeatureFlag(FeatureFlag.PM28365_ChangeMemberEmail)),
+
+  protected readonly privilegedControlsEnabled = toSignal(
+    from(this.configService.getFeatureFlag(FeatureFlag.Pam)),
   );
 
   protected readonly emailEditable = computed(
@@ -172,6 +177,7 @@ export class EditMemberDialogComponent {
     // set to readonly in the template
     ssoExternalId: this.formBuilder.control({ value: "", disabled: false }),
     accessSecretsManager: false,
+    accessPam: false,
     access: [[] as AccessItemValue[]],
     groups: [[] as AccessItemValue[]],
   });
@@ -222,6 +228,22 @@ export class EditMemberDialogComponent {
     this.formGroup.controls.ssoExternalId.valueChanges.pipe(map((v) => v || undefined)),
     { initialValue: this.formGroup.controls.ssoExternalId.value || undefined },
   );
+
+  /**
+   * Keykeeper: whether a permission our server enforces for custom roles is
+   * checked. Those roles can't also manage all collections yet (the server
+   * refuses it), so the dialog doesn't offer both.
+   */
+  protected get keykeeperPermissionChecked(): boolean {
+    const p = this.permissionsGroup.value;
+    return !!(
+      p.manageUsers ||
+      p.manageResetPassword ||
+      p.managePolicies ||
+      p.accessEventLogs ||
+      p.accessImportExport
+    );
+  }
 
   protected readonly customUserTypeSelected = computed(
     () => this.formTypeValue() === OrganizationUserType.Custom,
@@ -420,6 +442,7 @@ export class EditMemberDialogComponent {
       ssoExternalId: userDetails.ssoExternalId,
       access: accessSelections,
       accessSecretsManager: userDetails.accessSecretsManager,
+      accessPam: userDetails.accessPam,
       groups: groupAccessSelections,
     });
 
@@ -440,6 +463,10 @@ export class EditMemberDialogComponent {
     if (clearPermissions) {
       return new PermissionsApi();
     }
+    // Keykeeper: never ask for both (see keykeeperPermissionChecked).
+    const collections = this.keykeeperPermissionChecked
+      ? { createNewCollections: false, editAnyCollection: false, deleteAnyCollection: false }
+      : this.permissionsGroup.value.manageAllCollectionsGroup;
     const partialPermissions: Partial<PermissionsApi> = {
       accessEventLogs: this.permissionsGroup.value.accessEventLogs ?? undefined,
       accessImportExport: this.permissionsGroup.value.accessImportExport ?? undefined,
@@ -449,12 +476,9 @@ export class EditMemberDialogComponent {
       managePolicies: this.permissionsGroup.value.managePolicies ?? undefined,
       manageUsers: this.permissionsGroup.value.manageUsers ?? undefined,
       manageResetPassword: this.permissionsGroup.value.manageResetPassword ?? undefined,
-      createNewCollections:
-        this.permissionsGroup.value.manageAllCollectionsGroup?.createNewCollections ?? undefined,
-      editAnyCollection:
-        this.permissionsGroup.value.manageAllCollectionsGroup?.editAnyCollection ?? undefined,
-      deleteAnyCollection:
-        this.permissionsGroup.value.manageAllCollectionsGroup?.deleteAnyCollection ?? undefined,
+      createNewCollections: collections?.createNewCollections ?? undefined,
+      editAnyCollection: collections?.editAnyCollection ?? undefined,
+      deleteAnyCollection: collections?.deleteAnyCollection ?? undefined,
     };
 
     return Object.assign(p, partialPermissions);
@@ -477,6 +501,7 @@ export class EditMemberDialogComponent {
       : this.formGroup.value.groups?.map((m) => m.id);
 
     const accessSecretsManager = this.formGroup.value.accessSecretsManager ?? undefined;
+    const accessPam = this.formGroup.value.accessPam ?? undefined;
 
     const email = this.emailEditable()
       ? (this.formGroup.getRawValue().email ?? undefined)
@@ -490,6 +515,7 @@ export class EditMemberDialogComponent {
       groups,
       collections,
       accessSecretsManager,
+      accessPam,
       email,
       name,
     });
@@ -526,14 +552,10 @@ export class EditMemberDialogComponent {
     this.formGroup.markAllAsTouched();
 
     if (this.formGroup.invalid) {
-      const detailsTab = this.detailsTabEnabled() ? MemberDialogTab.Details : MemberDialogTab.Role;
-      if (this.tabIndex() !== detailsTab) {
-        const tabName = this.detailsTabEnabled()
-          ? this.i18nService.t("details")
-          : this.i18nService.t("role");
+      if (this.tabIndex() !== MemberDialogTab.Details) {
         this.toastService.showToast({
           variant: "error",
-          message: this.i18nService.t("fieldOnTabRequiresAttention", tabName),
+          message: this.i18nService.t("fieldOnTabRequiresAttention", this.i18nService.t("details")),
         });
       }
       return;

@@ -3,6 +3,7 @@
 // Keykeeper: `get` for items whose secrets the person can't see
 // (hidden-items.ts), item templates (templates.ts), and item history
 // (item-history.ts), through upstream's GetCommand.
+
 import { mock } from "jest-mock-extended";
 import { of } from "rxjs";
 
@@ -13,7 +14,6 @@ import { OrganizationService } from "@bitwarden/common/admin-console/abstraction
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions/account/billing-account-profile-state.service";
 import { EventCollectionService } from "@bitwarden/common/dirt/event-logs";
-import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
 import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { mockAccountInfoWith } from "@bitwarden/common/spec";
@@ -27,6 +27,8 @@ import { TEMPLATE_FIELD_NAME } from "@bitwarden/common/vault/keykeeper/templates
 import { Cipher } from "@bitwarden/common/vault/models/domain/cipher";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { KeyService } from "@bitwarden/key-management";
+// eslint-disable-next-line no-restricted-imports
+import { EncryptService, LegacyCompatKeyService } from "@bitwarden/legacy-crypto";
 
 import { GetCommand } from "../commands/get.command";
 import { ListResponse } from "../models/response/list.response";
@@ -86,6 +88,7 @@ describe("GetCommand with PassBundle's rules", () => {
       totpService,
       auditService,
       mock<KeyService>(),
+      mock<LegacyCompatKeyService>(),
       mock<EncryptService>(),
       mock<SearchService>(),
       apiService,

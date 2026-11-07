@@ -1,4 +1,4 @@
-<!-- Keykeeper: iconOnly is the vault page's New, a + beside the search (DESIGN.md, "The look"). -->
+<!-- Keykeeper: iconOnly is the vault page's Add, a + beside the search (DESIGN.md, "The look"). -->
 @if (useNewItemDialog()) {
   @if (iconOnly()) {
     <button
@@ -7,7 +7,7 @@
       type="button"
       (click)="navigateToNewItemPage()"
       [disabled]="!canCreateCipher()"
-      [label]="(btnTextAddCreateFeatureFlag() ? 'add' : 'new') | i18n"
+      [label]="'add' | i18n"
       [bitTooltip]="!canCreateCipher() ? ('organizationIsDeactivated' | i18n) : ''"
       data-testid="new-item-button"
     ></button>
@@ -21,7 +21,7 @@
       [bitTooltip]="!canCreateCipher() ? ('organizationIsDeactivated' | i18n) : ''"
       startIcon="bwi-plus"
     >
-      {{ (btnTextAddCreateFeatureFlag() ? "add" : "new") | i18n }}
+      {{ "add" | i18n }}
     </button>
   }
 } @else {
@@ -32,7 +32,7 @@
       type="button"
       [bitMenuTriggerFor]="itemOptions"
       [disabled]="!canCreateCipher()"
-      [label]="(btnTextAddCreateFeatureFlag() ? 'add' : 'new') | i18n"
+      [label]="'add' | i18n"
       [bitTooltip]="!canCreateCipher() ? ('organizationIsDeactivated' | i18n) : ''"
       data-testid="new-item-button"
     ></button>
@@ -46,7 +46,7 @@
       [disabled]="!canCreateCipher()"
       [bitTooltip]="!canCreateCipher() ? ('organizationIsDeactivated' | i18n) : ''"
     >
-      {{ (btnTextAddCreateFeatureFlag() ? "add" : "new") | i18n }}
+      {{ "add" | i18n }}
     </button>
   }
   <bit-menu #itemOptions>

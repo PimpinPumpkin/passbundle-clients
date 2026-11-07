@@ -61,6 +61,7 @@ export const EventCategoryEventTypes: Record<EventCategory, EventType[]> = {
     EventType.Cipher_ClientToggledIbanVisible,
     EventType.Cipher_ClientCopiedSwiftCode,
     EventType.Cipher_ClientToggledSwiftCodeVisible,
+    EventType.Cipher_ClientHttpAuthReleased,
     // Keykeeper: an item's earlier versions cleared, or one deleted.
     EventType.Keykeeper_CipherHistoryCleared,
     EventType.Keykeeper_CipherVersionDeleted,
