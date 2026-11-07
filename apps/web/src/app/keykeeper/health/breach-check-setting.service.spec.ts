@@ -72,6 +72,12 @@ describe("Check my passwords against known breaches after unlocking", () => {
       stateProvider = new FakeStateProvider(accountService);
     });
 
+    it("keeps never set apart from on when read back from the browser's storage", () => {
+      expect(CHECK_AFTER_UNLOCK.deserializer(null as never)).toBeNull();
+      expect(CHECK_AFTER_UNLOCK.deserializer(false)).toBe(false);
+      expect(CHECK_AFTER_UNLOCK.deserializer(true)).toBe(true);
+    });
+
     it("says what's here in the document's terms, and whether it was set here", async () => {
       const part = breachCheckSyncedPart(stateProvider);
       expect(part.name).toBe("health");

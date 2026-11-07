@@ -33,12 +33,16 @@ function readStored(value: string | null): boolean {
   }
 }
 
-/** On until the person turns it off; null (never set) counts as on. */
-export const CHECK_AFTER_UNLOCK = new UserKeyDefinition<boolean>(
+/**
+ * On until the person turns it off; null (never set) counts as on. Null stays
+ * null when read back, so the account's settings document can tell a switch
+ * nobody set on this device (which takes the document's) from one set here.
+ */
+export const CHECK_AFTER_UNLOCK = new UserKeyDefinition<boolean | null>(
   KEYKEEPER_HEALTH_DISK,
   "checkAfterUnlock",
   {
-    deserializer: (on) => on !== false,
+    deserializer: (on) => (on == null ? null : on !== false),
     clearOn: [],
   },
 );
