@@ -1035,5 +1035,11 @@
   },
   "keykeeperOpenAndFillHint": {
     "message": "Open and fill doesn't need this setting: the open button beside a login opens its website in a new tab and fills it there, once, and only on that site. It never submits the form."
+  },
+  "keykeeperDuoBackToApp": {
+    "message": "Back to the app"
+  },
+  "keykeeperDuoBackToAppDesc": {
+    "message": "Your browser opens the app to finish signing in. If it doesn't, select Back to the app."
   }
 }

@@ -28,9 +28,9 @@ window.addEventListener("load", async () => {
   await localeService.init();
 
   // PassBundle: the web vault and the extension, both on this page's own
-  // origin. Upstream's mobile and desktop apps got the code through deep
-  // links to upstream's apps; PassBundle's own apps don't use Duo here, so
-  // those are gone (DESIGN.md, "Connector pages").
+  // origin, and PassBundle's own apps (passbundle-apps), which sign in as
+  // "desktop" or "mobile" and get the answer through their own link. Never
+  // upstream's apps' links (DESIGN.md, "Connector pages").
   if (client === "web") {
     const channel = new BroadcastChannel("duoResult");
 
@@ -41,8 +41,28 @@ window.addEventListener("load", async () => {
   } else if (client === "browser") {
     window.postMessage({ command: "duoResult", code, state }, window.location.origin);
     displayHandoffMessage(client);
+  } else if (client === "desktop" || client === "mobile") {
+    const link = appLink(code, state);
+    displayHandoffMessage(client, link);
+    window.location.replace(link);
   }
 });
+
+/**
+ * PassBundle's apps' way back from Duo (passbundle-apps, two_step.dart and
+ * core/src/two_step.rs): the app finishes only the sign-in whose state the
+ * answer carries, so a link made anywhere else finishes nothing. The Mac and
+ * iPhone apps receive it in their own sign-in window; Android, Windows, and
+ * Linux open the app with it.
+ */
+export function appLink(code: string, state: string): string {
+  return (
+    "passbundle://duo-callback?code=" +
+    encodeURIComponent(code) +
+    "&state=" +
+    encodeURIComponent(state)
+  );
+}
 
 /**
  * validate the Duo AuthUrl and redirect to it.
@@ -95,7 +115,7 @@ export function redirectToDuoFrameless(redirectUrl: string) {
  * Note: browsers won't let javascript close a tab (button or otherwise) that wasn't opened by javascript,
  * so browser, desktop, and mobile are not able to take advantage of the countdown timer or close button.
  */
-function displayHandoffMessage(client: string) {
+function displayHandoffMessage(client: string, appLink?: string) {
   const content: HTMLElement | null = document.getElementById("content");
   if (!content) {
     throw new Error("content element not found");
@@ -120,6 +140,18 @@ function displayHandoffMessage(client: string) {
 
   content.appendChild(h1);
   content.appendChild(p);
+
+  // PassBundle's apps: the browser opens the app by itself, or asks first;
+  // if it doesn't, this does.
+  if (appLink) {
+    p.textContent = localeService.t("keykeeperDuoBackToAppDesc");
+    const back = document.createElement("a");
+    back.href = appLink;
+    back.textContent = localeService.t("keykeeperDuoBackToApp");
+    back.className =
+      "tw-bg-primary-600 hover:tw-bg-primary-700 tw-text-contrast tw-px-4 tw-py-2 tw-rounded-md tw-transition tw-no-underline tw-inline-block";
+    content.appendChild(back);
+  }
 
   // Web client will have a close button as well as an auto close timer
   if (client == "web") {
