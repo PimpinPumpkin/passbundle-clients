@@ -107,6 +107,12 @@
         route="settings/account"
         *ngIf="organization.isOwner"
       ></bit-nav-item>
+      <!-- Keykeeper: joining, the install command, and more, for owners and admins. The server answers only them. -->
+      <bit-nav-item
+        text="Joining and security"
+        route="settings/joining"
+        *ngIf="organization.isAdmin"
+      ></bit-nav-item>
       <bit-nav-item
         [text]="'policies' | i18n"
         route="settings/policies"

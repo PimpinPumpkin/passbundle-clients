@@ -41,7 +41,7 @@ describe("Offboarding words", () => {
     );
     expect(said.people).toBe("2 people from Northwind IT lost access to this organization.");
     expect(said.removed).toEqual([
-      "Script tokens they made, now revoked: RMM deploy and Backup. Make new ones on the Settings page if your scripts still need them.",
+      "Script tokens they made, now revoked: RMM deploy and Backup. Make new ones in Settings, Joining and security, if your scripts still need them.",
       "The provisioning token mia@northwind.test made, now revoked. Microsoft Entra ID stops updating your members until you make a new one on the Provisioning page.",
       "Event destinations they set up, now deleted: SOC.",
       "What let your apps confirm their staff on their own.",

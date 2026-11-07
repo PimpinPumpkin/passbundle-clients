@@ -79,7 +79,7 @@ export class KeykeeperInstallTokenPromptComponent {
     const confirmed = await this.dialogService.openSimpleDialog({
       title: "Replace the install token?",
       content:
-        "Install commands already run on your computers stop letting new people join. Copy the new command from the Settings page and run it there instead.",
+        "Install commands already run on your computers stop letting new people join. Copy the new command from Settings, Joining and security, and run it there instead.",
       acceptButtonText: "Replace token",
       type: "warning",
     });

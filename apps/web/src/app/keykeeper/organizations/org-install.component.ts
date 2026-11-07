@@ -2,24 +2,19 @@ import { ChangeDetectionStrategy, Component, effect, input, signal } from "@angu
 import { FormBuilder } from "@angular/forms";
 import { firstValueFrom } from "rxjs";
 
-import {
-  ClientEnrollment,
-  INSTALL_COMMAND_REFUSED,
-  InstallCommandParts,
-  installCommand,
-} from "@bitwarden/admin-console/common";
+import { ClientEnrollment } from "@bitwarden/admin-console/common";
 import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
-import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
-import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { DialogService, ToastService } from "@bitwarden/components";
 
 import { SharedModule } from "../../shared";
 import { KeykeeperJoinSealer } from "../joining/join-sealer.service";
 import { KeykeeperMspApiService } from "../msp/msp-api.service";
 
+import { KeykeeperInstallCommandComponent, ShownInstallParts } from "./install-command.component";
+
 type InstallState =
-  | { kind: "own"; enrollment: ClientEnrollment; parts: InstallCommandParts | null }
+  | { kind: "own"; enrollment: ClientEnrollment; parts: ShownInstallParts | null }
   /** An MSP's client: its install command is in the MSP's console. */
   | { kind: "provider"; provider: string };
 
@@ -32,7 +27,7 @@ type InstallState =
 @Component({
   selector: "app-keykeeper-org-install",
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SharedModule],
+  imports: [SharedModule, KeykeeperInstallCommandComponent],
   template: `
     @if (state(); as s) {
       <section data-testid="org-install">
@@ -43,26 +38,19 @@ type InstallState =
           </p>
         } @else {
           <p bitTypography="body1">
-            Run this on your organization's Windows computers as an administrator, from Intune,
-            group policy, or your RMM. It installs the extension in Edge and Chrome with this server
-            filled in, turns off the browsers' password managers, and anyone who then signs in joins
-            the organization.
+            Run it on your organization's computers to turn off the browsers' own password saving,
+            and to install the extension, once it's in the Chrome and Edge stores, with this server
+            filled in. Anyone who then signs in joins the organization.
           </p>
           @if (s.enrollment.token; as token) {
-            @if (installCommand(token); as command) {
-              <pre
-                class="tw-whitespace-pre-wrap tw-break-all tw-rounded tw-bg-background-alt tw-p-3 tw-text-sm"
-                data-testid="org-install-command"
-                >{{ command }}</pre>
-            } @else {
-              <p
-                bitTypography="body2"
-                class="tw-text-danger"
-                data-testid="org-install-command-refused"
-              >
-                {{ refusedCommand }}
-              </p>
-            }
+            <app-keykeeper-install-command
+              [token]="token"
+              [parts]="s.parts"
+              [serverUrl]="serverUrl()"
+              whose="your organization's"
+              joins="the organization"
+              testIdPrefix="org-install"
+            />
             <p bitTypography="helper" data-testid="org-install-joins">
               {{ s.enrollment.joins === 1 ? "1 person has" : s.enrollment.joins + " people have" }}
               joined with this command.
@@ -93,9 +81,6 @@ type InstallState =
               </button>
             </form>
             <div class="tw-flex tw-gap-2">
-              <button bitButton buttonType="primary" type="button" (click)="copyCommand(token)">
-                Copy command
-              </button>
               <button bitButton buttonType="danger" type="button" [bitAction]="replaceToken">
                 Replace token
               </button>
@@ -115,14 +100,12 @@ export class KeykeeperOrgInstallComponent {
 
   protected readonly state = signal<InstallState | null>(null);
   protected readonly domainsForm = this.formBuilder.nonNullable.group({ domains: "" });
-  private readonly serverUrl = signal("");
+  protected readonly serverUrl = signal("");
 
   constructor(
     private readonly formBuilder: FormBuilder,
     private readonly api: KeykeeperMspApiService,
     private readonly environmentService: EnvironmentService,
-    private readonly i18nService: I18nService,
-    private readonly platformUtilsService: PlatformUtilsService,
     private readonly dialogService: DialogService,
     private readonly toastService: ToastService,
     private readonly sealer: KeykeeperJoinSealer,
@@ -174,33 +157,10 @@ export class KeykeeperOrgInstallComponent {
     return s?.kind === "own" && s.enrollment.token != null;
   }
 
-  /** The command to run on each computer; the script's name comes from the brand. */
-  protected installCommand(token: string): string | null {
-    const s = this.state();
-    return installCommand(
-      this.i18nService.t("keykeeperInstallScript"),
-      this.serverUrl(),
-      token,
-      s?.kind === "own" ? s.parts : null,
-    );
-  }
-
-  protected readonly refusedCommand = INSTALL_COMMAND_REFUSED;
-
   protected domainList(domains: string[]): string {
     return domains.length < 2
       ? domains.join("")
       : `${domains.slice(0, -1).join(", ")} or ${domains[domains.length - 1]}`;
-  }
-
-  protected copyCommand(token: string) {
-    const command = this.installCommand(token);
-    if (command == null) {
-      this.toastService.showToast({ variant: "error", message: INSTALL_COMMAND_REFUSED });
-      return;
-    }
-    this.platformUtilsService.copyToClipboard(command);
-    this.toastService.showToast({ variant: "success", message: "Copied the install command" });
   }
 
   protected readonly saveDomains = async () => {

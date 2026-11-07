@@ -7,15 +7,16 @@ import {
   inject,
   signal,
 } from "@angular/core";
+import { toSignal } from "@angular/core/rxjs-interop";
 import { FormBuilder, Validators } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
-import { firstValueFrom } from "rxjs";
+import { firstValueFrom, switchMap } from "rxjs";
 
+import { InstallCommandParts } from "@bitwarden/admin-console/common";
 import {
-  INSTALL_COMMAND_REFUSED,
-  InstallCommandParts,
-  installCommand,
-} from "@bitwarden/admin-console/common";
+  canAccessOrgAdmin,
+  OrganizationService,
+} from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
@@ -23,7 +24,6 @@ import { PwnedPasswordsCancelledError } from "@bitwarden/common/dirt/keykeeper/p
 import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
-import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { PasswordStrengthServiceAbstraction } from "@bitwarden/common/tools/password-strength";
@@ -50,6 +50,8 @@ import {
   removedByClientLine,
   replaceTokenPrompt,
 } from "../offboarding/offboarding";
+import { KeykeeperInstallCommandComponent } from "../organizations/install-command.component";
+import { KeykeeperTwoStepDetour } from "../two-step-setup/two-step-detour";
 
 import { withAdminTwoStep } from "./admin-two-step-policy";
 import {
@@ -89,6 +91,19 @@ import { KeykeeperTechnicianAccessEditorComponent } from "./technician-access-ed
 const CONFIRMED = 2;
 const EVENTS_PER_PAGE = 50;
 
+/** Keykeeper: why the console couldn't open, in plain words. */
+function loadErrorText(e: unknown): string {
+  if (e instanceof ErrorResponse) {
+    return e.statusCode >= 500
+      ? `The server had a problem (error ${e.statusCode}). Try again in a minute.`
+      : e.getSingleMessage();
+  }
+  // fetch() fails with a TypeError when the server can't be reached.
+  return e instanceof TypeError
+    ? "This browser couldn't reach the server. Check that you're online, then try again."
+    : "Something went wrong opening it. Try again, and if it keeps happening, reload the page.";
+}
+
 /**
  * Plan features every client on our server has, for upstream's checks of
  * which policies to show. Which policies the server supports comes from the
@@ -119,6 +134,7 @@ const CLIENT_FEATURES = {
     KeykeeperMspTemplatesComponent,
     KeykeeperMspTwoStepComponent,
     KeykeeperTechnicianAccessEditorComponent,
+    KeykeeperInstallCommandComponent,
     TooltipDirective,
   ],
   template: `
@@ -149,6 +165,16 @@ const CLIENT_FEATURES = {
       }
       @if (loading()) {
         <bit-icon name="bwi-spinner" class="bwi-spin tw-text-muted" title="Loading"></bit-icon>
+      } @else if (loadError(); as error) {
+        <!-- Keykeeper: an MSP's own admin who's offline never lands on Create MSP. -->
+        <bit-callout
+          type="danger"
+          title="Couldn't open the MSP console"
+          data-testid="msp-load-error"
+        >
+          <p>{{ error }}</p>
+          <button bitButton buttonType="primary" type="button" [bitAction]="load">Try again</button>
+        </bit-callout>
       } @else if (msp(); as m) {
         <p class="tw-mb-6" data-testid="msp-name">
           <span bitTypography="h2" class="tw-mr-2">{{ m.name }}</span>
@@ -205,7 +231,15 @@ const CLIENT_FEATURES = {
             }
           }
           @if (m.clients.length === 0) {
-            <p bitTypography="body1">No clients yet.</p>
+            <p bitTypography="body1" data-testid="msp-no-clients">
+              @if (m.role === "admin") {
+                No clients yet. Add your first one below: its organization, default policies, and
+                shared folders are made in one step, and your staff are added to it.
+              } @else {
+                You don't work in any of {{ m.name }}'s clients yet. An MSP admin chooses which
+                clients each technician reaches{{ adminToAsk(m) }}.
+              }
+            </p>
           } @else {
             <!-- Keykeeper: what each client action does, for screen readers (its tooltip shows the same). -->
             <div hidden>
@@ -311,7 +345,29 @@ const CLIENT_FEATURES = {
                         they line up from row to row. Each says what it does in a tooltip, and
                         to screen readers through the descriptions above the table. -->
                       <div class="tw-flex tw-flex-col tw-items-start tw-gap-1">
-                        @if (client.you?.status === CONFIRMED) {
+                        @if (client.you?.status === CONFIRMED && !opensAdminConsole(client)) {
+                          <!-- Keykeeper: their custom role there has nothing in its admin console. -->
+                          @if (client.you?.vaultItems !== false) {
+                            <a
+                              bitLink
+                              class="tw-whitespace-nowrap"
+                              data-testid="msp-client-items"
+                              [routerLink]="['/vault']"
+                              [queryParams]="{ organizationId: client.id }"
+                              [bitTooltip]="noConsoleHelp(client)"
+                              [attr.aria-label]="'Items in ' + client.name"
+                              >Its items</a
+                            >
+                          } @else {
+                            <span
+                              class="tw-whitespace-nowrap tw-text-muted"
+                              data-testid="msp-client-no-console"
+                              [bitTooltip]="noConsoleHelp(client)"
+                              >No admin console</span
+                            >
+                          }
+                          <span class="tw-sr-only">{{ noConsoleHelp(client) }}</span>
+                        } @else if (client.you?.status === CONFIRMED) {
                           <a
                             bitLink
                             class="tw-whitespace-nowrap"
@@ -413,26 +469,15 @@ const CLIENT_FEATURES = {
                 </bit-callout>
               }
               @if (install.enrollment.token; as token) {
-                <p bitTypography="body2">
-                  Run this from your RMM on {{ install.client.name }}'s computers, as an
-                  administrator. It installs the extension in Edge and Chrome, turns off the
-                  browsers' password managers, and anyone who then signs in joins
-                  {{ install.client.name }}.
-                </p>
-                @if (installCommand(token); as command) {
-                  <pre
-                    class="tw-whitespace-pre-wrap tw-break-all tw-rounded tw-bg-background-alt tw-p-3 tw-text-sm"
-                    data-testid="msp-install-command"
-                    >{{ command }}</pre>
-                } @else {
-                  <p
-                    bitTypography="body2"
-                    class="tw-text-danger"
-                    data-testid="msp-install-command-refused"
-                  >
-                    {{ refusedCommand }}
-                  </p>
-                }
+                <!-- Keykeeper: for Windows, Mac, or Linux (install-command.component.ts). -->
+                <app-keykeeper-install-command
+                  [token]="token"
+                  [parts]="install.parts"
+                  [serverUrl]="serverUrl()"
+                  [whose]="possessive(install.client.name)"
+                  [joins]="install.client.name"
+                  testIdPrefix="msp-install"
+                />
                 <p bitTypography="helper">
                   {{
                     install.enrollment.joins === 1
@@ -468,16 +513,8 @@ const CLIENT_FEATURES = {
                     </button>
                   </form>
                 }
-                <div class="tw-flex tw-gap-2">
-                  <button
-                    bitButton
-                    buttonType="secondary"
-                    type="button"
-                    (click)="copyCommand(token)"
-                  >
-                    Copy command
-                  </button>
-                  @if (m.role === "admin") {
+                @if (m.role === "admin") {
+                  <div class="tw-flex tw-gap-2">
                     <button
                       bitButton
                       buttonType="danger"
@@ -486,8 +523,8 @@ const CLIENT_FEATURES = {
                     >
                       Replace token
                     </button>
-                  }
-                </div>
+                  </div>
+                }
               } @else if (m.role === "admin") {
                 <button
                   bitButton
@@ -925,10 +962,14 @@ const CLIENT_FEATURES = {
         </bit-callout>
         @if (needsTwoStep()) {
           <bit-callout type="warning" [title]="null" data-testid="msp-setup-two-step">
-            Your MSP's staff sign in with two-step login: an authenticator app, a security key or
-            passkey, or Duo. You haven't set it up, so once your MSP is made you'll be signed out,
-            and asked to set it up when you sign in again.
-            <a bitLink routerLink="/settings/security/two-factor">Set it up first</a>
+            <p>
+              Your MSP's staff sign in with two-step login: an authenticator app, a security key or
+              passkey, or Duo. Set it up before you make your MSP, so you stay signed in. It takes a
+              minute, and what you type here stays.
+            </p>
+            <button bitButton buttonType="secondary" type="button" (click)="setUpTwoStep()">
+              Set up two-step login
+            </button>
           </bit-callout>
         }
         <form [formGroup]="mspForm" [bitSubmit]="createMsp" class="tw-flex tw-items-end tw-gap-2">
@@ -945,6 +986,8 @@ const CLIENT_FEATURES = {
 export class KeykeeperMspComponent implements OnInit {
   protected readonly CONFIRMED = CONFIRMED;
   protected readonly loading = signal(true);
+  /** Keykeeper: why the console couldn't open, with Try again (never the Create MSP form). */
+  protected readonly loadError = signal<string | null>(null);
   protected readonly msp = signal<MspDetails | null>(null);
   /**
    * For MSP admins, the clients this browser trusts (their client seal
@@ -1006,12 +1049,22 @@ export class KeykeeperMspComponent implements OnInit {
   );
   /** Expired and soon-expiring items across the clients, from the same items. */
   protected readonly expiring = signal<ExpiringItem[] | null>(null);
+  /** Keykeeper: the person's own memberships, for which clients' admin consoles their role opens. */
+  private readonly organizationService = inject(OrganizationService);
+  private readonly myOrganizations = toSignal(
+    inject(AccountService).activeAccount$.pipe(
+      getUserId,
+      switchMap((userId) => this.organizationService.organizations$(userId)),
+    ),
+    { initialValue: [] as Organization[] },
+  );
+  private readonly twoStepDetour = inject(KeykeeperTwoStepDetour);
   protected readonly installFor = signal<{
     client: MspClient;
     enrollment: ClientEnrollment;
     parts: InstallCommandParts | null;
   } | null>(null);
-  private readonly serverUrl = signal("");
+  protected readonly serverUrl = signal("");
 
   protected readonly defaultAccess = DEFAULT_ACCESS;
   /** The technician whose access is being edited. */
@@ -1040,7 +1093,6 @@ export class KeykeeperMspComponent implements OnInit {
     private readonly formBuilder: FormBuilder,
     private readonly toastService: ToastService,
     private readonly sealer: KeykeeperJoinSealer,
-    private readonly i18nService: I18nService,
     private readonly environmentService: EnvironmentService,
     private readonly platformUtilsService: PlatformUtilsService,
     private readonly dialogService: DialogService,
@@ -1061,6 +1113,11 @@ export class KeykeeperMspComponent implements OnInit {
       (has) => this.needsTwoStep.set(!has),
       () => this.needsTwoStep.set(false),
     );
+    // Keykeeper: back from setting up two-step login, the name they'd typed.
+    const back = this.twoStepDetour.take("/msp");
+    if (back != null) {
+      this.mspForm.setValue({ name: back.name });
+    }
     try {
       const token = this.route.snapshot.queryParamMap.get("invite");
       if (token) {
@@ -1069,6 +1126,17 @@ export class KeykeeperMspComponent implements OnInit {
     } catch (e) {
       this.showError(e);
     }
+    await this.load();
+  }
+
+  /**
+   * Opens the console. If it can't, the page says why, with Try again: an
+   * MSP's admin who is offline, or whose server has a problem, must never be
+   * shown the Create MSP form as if they had none.
+   */
+  protected readonly load = async () => {
+    this.loading.set(true);
+    this.loadError.set(null);
     try {
       const [first] = await this.mspApi.list();
       if (first) {
@@ -1078,15 +1146,53 @@ export class KeykeeperMspComponent implements OnInit {
         void this.work.run();
       }
     } catch (e) {
-      this.showError(e);
+      if (this.msp() == null) {
+        this.loadError.set(loadErrorText(e));
+      } else {
+        this.showError(e);
+      }
     } finally {
       this.loading.set(false);
     }
+  };
+
+  /** Keykeeper: to the Two-step login page, with a way back here that keeps the name. */
+  protected async setUpTwoStep() {
+    await this.twoStepDetour.start({
+      path: "/msp",
+      label: "Set up your MSP",
+      name: this.mspForm.value.name ?? "",
+    });
   }
 
   protected readonly createMsp = async () => {
     if (this.mspForm.invalid) {
       this.mspForm.markAllAsTouched();
+      return;
+    }
+    // Keykeeper: without two-step login that counts, making the MSP would end
+    // this session at once (DESIGN.md, "Two-step login for admins"), so it
+    // says so first and offers to set it up. Checked now, not when the page
+    // opened: it may have been set up meanwhile.
+    let hasTwoStep = true;
+    try {
+      hasTwoStep = await this.mspApi.hasQualifyingTwoStep();
+    } catch {
+      // Unknown: the server decides.
+    }
+    this.needsTwoStep.set(!hasTwoStep);
+    if (!hasTwoStep) {
+      const name = this.mspForm.value.name!.trim();
+      const setUp = await this.dialogService.openSimpleDialog({
+        title: "Set up two-step login first",
+        content: `Your MSP's staff sign in with two-step login: an authenticator app, a security key or passkey, or Duo. Email codes don't count. Without it, making ${name} would sign you out right away. Set it up now, and come back here to make ${name}.`,
+        acceptButtonText: "Set up two-step login",
+        cancelButtonText: "Not now",
+        type: "warning",
+      });
+      if (setUp) {
+        await this.setUpTwoStep();
+      }
       return;
     }
     await this.attempt(async () => {
@@ -1191,6 +1297,31 @@ export class KeykeeperMspComponent implements OnInit {
 
   protected accessText(access: TechnicianAccess): string {
     return describeAccess(access, this.msp()?.clients ?? []);
+  }
+
+  /** For a technician with no clients: an MSP admin to ask, by name. */
+  protected adminToAsk(msp: MspDetails): string {
+    const admin = msp.staff.find((p) => p.role === "admin");
+    return admin == null
+      ? ": ask one to give you access"
+      : `: ask ${admin.name || admin.email} to give you access`;
+  }
+
+  /**
+   * Whether the person's role in a client opens its admin console, by
+   * upstream's own rule. A custom role with no admin permissions there gets
+   * a plain explanation instead of a link the admin console would refuse.
+   * A client not synced yet keeps the link: the admin console decides.
+   */
+  protected opensAdminConsole(client: MspClient): boolean {
+    const organization = this.myOrganizations().find((o) => o.id === client.id);
+    return organization == null || canAccessOrgAdmin(organization);
+  }
+
+  protected noConsoleHelp(client: MspClient): string {
+    return client.you?.vaultItems !== false
+      ? `Your role in ${client.name} doesn't include its admin console. Its items are in your vault.`
+      : `Your role in ${client.name} doesn't include its admin console or its items. An MSP admin can change your access.`;
   }
 
   /** What each of a client's actions does: its tooltip, and its description for screen readers. */
@@ -1324,33 +1455,16 @@ export class KeykeeperMspComponent implements OnInit {
     });
   };
 
-  /** The command an MSP runs from their RMM; the script's name comes from the brand. */
-  protected installCommand(token: string): string | null {
-    return installCommand(
-      this.i18nService.t("keykeeperInstallScript"),
-      this.serverUrl(),
-      token,
-      this.installFor()?.parts,
-    );
+  /** "Acme Dental's", for the install command's words. */
+  protected possessive(name: string): string {
+    return `${name}'s`;
   }
-
-  protected readonly refusedCommand = INSTALL_COMMAND_REFUSED;
 
   // Keykeeper: offboarding's words (DESIGN.md, "Offboarding").
   protected readonly clientRemovedLine = clientRemovedLine;
   protected readonly removedByClientLine = removedByClientLine;
   protected readonly replaceTokenPrompt = (removedSinceToken: number | undefined) =>
     replaceTokenPrompt(removedSinceToken);
-
-  protected copyCommand(token: string) {
-    const command = this.installCommand(token);
-    if (command == null) {
-      this.toastService.showToast({ variant: "error", message: INSTALL_COMMAND_REFUSED });
-      return;
-    }
-    this.platformUtilsService.copyToClipboard(command);
-    this.toast("Copied the install command");
-  }
 
   /**
    * A client an MSP admin holds the key of that this browser can't check is

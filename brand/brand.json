@@ -22,6 +22,8 @@
     "send": "https://vault.passbundle.com/#/send/"
   },
   "installScript": "Install-PassBundle.ps1",
+  "installScriptMacLinux": "install-passbundle.sh",
+  "macProfile": "PassBundle.mobileconfig",
   "nativeMessagingHost": "com.passbundle.agent",
   "cli": {
     "command": "passbundle",

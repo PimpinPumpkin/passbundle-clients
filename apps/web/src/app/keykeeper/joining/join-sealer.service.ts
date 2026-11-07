@@ -198,12 +198,13 @@ export class KeykeeperJoinSealer {
    * What the install command carries besides the token: the join secret, and
    * the fingerprint of the organization's public key, made from its private
    * key (never from the public key the server sends). Null without the key or
-   * a secret.
+   * a secret. With them, the organization's fingerprint phrase from the same
+   * key, which the extension shows the people who join, to compare.
    */
   async commandParts(
     organizationId: string,
     encryptedSecret: string | null | undefined,
-  ): Promise<{ secret: string; fingerprint: string } | null> {
+  ): Promise<{ secret: string; fingerprint: string; phrase: string[] } | null> {
     const key = await this.orgKey(organizationId);
     if (key == null || encryptedSecret == null) {
       return null;
@@ -222,7 +223,11 @@ export class KeykeeperJoinSealer {
         key,
       );
       const publicKey = await this.cryptoFunctionService.rsaExtractPublicKey(privateKey);
-      return { secret, fingerprint: await this.seals.fingerprint(publicKey) };
+      return {
+        secret,
+        fingerprint: await this.seals.fingerprint(publicKey),
+        phrase: await this.keyService.getFingerprint(organizationId, publicKey),
+      };
     } catch {
       return null;
     }

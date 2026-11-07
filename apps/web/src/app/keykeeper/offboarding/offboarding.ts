@@ -26,7 +26,7 @@ export function describeMspRemoval(removal: MspRemoval): {
   if (removal.scriptTokensRevoked.length > 0) {
     const names = removal.scriptTokensRevoked.map((t) => t.name);
     removed.push(
-      `Script tokens they made, now revoked: ${inWords(names)}. Make new ones on the Settings page if your scripts still need them.`,
+      `Script tokens they made, now revoked: ${inWords(names)}. Make new ones in Settings, Joining and security, if your scripts still need them.`,
     );
   }
   if (removal.provisioningTokenRevoked != null) {
@@ -48,7 +48,7 @@ export function describeMspRemoval(removal: MspRemoval): {
         ? `${people(removal.peopleRemoved)} from ${msp} lost access to this organization.`
         : `Nobody from ${msp} was left in this organization.`,
     removed,
-    installCommand: `${msp}'s install command stopped working. Make your own on the Settings page and run it on your computers.`,
+    installCommand: `${msp}'s install command stopped working. Make your own in Settings, Joining and security, and run it on your computers.`,
     singleSignOn:
       sso == null
         ? null
