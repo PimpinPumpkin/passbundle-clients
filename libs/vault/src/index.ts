@@ -121,6 +121,7 @@ export * from "./keykeeper/new-item-dialog.component";
 export * from "./keykeeper/template-badge.component";
 export * from "./keykeeper/template-chooser.component";
 export * from "./keykeeper/category-tile.component";
+export * from "./keykeeper/folder-look-picker.component";
 export * from "./keykeeper/item-tile.component";
 export * from "./keykeeper/item-hero.component";
 export * from "./keykeeper/password-health-line.component";
