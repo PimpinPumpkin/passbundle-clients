@@ -28,7 +28,7 @@ import { Cipher } from "@bitwarden/common/vault/models/domain/cipher";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { KeyService } from "@bitwarden/key-management";
 // eslint-disable-next-line no-restricted-imports
-import { EncryptService } from "@bitwarden/legacy-crypto";
+import { EncryptService, LegacyCompatKeyService } from "@bitwarden/legacy-crypto";
 
 import { GetCommand } from "../commands/get.command";
 import { ListResponse } from "../models/response/list.response";
@@ -88,6 +88,7 @@ describe("GetCommand with PassBundle's rules", () => {
       totpService,
       auditService,
       mock<KeyService>(),
+      mock<LegacyCompatKeyService>(),
       mock<EncryptService>(),
       mock<SearchService>(),
       apiService,

@@ -5,8 +5,7 @@ import { PolicyType } from "@bitwarden/common/admin-console/enums";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 
-import { RequireSsoPolicy } from "./require-sso.component";
-import { SimpleTogglePolicyComponent } from "./simple-toggle-policy.component";
+import { RequireSsoPolicy, RequireSsoPolicyComponent } from "./require-sso.component";
 
 describe("RequireSsoPolicy", () => {
   const policy = new RequireSsoPolicy();
@@ -16,7 +15,8 @@ describe("RequireSsoPolicy", () => {
     expect(policy.description).toBe("requireSsoPolicyDescV2");
     expect(policy.prerequisiteKey).toBe("requireSsoPolicyReqV2");
     expect(policy.type).toBe(PolicyType.RequireSso);
-    expect(policy.component).toBe(SimpleTogglePolicyComponent);
+    // Keykeeper: our own form, upstream's switch plus who isn't linked yet.
+    expect(policy.component).toBe(RequireSsoPolicyComponent);
   });
 
   describe("display$", () => {

@@ -85,6 +85,8 @@ describe("OrganizationVaultExportService", () => {
     );
 
     collectionService = mock<CollectionService>();
+    // Keykeeper: the export grid's check reads the person's collections; none limits this.
+    collectionService.decryptedCollections$.mockReturnValue(of([]));
     collectionService.encryptedCollections$.mockReturnValue(
       of([{ id: "col-1", organizationId, manage: true } as unknown as Collection]),
     );

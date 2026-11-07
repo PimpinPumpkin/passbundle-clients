@@ -39,7 +39,7 @@ import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
 import { PasswordHistoryView } from "@bitwarden/common/vault/models/view/password-history.view";
 import { KeyService } from "@bitwarden/key-management";
 // eslint-disable-next-line no-restricted-imports
-import { EncryptService } from "@bitwarden/legacy-crypto";
+import { EncryptService, LegacyCompatKeyService } from "@bitwarden/legacy-crypto";
 
 import { GetCommand } from "../commands/get.command";
 import { ListCommand } from "../commands/list.command";
@@ -151,6 +151,7 @@ describe("every kind of item, for someone who can't see its passwords", () => {
       mock<TotpService>(),
       mock<AuditService>(),
       mock<KeyService>(),
+      mock<LegacyCompatKeyService>(),
       mock<EncryptService>(),
       searchService,
       mock<ApiService>(),

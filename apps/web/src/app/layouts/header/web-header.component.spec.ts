@@ -5,6 +5,7 @@ import { ActivatedRoute } from "@angular/router";
 import { of } from "rxjs";
 
 import { JslibModule } from "@bitwarden/angular/jslib.module";
+import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { HeaderComponent, IconButtonModule, SideNavService } from "@bitwarden/components";
 
@@ -35,6 +36,8 @@ describe("WebHeaderComponent", () => {
       providers: [
         { provide: ActivatedRoute, useValue: { data: of({ titleId: "vaults" }) } },
         { provide: I18nService, useValue: { t: (key: string) => key } },
+        // Upstream's new vault look (VFO1) stays off, as on our server.
+        { provide: ConfigService, useValue: { getFeatureFlag$: () => of(false) } },
         { provide: SideNavService, useValue: sideNav },
         ...(menuButton == null ? [] : [{ provide: KEYKEEPER_MENU_BUTTON, useValue: menuButton }]),
       ],

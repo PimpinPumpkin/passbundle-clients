@@ -658,50 +658,31 @@ describe("VaultComponent", () => {
     }));
 
     /**
-     * The switcher names the page only when it renders, so a one-vault account keeps the title.
+     * Keykeeper: the page's top is the search and New, with the title kept for
+     * screen readers, so there's no upstream page header whose title the
+     * switcher would replace (DESIGN.md, "The look").
      */
     describe("page title", () => {
-      const title = (fixture: ComponentFixture<VaultComponent>) =>
-        fixture.debugElement.query(By.css("popup-header")).componentInstance.pageTitle();
+      const srTitle = (fixture: ComponentFixture<VaultComponent>) =>
+        fixture.debugElement.query(By.css('[data-keykeeper="vault-top"] h1')).nativeElement
+          .textContent;
 
-      it("drops the title when the switcher names the page", fakeAsync(() => {
-        vaultNav$.next({
-          vaults: [{ id: "user-1" }, { id: "org-1" }],
-          organizationDataOwnership: false,
-        });
+      it.each([true, false])("keeps the title for screen readers (flag %s)", (flag) =>
+        fakeAsync(() => {
+          vaultNav$.next({
+            vaults: [{ id: "user-1" }, { id: "org-1" }],
+            organizationDataOwnership: false,
+          });
 
-        const fixture = createWithFlag(true);
+          const fixture = createWithFlag(flag);
 
-        expect(title(fixture)).toBe("");
+          expect(fixture.debugElement.query(By.css("popup-header"))).toBeNull();
+          expect(srTitle(fixture).trim()).toBe("vault");
 
-        flush();
-        fixture.destroy();
-      }));
-
-      it("keeps the title when there is only one vault to switch between", fakeAsync(() => {
-        vaultNav$.next({ vaults: [{ id: "user-1" }], organizationDataOwnership: false });
-
-        const fixture = createWithFlag(true);
-
-        expect(title(fixture)).toBe("vault");
-
-        flush();
-        fixture.destroy();
-      }));
-
-      it("keeps the title with the flag off", fakeAsync(() => {
-        vaultNav$.next({
-          vaults: [{ id: "user-1" }, { id: "org-1" }],
-          organizationDataOwnership: false,
-        });
-
-        const fixture = createWithFlag(false);
-
-        expect(title(fixture)).toBe("vault");
-
-        flush();
-        fixture.destroy();
-      }));
+          flush();
+          fixture.destroy();
+        })(),
+      );
     });
 
     it("publishes the route's vault scope to the list table service", fakeAsync(() => {

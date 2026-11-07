@@ -544,11 +544,12 @@ describe("VaultComponent", () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
 
+    // Keykeeper: viewing opens the side panel, not upstream's dialog.
     it("opens the cipher from local state", async () => {
       await openAndFlush();
 
-      expect(openVaultItemDialogSpy).toHaveBeenCalled();
-      const params = openVaultItemDialogSpy.mock.lastCall[1];
+      expect(openVaultItemPanelSpy).toHaveBeenCalled();
+      const params = openVaultItemPanelSpy.mock.lastCall[1];
       expect(params.formConfig.originalCipher).toBe(mockCipher);
     });
   });

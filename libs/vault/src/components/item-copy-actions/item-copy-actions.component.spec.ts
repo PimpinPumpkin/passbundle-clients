@@ -303,7 +303,7 @@ describe("VaultItemCopyActionsComponent", () => {
 
       const result = component.singleCopyableLogin;
 
-      expect(result).toEqual({ key: "translated-username", field: "username" });
+      expect(result).toEqual({ key: "copyUsername", field: "username" });
     });
 
     it("returns null when password is hidden and password is the only populated login field", () => {
@@ -920,7 +920,7 @@ describe("VaultItemCopyActionsComponent", () => {
         swiftCode: true,
       };
       expect(component.singleCopyableBankAccount).toEqual({
-        key: "translated-nameOnAccount",
+        key: "copyNameOnAccount",
         field: "nameOnAccount",
       });
 

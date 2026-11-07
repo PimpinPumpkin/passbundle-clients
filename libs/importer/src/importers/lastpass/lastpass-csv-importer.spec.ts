@@ -210,7 +210,7 @@ describe("Lastpass CSV Importer", () => {
 
   // Keykeeper: a card's brand, and only what's the card's own as fields.
   it("should give a card its brand from the number, without LastPass's own fields", async () => {
-    const result = await new LastPassCsvImporter()
+    const result = await new LastPassCsvImporter(configService)
       .parse(`url,username,password,totp,extra,name,grouping,fav
 http://sn,,,,"NoteType:Credit Card
 Language:en-US
@@ -233,7 +233,7 @@ Notes:Not a real card.",Test Visa,Finance,1`);
   });
 
   it("should keep a card type that isn't its brand, and a real start date, as fields", async () => {
-    const result = await new LastPassCsvImporter()
+    const result = await new LastPassCsvImporter(configService)
       .parse(`url,username,password,totp,extra,name,grouping,fav
 http://sn,,,,"NoteType:Credit Card
 Language:en-US
@@ -254,7 +254,7 @@ Notes:",Test Mastercard,,0`);
   });
 
   it("should give an address its phone, without LastPass's language", async () => {
-    const result = await new LastPassCsvImporter()
+    const result = await new LastPassCsvImporter(configService)
       .parse(`url,username,password,totp,extra,name,grouping,fav
 http://sn,,,,"NoteType:Address
 Language:en-US
@@ -284,7 +284,7 @@ Notes:",Zoë,,0`);
     // A pattern took seconds on this, growing with the length squared.
     const long = "{" + '""num""'.repeat(20000);
     const started = Date.now();
-    const result = await new LastPassCsvImporter()
+    const result = await new LastPassCsvImporter(configService)
       .parse(`url,username,password,totp,extra,name,grouping,fav
 http://sn,,,,"NoteType:Address
 First Name:Test

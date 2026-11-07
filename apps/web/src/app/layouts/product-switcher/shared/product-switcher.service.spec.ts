@@ -143,16 +143,16 @@ describe("ProductSwitcherService", () => {
         expect(products.other.find((p) => p.name === "Secrets Manager")).toBeUndefined();
       });
 
-      it("overrides the other section name when the VFO1 flag is enabled", async () => {
+      // Keykeeper: not advertised with the VFO1 flag either, so there's no
+      // "other" entry for upstream's new name to override.
+      it("is never advertised in other with the VFO1 flag enabled either", async () => {
         vfo1Enabled = true;
 
         initiateService();
 
         const products = await firstValueFrom(service.products$);
 
-        expect(
-          products.other.find((p) => p.name === "Secrets Manager").otherProductOverrides.name,
-        ).toBe("getSecretsManager");
+        expect(products.other.find((p) => p.name === "Secrets Manager")).toBeUndefined();
       });
 
       it("is included in bento when there is an organization with SM", async () => {

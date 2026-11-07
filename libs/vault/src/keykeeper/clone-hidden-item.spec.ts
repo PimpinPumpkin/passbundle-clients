@@ -14,6 +14,7 @@ import { NudgesService } from "@bitwarden/angular/vault";
 import { AuditService } from "@bitwarden/common/abstractions/audit.service";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import { AvatarService } from "@bitwarden/common/auth/abstractions/avatar.service";
 import { AutofillSettingsServiceAbstraction } from "@bitwarden/common/autofill/services/autofill-settings.service";
 import { DomainSettingsService } from "@bitwarden/common/autofill/services/domain-settings.service";
 import { EventCollectionService } from "@bitwarden/common/dirt/event-logs";
@@ -221,6 +222,8 @@ describe("copying an item whose secrets the person can't see, through the whole 
           provide: AccountService,
           useValue: { activeAccount$: new BehaviorSubject({ id: "ana", email: "ana@test" }) },
         },
+        // Upstream's owner list draws the person's avatar color (web-v2026.10.1).
+        { provide: AvatarService, useValue: { getUserAvatarColor$: () => of(null) } },
         {
           provide: CipherArchiveService,
           useValue: { userCanArchive$: () => of(false) },

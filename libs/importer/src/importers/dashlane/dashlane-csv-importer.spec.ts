@@ -422,7 +422,8 @@ describe("Dashlane CSV Importer", () => {
     expect(cipher.identity.fullName).toEqual("MR John Doe");
     expect(cipher.identity.title).toEqual("MR");
     expect(cipher.identity.firstName).toEqual("John");
-    expect(cipher.identity.middleName).toBeUndefined();
+    // Keykeeper: each part of the name from its own column; an empty one is null.
+    expect(cipher.identity.middleName).toBeNull();
     expect(cipher.identity.lastName).toEqual("Doe");
     expect(cipher.identity.username).toEqual("jdoe");
     expect(cipher.identity.email).toEqual("jdoe@example.com");

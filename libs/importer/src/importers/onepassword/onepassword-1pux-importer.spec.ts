@@ -143,7 +143,7 @@ describe("1Password 1Pux Importer", () => {
 
   // Keykeeper: favIndex is the place among the favorites, so the second favorite is 2.
   it("should set favourite for every favorite, not only the first", async () => {
-    const importer = new OnePassword1PuxImporter();
+    const importer = new OnePassword1PuxImporter(configService);
     const data: typeof LoginData = JSON.parse(JSON.stringify(LoginData));
     const item = data.accounts[0].vaults[0].items[0];
     data.accounts[0].vaults[0].items = [
@@ -159,7 +159,7 @@ describe("1Password 1Pux Importer", () => {
   // Keykeeper: a field on more than one line goes to the notes; the item's own notes must not
   // replace it.
   it("should keep a field on more than one line when the item has notes", async () => {
-    const importer = new OnePassword1PuxImporter();
+    const importer = new OnePassword1PuxImporter(configService);
     const data: typeof LoginData = JSON.parse(JSON.stringify(LoginData));
     const details = data.accounts[0].vaults[0].items[0].details;
     details.notesPlain = "The item's own notes.";

@@ -2,6 +2,7 @@ import { mock } from "jest-mock-extended";
 import { of } from "rxjs";
 
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { mockAccountInfoWith } from "@bitwarden/common/spec";
 import { emptyGuid } from "@bitwarden/common/types/guid";
@@ -38,6 +39,9 @@ const PLANTED_RULE = JSON.stringify({
   fill: { from: "password" },
 });
 const PLANTED_COPY = JSON.stringify({ id: "msp-tpl", base: "login", v: 1, from: "Your MSP" });
+// Upstream's importers that ask for a feature flag, with every flag off.
+const configService = mock<ConfigService>();
+configService.getFeatureFlag.mockResolvedValue(false);
 
 /** Every field with one of our names, on every item. */
 const reserved = (result: ImportResult) =>
@@ -79,7 +83,7 @@ describe("Keykeeper: imports never plant our own fields", () => {
       { value: PLANTED_COPY, id: "y", name: " KeyKeeper.Template-Definition ", fieldType: "T" },
     );
 
-    expectDefused(await new OnePassword1PuxImporter().parse(JSON.stringify(data)), [
+    expectDefused(await new OnePassword1PuxImporter(configService).parse(JSON.stringify(data)), [
       "keykeeper.fill",
       "KeyKeeper.Template-Definition",
     ]);
@@ -111,7 +115,7 @@ describe("Keykeeper: imports never plant our own fields", () => {
       `http://sn,,,,"${extra.replace(/"/g, '""')}",Fake card,,0`,
     ].join("\n");
 
-    expectDefused(await new LastPassCsvImporter().parse(csv), [
+    expectDefused(await new LastPassCsvImporter(configService).parse(csv), [
       "keykeeper.fill",
       "keykeeper.template-definition",
     ]);
@@ -126,7 +130,9 @@ describe("Keykeeper: imports never plant our own fields", () => {
     );
 
     expectDefused(
-      await new ProtonPassJsonImporter(mock<I18nService>()).parse(JSON.stringify(data)),
+      await new ProtonPassJsonImporter(mock<I18nService>(), configService).parse(
+        JSON.stringify(data),
+      ),
       ["keykeeper.fill", "keykeeper.template-definition"],
     );
   });
