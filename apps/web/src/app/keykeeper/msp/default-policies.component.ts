@@ -12,10 +12,13 @@ import { SharedModule } from "../../shared";
 import { KeykeeperDefaultPolicyDialogComponent } from "./default-policy-dialog.component";
 import { KeykeeperMspApiService, MspPolicies } from "./msp-api.service";
 import {
+  allNames,
   clientList,
+  clientsRequiringChanges,
   DefaultPolicyRow,
   defaultPolicyRows,
   describePolicyResult,
+  rowClientsSummary,
 } from "./msp-policies";
 
 /** Turning these on revokes some of a client's members, so the console asks first. */
@@ -31,7 +34,10 @@ const REVOKING: Partial<Record<PolicyType, string>> = {
  * them; a client whose policy differs, because someone changed it in that
  * client's admin console, has its own setting, which changing the default
  * skips. MSP admins edit defaults with upstream's own policy forms and can put
- * clients back on the default. See DESIGN.md, "Default policies".
+ * clients back on the default. A default can be required for every client
+ * instead: it reaches clients with their own setting too, and nobody changes
+ * it in a client's admin console until it's no longer required. See
+ * DESIGN.md, "Default policies" and "Required for every client".
  */
 @Component({
   selector: "app-keykeeper-default-policies",
@@ -43,14 +49,16 @@ const REVOKING: Partial<Record<PolicyType, string>> = {
       <p bitTypography="body2">
         Every client follows these, including clients you add later. To give one client a different
         setting, change that policy in the client's admin console. That client then keeps its own
-        setting when you change the default, until you use the default there again.
+        setting when you change the default, until you use the default there again. A policy
+        required for every client reaches clients with their own setting too, and nobody can change
+        it in a client's admin console until you stop requiring it.
       </p>
       <bit-table>
         <ng-container header>
           <tr>
             <th bitCell>Policy</th>
             <th bitCell>Default</th>
-            <th bitCell>Clients with their own setting</th>
+            <th bitCell>Clients</th>
             <th bitCell></th>
           </tr>
         </ng-container>
@@ -65,30 +73,61 @@ const REVOKING: Partial<Record<PolicyType, string>> = {
                 } @else {
                   <span bitBadge variant="secondary">Off</span>
                 }
+                @if (row.required) {
+                  <span
+                    bitBadge
+                    variant="primary"
+                    startIcon="bwi-lock"
+                    class="tw-ml-1"
+                    data-testid="msp-policy-required"
+                    title="Required for every client"
+                    >Required</span
+                  >
+                }
               </td>
-              <td bitCell data-testid="msp-policy-own">
-                @for (client of row.own; track client.id) {
-                  <div>
-                    {{ client.name }}
-                    @if (isAdmin()) {
-                      <button
-                        type="button"
-                        bitLink
-                        class="tw-ml-2"
-                        [attr.aria-label]="'Use the default ' + name + ' in ' + client.name"
-                        (click)="useDefault(row, [client])"
-                      >
-                        Use default
+              <td bitCell data-testid="msp-policy-clients">
+                <div data-testid="msp-policy-reach">{{ summaryOf(row) }}</div>
+                @if (row.required) {
+                  @for (client of row.notInStep; track client.id) {
+                    <div data-testid="msp-policy-not-in-step">
+                      {{ client.name }}: not in step
+                      @if (isAdmin()) {
+                        <button
+                          type="button"
+                          bitLink
+                          class="tw-ml-2"
+                          [attr.aria-label]="'Try ' + name + ' again in ' + client.name"
+                          (click)="tryAgain(row, [client])"
+                        >
+                          Try again
+                        </button>
+                      }
+                    </div>
+                  }
+                } @else if (row.own.length > 0) {
+                  <div data-testid="msp-policy-own">
+                    @for (client of row.own; track client.id) {
+                      <div>
+                        {{ client.name }}
+                        @if (isAdmin()) {
+                          <button
+                            type="button"
+                            bitLink
+                            class="tw-ml-2"
+                            [attr.aria-label]="'Use the default ' + name + ' in ' + client.name"
+                            (click)="useDefault(row, [client])"
+                          >
+                            Use default
+                          </button>
+                        }
+                      </div>
+                    }
+                    @if (isAdmin() && row.own.length > 1) {
+                      <button type="button" bitLink (click)="useDefault(row, row.own)">
+                        Use default in all {{ row.own.length }}
                       </button>
                     }
                   </div>
-                } @empty {
-                  <span class="tw-text-muted">None</span>
-                }
-                @if (isAdmin() && row.own.length > 1) {
-                  <button type="button" bitLink (click)="useDefault(row, row.own)">
-                    Use default in all {{ row.own.length }}
-                  </button>
                 }
               </td>
               <td bitCell class="tw-text-right">
@@ -135,6 +174,10 @@ export class KeykeeperDefaultPoliciesComponent {
     private readonly i18nService: I18nService,
   ) {}
 
+  protected summaryOf(row: DefaultPolicyRow): string {
+    return rowClientsSummary(row);
+  }
+
   protected nameOf(type: number): string {
     const definition = this.definitionOf(type);
     return definition ? this.i18nService.t(definition.name) : String(type);
@@ -153,28 +196,69 @@ export class KeykeeperDefaultPoliciesComponent {
     const followers = this.policies()
       .clients.filter((c) => !own.has(c.id))
       .map(({ id, name }) => ({ id, name }));
+    const needs = (this.policies().prerequisites ?? [])
+      .filter((p) => p.type === row.type)
+      .flatMap((p) => p.needs)
+      .map((type) => ({
+        name: this.nameOf(type),
+        on: this.policies().defaults.some((d) => d.type === type && d.enabled),
+      }));
     const saved = await firstValueFrom(
       KeykeeperDefaultPolicyDialogComponent.open(this.dialogService, {
         definition,
         policy: row.default,
         organizationId: this.organizationId(),
         followers,
+        required: row.required,
+        own: row.own,
+        hadOwn: row.hadOwn,
+        needs,
       }).closed,
     );
     if (saved == null) {
       return;
     }
-    const reached = followers.length - saved.keep.length;
+    const name = this.nameOf(row.type);
     const revokes = REVOKING[row.type as PolicyType];
-    if (saved.enabled && !row.default.enabled && revokes && reached > 0) {
-      const confirmed = await this.dialogService.openSimpleDialog({
-        title: `Turn on ${this.nameOf(row.type)} in ${reached === 1 ? "1 client" : reached + " clients"}?`,
-        content: `${revokes} MSP staff aren't affected.`,
-        acceptButtonText: "Turn it on",
-        type: "warning",
-      });
-      if (!confirmed) {
-        return;
+    if (saved.required) {
+      // Before requiring it, or changing what's required: which clients change, by name.
+      const changes = clientsRequiringChanges(this.policies(), row.type, saved);
+      if (!row.required || changes.length > 0) {
+        const revoking =
+          revokes && changes.some((c) => !c.enabled)
+            ? ` ${revokes} MSP staff aren't affected.`
+            : "";
+        const confirmed = await this.dialogService.openSimpleDialog({
+          title: row.required
+            ? `Change ${name} in every client?`
+            : `Require ${name} for every client?`,
+          content:
+            (changes.length === 0
+              ? "Every client already has this setting."
+              : `This changes it in ${allNames(changes)}.`) +
+            revoking +
+            (row.required
+              ? ""
+              : " Nobody can change it in a client's admin console until you stop requiring it."),
+          acceptButtonText: row.required ? "Change it" : "Require it",
+          type: "warning",
+        });
+        if (!confirmed) {
+          return;
+        }
+      }
+    } else {
+      const reached = followers.length - saved.keep.length;
+      if (saved.enabled && !row.default.enabled && revokes && reached > 0) {
+        const confirmed = await this.dialogService.openSimpleDialog({
+          title: `Turn on ${name} in ${reached === 1 ? "1 client" : reached + " clients"}?`,
+          content: `${revokes} MSP staff aren't affected.`,
+          acceptButtonText: "Turn it on",
+          type: "warning",
+        });
+        if (!confirmed) {
+          return;
+        }
       }
     }
     await this.attempt(async () => {
@@ -183,8 +267,32 @@ export class KeykeeperDefaultPoliciesComponent {
         row.type,
         { enabled: saved.enabled, data: saved.data },
         saved.keep,
+        saved.required,
       );
-      this.report(`Saved the default. ${describePolicyResult(result)}`, result.refused.length);
+      let message: string;
+      if (saved.required && !row.required) {
+        message = `Required for every client. ${describePolicyResult(result)}`;
+      } else if (row.required && !saved.required) {
+        message = "Stopped requiring it. Every client keeps its setting and follows the default.";
+        if (result.changed.length > 0 || result.refused.length > 0) {
+          message += ` ${describePolicyResult(result)}`;
+        }
+      } else {
+        message = `Saved the default. ${describePolicyResult(result)}`;
+      }
+      this.report(message, result.refused.length);
+    });
+  }
+
+  /** Tries a required default again in clients that refused it. */
+  protected async tryAgain(row: DefaultPolicyRow, clients: { id: string; name: string }[]) {
+    await this.attempt(async () => {
+      const result = await this.mspApi.useDefaultPolicy(
+        this.mspId(),
+        row.type,
+        clients.map((c) => c.id),
+      );
+      this.report(describePolicyResult(result), result.refused.length);
     });
   }
 

@@ -16,6 +16,7 @@ import {
   ChangeVerification,
   ClientEnrollment,
   ClientMsp,
+  ClientMspPolicies,
   ClientPreset,
   DefaultPolicyResult,
   InvitationInfo,
@@ -100,6 +101,7 @@ export type {
   InvitationInfo,
   ClientEnrollment,
   ClientMsp,
+  ClientMspPolicies,
   MspPolicy,
   MspPolicies,
   MspRemoval,
@@ -786,22 +788,40 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     return this.apiService.send("GET", `/keykeeper/organizations/${orgId}/msp`, null, true, true);
   }
 
+  /**
+   * For whoever can open a client's Policies page: its MSP, the policies the
+   * MSP requires for every client, and the organization's own settings.
+   */
+  async getClientMspPolicies(orgId: string): Promise<ClientMspPolicies> {
+    return this.apiService.send(
+      "GET",
+      `/keykeeper/organizations/${orgId}/msp-policies`,
+      null,
+      true,
+      true,
+    );
+  }
+
   async getPolicies(mspId: string): Promise<MspPolicies> {
     return this.apiService.send("GET", `/keykeeper/msp/${mspId}/policies`, null, true, true);
   }
 
-  /** Changes a default, and with it every client that follows it. */
-  /** Changes a default; `keep` names following clients to leave as they are. */
+  /**
+   * Changes a default, and with it every client that follows it; `keep` names
+   * following clients to leave as they are. `required` makes it required for
+   * every client, or a default again; left out, it stays as it is.
+   */
   async setDefaultPolicy(
     mspId: string,
     type: number,
     policy: { enabled: boolean; data: any },
     keep: string[] = [],
+    required?: boolean,
   ): Promise<DefaultPolicyResult> {
     const result: DefaultPolicyResult = await this.apiService.send(
       "PUT",
       `/keykeeper/msp/${mspId}/policies/${type}`,
-      { ...policy, keep },
+      { ...policy, keep, ...(required == null ? {} : { required }) },
       true,
       true,
     );
