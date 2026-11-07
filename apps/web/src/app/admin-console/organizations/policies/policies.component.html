@@ -14,6 +14,7 @@
 @let policySections = policySections$ | async;
 @let policiesEnabledMap = policiesEnabledMap$ | async;
 @let organization = organization$ | async;
+@let keykeeperMspInfo = keykeeperMsp();
 
 <bit-container>
   @if (!policySections || !policiesEnabledMap || !organization) {
@@ -25,7 +26,11 @@
     <span class="tw-sr-only">{{ "loading" | i18n }}</span>
   } @else {
     <!-- Keykeeper: the MSP's default policies, if an MSP manages this organization -->
-    <app-keykeeper-client-msp-policies class="tw-mb-4 tw-block" [organization]="organization" />
+    <app-keykeeper-client-msp-policies
+      class="tw-mb-4 tw-block"
+      [organization]="organization"
+      (loaded)="keykeeperMsp.set($event)"
+    />
     @for (section of policySections; track section.category) {
       <bit-section>
         <bit-section-header>
@@ -33,18 +38,45 @@
         </bit-section-header>
         <bit-item-group [attr.aria-label]="section.labelKey | i18n">
           @for (p of section.policies; track p.type) {
+            <!-- Keykeeper: one the MSP requires for every client can't be edited here -->
+            @let required = keykeeperRequiredBy(keykeeperMspInfo, p.type);
             <bit-item>
               @let nk = nameKeys(p);
               @let dk = descriptionKeys(p);
-              <button type="button" bit-item-content (click)="edit(p, organization)">
-                {{ nk[0] | vfo1I18n: nk[1] }}
-                <span slot="secondary">{{ dk[0] | vfo1I18n: dk[1] }}</span>
-                @if (policiesEnabledMap.get(p.type)) {
-                  <span bitBadge variant="success" slot="end">{{ "on" | i18n }}</span>
-                } @else {
-                  <span bitBadge variant="secondary" slot="end">{{ "off" | i18n }}</span>
-                }
-              </button>
+              @if (required) {
+                <bit-item-content data-testid="keykeeper-required-policy">
+                  {{ nk[0] | vfo1I18n: nk[1] }}
+                  <span slot="secondary">{{ dk[0] | vfo1I18n: dk[1] }}</span>
+                  <span
+                    bitBadge
+                    variant="primary"
+                    slot="end"
+                    startIcon="bwi-lock"
+                    [truncate]="false"
+                    [title]="
+                      required.neededBy
+                        ? required.neededBy + ', which ' + required.msp + ' requires, needs it on'
+                        : 'Only ' + required.msp + '\'s console can change it'
+                    "
+                    >Required by {{ required.msp }}</span
+                  >
+                  @if (policiesEnabledMap.get(p.type)) {
+                    <span bitBadge variant="success" slot="end">{{ "on" | i18n }}</span>
+                  } @else {
+                    <span bitBadge variant="secondary" slot="end">{{ "off" | i18n }}</span>
+                  }
+                </bit-item-content>
+              } @else {
+                <button type="button" bit-item-content (click)="edit(p, organization)">
+                  {{ nk[0] | vfo1I18n: nk[1] }}
+                  <span slot="secondary">{{ dk[0] | vfo1I18n: dk[1] }}</span>
+                  @if (policiesEnabledMap.get(p.type)) {
+                    <span bitBadge variant="success" slot="end">{{ "on" | i18n }}</span>
+                  } @else {
+                    <span bitBadge variant="secondary" slot="end">{{ "off" | i18n }}</span>
+                  }
+                </button>
+              }
             </bit-item>
           }
         </bit-item-group>

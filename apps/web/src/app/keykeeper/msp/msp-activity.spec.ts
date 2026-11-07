@@ -48,6 +48,20 @@ describe("MSP activity sentences", () => {
       "ana@northwind.test put Acme Dental back on the default Master password requirements",
     ],
     [
+      {
+        event: "default_policy_required",
+        detail: "Require two-step login for every client: 2 clients changed, 1 client refused it",
+      },
+      "ana@northwind.test required Require two-step login for every client: 2 clients changed, 1 client refused it",
+    ],
+    [
+      {
+        event: "default_policy_unrequired",
+        detail: "Require two-step login for every client: 1 client had its own setting before",
+      },
+      "ana@northwind.test stopped requiring Require two-step login for every client: 1 client had its own setting before",
+    ],
+    [
       { event: "joining_default_set", detail: "confirmed automatically; invitations last 2 hours" },
       "ana@northwind.test set how people join clients: confirmed automatically; invitations last 2 hours",
     ],
