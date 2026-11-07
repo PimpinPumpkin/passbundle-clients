@@ -15,6 +15,7 @@ import { KeyService } from "@bitwarden/key-management";
 import {
   CryptoFunctionService,
   EncryptService,
+  LegacyCompatKeyService,
   SymmetricCryptoKey,
 } from "@bitwarden/legacy-crypto";
 
@@ -94,7 +95,7 @@ function setUp(msp: MspDetails, mspJoining?: MspJoining) {
   const api = new KeykeeperMspApiService(
     apiService,
     accountService as AccountService,
-    keyService,
+    mock<LegacyCompatKeyService>(),
     mock<EncryptService>(),
     mock<I18nService>(),
     mock<SyncService>(),

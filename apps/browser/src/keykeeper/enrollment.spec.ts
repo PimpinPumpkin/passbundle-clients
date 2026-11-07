@@ -20,7 +20,12 @@ import { UserId } from "@bitwarden/common/types/guid";
 import { UserKey } from "@bitwarden/common/types/key";
 import { KeyService } from "@bitwarden/key-management";
 // eslint-disable-next-line no-restricted-imports
-import { CryptoFunctionService, EncryptService, EncString } from "@bitwarden/legacy-crypto";
+import {
+  CryptoFunctionService,
+  EncryptService,
+  EncString,
+  LegacyCompatKeyService,
+} from "@bitwarden/legacy-crypto";
 
 import { EnrollmentPlatform, EnrollmentState, KeykeeperEnrollment } from "./enrollment";
 import { JoinRequest } from "./join-request";
@@ -81,7 +86,8 @@ function setUp(options: Options = {}) {
   );
   const userKey = { key: "user-key" } as unknown as UserKey;
   keyService.userKey$.mockReturnValue(new BehaviorSubject(userKey));
-  keyService.getFingerprint.mockResolvedValue(["alpha", "bravo", "charlie"]);
+  const legacyCompatKeyService = mock<LegacyCompatKeyService>();
+  legacyCompatKeyService.getFingerprint.mockResolvedValue(["alpha", "bravo", "charlie"]);
   keyService.userPublicKey$.mockReturnValue(new BehaviorSubject(userPublicKey));
   encryptService.encapsulateKeyUnsigned.mockResolvedValue({
     encryptedString: "4.recovery",
@@ -111,6 +117,7 @@ function setUp(options: Options = {}) {
     mock<AuthService>(),
     apiService,
     keyService,
+    legacyCompatKeyService,
     encryptService,
     syncService,
     environmentService,

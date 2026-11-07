@@ -1961,6 +1961,7 @@ export default class MainBackground {
       this.authService,
       this.apiService,
       this.keyService,
+      this.legacyCompatKeyService,
       this.encryptService,
       this.syncService,
       this.environmentService,

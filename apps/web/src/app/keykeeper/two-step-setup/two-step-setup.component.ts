@@ -22,7 +22,8 @@ import { EnvironmentService } from "@bitwarden/common/platform/abstractions/envi
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { Fido2Utils } from "@bitwarden/common/platform/services/fido2/fido2-utils";
 import { ToastService } from "@bitwarden/components";
-import { KeyService } from "@bitwarden/key-management";
+// eslint-disable-next-line no-restricted-imports
+import { LegacyCompatKeyService } from "@bitwarden/legacy-crypto";
 
 import { SharedModule } from "../../shared";
 
@@ -273,7 +274,7 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
     private readonly router: Router,
     private readonly environmentService: EnvironmentService,
     private readonly passwordPreloginService: PasswordPreloginService,
-    private readonly keyService: KeyService,
+    private readonly legacyCompatKeyService: LegacyCompatKeyService,
     private readonly platformUtilsService: PlatformUtilsService,
     private readonly toastService: ToastService,
     private readonly ngZone: NgZone,
@@ -319,8 +320,12 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
     }
     const prelogin = await firstValueFrom(this.passwordPreloginService.getPreloginData$(email));
     this.passwordPreloginService.clearCache();
-    const masterKey = await this.keyService.makeMasterKey(password, email, prelogin.kdfConfig);
-    return this.keyService.hashMasterKey(password, masterKey);
+    const masterKey = await this.legacyCompatKeyService.makeMasterKey(
+      password,
+      email,
+      prelogin.kdfConfig,
+    );
+    return this.legacyCompatKeyService.hashMasterKey(password, masterKey);
   }
 
   /** The server took this hash: keep it for the next step, in memory only. */

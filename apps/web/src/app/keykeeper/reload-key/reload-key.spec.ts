@@ -168,6 +168,7 @@ describe("KeykeeperReloadKey", () => {
   let policies$: BehaviorSubject<Policy[]>;
   let api: ReturnType<typeof mock<ApiService>>;
   let keyService: ReturnType<typeof mock<KeyService>>;
+  let unlockWithUserKey: jest.Mock<Promise<void>, [UserId, UserKey]>;
   let lockActions: Array<(userId: UserId) => Promise<void>>;
   let server: Map<string, string>;
   let forgotten: string[];
@@ -207,7 +208,7 @@ describe("KeykeeperReloadKey", () => {
 
     keyService = mock<KeyService>();
     keyService.userKey$.mockReturnValue(userKey$);
-    keyService.setUserKey.mockImplementation(async (key) => userKey$.next(key as UserKey));
+    unlockWithUserKey = jest.fn(async (_userId: UserId, key: UserKey) => userKey$.next(key));
 
     // A server that keeps R by tab, and forgets it on request.
     api = mock<ApiService>();
@@ -270,6 +271,7 @@ describe("KeykeeperReloadKey", () => {
       lock: async (userId) => {
         locked.push(userId);
       },
+      unlockWithUserKey,
       navigationType: () => navigation,
       onPageLifecycle: (leave, back) => {
         page = { leave, back };
@@ -331,7 +333,7 @@ describe("KeykeeperReloadKey", () => {
     api.send.mockClear();
     const reloaded = new KeykeeperReloadKey((reloadKey as any).deps);
     expect(await reloaded.restore(USER)).toBe(true);
-    expect(keyService.setUserKey).toHaveBeenCalledWith(expect.anything(), USER);
+    expect(unlockWithUserKey).toHaveBeenCalledWith(USER, expect.anything());
     expect(userKey$.value!.toEncoded()).toEqual(userKey.toEncoded());
     const released = posts("/keykeeper/reload-key/release")[0][2];
     expect(released).toEqual({ tabId, pageId: expect.stringMatching(/^[0-9a-f]{32}$/) });
@@ -359,7 +361,7 @@ describe("KeykeeperReloadKey", () => {
     userKey$.next(null);
 
     expect(await reloadKey.restore(USER)).toBe(false);
-    expect(keyService.setUserKey).not.toHaveBeenCalled();
+    expect(unlockWithUserKey).not.toHaveBeenCalled();
     expect(await record()).toBeNull();
   });
 
@@ -455,7 +457,7 @@ describe("KeykeeperReloadKey", () => {
       const reopened = new KeykeeperReloadKey((reloadKey as any).deps);
       expect(await reopened.restore(USER)).toBe(false);
       expect(posts("/keykeeper/reload-key/release")).toHaveLength(0);
-      expect(keyService.setUserKey).not.toHaveBeenCalled();
+      expect(unlockWithUserKey).not.toHaveBeenCalled();
       // This tab won't try again, and the server ends the entry now.
       expect(await record()).toBeNull();
       expect(forgotten).toContain(tabId);

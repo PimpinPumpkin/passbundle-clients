@@ -46,9 +46,8 @@ import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { OrgKey } from "@bitwarden/common/types/key";
-import { KeyService } from "@bitwarden/key-management";
 // eslint-disable-next-line no-restricted-imports
-import { EncryptService } from "@bitwarden/legacy-crypto";
+import { EncryptService, LegacyCompatKeyService } from "@bitwarden/legacy-crypto";
 
 import { KeykeeperJoinSealer, ReportedJoining } from "../joining/join-sealer.service";
 
@@ -114,7 +113,7 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
   constructor(
     apiService: ApiService,
     private readonly accountService: AccountService,
-    private readonly keyService: KeyService,
+    private readonly legacyCompatKeyService: LegacyCompatKeyService,
     private readonly encryptService: EncryptService,
     private readonly i18nService: I18nService,
     private readonly syncService: SyncService,
@@ -309,8 +308,8 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
    */
   async createClient(mspId: string, name: string, preset: ClientPreset): Promise<string> {
     const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
-    const [encryptedKey, key] = await this.keyService.makeOrgKey<OrgKey>(userId);
-    const [publicKey, encryptedPrivateKey] = await this.keyService.makeKeyPair(key);
+    const [encryptedKey, key] = await this.legacyCompatKeyService.makeOrgKey<OrgKey>(userId);
+    const [publicKey, encryptedPrivateKey] = await this.legacyCompatKeyService.makeKeyPair(key);
     const business = preset === "business";
     const collectionName = await this.encryptService.encryptString(
       business ? "Everyone" : this.i18nService.t("defaultCollection"),
@@ -370,8 +369,8 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
   async createOrganization(name: string, preset: ClientPreset): Promise<string> {
     const account = await firstValueFrom(this.accountService.activeAccount$);
     const userId = account!.id;
-    const [encryptedKey, key] = await this.keyService.makeOrgKey<OrgKey>(userId);
-    const [publicKey, encryptedPrivateKey] = await this.keyService.makeKeyPair(key);
+    const [encryptedKey, key] = await this.legacyCompatKeyService.makeOrgKey<OrgKey>(userId);
+    const [publicKey, encryptedPrivateKey] = await this.legacyCompatKeyService.makeKeyPair(key);
     const business = preset === "business";
     const collectionName = await this.encryptService.encryptString(
       business ? "Everyone" : this.i18nService.t("defaultCollection"),

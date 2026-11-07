@@ -223,6 +223,12 @@ export type ReloadKeyDeps = {
   registerOnLockAction: (action: (userId: UserId) => Promise<void>) => void;
   /** Upstream's lock itself. */
   lock: (userId: UserId) => Promise<void>;
+  /**
+   * Upstream's unlock with a user key already decrypted
+   * (UnlockService.unlockWithDecryptedUserKey): the key goes into memory and
+   * upstream's unlock steps run, as for its other unlocks.
+   */
+  unlockWithUserKey: (userId: UserId, userKey: UserKey) => Promise<void>;
   /** How this page was loaded: "reload", "navigate", "back_forward", "prerender". */
   navigationType: () => string | undefined;
   /** Runs `leave` as the page goes (pagehide), and `back` when it comes back from the back-forward cache. */
@@ -322,7 +328,7 @@ export class KeykeeperReloadKey {
       const wrappingKey = new SymmetricCryptoKey(Utils.fromB64ToArray(response.key));
       const userKey = await unwrapAfterReload(encryptService, record.wrappedUserKey, wrappingKey);
       this.tab = { userId, tabId: record.tabId };
-      await keyService.setUserKey(userKey, userId);
+      await this.deps.unlockWithUserKey(userId, userKey);
       return true;
     } catch {
       logService.info("[Keykeeper] This reload asks for the master password");

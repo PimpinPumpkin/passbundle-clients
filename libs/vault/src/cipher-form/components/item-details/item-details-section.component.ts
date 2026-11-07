@@ -31,6 +31,7 @@ import { Utils } from "@bitwarden/common/platform/misc/utils";
 import { CollectionId, OrganizationId, UserId } from "@bitwarden/common/types/guid";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
+  BitwardenIcon,
   CardComponent,
   ChipActionComponent,
   FormFieldModule,

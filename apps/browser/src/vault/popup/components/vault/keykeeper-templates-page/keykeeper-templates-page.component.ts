@@ -61,9 +61,9 @@ export class KeykeeperTemplatesPageComponent {
   }
 
   private addItem(params: AddEditQueryParams) {
-    const { folderId, organizationId, collectionId } = this.route.snapshot.queryParams;
+    const { folderId, organizationId, collectionIds } = this.route.snapshot.queryParams;
     void this.router.navigate(["/add-cipher"], {
-      queryParams: { folderId, organizationId, collectionId, ...params },
+      queryParams: { folderId, organizationId, collectionIds, ...params },
     });
   }
 }
