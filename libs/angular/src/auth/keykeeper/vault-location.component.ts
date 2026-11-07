@@ -32,6 +32,8 @@ import {
   SelfHostedEnvConfigDialogComponent,
 } from "../self-hosted-env-config-dialog";
 
+import { checkServer, KEYKEEPER_SERVER_CHECK_FETCH, ServerCheck } from "./server-check";
+
 /**
  * Keykeeper: "Where's your vault?" at the top of the extension's sign-in
  * (DESIGN.md, "The look"): PassBundle's service or the person's own server,
@@ -47,7 +49,17 @@ import {
  * (the sign-in's buttons are off), and commit(), which the sign-in awaits
  * before it goes on, saves a typed address that hasn't been saved yet. The
  * switch and the field always follow the saved environment when it changes.
+ *
+ * An address is saved only once a server answers there (server-check.ts):
+ * otherwise what's wrong shows under the field (nothing answered, it isn't a
+ * server, it had a problem), not after the master password as "An
+ * unexpected error has occurred."
  */
+type ServerProblem = Extract<ServerCheck, { ok: false }>["problem"];
+
+/** Saving a typed address: saved, refused by the server check or the environment, or typed over meanwhile. */
+type SaveOutcome = "saved" | "changed" | "invalid" | ServerProblem;
+
 @Component({
   selector: "auth-keykeeper-vault-location",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -109,6 +121,10 @@ import {
           />
           @if (error(); as message) {
             <span data-part="error" id="keykeeper-server-error" role="alert">{{ message }}</span>
+          } @else if (checking()) {
+            <span data-part="hint" id="keykeeper-server-hint" aria-live="polite">{{
+              "keykeeperServerChecking" | i18n
+            }}</span>
           } @else {
             <span data-part="hint" id="keykeeper-server-hint">{{
               "keykeeperServerAddressHint" | i18n
@@ -214,6 +230,7 @@ export class KeykeeperVaultLocationComponent {
   private readonly logService = inject(LogService);
   private readonly dialogService = inject(DialogService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly fetchServer = inject(KEYKEEPER_SERVER_CHECK_FETCH);
 
   private readonly addressInput = viewChild<ElementRef<HTMLInputElement>>("addressInput");
 
@@ -229,6 +246,12 @@ export class KeykeeperVaultLocationComponent {
   /** The saved environment has its own address for each service, from the dialog or a policy. */
   protected readonly customAddresses = signal(false);
   protected readonly error = signal<string | null>(null);
+  /** A server is being asked whether it's there, before its address is saved. */
+  protected readonly checking = signal(false);
+  /** Checking and saving an address, while it runs: leaving the field and Continue share it. */
+  private readonly running: { save: { base: string; result: Promise<SaveOutcome> } | null } = {
+    save: null,
+  };
 
   /** The self-hosted dialog's check: https:// only, except in a development build. */
   private readonly httpsOnly = onlyHttpsValidator();
@@ -323,8 +346,8 @@ export class KeykeeperVaultLocationComponent {
 
   /**
    * Before signing in goes on: saves the typed address when it isn't the saved
-   * one yet, the way the self-hosted dialog saves its server URL. False, with
-   * the reason shown, when it can't be used.
+   * one yet, the way the self-hosted dialog saves its server URL, once a
+   * server answers there. False, with the reason shown, when it can't be used.
    */
   async commit(): Promise<boolean> {
     if (!this.ownServer() || this.customAddresses()) {
@@ -336,17 +359,84 @@ export class KeykeeperVaultLocationComponent {
       return false;
     }
     this.error.set(null);
-    const current = await firstValueFrom(this.environmentService.globalEnvironment$);
-    if (current.getRegion() === Region.SelfHosted && current.getUrls().base === checked.base) {
+    if (await this.isSaved(checked.base)) {
       return true;
     }
+    this.checking.set(true);
+    let outcome: SaveOutcome;
     try {
-      await this.environmentService.setEnvironment(Region.SelfHosted, { base: checked.base });
+      outcome = await this.checkAndSave(checked.base);
+    } finally {
+      this.checking.set(false);
+    }
+    if (outcome === "saved") {
       return true;
-    } catch (e) {
-      this.logService.error(e);
-      this.error.set(this.i18nService.t("keykeeperServerAddressInvalid"));
-      return false;
+    }
+    // Typed over, or switched, meanwhile: the field has its own say now.
+    if (outcome !== "changed") {
+      this.error.set(
+        outcome === "invalid"
+          ? this.i18nService.t("keykeeperServerAddressInvalid")
+          : this.problem(outcome),
+      );
+    }
+    return false;
+  }
+
+  private async isSaved(base: string): Promise<boolean> {
+    const current = await firstValueFrom(this.environmentService.globalEnvironment$);
+    return current.getRegion() === Region.SelfHosted && current.getUrls().base === base;
+  }
+
+  /**
+   * Asks the server at `base`, then saves it, unless the field shows another
+   * address by then. One at a time for an address: leaving the field and
+   * Continue share it.
+   */
+  private checkAndSave(base: string): Promise<SaveOutcome> {
+    const running = this.running.save;
+    if (running?.base === base) {
+      return running.result;
+    }
+    const result: Promise<SaveOutcome> = (async (): Promise<SaveOutcome> => {
+      const answer = await checkServer(base, this.fetchServer);
+      const now = this.checked();
+      if (!this.ownServer() || !("base" in now) || now.base !== base) {
+        return "changed";
+      }
+      if ("problem" in answer) {
+        return answer.problem;
+      }
+      if (await this.isSaved(base)) {
+        return "saved";
+      }
+      try {
+        await this.environmentService.setEnvironment(Region.SelfHosted, { base });
+        return "saved";
+      } catch (e) {
+        this.logService.error(e);
+        return "invalid";
+      }
+    })().finally(() => {
+      if (this.running.save?.result === result) {
+        this.running.save = null;
+      }
+    });
+    this.running.save = { base, result };
+    return result;
+  }
+
+  /** What's wrong with an address no server answered at as one should, and what to do. */
+  private problem(problem: ServerProblem): string {
+    switch (problem) {
+      case "unreachable":
+        return this.i18nService.t("keykeeperServerUnreachable");
+      case "slow":
+        return this.i18nService.t("keykeeperServerSlow");
+      case "broken":
+        return this.i18nService.t("keykeeperServerBroken");
+      case "notAServer":
+        return this.i18nService.t("keykeeperServerNotAServer", this.i18nService.t("appName"));
     }
   }
 }

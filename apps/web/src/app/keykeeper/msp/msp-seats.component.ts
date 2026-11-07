@@ -3,8 +3,8 @@ import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormControl } from "@angular/forms";
 
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
-import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { FileDownloadService } from "@bitwarden/common/platform/abstractions/file-download/file-download.service";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { ToastService } from "@bitwarden/components";
 
 import { SharedModule } from "../../shared";
@@ -149,7 +149,7 @@ export class KeykeeperMspSeatsComponent {
       this.month.setValue(this.seats()?.month ?? "", { emitEvent: false });
       this.toastService.showToast({
         variant: "error",
-        message: e instanceof ErrorResponse ? e.getSingleMessage() : String(e),
+        message: plainErrorMessage(e),
       });
     }
   }
@@ -170,7 +170,7 @@ export class KeykeeperMspSeatsComponent {
     } catch (e) {
       this.toastService.showToast({
         variant: "error",
-        message: e instanceof ErrorResponse ? e.getSingleMessage() : String(e),
+        message: plainErrorMessage(e),
       });
     } finally {
       this.downloading.set(false);

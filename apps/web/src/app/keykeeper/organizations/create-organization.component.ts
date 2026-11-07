@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, signal } from "@angular/cor
 import { FormBuilder, Validators } from "@angular/forms";
 import { Router } from "@angular/router";
 
-import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { DialogService, ToastService } from "@bitwarden/components";
 
 import { HeaderModule } from "../../layouts/header/header.module";
@@ -155,7 +155,7 @@ export class KeykeeperCreateOrganizationComponent implements OnInit {
       this.toastService.showToast({ variant: "success", message: `Created ${name}` });
       await this.router.navigate(["/organizations", id, "members"]);
     } catch (e) {
-      const message = e instanceof ErrorResponse ? e.getSingleMessage() : String(e);
+      const message = plainErrorMessage(e);
       this.toastService.showToast({ variant: "error", message });
     }
   };

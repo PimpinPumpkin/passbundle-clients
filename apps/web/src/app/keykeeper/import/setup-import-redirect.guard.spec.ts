@@ -2,6 +2,8 @@ import { TestBed } from "@angular/core/testing";
 import { ActivatedRouteSnapshot, Router, RouterStateSnapshot } from "@angular/router";
 import { BehaviorSubject, throwError } from "rxjs";
 
+import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
+import { PolicyType } from "@bitwarden/common/admin-console/enums";
 import { Account, AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
@@ -16,17 +18,25 @@ describe("setupImportRedirectGuard", () => {
   } as unknown as Account);
   const createUrlTree = jest.fn((commands: string[]) => commands.join("/"));
   let ciphers$: jest.Mock;
+  let policyApplies$: jest.Mock;
 
   beforeEach(() => {
     Utils.isMobileBrowser = false;
     sessionStorage.clear();
     createUrlTree.mockClear();
     ciphers$ = jest.fn(() => new BehaviorSubject({}));
+    policyApplies$ = jest.fn(() => new BehaviorSubject(false));
     TestBed.configureTestingModule({
       providers: [
         { provide: Router, useValue: { createUrlTree } },
         { provide: AccountService, useValue: { activeAccount$ } },
         { provide: CipherService, useValue: { ciphers$: (id: string) => ciphers$(id) } },
+        {
+          provide: PolicyService,
+          useValue: {
+            policyAppliesToUser$: (type: PolicyType, id: string) => policyApplies$(type, id),
+          },
+        },
       ],
     });
   });
@@ -54,6 +64,15 @@ describe("setupImportRedirectGuard", () => {
     ciphers$.mockReturnValue(new BehaviorSubject({ "cipher-id": {} }));
 
     expect(await guard()).toBe(true);
+    expect(sessionStorage.getItem(SETUP_IMPORT)).toBeNull();
+  });
+
+  it("skips it, and forgets it, where an organization keeps items out of Personal", async () => {
+    sessionStorage.setItem(SETUP_IMPORT, "1");
+    policyApplies$.mockReturnValue(new BehaviorSubject(true));
+
+    expect(await guard()).toBe(true);
+    expect(policyApplies$).toHaveBeenCalledWith(PolicyType.OrganizationDataOwnership, "account-id");
     expect(sessionStorage.getItem(SETUP_IMPORT)).toBeNull();
   });
 

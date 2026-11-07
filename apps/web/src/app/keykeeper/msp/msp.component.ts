@@ -18,10 +18,10 @@ import { Organization } from "@bitwarden/common/admin-console/models/domain/orga
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { PwnedPasswordsCancelledError } from "@bitwarden/common/dirt/keykeeper/pwned-passwords";
-import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { PasswordStrengthServiceAbstraction } from "@bitwarden/common/tools/password-strength";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
@@ -89,19 +89,6 @@ import { KeykeeperTechnicianAccessEditorComponent } from "./technician-access-ed
 
 const CONFIRMED = 2;
 const EVENTS_PER_PAGE = 50;
-
-/** Keykeeper: why the console couldn't open, in plain words. */
-function loadErrorText(e: unknown): string {
-  if (e instanceof ErrorResponse) {
-    return e.statusCode >= 500
-      ? `The server had a problem (error ${e.statusCode}). Try again in a minute.`
-      : e.getSingleMessage();
-  }
-  // fetch() fails with a TypeError when the server can't be reached.
-  return e instanceof TypeError
-    ? "This browser couldn't reach the server. Check that you're online, then try again."
-    : "Something went wrong opening it. Try again, and if it keeps happening, reload the page.";
-}
 
 /**
  * Plan features every client on our server has, for upstream's checks of
@@ -1148,7 +1135,7 @@ export class KeykeeperMspComponent implements OnInit {
       }
     } catch (e) {
       if (this.msp() == null) {
-        this.loadError.set(loadErrorText(e));
+        this.loadError.set(plainErrorMessage(e));
       } else {
         this.showError(e);
       }
@@ -1801,12 +1788,7 @@ export class KeykeeperMspComponent implements OnInit {
   }
 
   private showError(e: unknown) {
-    const message =
-      e instanceof ErrorResponse
-        ? e.getSingleMessage()
-        : e instanceof Error
-          ? e.message
-          : String(e);
+    const message = plainErrorMessage(e);
     this.toastService.showToast({ variant: "error", message });
   }
 }

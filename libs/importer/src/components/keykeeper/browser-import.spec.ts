@@ -12,6 +12,7 @@ import {
   detectBrowser,
   detectComputer,
   guideFor,
+  isEmptyPasswordExport,
   prepareImport,
 } from "./browser-import";
 
@@ -138,5 +139,25 @@ describe("Guided browser import", () => {
     const prepared = prepareImport(result, vault, "Check these: from Chrome");
     expect(prepared).toMatchObject({ added: 1, alreadyThere: 1, toCheck: 0 });
     expect(prepared.result.ciphers[0].login.uris[0].uri).toBe("https://news.example.com/");
+  });
+});
+
+describe("isEmptyPasswordExport", () => {
+  it("knows every browser's export by its password column, with nothing under it", () => {
+    expect(isEmptyPasswordExport("name,url,username,password,note\n")).toBe(true);
+    expect(isEmptyPasswordExport("\uFEFFname,url,username,password,note")).toBe(true);
+    expect(
+      isEmptyPasswordExport(
+        '"url","username","password","httpRealm","formActionOrigin","guid"\r\n',
+      ),
+    ).toBe(true);
+    expect(isEmptyPasswordExport("Title,URL,Username,Password,Notes,OTPAuth\n\n")).toBe(true);
+  });
+
+  it("doesn't take an export with rows, or another file, for one", () => {
+    expect(isEmptyPasswordExport("name,url,username,password,note\na,b,c,d,e")).toBe(false);
+    expect(isEmptyPasswordExport("just some notes")).toBe(false);
+    expect(isEmptyPasswordExport("")).toBe(false);
+    expect(isEmptyPasswordExport("name,passwords are here")).toBe(false);
   });
 });
