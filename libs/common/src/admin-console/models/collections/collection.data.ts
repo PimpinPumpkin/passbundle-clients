@@ -17,6 +17,8 @@ export class CollectionData {
   type: CollectionType = CollectionTypes.SharedCollection;
   /** Keykeeper: the person's own capabilities in the folder. */
   keykeeper?: FolderGrid;
+  /** Keykeeper: the folder's icon and color, encrypted (DESIGN.md, "Folder icons"). */
+  keykeeperLook?: string;
 
   constructor(response: CollectionDetailsResponse) {
     this.id = response.id;
@@ -30,6 +32,9 @@ export class CollectionData {
     this.defaultUserCollectionEmail = response.defaultUserCollectionEmail;
     if (response.keykeeper != null) {
       this.keykeeper = response.keykeeper;
+    }
+    if (response.keykeeperLook) {
+      this.keykeeperLook = response.keykeeperLook;
     }
   }
 

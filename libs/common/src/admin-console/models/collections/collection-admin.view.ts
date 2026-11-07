@@ -1,6 +1,7 @@
 import { EncryptService } from "../../../key-management/crypto/abstractions/encrypt.service";
 import { EncString } from "../../../key-management/crypto/models/enc-string";
 import { OrgKey } from "../../../types/key";
+import { decryptFolderLook } from "../../../vault/keykeeper/folder-looks";
 import { Organization } from "../domain/organization";
 
 import { CollectionAccessDetailsResponse, CollectionResponse } from "./collection.response";
@@ -137,6 +138,8 @@ export class CollectionAdminView extends CollectionView {
     if (collection.keykeeper != null) {
       view.keykeeper = collection.keykeeper;
     }
+    // Keykeeper: the folder's icon and color (DESIGN.md, "Folder icons").
+    view.keykeeperLook = await decryptFolderLook(collection.keykeeperLook, orgKey, encryptService);
     view.unmanaged = collection.unmanaged;
     view.type = collection.type;
     view.externalId = collection.externalId;
@@ -178,6 +181,11 @@ export class CollectionAdminView extends CollectionView {
     });
 
     collectionAdminView.externalId = collection.externalId;
+    collectionAdminView.keykeeperLook = await decryptFolderLook(
+      collection.keykeeperLook,
+      orgKey,
+      encryptService,
+    );
 
     return collectionAdminView;
   }

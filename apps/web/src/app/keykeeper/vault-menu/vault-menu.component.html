@@ -142,18 +142,27 @@
      right-aligned. With the menu closed to icons, only the entries marked for
      the rail stay, with their icons. Personal and each organization are the
      folders' owners. -->
+<!-- A shared folder with an icon and color of its own shows them as its tile
+     (DESIGN.md, "Folder icons"); the others keep their glyph. -->
 <ng-template #entry let-e let-rail="rail">
   <bit-nav-item
     [class.keykeeper-menu-scope]="e.scope"
     [class.keykeeper-menu-owner]="!rail && e.depth === 0"
     [text]="e.label"
-    [icon]="open ? (e.tile ? undefined : e.icon) : rail ? e.icon : undefined"
+    [icon]="open ? (e.tile || e.look ? undefined : e.icon) : rail ? e.icon : undefined"
     [treeDepth]="e.depth"
     [forceActiveStyles]="e.active"
     (mainContentClicked)="e.select()"
   >
     @if (open && e.tile) {
       <vault-keykeeper-category-tile slot="icon" [category]="e.tile" [size]="28" />
+    } @else if (open && e.look) {
+      <vault-keykeeper-category-tile
+        slot="icon"
+        [look]="e.look"
+        [size]="24"
+        data-testid="keykeeper-folder-tile"
+      />
     }
     <span slot="end" class="tw-flex tw-items-center tw-gap-1">
       @if (e.organization; as organization) {

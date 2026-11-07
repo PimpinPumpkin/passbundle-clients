@@ -4,6 +4,7 @@ import { map } from "rxjs";
 
 import { IconButtonModule, MenuModule } from "@bitwarden/components";
 import { I18nPipe } from "@bitwarden/ui-common";
+import { KeykeeperCategoryTileComponent } from "@bitwarden/vault";
 
 import {
   KeykeeperPlaceEntry,
@@ -30,7 +31,7 @@ const ICONS: Record<KeykeeperPlaceEntry["kind"], string> = {
 @Component({
   selector: "app-keykeeper-folder-filter",
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [AsyncPipe, I18nPipe, IconButtonModule, MenuModule],
+  imports: [AsyncPipe, I18nPipe, IconButtonModule, MenuModule, KeykeeperCategoryTileComponent],
   template: `
     @let places = places$ | async;
     @if (places?.length) {
@@ -69,7 +70,16 @@ const ICONS: Record<KeykeeperPlaceEntry["kind"], string> = {
             (click)="pick(place)"
             data-testid="keykeeper-place"
           >
-            <i slot="start" class="bwi bwi-fw {{ icon(place) }}" aria-hidden="true"></i>
+            @if (place.tile) {
+              <vault-keykeeper-category-tile
+                slot="start"
+                [look]="place.tile"
+                [size]="20"
+                data-testid="keykeeper-folder-tile"
+              />
+            } @else {
+              <i slot="start" class="bwi bwi-fw {{ icon(place) }}" aria-hidden="true"></i>
+            }
             {{ place.label }}
             <span slot="end" data-kk="count">
               @if (place.picked) {

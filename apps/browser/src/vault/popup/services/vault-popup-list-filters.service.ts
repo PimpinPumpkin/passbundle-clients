@@ -44,6 +44,8 @@ import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { FolderService } from "@bitwarden/common/vault/abstractions/folder/folder.service.abstraction";
 import { CipherType } from "@bitwarden/common/vault/enums";
+import { KeykeeperCategoryLook } from "@bitwarden/common/vault/keykeeper/categories";
+import { folderTileLook } from "@bitwarden/common/vault/keykeeper/folder-looks";
 import { OwnerPlace, ownerPlaces } from "@bitwarden/common/vault/keykeeper/folders-by-owner";
 import { isMspTemplateCopy } from "@bitwarden/common/vault/keykeeper/templates";
 import { ITreeNodeObject, TreeNode } from "@bitwarden/common/vault/models/domain/tree-node";
@@ -97,6 +99,11 @@ export type KeykeeperPlaceEntry = OwnerPlace & {
   filters: Pick<PopupListFilter, "organization" | "collection" | "folder">;
   /** Its owner's name, for a shared folder: "Contoso IT · Servers". */
   ownerName?: string;
+  /**
+   * A shared folder's tile, when it has an icon and color of its own
+   * (DESIGN.md, "Folder icons"); otherwise it keeps the plain glyph.
+   */
+  tile?: KeykeeperCategoryLook;
 };
 
 /**
@@ -583,6 +590,7 @@ export class VaultPopupListFiltersService {
           id: c.id!,
           name: c.name,
           organizationId: c.organizationId,
+          look: c.keykeeperLook,
         })),
         compare: (a, b) => this.i18nService.collator?.compare(a, b) ?? a.localeCompare(b),
       });
@@ -639,6 +647,7 @@ export class VaultPopupListFiltersService {
           filters: picks,
           ownerName:
             place.kind === "sharedFolder" ? orgById.get(place.organizationId!)?.name : undefined,
+          tile: folderTileLook(place.look),
         };
       });
     }),

@@ -92,6 +92,15 @@ describe("VaultHeaderComponent", () => {
     expect(pickPlace).toHaveBeenCalledWith(null);
   });
 
+  it("shows the picked shared folder's own icon and color, if it has one", () => {
+    picked$.next(place({ tile: { light: "#A8291F", dark: "#FF9D92", glyph: "M4 4h16v6H4Z" } }));
+    fixture.detectChanges();
+    const tile = chip().query(By.css('[data-testid="keykeeper-folder-tile"] [data-jewel]'));
+    expect(tile.nativeElement.style.getPropertyValue("--pb-jewel")).toBe("#A8291F");
+    expect(chip().query(By.css(".bwi-collection-shared"))).toBeNull();
+    expect(chip().nativeElement.textContent).toContain("Lakeside Clinic · Everyone");
+  });
+
   it("names Personal and a personal folder by themselves", () => {
     picked$.next(
       place({ key: "personal", kind: "personal", label: "myVault", ownerName: undefined }),

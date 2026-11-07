@@ -94,6 +94,30 @@ describe("KeykeeperFolderFilterComponent", () => {
     expect(entries[4].hasAttribute("data-owner")).toBe(true);
   });
 
+  it("shows a shared folder's own icon and color as a tile, and the plain glyph for the rest", () => {
+    places$.next([
+      ...places,
+      entry("shared:c-bank", {
+        kind: "sharedFolder",
+        label: "Banking",
+        tile: { light: "#0E7A47", dark: "#6FDBA0", glyph: "M3 9l9-5 9 5" },
+      }),
+    ]);
+    fixture.detectChanges();
+    const entries = openMenu();
+    const banking = entries.find((e) => e.getAttribute("data-place") === "shared:c-bank")!;
+    const tile = banking.querySelector<HTMLElement>(
+      '[data-testid="keykeeper-folder-tile"] [data-jewel]',
+    )!;
+    expect(tile.style.getPropertyValue("--pb-jewel")).toBe("#0E7A47");
+    expect(tile.querySelector("path")!.getAttribute("d")).toBe("M3 9l9-5 9 5");
+    expect(banking.querySelector(".bwi")).toBeNull();
+
+    const everyone = entries.find((e) => e.getAttribute("data-place") === "shared:c-everyone")!;
+    expect(everyone.querySelector('[data-testid="keykeeper-folder-tile"]')).toBeNull();
+    expect(everyone.querySelector(".bwi-collection-shared")).not.toBeNull();
+  });
+
   it("picks a place, or all of them", () => {
     let entries = openMenu();
     entries[5].click();
