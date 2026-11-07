@@ -12,6 +12,7 @@ import {
   MspSummary,
   MspTemplates,
   NewScriptToken,
+  OrganizationJoining,
   OrgJoining,
   PendingMember,
   ScriptReadView,
@@ -52,8 +53,26 @@ export class KeykeeperMspRequests {
 
   /** Memberships waiting for an org key in every organization where the person can confirm them. */
   async organizationsPending(): Promise<PendingMember[]> {
-    return (await this.apiService.send("GET", "/keykeeper/organizations/pending", null, true, true))
-      .data;
+    return (await this.organizationsWaiting()).pending;
+  }
+
+  /**
+   * Who's waiting, as `organizationsPending`, and the joining setting with
+   * its seal of every organization where the person is an owner or admin.
+   * None of the latter from a server that doesn't say.
+   */
+  async organizationsWaiting(): Promise<{
+    pending: PendingMember[];
+    joining: OrganizationJoining[];
+  }> {
+    const answer = await this.apiService.send(
+      "GET",
+      "/keykeeper/organizations/pending",
+      null,
+      true,
+      true,
+    );
+    return { pending: answer.data, joining: answer.joining ?? [] };
   }
 
   /**
