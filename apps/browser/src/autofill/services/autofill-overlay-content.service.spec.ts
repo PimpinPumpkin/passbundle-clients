@@ -528,6 +528,40 @@ describe("AutofillOverlayContentService", () => {
           );
         });
 
+        // Keykeeper: the last characters typed before a quick Enter are part
+        // of what the save and update prompts offer (DESIGN.md, "Missed save
+        // prompts on fast sites").
+        it("keeps every character typed before a quick submit", async () => {
+          jest.useFakeTimers();
+          const passwordFieldElement = document.getElementById(
+            "password-field",
+          ) as ElementWithOpId<FillableFormFieldElement>;
+          const passwordFieldData = createAutofillFieldMock({
+            opid: "password-field",
+            form: "validFormId",
+            elementNumber: 2,
+            type: "password",
+          });
+          await autofillOverlayContentService.setupOverlayListeners(
+            passwordFieldElement,
+            passwordFieldData,
+            pageDetailsMock,
+          );
+
+          passwordFieldElement.value = "changed-pas";
+          passwordFieldElement.dispatchEvent(new Event("input"));
+          passwordFieldElement.value = "changed-pass";
+          passwordFieldElement.dispatchEvent(new Event("input"));
+          // Submitted before the typing pause the menu waits for.
+          passwordFieldElement.form!.dispatchEvent(new Event("submit"));
+
+          expect(sendExtensionMessageSpy).toHaveBeenCalledWith(
+            "formFieldSubmitted",
+            expect.objectContaining({ password: "changed-pass" }),
+          );
+          jest.useRealTimers();
+        });
+
         // Keykeeper: on a passwordless sign-in, the code next to the email
         // field is never the password the save prompt offers.
         it("never stores a masked field the page calls a one-time code as the password", async () => {

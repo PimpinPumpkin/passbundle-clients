@@ -849,6 +849,42 @@ describe("OverlayNotificationsBackground", () => {
         expect(notificationAddLoginSpy).toHaveBeenCalled();
       });
 
+      // Keykeeper: on a site that answers at once, the page after the sign-in
+      // can finish loading before the navigation listener is in place, and no
+      // event ever comes (DESIGN.md, "Missed save prompts on fast sites").
+      it("still prompts when the page finished loading before the wait began, with no navigation event", async () => {
+        let status: chrome.tabs.Tab["status"] = "loading";
+        chrome.tabs.get = jest.fn().mockImplementation((tabId, callback) => {
+          callback(mock<chrome.tabs.Tab>({ id: tabId, status, url: sender.url }));
+        });
+        triggerWebRequestOnCompletedEvent(
+          mock<chrome.webRequest.OnCompletedDetails>({
+            url: sender.url,
+            tabId: sender.tab.id,
+            requestId,
+          }),
+        );
+        await flushPromises();
+        status = "complete";
+
+        jest.advanceTimersByTime(0);
+        await flushPromises();
+
+        expect(notificationAddLoginSpy).toHaveBeenCalledTimes(1);
+
+        // And only once, when the late navigation event comes after all.
+        triggerWebNavigationOnCompletedEvent(
+          mock<chrome.webNavigation.WebNavigationFramedCallbackDetails>({
+            tabId: sender.tab.id,
+            url: sender.url,
+          }),
+        );
+        jest.advanceTimersByTime(5000);
+        await flushPromises();
+
+        expect(notificationAddLoginSpy).toHaveBeenCalledTimes(1);
+      });
+
       it("with `useUndeterminedCipherScenarioTriggeringLogic` on, waits for the tab's navigation to complete using the web navigation API before initializing the notification", async () => {
         notificationBackground.useUndeterminedCipherScenarioTriggeringLogic$ = of(true);
         chrome.tabs.get = jest.fn().mockImplementationOnce((tabId, callback) => {

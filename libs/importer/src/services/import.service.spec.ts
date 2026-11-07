@@ -9,6 +9,7 @@ import { of } from "rxjs";
 // This import has been flagged as unallowed for this class. It may be involved in a circular dependency loop.
 // eslint-disable-next-line no-restricted-imports
 import { CollectionService } from "@bitwarden/admin-console/common";
+import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import {
   CollectionView,
   CollectionTypes,
@@ -18,13 +19,15 @@ import { ConfigService } from "@bitwarden/common/platform/abstractions/config/co
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { SdkService } from "@bitwarden/common/platform/abstractions/sdk/sdk.service";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
+import { SyncService } from "@bitwarden/common/platform/sync";
 import { CollectionId, OrganizationId, UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { FolderService } from "@bitwarden/common/vault/abstractions/folder/folder.service.abstraction";
-import { CipherType } from "@bitwarden/common/vault/enums";
+import { CipherType, FieldType } from "@bitwarden/common/vault/enums";
 import { Folder } from "@bitwarden/common/vault/models/domain/folder";
 import { FolderWithOptionalIdRequest } from "@bitwarden/common/vault/models/request/folder-with-optional-id.request";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
+import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
 import { FolderView } from "@bitwarden/common/vault/models/view/folder.view";
 import { RestrictedItemTypesService } from "@bitwarden/common/vault/services/restricted-item-types.service";
 import { KeyService } from "@bitwarden/key-management";
@@ -35,7 +38,12 @@ import { BitwardenPasswordProtectedImporter } from "../importers";
 import { Importer } from "../importers/importer";
 import { ImportType } from "../models/import-options";
 import { ImportResult } from "../models/import-result";
-import { buildSdkImporterRegistry, SdkImportCredentials } from "../sdk";
+import {
+  buildSdkImporterRegistry,
+  CredentialKind,
+  SdkImportCredentials,
+  SdkVaultImporter,
+} from "../sdk";
 import { toSdkCollectionType } from "../sdk/sdk-collection-type";
 
 import { ImportApiServiceAbstraction } from "./import-api.service.abstraction";
@@ -55,6 +63,8 @@ describe("ImportService", () => {
   let restrictedItemTypesService: MockProxy<RestrictedItemTypesService>;
   let configService: MockProxy<ConfigService>;
   let sdkService: MockProxy<SdkService>;
+  let syncService: MockProxy<SyncService>;
+  let organizationService: MockProxy<OrganizationService>;
 
   beforeEach(() => {
     cipherService = mock<CipherService>();
@@ -69,6 +79,8 @@ describe("ImportService", () => {
     restrictedItemTypesService = mock<RestrictedItemTypesService>();
     configService = mock<ConfigService>();
     sdkService = mock<SdkService>();
+    syncService = mock<SyncService>();
+    organizationService = mock<OrganizationService>();
 
     importService = new ImportService(
       cipherService,
@@ -83,6 +95,8 @@ describe("ImportService", () => {
       restrictedItemTypesService,
       configService,
       sdkService,
+      syncService,
+      organizationService,
     );
 
     // Feature flags are only used by certain specific importers, not the base
@@ -482,6 +496,24 @@ describe("ImportService", () => {
       accountService.activeAccount$ = of({ id: userId } as any);
       (restrictedItemTypesService as any).restricted$ = of([]);
       i18nService.t.mockImplementation((key) => key);
+      // Keykeeper: what the SDK saved is read back and checked (sdk-import-check.spec.ts):
+      // nothing before, the one item the summary counts after, for wherever it went.
+      syncService.fullSync.mockResolvedValue(true);
+      const imported = (organizationId?: string) => ({
+        "imported-1": { id: "imported-1", organizationId: organizationId ?? null, type: 1 },
+      });
+      importKdbx.mockImplementation(async (_file, _password, _keyFile, options) => {
+        cipherService.ciphers$.mockReturnValue(of(imported(options.organization_id) as any));
+        return summary;
+      });
+      cipherService.ciphers$.mockReturnValue(of({} as any));
+      cipherService.decrypt.mockImplementation(async (cipher) => {
+        const view = new CipherView();
+        view.id = cipher.id;
+        view.organizationId = cipher.organizationId;
+        return view;
+      });
+      organizationService.organizations$.mockReturnValue(of([]));
     });
 
     it("imports into the personal vault, passing the target folder", async () => {
@@ -547,6 +579,15 @@ describe("ImportService", () => {
 
     it("allows an org import with no target when the user has import/export permission", async () => {
       const organizationId = Utils.newGuid() as OrganizationId;
+      // Read back as the admin console reads the organization's items.
+      organizationService.organizations$.mockReturnValue(
+        of([{ id: organizationId, canEditAllCiphers: true } as any]),
+      );
+      const importedView = new CipherView();
+      importedView.id = "imported-1";
+      cipherService.getAllFromApiForOrganization
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([importedView]);
 
       await importService.importWithSdk(
         "keepasskdbx",
@@ -594,6 +635,59 @@ describe("ImportService", () => {
       );
 
       expect(importKdbx).toHaveBeenCalledWith(file, "pw", keyFile, expect.anything());
+    });
+
+    // Keykeeper: every SDK importer goes through the same check, so one added
+    // later is checked without doing anything (sdk-import-check.ts).
+    it("checks what any SDK importer saved for our own fields, a new one too", async () => {
+      const planted = new CipherView();
+      planted.id = "planted-1";
+      planted.name = "Planted";
+      const fill = new FieldView();
+      fill.name = "keykeeper.fill";
+      fill.value = '{"v":1,"field":{"id":"q"},"fill":{"from":"password"}}';
+      fill.type = FieldType.Hidden;
+      planted.fields = [fill];
+      const newImporter: SdkVaultImporter = {
+        credentialKind: CredentialKind.none,
+        import: jest.fn().mockImplementation(async () => {
+          cipherService.ciphers$.mockReturnValue(
+            of({ "planted-1": { id: "planted-1", organizationId: null, type: 1 } } as any),
+          );
+          return summary;
+        }),
+      };
+      (importService as any).sdkImporters.register("someday", () => newImporter);
+      cipherService.decrypt.mockResolvedValue(planted);
+      cipherService.updateWithServer.mockImplementation(async (view) => view);
+
+      await importService.importWithSdk(
+        "someday" as ImportType,
+        file,
+        { kind: "none" },
+        null,
+        null,
+        false,
+      );
+
+      expect(cipherService.updateWithServer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "planted-1",
+          fields: [expect.objectContaining({ name: "Imported keykeeper.fill" })],
+        }),
+        userId,
+        undefined,
+        false,
+      );
+    });
+
+    it("imports nothing when the items can't be read to check them afterwards", async () => {
+      syncService.fullSync.mockRejectedValue(new Error("offline"));
+
+      await expect(
+        importService.importWithSdk("keepasskdbx", file, credentials, null, null, false),
+      ).rejects.toThrow("keykeeperImportCheckNotStarted");
+      expect(importKdbx).not.toHaveBeenCalled();
     });
 
     it("throws for an unregistered SDK importer", async () => {

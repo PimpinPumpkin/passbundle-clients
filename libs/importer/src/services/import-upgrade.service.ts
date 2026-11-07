@@ -3,12 +3,14 @@
 // This import has been flagged as unallowed for this class. It may be involved in a circular dependency loop.
 // eslint-disable-next-line no-restricted-imports
 import { CollectionService } from "@bitwarden/admin-console/common";
+import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { CollectionView } from "@bitwarden/common/admin-console/models/collections";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { SdkService } from "@bitwarden/common/platform/abstractions/sdk/sdk.service";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
+import { SyncService } from "@bitwarden/common/platform/sync";
 import { OrganizationId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { FolderService } from "@bitwarden/common/vault/abstractions/folder/folder.service.abstraction";
@@ -60,6 +62,9 @@ export class ImportUpgradeService extends ImportService implements ImportUpgrade
     restrictedItemTypesService: RestrictedItemTypesService,
     configService: ConfigService,
     sdkService: SdkService,
+    // Keykeeper: for checking what an SDK import saved (keykeeper/sdk-import-check.ts).
+    syncService: SyncService,
+    organizationService: OrganizationService,
   ) {
     super(
       cipherService,
@@ -74,6 +79,8 @@ export class ImportUpgradeService extends ImportService implements ImportUpgrade
       restrictedItemTypesService,
       configService,
       sdkService,
+      syncService,
+      organizationService,
     );
     this.bitwardenImporterDeps = {
       keyService,

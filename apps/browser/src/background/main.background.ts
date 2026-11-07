@@ -1444,6 +1444,8 @@ export default class MainBackground {
       this.restrictedItemTypesService,
       this.configService,
       this.sdkService,
+      this.syncService,
+      this.organizationService,
     );
 
     this.individualVaultExportService = new IndividualVaultExportService(

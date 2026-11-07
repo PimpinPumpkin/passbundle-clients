@@ -5,6 +5,7 @@ import { firstValueFrom, map, switchMap } from "rxjs";
 // This import has been flagged as unallowed for this class. It may be involved in a circular dependency loop.
 // eslint-disable-next-line no-restricted-imports
 import { CollectionService, CollectionWithIdRequest } from "@bitwarden/admin-console/common";
+import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import {
   CollectionView,
   CollectionTypes,
@@ -19,6 +20,7 @@ import { ConfigService } from "@bitwarden/common/platform/abstractions/config/co
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { asUuid, SdkService } from "@bitwarden/common/platform/abstractions/sdk/sdk.service";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
+import { SyncService } from "@bitwarden/common/platform/sync";
 import { OrganizationId, UserId } from "@bitwarden/common/types/guid";
 import { UserKey } from "@bitwarden/common/types/key";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
@@ -126,11 +128,14 @@ import { toSdkCollectionType } from "../sdk/sdk-collection-type";
 import { ImportApiServiceAbstraction } from "../services/import-api.service.abstraction";
 import { ImportServiceAbstraction } from "../services/import.service.abstraction";
 import { guardReservedFields, ImportSource } from "../services/keykeeper/reserved-fields";
+import { SdkImportCheck, SdkImportDestination } from "../services/keykeeper/sdk-import-check";
 
 export class ImportService implements ImportServiceAbstraction {
   importOptions = importOptions;
 
   private readonly sdkImporters: SdkImporterRegistry = buildSdkImporterRegistry();
+
+  private readonly sdkImportCheck: SdkImportCheck;
 
   constructor(
     private cipherService: CipherService,
@@ -145,7 +150,17 @@ export class ImportService implements ImportServiceAbstraction {
     private restrictedItemTypesService: RestrictedItemTypesService,
     private configService: ConfigService,
     private sdkService: SdkService,
-  ) {}
+    // Keykeeper: for checking what an SDK import saved (keykeeper/sdk-import-check.ts).
+    syncService: SyncService,
+    organizationService: OrganizationService,
+  ) {
+    this.sdkImportCheck = new SdkImportCheck(
+      cipherService,
+      syncService,
+      organizationService,
+      i18nService,
+    );
+  }
 
   getImportOptions(): ImportOption[] {
     return [...this.importOptions];
@@ -320,7 +335,17 @@ export class ImportService implements ImportServiceAbstraction {
     );
     const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
 
-    return await firstValueFrom(
+    // Keykeeper: the SDK saves the items itself, so they're checked for our
+    // own field names right after (keykeeper/sdk-import-check.ts). Every SDK
+    // importer goes through here, so a new one is checked too.
+    const destination: SdkImportDestination = {
+      userId,
+      organizationId: organizationId ?? null,
+      asAdmin: organizationId != null && canAccessImportExport,
+    };
+    const baseline = await this.sdkImportCheck.before(destination);
+
+    const summary = await firstValueFrom(
       this.sdkService.userClient$(userId).pipe(
         switchMap(async (sdk) => {
           if (!sdk) {
@@ -335,6 +360,9 @@ export class ImportService implements ImportServiceAbstraction {
         }),
       ),
     );
+
+    await this.sdkImportCheck.after(destination, baseline, summary);
+    return summary;
   }
 
   /**
