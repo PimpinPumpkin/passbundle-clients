@@ -886,5 +886,11 @@
   },
   "keykeeperSsoForCommandLine": {
     "message": "This signs in the command-line tool on this computer. Continue only if you started that sign-in yourself, just now."
+  },
+  "keykeeperDuoBackToApp": {
+    "message": "Back to the app"
+  },
+  "keykeeperDuoBackToAppDesc": {
+    "message": "Your browser opens the app to finish signing in. If it doesn't, select Back to the app."
   }
 }
