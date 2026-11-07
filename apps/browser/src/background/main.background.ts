@@ -252,7 +252,7 @@ import { InternalFolderService as InternalFolderServiceAbstraction } from "@bitw
 import { SearchService as SearchServiceAbstraction } from "@bitwarden/common/vault/abstractions/search.service";
 import { TotpService as TotpServiceAbstraction } from "@bitwarden/common/vault/abstractions/totp.service";
 import { VaultSettingsService as VaultSettingsServiceAbstraction } from "@bitwarden/common/vault/abstractions/vault-settings/vault-settings.service";
-import { ExtensionPageUrls } from "@bitwarden/common/vault/enums";
+import { CipherRepromptType, ExtensionPageUrls } from "@bitwarden/common/vault/enums";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
   DefaultEndUserNotificationService,
@@ -368,6 +368,7 @@ import {
 } from "../autofill/fido2/services/browser-fido2-user-interface.service";
 import { keykeeperFillPicker as fillPickerHooks } from "../autofill/keykeeper/fill-field-menu";
 import { keykeeperSiteFixes as siteFixHooks } from "../autofill/keykeeper/fill-rules";
+import { KeykeeperOpenAndFill } from "../autofill/keykeeper/open-and-fill";
 import { KeykeeperSiteFixes } from "../autofill/keykeeper/site-fixes";
 import { AutofillLifecycleService } from "../autofill/services/abstractions/autofill-lifecycle.service";
 import { AutofillService as AutofillServiceAbstraction } from "../autofill/services/abstractions/autofill.service";
@@ -608,6 +609,7 @@ export default class MainBackground {
   keykeeperEnrollment: KeykeeperEnrollment;
   keykeeperMspWork: KeykeeperMspWork;
   keykeeperAgentBiometrics: KeykeeperAgentBiometrics;
+  keykeeperOpenAndFill: KeykeeperOpenAndFill;
   private runtimeBackground: RuntimeBackground;
   private tabsBackground: TabsBackground;
   private webRequestBackground: WebRequestBackground;
@@ -1876,7 +1878,7 @@ export default class MainBackground {
     siteFixHooks.rulesFor = (url) => this.keykeeperSiteFixes.rulesFor(url);
     siteFixHooks.share = (rule) => this.keykeeperSiteFixes.share(rule);
     // Keykeeper: the fill picker matches an item to a page as autofill does.
-    fillPickerHooks.itemMatches = async (cipher, url) => {
+    const itemMatches = async (cipher: CipherView, url: string) => {
       const equivalentDomains = await firstValueFrom(
         this.domainSettingsService.getUrlEquivalentDomains(url),
       );
@@ -1885,6 +1887,27 @@ export default class MainBackground {
       );
       return cipher.login?.matchesUri(url, equivalentDomains, defaultUriMatch) ?? false;
     };
+    fillPickerHooks.itemMatches = itemMatches;
+    // Keykeeper: "Open and fill": a login's open button fills the tab it opens, once.
+    this.keykeeperOpenAndFill = new KeykeeperOpenAndFill({
+      autofillService: this.autofillService,
+      cipherService: this.cipherService,
+      accountService: this.accountService,
+      authService: this.authService,
+      passwordRepromptRequired: async (cipher) =>
+        cipher.reprompt === CipherRepromptType.Password &&
+        (await this.userVerificationService.hasMasterPassword()),
+      itemMatches,
+      defaultMatch: () =>
+        firstValueFrom(this.domainSettingsService.resolvedDefaultUriMatchStrategy$),
+      isBlocked: async (url) => {
+        const blocked = await firstValueFrom(this.domainSettingsService.blockedInteractionsUris$);
+        return blocked != null && isUrlInList(url, blocked);
+      },
+      copyToClipboard: (text) => this.platformUtilsService.copyToClipboard(text),
+      logError: (error) => this.logService.error(error),
+    });
+    this.keykeeperOpenAndFill.init();
     // Keykeeper: join the client organization named by the MSP's install command.
     this.keykeeperEnrollment = new KeykeeperEnrollment(
       this.accountService,
