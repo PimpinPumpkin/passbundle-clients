@@ -89,6 +89,7 @@ function setUp(msp: MspDetails, mspJoining?: MspJoining) {
     mock<EncryptService>(),
     mock<CryptoFunctionService>(),
     apiService,
+    mock<LegacyCompatKeyService>(),
   );
   // The sealer's own seals use the browser's crypto; these use Node's, which is the same.
   (sealer as any).seals = seals;

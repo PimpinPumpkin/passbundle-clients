@@ -13,7 +13,12 @@ import { OrganizationId } from "@bitwarden/common/types/guid";
 import { OrgKey } from "@bitwarden/common/types/key";
 import { KeyService } from "@bitwarden/key-management";
 // eslint-disable-next-line no-restricted-imports
-import { CryptoFunctionService, EncryptService, EncString } from "@bitwarden/legacy-crypto";
+import {
+  CryptoFunctionService,
+  EncryptService,
+  EncString,
+  LegacyCompatKeyService,
+} from "@bitwarden/legacy-crypto";
 
 /** An organization's joining setting as the server reports it, with its seal. */
 export type ReportedJoining = { autoConfirm: boolean; domains: string[]; seal: string | null };
@@ -37,6 +42,7 @@ export class KeykeeperJoinSealer {
     private readonly encryptService: EncryptService,
     private readonly cryptoFunctionService: CryptoFunctionService,
     private readonly apiService: ApiService,
+    private readonly legacyCompatKeyService: LegacyCompatKeyService,
   ) {}
 
   /** The organization's key, if this person holds it. */
@@ -197,12 +203,13 @@ export class KeykeeperJoinSealer {
    * What the install command carries besides the token: the join secret, and
    * the fingerprint of the organization's public key, made from its private
    * key (never from the public key the server sends). Null without the key or
-   * a secret.
+   * a secret. With them, the organization's fingerprint phrase from the same
+   * key, which the extension shows the people who join, to compare.
    */
   async commandParts(
     organizationId: string,
     encryptedSecret: string | null | undefined,
-  ): Promise<{ secret: string; fingerprint: string } | null> {
+  ): Promise<{ secret: string; fingerprint: string; phrase: string[] } | null> {
     const key = await this.orgKey(organizationId);
     if (key == null || encryptedSecret == null) {
       return null;
@@ -221,7 +228,11 @@ export class KeykeeperJoinSealer {
         key,
       );
       const publicKey = await this.cryptoFunctionService.rsaExtractPublicKey(privateKey);
-      return { secret, fingerprint: await this.seals.fingerprint(publicKey) };
+      return {
+        secret,
+        fingerprint: await this.seals.fingerprint(publicKey),
+        phrase: await this.legacyCompatKeyService.getFingerprint(organizationId, publicKey),
+      };
     } catch {
       return null;
     }

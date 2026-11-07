@@ -3,11 +3,12 @@ import { FormBuilder, Validators } from "@angular/forms";
 import { Router } from "@angular/router";
 
 import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
-import { ToastService } from "@bitwarden/components";
+import { DialogService, ToastService } from "@bitwarden/components";
 
 import { HeaderModule } from "../../layouts/header/header.module";
 import { SharedModule } from "../../shared";
 import { ClientPreset, KeykeeperMspApiService } from "../msp/msp-api.service";
+import { KeykeeperTwoStepDetour } from "../two-step-setup/two-step-detour";
 
 /**
  * Keykeeper: "New organization" on our own server. Upstream asks a self-hosted
@@ -26,7 +27,14 @@ import { ClientPreset, KeykeeperMspApiService } from "../msp/msp-api.service";
     <bit-container>
       <p bitTypography="body1">
         An organization shares items with the people you invite. Invite them from its Members page:
-        they get in as soon as they accept, unless you ask for approval on its Settings page.
+        they get in as soon as they accept, unless you ask for approval in its settings, under
+        Joining and security.
+      </p>
+      <!-- Keykeeper: the way into the MSP console for someone who isn't on an MSP yet. -->
+      <p bitTypography="body2" data-testid="create-org-msp">
+        Run IT for several companies?
+        <a bitLink routerLink="/msp">Set up your MSP</a> instead: one console for every client, with
+        default policies, templates, and an install command for each.
       </p>
       <form [formGroup]="form" [bitSubmit]="submit" class="tw-max-w-xl">
         <bit-form-field>
@@ -54,10 +62,15 @@ import { ClientPreset, KeykeeperMspApiService } from "../msp/msp-api.service";
         </bit-radio-group>
         @if (form.controls.preset.value === "business" && needsTwoStep()) {
           <bit-callout type="warning" [title]="null" data-testid="create-org-two-step">
-            A business requires two-step login of its owners and admins: an authenticator app, a
-            security key or passkey, or Duo. You haven't set it up, so once the organization is made
-            you'll be signed out, and asked to set it up when you sign in again.
-            <a bitLink routerLink="/settings/security/two-factor">Set it up first</a>
+            <p>
+              A business requires two-step login of its owners and admins: an authenticator app, a
+              security key or passkey, or Duo. Set it up before you make the organization, so you
+              stay signed in. It takes a minute, and what you type here stays. A family or a group
+              doesn't need it.
+            </p>
+            <button bitButton buttonType="secondary" type="button" (click)="setUpTwoStep()">
+              Set up two-step login
+            </button>
           </bit-callout>
         }
         <button bitButton bitFormButton buttonType="primary" type="submit">
@@ -80,14 +93,38 @@ export class KeykeeperCreateOrganizationComponent implements OnInit {
     private readonly api: KeykeeperMspApiService,
     private readonly router: Router,
     private readonly toastService: ToastService,
+    private readonly dialogService: DialogService,
+    private readonly twoStepDetour: KeykeeperTwoStepDetour,
   ) {}
 
   async ngOnInit() {
-    try {
-      this.needsTwoStep.set(!(await this.api.hasQualifyingTwoStep()));
-    } catch {
-      // Unknown: say nothing.
+    // Back from setting up two-step login: the form as they left it.
+    const back = this.twoStepDetour.take("/create-organization");
+    if (back != null) {
+      this.form.setValue({ name: back.name, preset: back.preset ?? "business" });
     }
+    await this.checkTwoStep();
+  }
+
+  /** Whether the person has two-step login that counts; unknown counts as yes, and the server decides. */
+  private async checkTwoStep(): Promise<boolean> {
+    try {
+      const has = await this.api.hasQualifyingTwoStep();
+      this.needsTwoStep.set(!has);
+      return has;
+    } catch {
+      return true;
+    }
+  }
+
+  /** To the Two-step login page, with a way back here that keeps the form. */
+  protected async setUpTwoStep() {
+    await this.twoStepDetour.start({
+      path: "/create-organization",
+      label: "New organization",
+      name: this.form.controls.name.value,
+      preset: this.form.controls.preset.value,
+    });
   }
 
   protected readonly submit = async () => {
@@ -96,6 +133,23 @@ export class KeykeeperCreateOrganizationComponent implements OnInit {
       return;
     }
     const name = this.form.controls.name.value.trim();
+    // A business requires two-step login of its owners: without it, making
+    // one would end this session at once (DESIGN.md, "Two-step login for
+    // admins"), so it says so first and offers to set it up. Checked now: it
+    // may have been set up since the page opened.
+    if (this.form.controls.preset.value === "business" && !(await this.checkTwoStep())) {
+      const setUp = await this.dialogService.openSimpleDialog({
+        title: "Set up two-step login first",
+        content: `A business requires two-step login of its owners and admins: an authenticator app, a security key or passkey, or Duo. Email codes don't count. Without it, making ${name} would sign you out right away. Set it up now, and come back here to make ${name}.`,
+        acceptButtonText: "Set up two-step login",
+        cancelButtonText: "Not now",
+        type: "warning",
+      });
+      if (setUp) {
+        await this.setUpTwoStep();
+      }
+      return;
+    }
     try {
       const id = await this.api.createOrganization(name, this.form.controls.preset.value);
       this.toastService.showToast({ variant: "success", message: `Created ${name}` });

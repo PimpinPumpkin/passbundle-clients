@@ -216,6 +216,30 @@ function originOf(url: string | null | undefined): string | null {
   }
 }
 
+/**
+ * Why an install command's token can't be used from this account: the
+ * browser policy names another server, or none. Names only the servers'
+ * addresses; the token goes nowhere.
+ */
+function otherServerProblem(
+  server: string | null,
+  signedInTo: string | null,
+): { title: string; message: string } {
+  if (server == null) {
+    return {
+      title: "Couldn't join your organization",
+      message:
+        "Your IT's install command doesn't say which server it's for, so this browser can't join you to your organization. Ask your IT to run it again with the server's address.",
+    };
+  }
+  const host = new URL(server).host;
+  const yours = signedInTo == null ? "another server" : new URL(signedInTo).host;
+  return {
+    title: `Sign in to ${host} to join your organization`,
+    message: `Your IT set up this browser for ${host}, but you're signed in to ${yours}. To join your organization, sign in to ${host} instead.`,
+  };
+}
+
 export class KeykeeperEnrollment {
   /** The run in progress for each account, so an unlock and a late answer can't both join. */
   private readonly running = new Map<UserId, Promise<EnrollmentOutcome>>();
@@ -286,19 +310,28 @@ export class KeykeeperEnrollment {
     if (token == null) {
       return "no-token";
     }
-    // The token goes only to the server the same policy names: never to
-    // another account's server.
-    const environment = await firstValueFrom(this.environmentService.getEnvironment$(userId));
-    const server = originOf(await this.platform.managedServer());
-    if (server == null || server !== originOf(environment?.getWebVaultUrl())) {
-      return "other-server";
-    }
     // The token's SHA-256, to remember it by without keeping it.
     const tokenHash = Utils.fromBufferToHex(
       (await this.cryptoFunctionService.hash(token, "sha256")).buffer,
     );
     const state = await this.platform.load();
     const previous = state[userId];
+    // The token goes only to the server the same policy names: never to
+    // another account's server. Signed in somewhere else, the person hears
+    // why nothing happens, once, and the token goes nowhere.
+    const environment = await firstValueFrom(this.environmentService.getEnvironment$(userId));
+    const server = originOf(await this.platform.managedServer());
+    const signedInTo = originOf(environment?.getWebVaultUrl());
+    if (server == null || server !== signedInTo) {
+      await this.tellOnce(
+        state,
+        userId,
+        tokenHash,
+        previous,
+        otherServerProblem(server, signedInTo),
+      );
+      return "other-server";
+    }
     if (previous?.tokenHash === tokenHash) {
       if (previous.result === "joined") {
         return "already-done";
@@ -398,18 +431,34 @@ export class KeykeeperEnrollment {
       return "joined";
     } catch (e) {
       const error = e instanceof ErrorResponse ? e.getSingleMessage() : String(e);
-      // Tell the person once per problem, not at every unlock.
-      const sameAsBefore =
-        previous?.tokenHash === tokenHash &&
-        typeof previous.result === "object" &&
-        previous.result.error === error;
-      if (!sameAsBefore) {
-        await this.platform.notify("Couldn't join your organization", error);
-      }
-      state[userId] = { tokenHash, result: { error } };
-      await this.platform.save(state);
+      await this.tellOnce(state, userId, tokenHash, previous, {
+        title: "Couldn't join your organization",
+        message: error,
+      });
       return "failed";
     }
+  }
+
+  /**
+   * Tells the person about a problem once per problem and token, not at
+   * every unlock, judged by the outcome before this run (`previous`).
+   */
+  private async tellOnce(
+    state: EnrollmentState,
+    userId: UserId,
+    tokenHash: string,
+    previous: EnrollmentState[string] | undefined,
+    problem: { title: string; message: string },
+  ) {
+    const sameAsBefore =
+      previous?.tokenHash === tokenHash &&
+      typeof previous.result === "object" &&
+      previous.result.error === problem.message;
+    if (!sameAsBefore) {
+      await this.platform.notify(problem.title, problem.message);
+    }
+    state[userId] = { tokenHash, result: { error: problem.message } };
+    await this.platform.save(state);
   }
 
   /**

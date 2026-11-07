@@ -189,7 +189,8 @@ const SOURCES: Source[] = [
       } @else {
         <h1 bitTypography="h1" class="tw-mb-2 tw-text-center">Bring your passwords over</h1>
         <p bitTypography="body1" class="tw-mb-6 tw-text-center tw-text-muted">
-          From wherever they are now. It takes a minute, and you can do it later from Tools, Import.
+          From wherever they are now. It takes a minute, and you can do it later from Import and
+          export, Import, in the menu.
         </p>
         <div class="tw-grid tw-grid-cols-1 tw-gap-3 sm:tw-grid-cols-2 md:tw-grid-cols-3">
           @for (s of sources; track s.id) {

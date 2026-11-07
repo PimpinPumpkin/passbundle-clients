@@ -185,6 +185,54 @@ describe("Keykeeper enrollment through the install command", () => {
     }
   });
 
+  it("says once, naming both servers, why signing in to another server joins nothing", async () => {
+    const t = setUp({ accountServer: "https://vault.other.test" });
+
+    expect(await t.enrollment.run(userId)).toBe("other-server");
+    expect(t.notices).toEqual([
+      [
+        "Sign in to vault.example.test to join your organization",
+        "Your IT set up this browser for vault.example.test, but you're signed in to vault.other.test. To join your organization, sign in to vault.example.test instead.",
+      ],
+    ]);
+    // Not at every unlock, and still nothing sent.
+    expect(await t.enrollment.run(userId)).toBe("other-server");
+    expect(t.notices).toHaveLength(1);
+    expect(t.apiService.send).not.toHaveBeenCalled();
+    // Only a hash of the token is kept.
+    expect(JSON.stringify(t.state())).not.toContain(token);
+    expect(t.state()[userId].tokenHash).toBe(await hash(token));
+
+    // A port is part of the server too.
+    const port = setUp({ accountServer: "https://vault.example.test:8443" });
+    await port.enrollment.run(userId);
+    expect(port.notices[0][1]).toContain("you're signed in to vault.example.test:8443");
+  });
+
+  it("says when the install command names no server, and sends nothing", async () => {
+    for (const managedServer of [null, "not a url"]) {
+      const t = setUp({ managedServer });
+      expect(await t.enrollment.run(userId)).toBe("other-server");
+      expect(t.notices).toEqual([
+        [
+          "Couldn't join your organization",
+          "Your IT's install command doesn't say which server it's for, so this browser can't join you to your organization. Ask your IT to run it again with the server's address.",
+        ],
+      ]);
+      expect(t.apiService.send).not.toHaveBeenCalled();
+    }
+  });
+
+  it("joins once the person signs in to the right server, after saying they weren't", async () => {
+    const elsewhere = setUp({ accountServer: "https://vault.other.test" });
+    await elsewhere.enrollment.run(userId);
+
+    const t = setUp({ saved: elsewhere.state() });
+    t.respond(t.info(false));
+    expect(await t.enrollment.run(userId)).toBe("joined");
+    expect(t.asked).toHaveLength(1);
+  });
+
   it("asks first, then joins with the user key encrypted to the organization's public key when it uses account recovery", async () => {
     const t = setUp();
     t.respond(t.info(true));

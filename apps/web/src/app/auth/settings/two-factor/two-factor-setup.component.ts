@@ -49,6 +49,7 @@ import {
   ToastService,
 } from "@bitwarden/components";
 
+import { KeykeeperTwoStepDetourComponent } from "../../../keykeeper/two-step-setup/two-step-detour";
 import { HeaderModule } from "../../../layouts/header/header.module";
 import { SharedModule } from "../../../shared/shared.module";
 
@@ -72,6 +73,8 @@ import { TwoFactorVerifyComponent } from "./two-factor-verify.component";
     PremiumBadgeComponent,
     TwoFactorIconComponent,
     SharedModule,
+    // Keykeeper: the way back to the form that sent someone here.
+    KeykeeperTwoStepDetourComponent,
   ],
 })
 export class TwoFactorSetupComponent implements OnInit, OnDestroy {
