@@ -265,6 +265,22 @@ function apply() {
     );
   }
   ownMessages.keykeeperInstallScript = { message: BRAND.installScript };
+  // The Mac and Linux script, and the Mac profile it's used with, carry it too.
+  if (
+    typeof BRAND.installScriptMacLinux !== "string" ||
+    !/^[\w-]+\.sh$/.test(BRAND.installScriptMacLinux)
+  ) {
+    fail(
+      'brand.json needs "installScriptMacLinux", the Mac and Linux install script\'s file name, such as "install-example.sh".',
+    );
+  }
+  if (typeof BRAND.macProfile !== "string" || !/^[\w-]+\.mobileconfig$/.test(BRAND.macProfile)) {
+    fail(
+      'brand.json needs "macProfile", the Mac configuration profile\'s file name, such as "Example.mobileconfig".',
+    );
+  }
+  ownMessages.keykeeperInstallScriptMacLinux = { message: BRAND.installScriptMacLinux };
+  ownMessages.keykeeperMacProfile = { message: BRAND.macProfile };
   for (const rel of trackedFiles(
     "apps/browser/src/_locales/en/messages.json",
     "apps/web/src/locales/en/messages.json",
