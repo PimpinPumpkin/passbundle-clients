@@ -14,11 +14,11 @@ import { mockAccountServiceWith } from "@bitwarden/common/spec";
 import { UserId } from "@bitwarden/common/types/guid";
 import { NavigationModule, PopoverModule, SideNavService, SvgModule } from "@bitwarden/components";
 import { SendPolicyService } from "@bitwarden/send-ui";
+import { CoachmarkComponent, CoachmarkService } from "@bitwarden/vault";
 import { PremiumSubscriptionRoutingService } from "@bitwarden/web-vault/app/billing/individual/services/premium-subscription-routing.service";
 
 import { KeykeeperMspApiService } from "../keykeeper/msp/msp-api.service";
 import { KEYKEEPER_MENU_BUTTON } from "../keykeeper/vault-menu/menu-button";
-import { CoachmarkComponent, CoachmarkService } from "../vault/components/coachmark";
 
 import { UserLayoutComponent } from "./user-layout.component";
 

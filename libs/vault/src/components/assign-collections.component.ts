@@ -50,8 +50,6 @@ import { Organization } from "@bitwarden/common/admin-console/models/domain/orga
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { ProductTierType } from "@bitwarden/common/billing/enums";
-import { FeatureFlag } from "@bitwarden/common/enums/feature-flag.enum";
-import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { CipherId, CollectionId, OrganizationId, UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
@@ -65,12 +63,14 @@ import {
   ButtonModule,
   DialogModule,
   FormFieldModule,
+  IconTileOptions,
   MultiSelectModule,
   SelectItemView,
   SelectModule,
   ToastService,
 } from "@bitwarden/components";
 
+import { orgIconTile } from "../models/vault-icon-tile";
 import { Vfo1I18nPipe } from "../pipes/vfo1-i18n.pipe";
 import { Vfo1TerminologyService } from "../services/vfo1-terminology.service";
 
@@ -196,6 +196,14 @@ export class AssignCollectionsComponent implements OnInit, OnDestroy, AfterViewI
   protected orgName: string;
   protected showOrgSelector: boolean = false;
 
+  /**
+   * Icon tiles per organization id, colored to match the vault's tile in the side nav, item table,
+   * and item form. Rebuilt whenever the org list emits so each template binding gets a stable
+   * object — `bit-select` maps its options in an `afterRenderEffect` that re-runs on a changed
+   * reference, so a fresh tile per change detection would loop.
+   */
+  protected orgIconTiles = new Map<string, IconTileOptions>();
+
   protected organizations$: Observable<Organization[]> = this.accountService.activeAccount$.pipe(
     switchMap((account) =>
       this.organizationService.organizations$(account?.id).pipe(
@@ -205,6 +213,10 @@ export class AssignCollectionsComponent implements OnInit, OnDestroy, AfterViewI
             .sort((a, b) => a.name.localeCompare(b.name)),
         ),
         tap((orgs) => {
+          this.orgIconTiles = new Map(
+            orgs.map((org) => [org.id, orgIconTile(org.productTierType)]),
+          );
+
           if (orgs.length > 0 && this.showOrgSelector) {
             // Using setTimeout to defer the patchValue call until the next event loop cycle
             setTimeout(() => {
@@ -294,7 +306,6 @@ export class AssignCollectionsComponent implements OnInit, OnDestroy, AfterViewI
     private formBuilder: FormBuilder,
     private toastService: ToastService,
     private accountService: AccountService,
-    private configService: ConfigService,
   ) {}
 
   async ngOnInit() {
@@ -397,24 +408,11 @@ export class AssignCollectionsComponent implements OnInit, OnDestroy, AfterViewI
         ? this.updateAssignedCollections(this.editableItems[0], activeUserId)
         : this.bulkUpdateCollections(cipherIds, activeUserId));
 
-      const batchBarEnabled = await this.configService.getFeatureFlag(
-        FeatureFlag.PM37785_VaultBatchBar,
-      );
       const selectedCollectionsCount = this.formGroup.controls.collections.value.length;
       const ciphersCount = this.params.ciphers.length;
-      let assignedMessageKey: string;
-
-      if (batchBarEnabled) {
-        assignedMessageKey = this.collectionAssignmentToastKey(
-          ciphersCount,
-          selectedCollectionsCount,
-        );
-      } else {
-        assignedMessageKey = this.vfo1TerminologyService.enabled()
-          ? "successfullyAddedSharedFolders"
-          : "successfullyAssignedCollections";
-      }
-      const assignedMessage = this.i18nService.t(assignedMessageKey);
+      const assignedMessage = this.i18nService.t(
+        this.collectionAssignmentToastKey(ciphersCount, selectedCollectionsCount),
+      );
 
       this.toastService.showToast({
         variant: "success",
@@ -653,31 +651,13 @@ export class AssignCollectionsComponent implements OnInit, OnDestroy, AfterViewI
       userId,
     );
 
-    const batchBarEnabled = await this.configService.getFeatureFlag(
-      FeatureFlag.PM37785_VaultBatchBar,
-    );
-
-    if (batchBarEnabled) {
-      this.toastService.showToast({
-        variant: "success",
-        title: null,
-        message: this.i18nService.t(
-          this.collectionAssignmentToastKey(shareableCiphers.length, selectedCollectionIds.length),
-        ),
-      });
-    } else {
-      this.toastService.showToast({
-        variant: "success",
-        title: null,
-        message: this.i18nService.t(
-          shareableCiphers.length === 1 ? "itemMovedToOrg" : "itemsMovedToOrg",
-          this.orgName ??
-            (this.vfo1TerminologyService.enabled()
-              ? this.i18nService.t("vault")
-              : this.i18nService.t("organization")),
-        ),
-      });
-    }
+    this.toastService.showToast({
+      variant: "success",
+      title: null,
+      message: this.i18nService.t(
+        this.collectionAssignmentToastKey(shareableCiphers.length, selectedCollectionIds.length),
+      ),
+    });
   }
 
   private async bulkUpdateCollections(cipherIds: CipherId[], userId: UserId) {

@@ -16,14 +16,12 @@ import platformPlugins from "./libs/eslint/platform/index.mjs";
 import componentPlugins from "./libs/eslint/components/index.mjs";
 
 /// @bitwarden/legacy-crypto is a holding pen for crypto primitives being retired in favour of the
-/// SDK. Nothing may import it except the re-export shims left behind at the pre-move paths, which
-/// keep existing callers working. Those shims are allowlisted at the bottom of this config via
-/// `allowLegacyCrypto`; that list only ever shrinks.
+/// SDK
 const LEGACY_CRYPTO_RESTRICTED_PATTERN = {
   group: ["@bitwarden/legacy-crypto", "@bitwarden/legacy-crypto/**"],
   message:
     "@bitwarden/legacy-crypto holds crypto primitives that are being retired in favour of the SDK. " +
-    "Do not add new imports — implement the operation in the SDK and contact the Key Management team.",
+    "Do not add new imports if possible — implement the operation in the SDK and contact the Key Management team.",
 };
 
 // Common is at the base level - should not import from other libs except shared
@@ -71,7 +69,7 @@ export default tseslint.config(
   ...storybook.configs["flat/recommended"],
   {
     // Everything in this config object targets our TypeScript files (Components, Directives, Pipes etc)
-    files: ["**/*.ts", "**/*.js"],
+    files: ["**/*.ts", "**/*.mts", "**/*.js"],
     extends: [
       eslint.configs.recommended,
       ...tseslint.configs.recommended,
@@ -291,6 +289,7 @@ export default tseslint.config(
       "apps/browser/src/autofill/{deprecated/content,content,notification}/**/*.ts",
       "apps/browser/src/**/background/**/*.ts", // It's okay to have long lived listeners in the background
       "apps/browser/src/platform/background.ts",
+      "apps/browser/src/**/*.spec.ts", // Specs are not production dispatch paths.
     ],
     rules: {
       "no-restricted-syntax": [
@@ -309,6 +308,24 @@ export default tseslint.config(
           selector:
             "CallExpression > [object.object.object.object.name='chrome'][property.name='addListener']",
         },
+        // This block owns the non-background browser files; the background block below covers the rest, so
+        // together they follow these methods everywhere without a third, colliding `no-restricted-syntax` block.
+        doAutoFillSyntaxRule(),
+        unsafeAutofillTabWithCipherSyntaxRule(),
+      ],
+    },
+  },
+  {
+    files: ["apps/browser/src/**/background/**/*.ts"],
+    ignores: [
+      "apps/browser/src/autofill/background/autofill-orchestrator.ts",
+      "apps/browser/src/**/*.spec.ts", // Specs are not production dispatch paths.
+    ],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        doAutoFillSyntaxRule(),
+        unsafeAutofillTabWithCipherSyntaxRule(),
       ],
     },
   },
@@ -681,43 +698,6 @@ export default tseslint.config(
     },
   },
 
-  /// The re-export shims left behind when the crypto primitives moved to @bitwarden/legacy-crypto.
-  /// These are the only files permitted to import that package. Delete an entry here whenever its
-  /// shim is deleted; never add one.
-  {
-    files: [
-      "libs/common/src/key-management/crypto/**/*.ts",
-      "libs/common/src/key-management/types.ts",
-      "libs/common/src/platform/enums/encryption-type.enum.ts",
-      "libs/common/src/platform/interfaces/decryptable.interface.ts",
-      "libs/common/src/platform/models/domain/enc-array-buffer.ts",
-      "libs/common/src/platform/models/domain/symmetric-crypto-key.ts",
-      "libs/common/src/types/csprng.ts",
-    ],
-    rules: {
-      "no-restricted-imports": buildNoRestrictedImports(COMMON_FORBIDDEN_PACKAGES, false, true),
-    },
-  },
-  {
-    files: [
-      "libs/key-management/src/enums/kdf-type.enum.ts",
-      "libs/key-management/src/models/kdf-config.ts",
-    ],
-    rules: {
-      "no-restricted-imports": buildNoRestrictedImports(
-        KEY_MANAGEMENT_FORBIDDEN_PACKAGES,
-        false,
-        true,
-      ),
-    },
-  },
-  {
-    files: ["libs/node/src/services/node-crypto-function.service.ts"],
-    rules: {
-      "no-restricted-imports": buildNoRestrictedImports(NODE_FORBIDDEN_PACKAGES, false, true),
-    },
-  },
-
   // Within a package, import sibling code via relative paths rather than the package's own
   // `@bitwarden/*` alias. Scoped to libs here; the rule self-limits to the file's owning package.
   // https://contributing.bitwarden.com/contributing/code-style/web/typescript#imports-within-the-same-package
@@ -785,6 +765,16 @@ export default tseslint.config(
     },
   },
 
+  // Playwright fixtures
+  {
+    files: ["e2e/**/*.ts"],
+    rules: {
+      // Playwright requires a destructuring pattern as the first fixture argument, so a
+      // fixture that depends on nothing has to be declared as `async ({}, use)`.
+      "no-empty-pattern": "off",
+    },
+  },
+
   // Keep ignores at the end
   {
     ignores: [
@@ -792,6 +782,7 @@ export default tseslint.config(
       "**/dist/",
       "**/coverage/",
       ".angular/",
+      ".debug/",
       "storybook-static/",
 
       "**/node_modules/",
@@ -816,6 +807,9 @@ export default tseslint.config(
 
       "scripts/*.js",
       "jest.preset.js",
+
+      // Agent configuration and its tooling, not shipped code.
+      ".claude/",
     ],
   },
 );
@@ -853,4 +847,32 @@ function buildNoRestrictedImports(
       ],
     },
   ];
+}
+
+/**
+ * A `no-restricted-syntax` entry that flags direct calls to the `AutofillService.doAutoFill*`
+ * methods.
+ * @returns {any}
+ */
+function doAutoFillSyntaxRule() {
+  return {
+    selector:
+      "CallExpression[callee.type='MemberExpression'][callee.property.name=/^doAutoFill(ActiveTab|OnTab)?$/]",
+    message:
+      "Request a fill using the AutofillOrchestrator (fillCipher / autofillTabWithCipher). See autofill.design.md and orchestrator.design.md for additional information.",
+  };
+}
+
+/**
+ * A `no-restricted-syntax` entry that flags every call to
+ * `AutofillOrchestrator.unsafeAutofillTabWithCipher`.
+ * @returns {any}
+ */
+function unsafeAutofillTabWithCipherSyntaxRule() {
+  return {
+    selector:
+      "CallExpression[callee.type='MemberExpression'][callee.property.name='unsafeAutofillTabWithCipher']",
+    message:
+      "unsafeAutofillTabWithCipher can fill a tab the user is not looking at. Only call this method after confirming the sender is internal to the extension with BrowserApi.senderIsInternal, and disable this rule inline with that justification. See orchestrator.design.md for additional information.",
+  };
 }

@@ -15,22 +15,27 @@ import {
   switchMap,
 } from "rxjs";
 
-import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { PasswordManagerLogo } from "@bitwarden/assets/svg";
-import { canAccessEmergencyAccess } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
+import {
+  canAccessEmergencyAccess,
+  singleOrganizationPolicyApplies$,
+} from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
+import { FeatureFlag } from "@bitwarden/common/enums/feature-flag.enum";
+import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { PopoverModule, SideNavService, SvgModule } from "@bitwarden/components";
 import { SendPolicyService } from "@bitwarden/send-ui";
+import { I18nPipe } from "@bitwarden/ui-common";
+import { CoachmarkComponent, CoachmarkService } from "@bitwarden/vault";
 import { PremiumSubscriptionRoutingService } from "@bitwarden/web-vault/app/billing/individual/services/premium-subscription-routing.service";
 
 import { BillingFreeFamiliesNavItemComponent } from "../billing/shared/billing-free-families-nav-item.component";
 import { KeykeeperMspApiService } from "../keykeeper/msp/msp-api.service";
 import { KEYKEEPER_MENU_BUTTON } from "../keykeeper/vault-menu/menu-button";
 import { KeykeeperVaultMenuComponent } from "../keykeeper/vault-menu/vault-menu.component";
-import { CoachmarkComponent, CoachmarkService } from "../vault/components/coachmark";
 
 import { WebLayoutModule } from "./web-layout.module";
 
@@ -42,7 +47,7 @@ import { WebLayoutModule } from "./web-layout.module";
   imports: [
     CommonModule,
     RouterModule,
-    JslibModule,
+    I18nPipe,
     WebLayoutModule,
     SvgModule,
     BillingFreeFamiliesNavItemComponent,
@@ -63,6 +68,25 @@ export class UserLayoutComponent implements OnInit {
 
   protected readonly coachmarkService = inject(CoachmarkService);
   protected readonly sideNavService = inject(SideNavService);
+  private readonly configService = inject(ConfigService);
+
+  protected readonly exportRoute = computed(() => {
+    const vfo1Enabled = this.vfo1Enabled();
+    return vfo1Enabled ? "/settings/export" : "/tools/export";
+  });
+
+  protected readonly vfo1Enabled: Signal<boolean> = toSignal(
+    inject(ConfigService).getFeatureFlag$(FeatureFlag.VFO1Foundation),
+    { initialValue: false },
+  );
+
+  protected readonly singleOrgPolicyApplies = toSignal(
+    this.accountService.activeAccount$.pipe(
+      getUserId,
+      switchMap((userId) => singleOrganizationPolicyApplies$(userId, this.policyService)),
+    ),
+    { initialValue: true },
+  );
 
   protected readonly importCoachmarkOpen = computed(
     () => this.coachmarkService.activeStepId() === "importData",

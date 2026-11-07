@@ -40,6 +40,7 @@ import { LoginUriView } from "@bitwarden/common/vault/models/view/login-uri.view
 import { CipherAuthorizationService } from "@bitwarden/common/vault/services/cipher-authorization.service";
 import { TaskService } from "@bitwarden/common/vault/tasks";
 import { DialogService, ToastService } from "@bitwarden/components";
+import { ShareLinkService } from "@bitwarden/tools-share";
 import {
   ArchiveCipherUtilitiesService,
   CopyCipherFieldService,
@@ -114,7 +115,6 @@ describe("ViewComponent", () => {
 
   const mockCipherService = {
     cipherViews$: jest.fn().mockImplementation((userId) => of([mockCipher])),
-    getKeyForCipherKeyDecryption: jest.fn().mockResolvedValue({}),
     deleteWithServer: jest.fn().mockResolvedValue(undefined),
     softDeleteWithServer: jest.fn().mockResolvedValue(undefined),
     updateWithServer: jest.fn().mockResolvedValue(undefined),
@@ -265,6 +265,10 @@ describe("ViewComponent", () => {
           provide: ChangeLoginPasswordService,
           useValue: mock<ChangeLoginPasswordService>(),
         },
+        {
+          provide: ShareLinkService,
+          useValue: { cipherCanBeShared$: () => of(false) },
+        },
       ],
     })
       .overrideProvider(DialogService, {
@@ -296,28 +300,28 @@ describe("ViewComponent", () => {
       params$.next({ cipherId: mockCipher.id });
       flush(); // Resolve all promises
 
-      expect(component.headerText).toEqual("viewItemHeaderLogin");
+      expect(component.headerText).toEqual("viewItemHeaderLoginSentenceCase");
 
       // Set header text for a card
       mockCipher.type = CipherType.Card;
       params$.next({ cipherId: mockCipher.id });
       flush(); // Resolve all promises
 
-      expect(component.headerText).toEqual("viewItemHeaderCard");
+      expect(component.headerText).toEqual("viewItemHeaderCardSentenceCase");
 
       // Set header text for an identity
       mockCipher.type = CipherType.Identity;
       params$.next({ cipherId: mockCipher.id });
       flush(); // Resolve all promises
 
-      expect(component.headerText).toEqual("viewItemHeaderIdentity");
+      expect(component.headerText).toEqual("viewItemHeaderIdentitySentenceCase");
 
       // Set header text for a secure note
       mockCipher.type = CipherType.SecureNote;
       params$.next({ cipherId: mockCipher.id });
       flush(); // Resolve all promises
 
-      expect(component.headerText).toEqual("viewItemHeaderNote");
+      expect(component.headerText).toEqual("viewItemHeaderNoteSentenceCase");
 
       // Set header text for a passport
       mockCipher.type = CipherType.Passport;
@@ -914,7 +918,7 @@ describe("ViewComponent", () => {
       expect(result).toBe(false);
     }));
 
-    it("returns false for SshKey type", fakeAsync(() => {
+    it("returns true for SshKey type", fakeAsync(() => {
       autofillAllowed$.next(true);
 
       // Recreate component to pick up the signal values
@@ -933,7 +937,7 @@ describe("ViewComponent", () => {
 
       const result = component.showAutofillButton();
 
-      expect(result).toBe(false);
+      expect(result).toBe(true);
     }));
 
     it("returns false when cipher is archived", fakeAsync(() => {

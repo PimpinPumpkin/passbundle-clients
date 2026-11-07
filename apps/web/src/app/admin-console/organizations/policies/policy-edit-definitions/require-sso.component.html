@@ -1,9 +1,3 @@
-<bit-callout type="info" title="{{ 'prerequisite' | i18n }}">
-  {{ "requireSsoPolicyReq" | i18n }}
-</bit-callout>
-<bit-callout type="warning">
-  {{ "requireSsoExemption" | i18n }}
-</bit-callout>
 @if (keykeeperUnlinked(); as unlinked) {
   @if (unlinked.length > 0) {
     <!-- Keykeeper: who will be asked to link (DESIGN.md, "Sign in with Microsoft Entra ID"). -->
@@ -22,6 +16,6 @@
 }
 
 <bit-form-control>
-  <input type="checkbox" bitCheckbox [formControl]="enabled" id="enabled" />
-  <bit-label>{{ "turnOn" | i18n }}</bit-label>
+  <bit-switch [formControl]="enabled"></bit-switch>
+  <bit-label>{{ "enablePolicy" | i18n }}</bit-label>
 </bit-form-control>

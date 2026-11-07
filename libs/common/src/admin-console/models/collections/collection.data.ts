@@ -17,6 +17,8 @@ export class CollectionData {
   type: CollectionType = CollectionTypes.SharedCollection;
   /** Keykeeper: the person's own capabilities in the folder. */
   keykeeper?: FolderGrid;
+  /** True when an enabled PAM access rule gates the collection's items. Derived by the server. */
+  hasEnabledAccessRule: boolean = false;
 
   constructor(response: CollectionDetailsResponse) {
     this.id = response.id;
@@ -31,6 +33,7 @@ export class CollectionData {
     if (response.keykeeper != null) {
       this.keykeeper = response.keykeeper;
     }
+    this.hasEnabledAccessRule = response.hasEnabledAccessRule;
   }
 
   static fromJSON(obj: Jsonify<CollectionData | null>): CollectionData | null {

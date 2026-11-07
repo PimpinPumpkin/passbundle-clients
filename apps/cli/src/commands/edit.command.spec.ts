@@ -7,7 +7,6 @@ import { PolicyService } from "@bitwarden/common/admin-console/abstractions/poli
 import { GRID_NONE } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions";
-import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
 import { mockAccountInfoWith } from "@bitwarden/common/spec";
 import { OrganizationId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
@@ -20,6 +19,8 @@ import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
 import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
 import { CipherAuthorizationService } from "@bitwarden/common/vault/services/cipher-authorization.service";
 import { KeyService } from "@bitwarden/key-management";
+// eslint-disable-next-line no-restricted-imports
+import { EncryptService } from "@bitwarden/legacy-crypto";
 import { UserId } from "@bitwarden/user-core";
 
 import { OrganizationCollectionRequest } from "../admin-console/models/request/organization-collection.request";
@@ -307,20 +308,47 @@ describe("EditCommand", () => {
   });
 
   describe("editOrganizationCollection", () => {
-    it("returns bad request when organizationId option is missing", async () => {
+    it("falls back to the request's organizationId when the option is missing", async () => {
       const result = await command["editOrganizationCollection"](validCollectionId, makeRequest(), {
         organizationId: null,
       });
-      expect(result.success).toBe(false);
-      expect(result.message).toContain("`organizationid` option is required");
+      expect(result.success).toBe(true);
+      expect(apiService.putCollection).toHaveBeenCalledWith(
+        validOrgId,
+        validCollectionId,
+        expect.anything(),
+      );
     });
 
-    it("returns bad request when organizationId option is empty string", async () => {
+    it("falls back to the request's organizationId when the option is an empty string", async () => {
       const result = await command["editOrganizationCollection"](validCollectionId, makeRequest(), {
         organizationId: "",
       });
+      expect(result.success).toBe(true);
+    });
+
+    it("falls back to the option's organizationId when the request does not provide one", async () => {
+      const result = await command["editOrganizationCollection"](
+        validCollectionId,
+        makeRequest({ organizationId: null }),
+        makeOptions(),
+      );
+      expect(result.success).toBe(true);
+      expect(apiService.putCollection).toHaveBeenCalledWith(
+        validOrgId,
+        validCollectionId,
+        expect.anything(),
+      );
+    });
+
+    it("returns bad request when organizationId is missing from both the option and the request", async () => {
+      const result = await command["editOrganizationCollection"](
+        validCollectionId,
+        makeRequest({ organizationId: null }),
+        { organizationId: null },
+      );
       expect(result.success).toBe(false);
-      expect(result.message).toContain("`organizationid` option is required");
+      expect(result.message).toContain("An organization id is required");
     });
 
     it("returns bad request when collection id is not a valid GUID", async () => {
@@ -349,7 +377,7 @@ describe("EditCommand", () => {
         makeOptions(),
       );
       expect(result.success).toBe(false);
-      expect(result.message).toContain("`organizationid` option does not match request object");
+      expect(result.message).toContain("does not match");
     });
 
     it("returns bad request when collection name is empty string", async () => {
