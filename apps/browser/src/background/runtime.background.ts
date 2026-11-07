@@ -34,6 +34,7 @@ import {
   FILL_FIELD_REPROMPTED,
   finishPickAfterReprompt,
 } from "../autofill/keykeeper/fill-field-menu";
+import { OPEN_AND_FILL } from "../autofill/keykeeper/open-and-fill-message";
 import { AutofillLifecycleService } from "../autofill/services/abstractions/autofill-lifecycle.service";
 import { AutofillService } from "../autofill/services/abstractions/autofill.service";
 import { FORCE_TARGETING_RULES_UPDATE_COMMAND } from "../autofill/services/targeting-rules-data.service";
@@ -112,6 +113,8 @@ export default class RuntimeBackground {
         // Keykeeper: biometric unlock through the desktop agent.
         ENROLL_BIOMETRICS,
         REMOVE_BIOMETRICS,
+        // Keykeeper: "Open and fill" answers whether it opened the tab.
+        OPEN_AND_FILL,
         "getUserPremiumStatus",
         "getUrlAutofillTargetingRules",
       ];
@@ -234,6 +237,11 @@ export default class RuntimeBackground {
           throw new Error("Not from the extension");
         }
         return await this.main.keykeeperAgentBiometrics.remove(msg.userId);
+      }
+      // Keykeeper: "Open and fill" (autofill/keykeeper/open-and-fill.ts), only
+      // from the extension's own pages, which it checks itself.
+      case OPEN_AND_FILL: {
+        return (await this.main.keykeeperOpenAndFill?.open(msg, sender)) ?? false;
       }
       // Keykeeper: the master password prompt's answer for a fill picker
       // choice (autofill/keykeeper/fill-field-menu.ts), only from the prompt.
