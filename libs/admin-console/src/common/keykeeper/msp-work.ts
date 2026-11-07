@@ -178,7 +178,11 @@ export class KeykeeperMspWork {
     if (!organizations.some((o) => o.isOwner || o.isAdmin)) {
       return { confirmed: 0, failed: [] };
     }
-    return this.confirm((await this.requests.organizationsPending()).filter((p) => p.autoConfirm));
+    const { pending, joining } = await this.requests.organizationsWaiting();
+    // Every organization's joining seal, whether or not anyone is waiting,
+    // so this device never goes back to an older setting than it has seen.
+    await this.joinChecks.learnJoining(userId, joining);
+    return this.confirm(pending.filter((p) => p.autoConfirm));
   }
 
   /**
