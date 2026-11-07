@@ -720,6 +720,27 @@
   "keykeeperServerAddressNeeded": {
     "message": "Type your server's address first."
   },
+  "keykeeperServerChecking": {
+    "message": "Checking the server…"
+  },
+  "keykeeperServerUnreachable": {
+    "message": "Couldn't reach a server at that address. Check it for typos, and that you're online."
+  },
+  "keykeeperServerSlow": {
+    "message": "The server at that address didn't answer in time. Check the address, then try again."
+  },
+  "keykeeperServerNotAServer": {
+    "message": "There's no $BRAND$ server at that address. Check it for typos.",
+    "placeholders": {
+      "brand": {
+        "content": "$1",
+        "example": "Acme Vault"
+      }
+    }
+  },
+  "keykeeperServerBroken": {
+    "message": "The server at that address had a problem. Try again in a few minutes, or ask whoever runs it."
+  },
   "keykeeperCustomServerAddresses": {
     "message": "This browser uses custom server addresses."
   },

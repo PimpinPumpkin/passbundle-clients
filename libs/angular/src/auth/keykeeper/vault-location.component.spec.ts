@@ -14,7 +14,20 @@ import { LogService } from "@bitwarden/common/platform/abstractions/log.service"
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { DialogService } from "@bitwarden/components";
 
+import { KEYKEEPER_SERVER_CHECK_FETCH } from "./server-check";
 import { KeykeeperVaultLocationComponent } from "./vault-location.component";
+
+/** A server's settings, as every server the extension can sign in to answers. */
+const SERVER_SETTINGS = { version: "2026.6.0", object: "config" };
+
+function answer(status: number, body: unknown, type = "application/json") {
+  return {
+    status,
+    ok: status >= 200 && status < 300,
+    headers: { get: (name: string) => (name.toLowerCase() === "content-type" ? type : null) },
+    json: async () => body,
+  } as unknown as Response;
+}
 
 describe("KeykeeperVaultLocationComponent", () => {
   let fixture: ComponentFixture<KeykeeperVaultLocationComponent>;
@@ -24,6 +37,9 @@ describe("KeykeeperVaultLocationComponent", () => {
     setEnvironment: jest.Mock;
   };
   let isDev: boolean;
+  /** The check's requests, answered as a server there would (`answers`, by URL). */
+  let serverFetch: jest.Mock;
+  let answers: Record<string, () => Promise<Response>>;
 
   const cloud = { key: Region.US, domain: "passbundle.com" } as RegionConfig;
 
@@ -75,6 +91,10 @@ describe("KeykeeperVaultLocationComponent", () => {
     };
 
     dialogService = { open: jest.fn(() => ({ closed: of(false) })) };
+    answers = {};
+    serverFetch = jest.fn(async (url: string) =>
+      answers[url] ? answers[url]() : answer(200, SERVER_SETTINGS),
+    );
 
     await TestBed.configureTestingModule({
       imports: [KeykeeperVaultLocationComponent],
@@ -88,6 +108,7 @@ describe("KeykeeperVaultLocationComponent", () => {
         { provide: LogService, useValue: mock<LogService>() },
         { provide: PlatformUtilsService, useValue: { isDev: () => isDev } },
         { provide: DialogService, useValue: dialogService },
+        { provide: KEYKEEPER_SERVER_CHECK_FETCH, useValue: serverFetch },
       ],
     }).compileComponents();
   });
@@ -226,6 +247,127 @@ describe("KeykeeperVaultLocationComponent", () => {
       expect(environmentService.setEnvironment).toHaveBeenCalledWith(Region.SelfHosted, {
         base: "https://b.example",
       });
+    });
+
+    it("asks the server first, and saves the address once one answers there", async () => {
+      await render();
+      segments()[1].click();
+      fixture.detectChanges();
+
+      await type("vault.example.com");
+
+      expect(serverFetch).toHaveBeenCalledWith(
+        "https://vault.example.com/api/config",
+        expect.objectContaining({ method: "GET", credentials: "omit" }),
+      );
+      expect(environmentService.setEnvironment).toHaveBeenCalledWith(Region.SelfHosted, {
+        base: "https://vault.example.com",
+      });
+      expect(shownError()).toBeUndefined();
+    });
+
+    it.each([
+      [
+        "nothing answers",
+        () => Promise.reject(new TypeError("Failed to fetch")),
+        "keykeeperServerUnreachable",
+      ],
+      [
+        "it's a website",
+        async () => answer(200, "<html></html>", "text/html"),
+        "keykeeperServerNotAServer",
+      ],
+      [
+        "it has no settings",
+        async () => answer(404, { message: "Not found" }),
+        "keykeeperServerNotAServer",
+      ],
+      ["it had a problem", async () => answer(502, null, "text/html"), "keykeeperServerBroken"],
+      [
+        "it doesn't answer in time",
+        () => Promise.reject(new DOMException("The operation was aborted.", "AbortError")),
+        "keykeeperServerSlow",
+      ],
+    ])("says what's wrong under the field, and saves nothing, when %s", async (_, reply, why) => {
+      answers["https://vualt.example.com/api/config"] = reply;
+      await render();
+      segments()[1].click();
+      fixture.detectChanges();
+
+      await type("vualt.example.com");
+      fixture.detectChanges();
+
+      expect(shownError()).toBe(why);
+      expect(address()!.getAttribute("aria-invalid")).toBe("true");
+      expect(environmentService.setEnvironment).not.toHaveBeenCalled();
+      expect(await component().commit()).toBe(false);
+      expect(environmentService.setEnvironment).not.toHaveBeenCalled();
+    });
+
+    it("names the product when it isn't a server", async () => {
+      answers["https://www.example.com/api/config"] = async () =>
+        answer(200, "<html></html>", "text/html");
+      const t = jest.fn((key: string, ...args: string[]) =>
+        key === "appName" ? "PassBundle" : [key, ...args].join(" "),
+      );
+      TestBed.overrideProvider(I18nService, { useValue: { t } });
+      await render();
+      segments()[1].click();
+      fixture.detectChanges();
+
+      await type("www.example.com");
+      fixture.detectChanges();
+
+      expect(shownError()).toBe("keykeeperServerNotAServer PassBundle");
+    });
+
+    it("says it's checking meanwhile, and asks once for leaving the field and Continue", async () => {
+      let reply!: (r: Response) => void;
+      answers["https://vault.example.com/api/config"] = () =>
+        new Promise<Response>((resolve) => (reply = resolve));
+      await render();
+      segments()[1].click();
+      fixture.detectChanges();
+
+      await typeOnly("vault.example.com");
+      const input = address()!;
+      input.dispatchEvent(new Event("change"));
+      const continued = component().commit();
+      await new Promise((resolve) => setTimeout(resolve));
+      fixture.detectChanges();
+
+      expect(el().querySelector("#keykeeper-server-hint")?.textContent?.trim()).toBe(
+        "keykeeperServerChecking",
+      );
+      reply(answer(200, SERVER_SETTINGS));
+      expect(await continued).toBe(true);
+      expect(serverFetch).toHaveBeenCalledTimes(1);
+      expect(environmentService.setEnvironment).toHaveBeenCalledTimes(1);
+    });
+
+    it("saves nothing when the address changed while it was being checked", async () => {
+      let reply!: (r: Response) => void;
+      answers["https://a.example/api/config"] = () =>
+        new Promise<Response>((resolve) => (reply = resolve));
+      await render();
+      segments()[1].click();
+      fixture.detectChanges();
+
+      await typeOnly("a.example");
+      const continued = component().commit();
+      await typeOnly("b.example");
+      reply(answer(200, SERVER_SETTINGS));
+
+      expect(await continued).toBe(false);
+      expect(environmentService.setEnvironment).not.toHaveBeenCalled();
+    });
+
+    it("doesn't ask again for the address that's already saved", async () => {
+      environment$.next(env(Region.SelfHosted, "https://a.example"));
+      await render();
+
+      expect(await component().commit()).toBe(true);
+      expect(serverFetch).not.toHaveBeenCalled();
     });
 
     it("lets the service go on as it is", async () => {

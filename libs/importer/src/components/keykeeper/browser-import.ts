@@ -160,6 +160,22 @@ export function deleteSteps(fileName: string, computer: Computer): string {
       : `Delete ${fileName}, and empty the trash if it goes there.`;
 }
 
+/**
+ * Whether a file is a browser's password export with no passwords in it: its
+ * first line names a password column, as every browser's export does
+ * ("name,url,username,password,note" from Chrome, Edge, and Brave;
+ * "url","username","password",... from Firefox;
+ * "Title,URL,Username,Password,Notes,OTPAuth" from Safari), and nothing
+ * follows it.
+ */
+export function isEmptyPasswordExport(text: string): boolean {
+  const [first, ...rest] = text.replace(/^\uFEFF/, "").split(/\r?\n/);
+  const namesPassword = (first ?? "")
+    .split(",")
+    .some((column) => column.trim().replace(/^"|"$/g, "").trim().toLowerCase() === "password");
+  return namesPassword && rest.every((line) => line.trim() === "");
+}
+
 /** What an import will do, before anything is saved. */
 export type PreparedImport = {
   /** What to import: new logins, with the ones to check in their own folder. */

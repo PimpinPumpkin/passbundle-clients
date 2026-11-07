@@ -18,8 +18,10 @@ import {
 } from "@bitwarden/auth/angular";
 import { WebAuthnChallengeResponse } from "@bitwarden/common/auth/models/response/web-authn-challenge.response";
 import { PasswordPreloginService } from "@bitwarden/common/auth/password-prelogin";
+import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { Fido2Utils } from "@bitwarden/common/platform/services/fido2/fido2-utils";
 import { ToastService } from "@bitwarden/components";
 import { KeyService } from "@bitwarden/key-management";
@@ -224,9 +226,16 @@ const qrious = () => (window as unknown as { QRious?: QRiousConstructor }).QRiou
       @case ("problem") {
         <div data-testid="two-step-setup-problem">
           <p bitTypography="body1">{{ problem() }}</p>
-          <button bitButton buttonType="secondary" type="button" (click)="leave()">
-            Back to sign in
-          </button>
+          <div class="tw-flex tw-gap-2">
+            @if (canRetry()) {
+              <button bitButton buttonType="primary" type="button" (click)="retry()">
+                Try again
+              </button>
+            }
+            <button bitButton buttonType="secondary" type="button" (click)="leave()">
+              Back to sign in
+            </button>
+          </div>
         </div>
       }
       @default {
@@ -240,6 +249,8 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
   protected readonly info = signal<SetupInfo | null>(null);
   protected readonly requiredBy = signal("");
   protected readonly problem = signal("");
+  /** The page couldn't load, but the session may still be good: offline, say. */
+  protected readonly canRetry = signal(false);
   protected readonly busy = signal(false);
   protected readonly key = signal("");
   protected readonly recoveryCode = signal<string | null>(null);
@@ -274,13 +285,23 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
   ) {}
 
   async ngOnInit() {
+    await this.load();
+  }
+
+  protected async retry() {
+    this.step.set("loading");
+    await this.load();
+  }
+
+  private async load() {
     const session = readSession();
     this.held.session = session;
     if (session == null) {
       this.fail("This setup session expired. Sign in again.");
       return;
     }
-    this.held.masterPasswordHash =
+    // Taken once: trying again keeps the hash the first try took.
+    this.held.masterPasswordHash ??=
       keykeeperTakeTwoStepHandoff(session.token)?.masterPasswordHash ?? null;
     this.haveHash.set(this.held.masterPasswordHash != null);
     try {
@@ -289,7 +310,11 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
       this.requiredBy.set(keykeeperNamesPhrase(info.requiredBy ?? session.requiredBy));
       this.step.set("choose");
     } catch (e) {
-      this.fail(errorMessage(e));
+      if (e instanceof SessionEnded) {
+        this.fail(e.message);
+      } else {
+        this.fail(plainErrorMessage(e), true);
+      }
     }
   }
 
@@ -373,9 +398,17 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
       const challenge = new WebAuthnChallengeResponse(
         offered.options ?? offered.Options ?? offered,
       );
-      const credential = (await navigator.credentials.create({
-        publicKey: challenge,
-      })) as PublicKeyCredential | null;
+      const credential = (await navigator.credentials
+        .create({ publicKey: challenge })
+        .catch((e: unknown) => {
+          // The browser's own words name the spec; these say what to do.
+          if (e instanceof DOMException && e.name === "InvalidStateError") {
+            throw new Error(
+              "That security key is already set up on your account. Use another one, or choose another way.",
+            );
+          }
+          throw e;
+        })) as PublicKeyCredential | null;
       if (credential == null) {
         throw new Error("Your browser didn't return a security key. Try again.");
       }
@@ -449,8 +482,9 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
     await this.router.navigate(["/login"], email ? { queryParams: { email } } : {});
   }
 
-  private fail(message: string) {
+  private fail(message: string, canRetry = false) {
     this.problem.set(message);
+    this.canRetry.set(canRetry);
     this.step.set("problem");
   }
 
@@ -462,7 +496,7 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
       if (e instanceof SessionEnded) {
         this.fail(e.message);
       } else {
-        this.toastService.showToast({ variant: "error", message: errorMessage(e) });
+        this.toastService.showToast({ variant: "error", message: plainErrorMessage(e) });
       }
     } finally {
       this.busy.set(false);
@@ -529,7 +563,9 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
       throw new SessionEnded("This setup session expired. Sign in again.");
     }
     if (!response.ok) {
-      throw new Error(serverMessage(json) ?? "Something went wrong. Try again.");
+      // Upstream's server says some of this unplainly ("Invalid TOTP code!
+      // Server time: ... IP: ..."): plainErrorMessage puts it in plain words.
+      throw new ErrorResponse(json, response.status);
     }
     return json;
   }
@@ -545,16 +581,4 @@ function readSession(): KeykeeperTwoStepSetupSession | null {
   } catch {
     return null;
   }
-}
-
-function serverMessage(json: unknown): string | null {
-  const body = json as { message?: string; ErrorModel?: { Message?: string } } | null;
-  return body?.message || body?.ErrorModel?.Message || null;
-}
-
-function errorMessage(e: unknown): string {
-  const message = (e as { message?: unknown } | null)?.message;
-  return typeof message === "string" && message !== ""
-    ? message
-    : "Something went wrong. Try again.";
 }

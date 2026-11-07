@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, input, signal } from "@angular/core";
 
 import { MspSiteFixes, SiteFixView } from "@bitwarden/admin-console/common";
-import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { describeFingerprint, describeSource } from "@bitwarden/common/vault/keykeeper/fill-rules";
 import { ToastService } from "@bitwarden/components";
 
@@ -160,7 +160,7 @@ export class KeykeeperMspSiteFixesComponent {
     } catch (e) {
       this.toastService.showToast({
         variant: "error",
-        message: e instanceof ErrorResponse ? e.getSingleMessage() : String(e),
+        message: plainErrorMessage(e),
       });
     }
     await this.load(this.mspId());

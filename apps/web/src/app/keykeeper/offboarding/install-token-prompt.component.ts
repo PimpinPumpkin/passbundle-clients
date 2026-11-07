@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, effect, input, signal } from "@angular/core";
 
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
-import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { ButtonModule, CalloutModule, DialogService, ToastService } from "@bitwarden/components";
 
 import { KeykeeperMspApiService } from "../msp/msp-api.service";
@@ -91,7 +91,7 @@ export class KeykeeperInstallTokenPromptComponent {
       this.toastService.showToast({ variant: "success", message: "Replaced the install token" });
       await this.load(this.organization());
     } catch (e) {
-      const message = e instanceof ErrorResponse ? e.getSingleMessage() : String(e);
+      const message = plainErrorMessage(e);
       this.toastService.showToast({ variant: "error", message });
     }
   }

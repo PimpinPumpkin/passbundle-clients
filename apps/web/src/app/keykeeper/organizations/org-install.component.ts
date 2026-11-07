@@ -8,10 +8,10 @@ import {
   InstallCommandParts,
   installCommand,
 } from "@bitwarden/admin-console/common";
-import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { DialogService, ToastService } from "@bitwarden/components";
 
 import { SharedModule } from "../../shared";
@@ -247,7 +247,7 @@ export class KeykeeperOrgInstallComponent {
     try {
       await work();
     } catch (e) {
-      const message = e instanceof ErrorResponse ? e.getSingleMessage() : String(e);
+      const message = plainErrorMessage(e);
       this.toastService.showToast({ variant: "error", message });
     }
   }

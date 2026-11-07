@@ -208,7 +208,7 @@ describe("MSP activity sentences", () => {
       },
       "ana@northwind.test set ben@northwind.test's access: Acme Dental, custom role (manage users), no vault items, no install commands",
     ],
-    [{ event: "something_new" }, "something_new by ana@northwind.test"],
+    [{ event: "something_new" }, "Something new in Acme Dental (by ana@northwind.test)"],
   ])("%j reads as %s", (fields, sentence) => {
     expect(describeEvent(event(fields))).toBe(sentence);
   });
@@ -246,5 +246,20 @@ describe("MSP activity sentences", () => {
     expect(describeEvent(event({ event: "template_stopped", detail: "other-id" }), names)).toBe(
       "ana@northwind.test removed a template",
     );
+  });
+
+  it("says which client's Templates folder was set", () => {
+    expect(describeEvent(event({ event: "templates_collection_set" }))).toBe(
+      "ana@northwind.test set Acme Dental's Templates folder",
+    );
+  });
+
+  it("reads an event it has no sentence for yet, never as the bare code", () => {
+    expect(describeEvent(event({ event: "client_seat_report" }))).toBe(
+      "Client seat report in Acme Dental (by ana@northwind.test)",
+    );
+    expect(
+      describeEvent(event({ event: "something_new", organizationName: null, actorEmail: null })),
+    ).toBe("Something new (by Someone)");
   });
 });

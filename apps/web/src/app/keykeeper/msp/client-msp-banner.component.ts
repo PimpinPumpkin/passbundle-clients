@@ -9,8 +9,8 @@ import {
 } from "@angular/core";
 
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
-import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { ButtonModule, CalloutModule, DialogService, ToastService } from "@bitwarden/components";
 
 import { KeykeeperMspRemovedDialogComponent } from "../offboarding/msp-removed-dialog.component";
@@ -109,7 +109,7 @@ export class KeykeeperClientMspBannerComponent {
       // Keykeeper: what went with it, and what to review (DESIGN.md, "Offboarding").
       this.dialogService.open(KeykeeperMspRemovedDialogComponent, { data: removal });
     } catch (e) {
-      const message = e instanceof ErrorResponse ? e.getSingleMessage() : String(e);
+      const message = plainErrorMessage(e);
       this.toastService.showToast({ variant: "error", message });
     }
   }

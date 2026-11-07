@@ -73,6 +73,19 @@ export type StaffRow = { userId: string; email: string };
 export const STAFF_EMAIL_CHANGED = (email: string) =>
   `The server now gives ${email}'s account another email address, so nothing was changed. Reload the page and check who's on your staff.`;
 
+/**
+ * Said when this browser doesn't have an organization's key: its person
+ * isn't confirmed there yet (or this browser hasn't synced since). Confirming
+ * happens on its own in an owner's or admin's unlocked web vault or extension
+ * (DESIGN.md, "Joining"), so that's what to wait for.
+ */
+export const NO_ORG_KEY_YET =
+  "This browser doesn't have the organization's key yet: an owner or admin still has to confirm you there. That happens on its own once one of them has the web vault or the extension open and unlocked. Then reload this page.";
+
+/** The same for an MSP's client, where another of the MSP's admins confirms too. */
+export const NO_CLIENT_KEY_YET =
+  "This browser doesn't have the client's key yet: you still have to be confirmed there. That happens on its own once one of its admins, or another admin of your MSP, has the web vault or the extension open and unlocked. Then reload this page.";
+
 /** Said when the server names a client this browser can't check is one. */
 export const UNTRUSTED_CLIENT =
   "This browser can't check that this organization is your client. An MSP admin can confirm it under Clients.";
@@ -153,7 +166,7 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
   async confirmClient(mspId: string, orgId: string): Promise<void> {
     const seal = await this.sealer.clientSeal(orgId, mspId);
     if (seal == null) {
-      throw new Error("This browser doesn't have the client's key yet. Reload and try again.");
+      throw new Error(NO_CLIENT_KEY_YET);
     }
     await this.putMspSeals(mspId, { clients: [{ organizationId: orgId, seal }] });
   }
@@ -516,9 +529,7 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
       .filter((e) => seals[e] != null)
       .map((email) => ({ email, seal: seals[email] }));
     if (list.length !== emails.length) {
-      throw new Error(
-        "This browser doesn't have the organization's key yet. Reload and try again.",
-      );
+      throw new Error(NO_ORG_KEY_YET);
     }
     return this.apiService.send(
       "PUT",
