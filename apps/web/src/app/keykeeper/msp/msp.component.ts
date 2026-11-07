@@ -79,6 +79,7 @@ import {
 } from "./msp-api.service";
 import { KeykeeperMspJoiningComponent } from "./msp-joining.component";
 import { clientPolicySummary } from "./msp-policies";
+import { KeykeeperMspSeatsComponent } from "./msp-seats.component";
 import { KeykeeperMspSiteFixesComponent } from "./msp-site-fixes.component";
 import { KeykeeperMspTemplatesComponent } from "./msp-templates.component";
 import { KeykeeperMspTwoStepComponent } from "./msp-two-step.component";
@@ -115,6 +116,7 @@ const CLIENT_FEATURES = {
     KeykeeperDefaultPoliciesComponent,
     KeykeeperMspJoiningComponent,
     KeykeeperEventStreamingComponent,
+    KeykeeperMspSeatsComponent,
     KeykeeperMspSiteFixesComponent,
     KeykeeperMspTemplatesComponent,
     KeykeeperMspTwoStepComponent,
@@ -673,6 +675,7 @@ const CLIENT_FEATURES = {
         />
 
         @if (m.role === "admin") {
+          <app-keykeeper-msp-seats [mspId]="m.id" />
           <app-keykeeper-msp-site-fixes [mspId]="m.id" />
           <div class="tw-mt-8">
             <app-keykeeper-event-streaming
