@@ -41,6 +41,7 @@ import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.servic
 import { MessagingService } from "@bitwarden/common/platform/abstractions/messaging.service";
 import { DialogRef, DialogService, ItemModule, ToastService } from "@bitwarden/components";
 
+import { KeykeeperTwoStepDetourComponent } from "../../../keykeeper/two-step-setup/two-step-detour";
 import { HeaderModule } from "../../../layouts/header/header.module";
 import { SharedModule } from "../../../shared/shared.module";
 
@@ -57,7 +58,15 @@ import { TwoFactorVerifyComponent } from "./two-factor-verify.component";
 @Component({
   selector: "app-two-factor-setup",
   templateUrl: "two-factor-setup.component.html",
-  imports: [ItemModule, HeaderModule, PremiumBadgeComponent, TwoFactorIconComponent, SharedModule],
+  imports: [
+    ItemModule,
+    HeaderModule,
+    PremiumBadgeComponent,
+    TwoFactorIconComponent,
+    SharedModule,
+    // Keykeeper: the way back to the form that sent someone here.
+    KeykeeperTwoStepDetourComponent,
+  ],
 })
 export class TwoFactorSetupComponent implements OnInit, OnDestroy {
   organizationId: string;

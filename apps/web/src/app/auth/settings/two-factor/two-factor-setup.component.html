@@ -7,6 +7,8 @@
   </div>
 
   <p *ngIf="!organizationId">{{ "twoStepLoginDesc" | i18n }}</p>
+  <!-- Keykeeper: the way back to making an MSP or a business organization, which needs this first. -->
+  <app-keykeeper-two-step-detour *ngIf="!organizationId" />
   <ng-container *ngIf="organizationId">
     <p>
       <ng-container *ngIf="isEnterpriseOrg; else teamsDescription">
