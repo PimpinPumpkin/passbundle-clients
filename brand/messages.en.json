@@ -734,7 +734,7 @@
     }
   },
   "keykeeperHealthToFix": {
-    "message": "$COUNT$ items to fix: weak, reused, or exposed passwords",
+    "message": "$COUNT$ items to fix: weak, reused, or exposed passwords, or items that expire soon",
     "placeholders": {
       "count": {
         "content": "$1",
@@ -752,7 +752,7 @@
     "message": "For the count beside Health (for MSP staff, every client item you can edit) and the MSP console's Exposed column. Each check sends Have I Been Pwned the first 5 characters of each password's SHA-1 hash. Turned off, nothing is sent unless you open the exposed passwords report or press Check. Creating or changing your master password checks it the same way while \"Check known data breaches for this password\" is ticked there, as it is at first."
   },
   "keykeeperHealthToFixOne": {
-    "message": "1 item to fix: a weak, reused, or exposed password"
+    "message": "1 item to fix: a weak, reused, or exposed password, or an item that expires soon"
   },
   "keykeeperHealthCouldntCheck": {
     "message": "Couldn't check for breaches"
