@@ -21,8 +21,8 @@ import { AuthenticationStatus } from "@bitwarden/common/auth/enums/authenticatio
 import { getOptionalUserId } from "@bitwarden/common/auth/services/account.service";
 import { CryptoFunctionService } from "@bitwarden/common/key-management/crypto/abstractions/crypto-function.service";
 import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
-import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { UserId } from "@bitwarden/common/types/guid";
@@ -392,7 +392,7 @@ export class KeykeeperEnrollment {
       await this.syncService.fullSync(true);
       return "joined";
     } catch (e) {
-      const error = e instanceof ErrorResponse ? e.getSingleMessage() : String(e);
+      const error = plainErrorMessage(e);
       // Tell the person once per problem, not at every unlock.
       const sameAsBefore =
         previous?.tokenHash === tokenHash &&

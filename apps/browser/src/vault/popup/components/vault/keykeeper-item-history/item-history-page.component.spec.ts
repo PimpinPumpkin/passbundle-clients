@@ -10,6 +10,7 @@ import { OrganizationService } from "@bitwarden/common/admin-console/abstraction
 import { CollectionView } from "@bitwarden/common/admin-console/models/collections";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
@@ -104,6 +105,10 @@ const version = (id: string, cipher: unknown, savedBy = { id: "bo", name: "Bo", 
   replacedBy: null as unknown,
   cipher,
 });
+
+/** A refusal as the server sends it, as upstream's ApiService throws it. */
+const refusal = (message: string) =>
+  new ErrorResponse({ message, validationErrors: { "": [message] }, object: "error" }, 400);
 
 describe("KeykeeperItemHistoryPageComponent", () => {
   let fixture: ComponentFixture<KeykeeperItemHistoryPageComponent>;
@@ -346,6 +351,53 @@ describe("KeykeeperItemHistoryPageComponent", () => {
       expect.objectContaining({ variant: "error", message: "keykeeperRestoreFailed" }),
     );
     expect(routerCache.back).not.toHaveBeenCalled();
+  });
+
+  it("says why when the server refuses the restore, in plain words", async () => {
+    formService.saveCipher.mockRejectedValue(
+      refusal("The client copy of this cipher is out of date. Resync the client and try again."),
+    );
+    const el = await render();
+    rows(el)[1].querySelector("button")!.click();
+    await settle();
+    buttons(el, "keykeeperRestoreVersion")[0].click();
+    await settle();
+    expect(toastService.showToast).toHaveBeenCalledWith({
+      variant: "error",
+      message: "This item changed since you opened it. Close it, open it again, and try once more.",
+    });
+  });
+
+  it("says why the server refused to clear the history, not just that something went wrong", async () => {
+    current = login("third", { organizationId: "org-1", collectionIds: ["col-1"] });
+    collections = [folder({ viewHistory: true, seePasswords: true, delete: true })];
+    const el = await render();
+    apiService.send.mockRejectedValueOnce(
+      refusal("You don't have permission to clear this item's history"),
+    );
+    buttons(el, "keykeeperClearHistory")[0].click();
+    await settle();
+    expect(toastService.showToast).toHaveBeenCalledWith({
+      variant: "error",
+      message: "You don't have permission to clear this item's history",
+    });
+  });
+
+  it("says why the server refused to delete a version", async () => {
+    current = login("third", { organizationId: "org-1", collectionIds: ["col-1"] });
+    collections = [folder({ viewHistory: true, seePasswords: true, delete: true })];
+    const el = await render();
+    rows(el)[1].querySelector("button")!.click();
+    await settle();
+    apiService.send.mockRejectedValueOnce(
+      refusal("You don't have permission to delete this item's versions"),
+    );
+    el.querySelector<HTMLButtonElement>('[bitIconButton="bwi-trash"]')!.click();
+    await settle();
+    expect(toastService.showToast).toHaveBeenCalledWith({
+      variant: "error",
+      message: "You don't have permission to delete this item's versions",
+    });
   });
 
   it("gives someone who can't see the item's passwords when and by whom only", async () => {
