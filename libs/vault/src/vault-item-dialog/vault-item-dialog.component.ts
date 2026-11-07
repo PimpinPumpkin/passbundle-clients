@@ -326,7 +326,7 @@ export class VaultItemDialogComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Keykeeper: in the panel, closing it (Close, Escape, another row, New)
+   * Keykeeper: in the panel, closing it (Close, Escape, another row, Add)
    * while its item has unsaved edits asks first, as upstream's policy drawer
    * does. A result (saved, deleted) always closes.
    */

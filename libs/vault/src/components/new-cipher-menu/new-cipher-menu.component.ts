@@ -77,7 +77,7 @@ export class NewCipherMenuComponent {
     () => this.coachmarkEnabled() && this.coachmark.isStepActive("addItem"),
   );
 
-  /** Keykeeper: New opens PassBundle's picker (KeykeeperNewItemDialogComponent). */
+  /** Keykeeper: Add opens PassBundle's picker (KeykeeperNewItemDialogComponent). */
   readonly keykeeperNewItemDialog = input(false);
 
   private readonly newItemTypesFlag = toSignal(

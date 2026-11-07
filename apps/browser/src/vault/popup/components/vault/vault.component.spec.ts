@@ -658,7 +658,7 @@ describe("VaultComponent", () => {
     }));
 
     /**
-     * Keykeeper: the page's top is the search and New, with the title kept for
+     * Keykeeper: the page's top is the search and Add, with the title kept for
      * screen readers, so there's no upstream page header whose title the
      * switcher would replace (DESIGN.md, "The look").
      */

@@ -66,7 +66,7 @@ export class NewItemDropdownComponent implements OnInit {
    */
   readonly canCreateCipher = input(true);
 
-  /** Keykeeper: a + with "New" as its name, instead of a button that says New. */
+  /** Keykeeper: a + with "Add" as its name, instead of a button that says Add. */
   readonly iconOnly = input(false, { transform: booleanAttribute });
 
   /** Keykeeper: the category whose tile a kind of item shows. */
