@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, inject } from "@angular/core";
 
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { IconButtonModule } from "@bitwarden/components";
+import { KeykeeperCategoryTileComponent } from "@bitwarden/vault";
 
 import {
   KeykeeperPlaceEntry,
@@ -22,6 +23,7 @@ import { KeykeeperFolderFilterComponent } from "../keykeeper-folder-filter/keyke
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     KeykeeperCategoryChipsComponent,
+    KeykeeperCategoryTileComponent,
     KeykeeperFolderFilterComponent,
     IconButtonModule,
     CommonModule,

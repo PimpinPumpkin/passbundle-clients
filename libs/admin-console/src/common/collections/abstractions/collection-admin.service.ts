@@ -5,7 +5,8 @@ import {
   CollectionAccessSelectionView,
   CollectionDetailsResponse,
 } from "@bitwarden/common/admin-console/models/collections";
-import { UserId } from "@bitwarden/common/types/guid";
+import { CollectionId, OrganizationId, UserId } from "@bitwarden/common/types/guid";
+import { FolderLook } from "@bitwarden/common/vault/keykeeper/folder-looks";
 
 export abstract class CollectionAdminService {
   abstract collectionAdminViews$(
@@ -26,5 +27,17 @@ export abstract class CollectionAdminService {
     collectionIds: string[],
     users: CollectionAccessSelectionView[],
     groups: CollectionAccessSelectionView[],
+  ): Promise<void>;
+  /**
+   * Keykeeper: sets a shared folder's icon and color, or with null gives it
+   * back the plain glyph (DESIGN.md, "Folder icons"). Encrypted with the
+   * organization's key, as the folder's name is. Only people who can rename
+   * the folder may; the server refuses anyone else with 400.
+   */
+  abstract setLook(
+    organizationId: OrganizationId,
+    collectionId: CollectionId,
+    look: FolderLook | null,
+    userId: UserId,
   ): Promise<void>;
 }

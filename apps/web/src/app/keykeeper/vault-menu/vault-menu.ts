@@ -1,5 +1,10 @@
 import { Unassigned } from "@bitwarden/common/admin-console/models/collections";
-import { categoryOfType, KeykeeperCategory } from "@bitwarden/common/vault/keykeeper/categories";
+import {
+  categoryOfType,
+  KeykeeperCategory,
+  KeykeeperCategoryLook,
+} from "@bitwarden/common/vault/keykeeper/categories";
+import { folderTileLook } from "@bitwarden/common/vault/keykeeper/folder-looks";
 import { ITreeNodeObject, TreeNode } from "@bitwarden/common/vault/models/domain/tree-node";
 import { CipherViewLike } from "@bitwarden/common/vault/utils/cipher-view-like-utils";
 import { BitwardenIcon } from "@bitwarden/components";
@@ -35,6 +40,11 @@ export interface VaultMenuEntry {
    * Favorites, and the categories (DESIGN.md, "The look").
    */
   tile?: KeykeeperCategory;
+  /**
+   * A shared folder's own icon and color, as a tile in place of its glyph
+   * (DESIGN.md, "Folder icons"); none keeps the plain glyph.
+   */
+  look?: KeykeeperCategoryLook;
   /** How many items the list shows once this is picked, as things are now. */
   count?: number;
   /** Nesting: folders inside Personal or their organization, and inside their parent. */
@@ -252,6 +262,7 @@ export function buildVaultMenu(state: VaultMenuState, actions: VaultMenuActions)
       key: `collection-${tree.node.id}`,
       label: tree.node.name ?? "",
       icon: tree.node.icon,
+      look: folderTileLook(tree.node.keykeeperLook),
       count: countAfter(ciphers, routed, (f) => (f.selectedCollectionNode = tree)),
       depth,
       active: picked(routed.collectionId === tree.node.id),
