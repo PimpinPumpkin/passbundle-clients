@@ -6,10 +6,12 @@ import { firstValueFrom } from "rxjs";
 import { first } from "rxjs/operators";
 
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
+import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { TokenService } from "@bitwarden/common/auth/abstractions/token.service";
 import { VerifyEmailRequest } from "@bitwarden/common/models/request/verify-email.request";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
+import { UserId } from "@bitwarden/common/types/guid";
 import { ToastService } from "@bitwarden/components";
 
 import { SharedModule } from "../shared/shared.module";
@@ -23,6 +25,7 @@ import { SharedModule } from "../shared/shared.module";
 })
 export class VerifyEmailTokenComponent implements OnInit {
   constructor(
+    private accountService: AccountService,
     private router: Router,
     private i18nService: I18nService,
     private route: ActivatedRoute,
@@ -42,6 +45,12 @@ export class VerifyEmailTokenComponent implements OnInit {
           );
           if (await firstValueFrom(this.tokenService.hasAccessToken$(qParams.userId))) {
             await this.apiService.refreshIdentityToken();
+            // Keykeeper: signed in here, so this browser's vault stops asking
+            // to verify the address now, without waiting for a sync.
+            const accounts = await firstValueFrom(this.accountService.accounts$);
+            if (accounts[qParams.userId as UserId] != null) {
+              await this.accountService.setAccountEmailVerified(qParams.userId, true);
+            }
           }
           this.toastService.showToast({
             variant: "success",

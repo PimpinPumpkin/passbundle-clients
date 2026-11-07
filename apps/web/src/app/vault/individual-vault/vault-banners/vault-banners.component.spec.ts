@@ -27,11 +27,14 @@ describe("VaultBannersComponent", () => {
   let messageSubject: Subject<{ command: string }>;
   const premiumBanner$ = new BehaviorSubject<boolean>(false);
   const pendingAuthRequest$ = new BehaviorSubject<boolean>(false);
+  // Keykeeper: the verify email banner follows the service's answer as it changes.
+  const verifyEmail$ = new BehaviorSubject<boolean>(false);
   const mockUserId = Utils.newGuid() as UserId;
 
   const bannerService = mock<VaultBannersService>({
     shouldShowUpdateBrowserBanner: jest.fn(),
     shouldShowVerifyEmailBanner: jest.fn(),
+    shouldShowVerifyEmailBanner$: jest.fn((userId: UserId) => verifyEmail$.asObservable()),
     shouldShowPendingAuthRequestBanner: jest.fn((userId: UserId) =>
       Promise.resolve(pendingAuthRequest$.value),
     ),
@@ -45,6 +48,7 @@ describe("VaultBannersComponent", () => {
     bannerService.shouldShowUpdateBrowserBanner.mockResolvedValue(false);
     bannerService.shouldShowVerifyEmailBanner.mockResolvedValue(false);
     pendingAuthRequest$.next(false);
+    verifyEmail$.next(false);
     premiumBanner$.next(false);
 
     await TestBed.configureTestingModule({
@@ -103,11 +107,6 @@ describe("VaultBannersComponent", () => {
         method: bannerService.shouldShowUpdateBrowserBanner,
         banner: VisibleVaultBanner.OutdatedBrowser,
       },
-      {
-        name: "VerifyEmail",
-        method: bannerService.shouldShowVerifyEmailBanner,
-        banner: VisibleVaultBanner.VerifyEmail,
-      },
     ].forEach(({ name, method, banner }) => {
       describe(name, () => {
         beforeEach(async () => {
@@ -135,6 +134,76 @@ describe("VaultBannersComponent", () => {
 
           expect(component.visibleBanners).toEqual([]);
         });
+      });
+    });
+
+    // Keykeeper: shown and hidden as the account changes, not decided once.
+    describe("VerifyEmail", () => {
+      const banner = () => fixture.debugElement.nativeElement.querySelector("#verify-email-banner");
+
+      beforeEach(async () => {
+        verifyEmail$.next(true);
+
+        await component.ngOnInit();
+        fixture.detectChanges();
+      });
+
+      it("shows VerifyEmail banner", async () => {
+        expect(component.visibleBanners).toEqual([VisibleVaultBanner.VerifyEmail]);
+        expect(banner()).not.toBeNull();
+      });
+
+      it("dismisses VerifyEmail banner", async () => {
+        const dismissButton = fixture.debugElement.nativeElement.querySelector(
+          'button[biticonbutton="bwi-close"]',
+        );
+
+        dismissButton.dispatchEvent(new Event("click"));
+        await fixture.whenStable();
+
+        expect(bannerService.dismissBanner).toHaveBeenCalledWith(
+          mockUserId,
+          VisibleVaultBanner.VerifyEmail,
+        );
+
+        // The service's answer turns false once it's dismissed.
+        verifyEmail$.next(false);
+        fixture.detectChanges();
+
+        expect(component.visibleBanners).toEqual([]);
+        expect(banner()).toBeNull();
+      });
+
+      it("goes away as soon as the email is verified, with the vault still open", () => {
+        expect(banner()).not.toBeNull();
+
+        // A sync (after verifying, even on another device) updates the account.
+        verifyEmail$.next(false);
+        fixture.detectChanges();
+
+        expect(component.visibleBanners).toEqual([]);
+        expect(banner()).toBeNull();
+      });
+
+      it("stays away when the banners are worked out again", async () => {
+        expect(banner()).not.toBeNull();
+        verifyEmail$.next(false);
+        await component.determineVisibleBanners();
+        fixture.detectChanges();
+
+        expect(component.visibleBanners).toEqual([]);
+        expect(banner()).toBeNull();
+      });
+
+      it("keeps the other banners when it goes", async () => {
+        pendingAuthRequest$.next(true);
+        await component.determineVisibleBanners();
+        expect(component.visibleBanners).toContain(VisibleVaultBanner.VerifyEmail);
+
+        verifyEmail$.next(false);
+        fixture.detectChanges();
+
+        expect(component.visibleBanners).toEqual([VisibleVaultBanner.PendingAuthRequest]);
       });
     });
 

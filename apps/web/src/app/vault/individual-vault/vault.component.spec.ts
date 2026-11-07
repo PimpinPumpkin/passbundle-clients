@@ -371,7 +371,10 @@ describe("VaultComponent", () => {
         },
       })
       .overrideProvider(VaultBannersService, {
-        useValue: mock<VaultBannersService>(),
+        // Keykeeper: the verify email banner follows an observable.
+        useValue: mock<VaultBannersService>({
+          shouldShowVerifyEmailBanner$: jest.fn(() => of(false)),
+        }),
       })
       .compileComponents();
 

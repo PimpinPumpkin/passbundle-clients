@@ -1,5 +1,5 @@
 import { Injectable } from "@angular/core";
-import { firstValueFrom, map } from "rxjs";
+import { combineLatest, distinctUntilChanged, firstValueFrom, map, Observable } from "rxjs";
 
 import { AuthRequestServiceAbstraction } from "@bitwarden/auth/common";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
@@ -71,15 +71,27 @@ export class VaultBannersService {
 
   /** Returns true when the verify email banner should be shown */
   async shouldShowVerifyEmailBanner(userId: UserId): Promise<boolean> {
-    const needsVerification = !(
-      await firstValueFrom(this.accountService.accounts$.pipe(map((accounts) => accounts[userId])))
-    )?.emailVerified;
+    return await firstValueFrom(this.shouldShowVerifyEmailBanner$(userId));
+  }
 
-    const alreadyDismissed = (await this.getBannerDismissedState(userId)).includes(
-      VisibleVaultBanner.VerifyEmail,
+  /**
+   * Keykeeper: whether the verify email banner should be shown, as it changes.
+   * It turns false as soon as the account's email is verified (the sync after
+   * a verification, even one on another device) or the banner is dismissed,
+   * so the banner doesn't wait for the vault to be opened again.
+   */
+  shouldShowVerifyEmailBanner$(userId: UserId): Observable<boolean> {
+    const needsVerification$ = this.accountService.accounts$.pipe(
+      map((accounts) => !accounts[userId]?.emailVerified),
+    );
+    const alreadyDismissed$ = this.sessionBannerState(userId).state$.pipe(
+      map((dismissed) => (dismissed ?? []).includes(VisibleVaultBanner.VerifyEmail)),
     );
 
-    return needsVerification && !alreadyDismissed;
+    return combineLatest([needsVerification$, alreadyDismissed$]).pipe(
+      map(([needsVerification, alreadyDismissed]) => needsVerification && !alreadyDismissed),
+      distinctUntilChanged(),
+    );
   }
 
   /** Dismiss the given banner and perform any respective side effects */

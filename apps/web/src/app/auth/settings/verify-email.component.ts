@@ -2,10 +2,13 @@
 // @ts-strict-ignore
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Output } from "@angular/core";
+import { firstValueFrom } from "rxjs";
 
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
+import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { TokenService } from "@bitwarden/common/auth/abstractions/token.service";
+import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import {
@@ -34,6 +37,7 @@ export class VerifyEmailComponent {
   @Output() onDismiss = new EventEmitter<void>();
 
   constructor(
+    private accountService: AccountService,
     private apiService: ApiService,
     private i18nService: I18nService,
     private platformUtilsService: PlatformUtilsService,
@@ -44,6 +48,10 @@ export class VerifyEmailComponent {
   async verifyEmail(): Promise<void> {
     await this.apiService.refreshIdentityToken();
     if (await this.tokenService.getEmailVerified()) {
+      // Keykeeper: the account knows it at once too, so whatever follows it
+      // (the vault's banner, Send's file option) doesn't wait for a sync.
+      const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
+      await this.accountService.setAccountEmailVerified(userId, true);
       this.onVerified.emit(true);
       this.toastService.showToast({
         variant: "success",
