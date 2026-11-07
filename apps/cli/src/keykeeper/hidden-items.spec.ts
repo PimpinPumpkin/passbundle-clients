@@ -1,5 +1,3 @@
-// FIXME: Update this file to be type safe and remove this and next line
-// @ts-strict-ignore
 // Keykeeper: see hidden-items.ts.
 import { CipherExport } from "@bitwarden/common/models/export/cipher.export";
 import { CipherType, FieldType, LoginLinkedId } from "@bitwarden/common/vault/enums";
@@ -31,7 +29,8 @@ function login(viewPassword: boolean | undefined): CipherView {
   item.type = CipherType.Login;
   item.name = "Domain admin";
   item.notes = "Ask before rotating.";
-  item.viewPassword = viewPassword;
+  // Undefined on purpose: an item that doesn't say counts as no.
+  item.viewPassword = viewPassword as boolean;
   item.login.username = "admin@contoso.example";
   item.login.password = "real-password";
   item.login.totp = "JBSWY3DPEHPK3PXP";
@@ -99,7 +98,7 @@ describe("CipherResponse for someone who can't see an item's passwords", () => {
       expYear: "2030",
       code: "123",
     });
-    const cardJson = new CipherResponse(card).card;
+    const cardJson = new CipherResponse(card).card!;
     expect(cardJson).toMatchObject({ cardholderName: "Ana Diaz", brand: "Visa", expYear: "2030" });
     expect(cardJson.number).toBeFalsy();
     expect(cardJson.code).toBeFalsy();
@@ -115,7 +114,7 @@ describe("CipherResponse for someone who can't see an item's passwords", () => {
       passportNumber: "X1234567",
       licenseNumber: "D1234",
     });
-    const identityJson = new CipherResponse(identity).identity;
+    const identityJson = new CipherResponse(identity).identity!;
     expect(identityJson).toMatchObject({ firstName: "Ana", email: "ana@contoso.example" });
     expect(identityJson.ssn).toBeFalsy();
     expect(identityJson.passportNumber).toBeFalsy();
@@ -130,7 +129,7 @@ describe("CipherResponse for someone who can't see an item's passwords", () => {
       publicKey: "ssh-ed25519 AAAA",
       keyFingerprint: "SHA256:abc",
     });
-    const sshJson = new CipherResponse(sshKey).sshKey;
+    const sshJson = new CipherResponse(sshKey).sshKey!;
     expect(sshJson.publicKey).toBe("ssh-ed25519 AAAA");
     expect(sshJson.keyFingerprint).toBe("SHA256:abc");
     expect(sshJson.privateKey).toBe("");
@@ -181,9 +180,9 @@ describe("keepHiddenSecrets", () => {
     expect(edited.login.totp).toBe("JBSWY3DPEHPK3PXP");
     expect(edited.login.fido2Credentials.map((p) => p.keyValue)).toEqual(["pk-private"]);
     expect(edited.passwordHistory.map((p) => p.password)).toEqual(["old-password"]);
-    const apiKey = edited.fields.find((f) => f.name === "API key");
+    const apiKey = edited.fields.find((f) => f.name === "API key")!;
     expect(apiKey.value).toBe("k-123");
-    const linked = edited.fields.find((f) => f.name === "Fills the password");
+    const linked = edited.fields.find((f) => f.name === "Fills the password")!;
     expect(linked.linkedId).toBe(LoginLinkedId.Password);
   });
 
@@ -283,7 +282,7 @@ describe("keepHiddenSecrets", () => {
     expect(edited.login.password).toBe("real-password");
     expect(edited.login.fido2Credentials.map((p) => p.keyValue)).toEqual(["pk-private"]);
     expect(edited.key).toEqual({ encryptedString: "2.item-key" });
-    expect(edited.fields.find((f) => f.name === "API key").value).toBe("k-123");
+    expect(edited.fields.find((f) => f.name === "API key")!.value).toBe("k-123");
   });
 
   it("gives the item's own key, wrapped, so an edit sends it back", () => {

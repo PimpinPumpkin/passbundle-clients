@@ -279,7 +279,7 @@ describe("Keykeeper enrollment through the install command", () => {
     expect(t.asked).toEqual([]);
     expect(t.paths()).not.toContain("/keykeeper/enrollment/join");
     expect(t.encryptService.encapsulateKeyUnsigned).not.toHaveBeenCalled();
-    expect(t.notices[0][1]).toContain("isn't the one your IT's install command names");
+    expect(t.notices[0][1]).toContain("isn't the one your IT admin's install command names");
   });
 
   it("needs a command that names the organization's key before escrowing for account recovery", async () => {
@@ -360,7 +360,7 @@ describe("Keykeeper enrollment through the install command", () => {
     expect(t.encryptService.encapsulateKeyUnsigned).not.toHaveBeenCalled();
     expect(t.paths()).not.toContain("/keykeeper/enrollment/join");
     // The command names a key, and the server gave none.
-    expect(t.notices[0][1]).toContain("isn't the one your IT's install command names");
+    expect(t.notices[0][1]).toContain("isn't the one your IT admin's install command names");
   });
 
   it("runs once at a time for an account", async () => {

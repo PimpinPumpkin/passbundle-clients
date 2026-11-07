@@ -636,7 +636,7 @@
     "message": "Where's your vault?"
   },
   "keykeeperMyOwnServer": {
-    "message": "My own server"
+    "message": "Self-hosted"
   },
   "keykeeperServerAddress": {
     "message": "Server address"

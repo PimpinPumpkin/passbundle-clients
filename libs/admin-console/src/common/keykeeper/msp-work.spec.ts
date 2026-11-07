@@ -281,7 +281,7 @@ describe("Keeping clients' templates current", () => {
     source.collectionIds = [];
     const failures = await setUp.work.run();
     expect(failures).toHaveLength(1);
-    expect(failures[0]).toContain("Firewall: That template is in your own vault.");
+    expect(failures[0]).toContain("Firewall: That template is in Personal.");
     expect(setUp.sender.send).not.toHaveBeenCalled();
   });
 
