@@ -5,6 +5,7 @@
 import { CollectionService } from "@bitwarden/admin-console/common";
 import { safeProvider, SafeProvider } from "@bitwarden/angular/platform/utils/safe-provider";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
+import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { KeyGenerationService } from "@bitwarden/common/key-management/crypto";
@@ -14,6 +15,7 @@ import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.servic
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { SdkService } from "@bitwarden/common/platform/abstractions/sdk/sdk.service";
+import { SyncService } from "@bitwarden/common/platform/sync";
 import { KeyServiceLegacyEncryptorProvider } from "@bitwarden/common/tools/cryptography/key-service-legacy-encryptor-provider";
 import { LegacyEncryptorProvider } from "@bitwarden/common/tools/cryptography/legacy-encryptor-provider";
 import { ExtensionRegistry } from "@bitwarden/common/tools/extension/extension-registry.abstraction";
@@ -89,6 +91,8 @@ export const ImporterProviders: SafeProvider[] = [
       AccountService,
       RestrictedItemTypesService,
       SdkService,
+      SyncService,
+      OrganizationService,
     ],
   }),
 ];

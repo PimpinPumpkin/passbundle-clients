@@ -42,6 +42,43 @@
   "keykeeperImportFromBrowser": {
     "message": "Import from your browser"
   },
+  "keykeeperImportCheckNotStarted": {
+    "message": "Your items couldn't be read to check this import, so nothing was imported. Try again."
+  },
+  "keykeeperImportCheckNotRead": {
+    "message": "The import finished, but its items couldn't be read back to be checked. Reload, then look in the items you imported for fields whose names start with \"keykeeper.\" and delete those fields."
+  },
+  "keykeeperImportCheckTrashed": {
+    "message": "The import finished, but these items have fields whose names start with \"keykeeper.\" that couldn't be changed, so they're in the trash: $NAMES$.",
+    "placeholders": {
+      "names": {
+        "content": "$1",
+        "example": "Bank, Email"
+      }
+    }
+  },
+  "keykeeperImportCheckNotSaved": {
+    "message": "The import finished, but these items have fields whose names start with \"keykeeper.\" that couldn't be changed, and the items couldn't be moved to the trash: $NAMES$. Delete them.",
+    "placeholders": {
+      "names": {
+        "content": "$1",
+        "example": "Bank, Email"
+      }
+    }
+  },
+  "keykeeperImportCheckMissing": {
+    "message": "The import finished, but only $CHECKED$ of its $TOTAL$ items could be checked. Look in the others for fields whose names start with \"keykeeper.\" and delete those fields.",
+    "placeholders": {
+      "checked": {
+        "content": "$1",
+        "example": "8"
+      },
+      "total": {
+        "content": "$2",
+        "example": "10"
+      }
+    }
+  },
   "keykeeperExpiringItemsReport": {
     "message": "Expiring items"
   },
