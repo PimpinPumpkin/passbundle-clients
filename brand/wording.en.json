@@ -727,6 +727,9 @@
     },
     "firstSsoLogin": {
       "message": "$ID$ linked their Microsoft account and signed in with single sign-on for the first time."
+    },
+    "promptUsersToMoveItemsV2": {
+      "message": "Prompt users to move their personal items to the organization"
     }
   },
   "browser": {
