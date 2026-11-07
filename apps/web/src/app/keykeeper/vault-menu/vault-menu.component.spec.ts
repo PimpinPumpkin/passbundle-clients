@@ -29,10 +29,10 @@ import {
   OrganizationFilter,
   VaultFilterServiceAbstraction,
   Vfo1TerminologyService,
+  CoachmarkService,
 } from "@bitwarden/vault";
 import { OrganizationWarningsService } from "@bitwarden/web-vault/app/billing/organizations/warnings/services";
 
-import { CoachmarkService } from "../../vault/components/coachmark";
 import { HealthCount, KeykeeperHealthCountService } from "../health/health-count.service";
 
 import { KeykeeperPickedLabelService } from "./picked-label.service";

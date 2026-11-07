@@ -2,8 +2,6 @@ import { mock } from "jest-mock-extended";
 import { of } from "rxjs";
 
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
-import { KeyGenerationService } from "@bitwarden/common/key-management/crypto";
-import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { mockAccountInfoWith } from "@bitwarden/common/spec";
 import { emptyGuid } from "@bitwarden/common/types/guid";
@@ -14,6 +12,8 @@ import { isReservedFieldName } from "@bitwarden/common/vault/keykeeper/reserved-
 import { isMspTemplateCopy, templateDefinition } from "@bitwarden/common/vault/keykeeper/templates";
 import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
 import { KeyService } from "@bitwarden/key-management";
+// eslint-disable-next-line no-restricted-imports
+import { KeyGenerationService, EncryptService } from "@bitwarden/legacy-crypto";
 import { UserId } from "@bitwarden/user-core";
 
 import { BitwardenPasswordProtectedImporter } from "../../importers/bitwarden/bitwarden-password-protected-importer";
@@ -86,7 +86,8 @@ describe("Keykeeper: imports never plant our own fields", () => {
   });
 
   it("KeePass 2: a string named like ours, protected or not", async () => {
-    const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    const escape = (s: string) =>
+      s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
     const xml = `<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <KeePassFile><Root><Group><Name>Database</Name><Entry>
   <String><Key>Title</Key><Value>Example Bank</Value></String>
@@ -124,10 +125,10 @@ describe("Keykeeper: imports never plant our own fields", () => {
       { fieldName: "keykeeper.template-definition", type: "text", data: { content: PLANTED_COPY } },
     );
 
-    expectDefused(await new ProtonPassJsonImporter(mock<I18nService>()).parse(JSON.stringify(data)), [
-      "keykeeper.fill",
-      "keykeeper.template-definition",
-    ]);
+    expectDefused(
+      await new ProtonPassJsonImporter(mock<I18nService>()).parse(JSON.stringify(data)),
+      ["keykeeper.fill", "keykeeper.template-definition"],
+    );
   });
 
   it("someone else's Bitwarden-format file, read as a browser's: nothing of ours comes in", async () => {
@@ -191,7 +192,11 @@ describe("Keykeeper: imports never plant our own fields", () => {
           { name: "keykeeper.surprise", value: "x", type: FieldType.Text },
           {
             name: "keykeeper.fill",
-            value: JSON.stringify({ v: 1, field: { id: "a" }, fill: { from: "field", name: "keykeeper.fill" } }),
+            value: JSON.stringify({
+              v: 1,
+              field: { id: "a" },
+              fill: { from: "field", name: "keykeeper.fill" },
+            }),
             type: FieldType.Hidden,
           },
         ]),
