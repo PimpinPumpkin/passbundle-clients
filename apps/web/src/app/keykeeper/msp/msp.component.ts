@@ -32,7 +32,7 @@ import {
   expirationBadgeVariant,
   expirationLabel,
 } from "@bitwarden/common/vault/keykeeper/expiration";
-import { DialogService, ToastService } from "@bitwarden/components";
+import { DialogService, ToastService, TooltipDirective } from "@bitwarden/components";
 import { templateDefinition } from "@bitwarden/vault";
 
 import {
@@ -119,6 +119,7 @@ const CLIENT_FEATURES = {
     KeykeeperMspTemplatesComponent,
     KeykeeperMspTwoStepComponent,
     KeykeeperTechnicianAccessEditorComponent,
+    TooltipDirective,
   ],
   template: `
     <app-header></app-header>
@@ -206,7 +207,15 @@ const CLIENT_FEATURES = {
           @if (m.clients.length === 0) {
             <p bitTypography="body1">No clients yet.</p>
           } @else {
-            <bit-table>
+            <!-- Keykeeper: what each client action does, for screen readers (its tooltip shows the same). -->
+            <div hidden>
+              <span id="msp-client-console-help">{{ clientActions.console }}</span>
+              <span id="msp-client-install-help">{{ clientActions.install }}</span>
+              <span id="msp-client-sync-help">{{ clientActions.sync }}</span>
+              <span id="msp-client-confirm-help">{{ clientActions.confirm }}</span>
+            </div>
+            <!-- On a narrow screen the table scrolls sideways rather than cutting its last columns off. -->
+            <bit-table style="overflow-x: auto">
               <ng-container header>
                 <tr>
                   <th bitCell>Client</th>
@@ -220,7 +229,7 @@ const CLIENT_FEATURES = {
                   <th bitCell title="Passwords with a strength of 2 or less out of 4">Weak</th>
                   <th bitCell title="Passwords used by more than one login">Reused</th>
                   <th bitCell [title]="exposedTitle">Exposed</th>
-                  <th bitCell></th>
+                  <th bitCell><span class="tw-sr-only">Actions</span></th>
                 </tr>
               </ng-container>
               <ng-template body>
@@ -298,16 +307,39 @@ const CLIENT_FEATURES = {
                       />
                     </td>
                     <td bitCell>
-                      <!-- The actions wrap, each kept whole, so the table fits beside the health columns. -->
-                      <div
-                        class="tw-flex tw-flex-wrap tw-items-center tw-justify-end tw-gap-x-4 tw-gap-y-1"
-                      >
+                      <!-- Keykeeper: a client's actions, one to a line so each stays whole and
+                        they line up from row to row. Each says what it does in a tooltip, and
+                        to screen readers through the descriptions above the table. -->
+                      <div class="tw-flex tw-flex-col tw-items-start tw-gap-1">
+                        @if (client.you?.status === CONFIRMED) {
+                          <a
+                            bitLink
+                            class="tw-whitespace-nowrap"
+                            [routerLink]="openLink(client)"
+                            [attr.aria-label]="'Admin console for ' + client.name"
+                            [bitTooltip]="clientActions.console"
+                            aria-describedby="msp-client-console-help"
+                          >
+                            Admin console
+                          </a>
+                        } @else if ((client.you?.status ?? 0) < 0) {
+                          <span
+                            class="tw-whitespace-nowrap tw-text-muted"
+                            data-testid="msp-client-revoked"
+                            >Revoked by the client</span
+                          >
+                        } @else {
+                          <span class="tw-whitespace-nowrap tw-text-muted">Waiting for access</span>
+                        }
                         @if (m.role === "admin" || m.access?.installCommands !== false) {
                           <button
                             type="button"
                             bitLink
                             class="tw-whitespace-nowrap"
+                            [attr.aria-label]="'Install command for ' + client.name"
                             [attr.aria-expanded]="installFor()?.client.id === client.id"
+                            [bitTooltip]="clientActions.install"
+                            aria-describedby="msp-client-install-help"
                             (click)="toggleInstall(client)"
                           >
                             Install command
@@ -318,9 +350,11 @@ const CLIENT_FEATURES = {
                             bitLink
                             class="tw-whitespace-nowrap"
                             [routerLink]="['/organizations', client.id, 'settings', 'provisioning']"
-                            [attr.aria-label]="'Provisioning for ' + client.name"
+                            [attr.aria-label]="'Entra ID sync for ' + client.name"
+                            [bitTooltip]="clientActions.sync"
+                            aria-describedby="msp-client-sync-help"
                           >
-                            Provisioning
+                            Entra ID sync
                           </a>
                         }
                         @if (unconfirmedClient(client)) {
@@ -330,21 +364,12 @@ const CLIENT_FEATURES = {
                             class="tw-whitespace-nowrap"
                             data-testid="msp-client-confirm"
                             [attr.aria-label]="'Confirm ' + client.name + ' is your client'"
+                            [bitTooltip]="clientActions.confirm"
+                            aria-describedby="msp-client-confirm-help"
                             (click)="confirmClient(client)"
                           >
                             Confirm client
                           </button>
-                        }
-                        @if (client.you?.status === CONFIRMED) {
-                          <a bitLink [routerLink]="openLink(client)">Open</a>
-                        } @else if ((client.you?.status ?? 0) < 0) {
-                          <span
-                            class="tw-whitespace-nowrap tw-text-muted"
-                            data-testid="msp-client-revoked"
-                            >Revoked by the client</span
-                          >
-                        } @else {
-                          <span class="tw-whitespace-nowrap tw-text-muted">Waiting for access</span>
                         }
                       </div>
                     </td>
@@ -1167,6 +1192,16 @@ export class KeykeeperMspComponent implements OnInit {
   protected accessText(access: TechnicianAccess): string {
     return describeAccess(access, this.msp()?.clients ?? []);
   }
+
+  /** What each of a client's actions does: its tooltip, and its description for screen readers. */
+  protected readonly clientActions = {
+    console: "Opens this client's admin console, with its members, policies, and settings.",
+    install:
+      "Shows the one-line command your RMM runs on this client's computers to install PassBundle and join their people to this client.",
+    sync: "Opens this client's page for syncing its people from Microsoft Entra ID (SCIM).",
+    confirm:
+      "Confirms this organization is your client, so PassBundle copies your templates there and vouches for your staff joining it.",
+  } as const;
 
   /** Into a client's admin console: Members for owners and admins, otherwise wherever their role starts. */
   protected openLink(client: MspClient): string[] {
