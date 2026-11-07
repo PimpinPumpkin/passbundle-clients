@@ -127,6 +127,73 @@ describe("VaultBannersService", () => {
 
       expect(await service.shouldShowVerifyEmailBanner(userId)).toBe(false);
     });
+
+    // Keykeeper: the banner follows the account, so it goes away when a sync
+    // learns the address was verified, even with the vault already open.
+    describe("as it changes", () => {
+      let laterUserId: UserId;
+
+      beforeEach(() => {
+        // Its own account each time: what one test dismisses stays dismissed.
+        laterUserId = Utils.newGuid() as UserId;
+        accounts$.next({
+          ...accounts$.value,
+          [laterUserId]: mockAccountInfoWith({ email: "later@example.test", name: "later" }),
+        });
+        accounts$.next({
+          ...accounts$.value,
+          [laterUserId]: { ...accounts$.value[laterUserId], emailVerified: false },
+        });
+      });
+
+      it("turns false as soon as the email is verified", () => {
+        service = TestBed.inject(VaultBannersService);
+        const seen: boolean[] = [];
+        const subscription = service
+          .shouldShowVerifyEmailBanner$(laterUserId)
+          .subscribe((show) => seen.push(show));
+
+        expect(seen).toEqual([true]);
+
+        // A sync sets the account's emailVerified from the server's profile.
+        accounts$.next({
+          ...accounts$.value,
+          [laterUserId]: { ...accounts$.value[laterUserId], emailVerified: true },
+        });
+
+        expect(seen).toEqual([true, false]);
+        subscription.unsubscribe();
+      });
+
+      it("doesn't repeat itself when something else about the accounts changes", () => {
+        service = TestBed.inject(VaultBannersService);
+        const seen: boolean[] = [];
+        const subscription = service
+          .shouldShowVerifyEmailBanner$(laterUserId)
+          .subscribe((show) => seen.push(show));
+
+        accounts$.next({
+          ...accounts$.value,
+          [laterUserId]: { ...accounts$.value[laterUserId], name: "renamed" },
+        });
+
+        expect(seen).toEqual([true]);
+        subscription.unsubscribe();
+      });
+
+      it("turns false when the banner is dismissed", async () => {
+        service = TestBed.inject(VaultBannersService);
+        const seen: boolean[] = [];
+        const subscription = service
+          .shouldShowVerifyEmailBanner$(laterUserId)
+          .subscribe((show) => seen.push(show));
+
+        await service.dismissBanner(laterUserId, VisibleVaultBanner.VerifyEmail);
+
+        expect(seen).toEqual([true, false]);
+        subscription.unsubscribe();
+      });
+    });
   });
 
   describe("PendingAuthRequest", () => {

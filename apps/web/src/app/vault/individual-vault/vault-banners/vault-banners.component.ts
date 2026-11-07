@@ -1,7 +1,7 @@
 import { Component, Input, OnInit } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { Router } from "@angular/router";
-import { filter, firstValueFrom, map } from "rxjs";
+import { filter, firstValueFrom, map, of, switchMap } from "rxjs";
 
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
@@ -36,6 +36,12 @@ export class VaultBannersComponent implements OnInit {
 
   private activeUserId$ = this.accountService.activeAccount$.pipe(map((a) => a?.id));
 
+  /**
+   * Keykeeper: the verify email banner follows the account rather than being
+   * decided once, so it goes away when a sync learns the address is verified.
+   */
+  private showVerifyEmail = false;
+
   constructor(
     private vaultBannerService: VaultBannersService,
     private router: Router,
@@ -52,6 +58,20 @@ export class VaultBannersComponent implements OnInit {
         if (!this.visibleBanners.includes(VisibleVaultBanner.PendingAuthRequest)) {
           this.visibleBanners = [...this.visibleBanners, VisibleVaultBanner.PendingAuthRequest];
         }
+      });
+
+    // Keykeeper: show or hide the verify email banner whenever that changes.
+    this.activeUserId$
+      .pipe(
+        switchMap((userId) =>
+          userId == null ? of(false) : this.vaultBannerService.shouldShowVerifyEmailBanner$(userId),
+        ),
+        takeUntilDestroyed(),
+      )
+      .subscribe((show) => {
+        this.showVerifyEmail = show;
+        const others = this.visibleBanners.filter((b) => b !== VisibleVaultBanner.VerifyEmail);
+        this.visibleBanners = show ? [...others, VisibleVaultBanner.VerifyEmail] : others;
       });
   }
 
@@ -89,13 +109,13 @@ export class VaultBannersComponent implements OnInit {
 
     const showBrowserOutdated =
       await this.vaultBannerService.shouldShowUpdateBrowserBanner(activeUserId);
-    const showVerifyEmail = await this.vaultBannerService.shouldShowVerifyEmailBanner(activeUserId);
     const showPendingAuthRequest =
       await this.vaultBannerService.shouldShowPendingAuthRequestBanner(activeUserId);
 
     this.visibleBanners = [
       showBrowserOutdated ? VisibleVaultBanner.OutdatedBrowser : null,
-      showVerifyEmail ? VisibleVaultBanner.VerifyEmail : null,
+      // Keykeeper: as the subscription above last saw it, never an older answer.
+      this.showVerifyEmail ? VisibleVaultBanner.VerifyEmail : null,
       showPendingAuthRequest ? VisibleVaultBanner.PendingAuthRequest : null,
     ].filter((banner) => banner !== null);
   }
