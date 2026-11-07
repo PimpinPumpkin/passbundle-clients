@@ -2,6 +2,7 @@
 export * from "./install-command";
 export * from "./join-checks";
 export * from "./join-seals";
+export * from "./joining-memory";
 export * from "./msp-types";
 export * from "./msp-requests";
 export * from "./msp-template-status";

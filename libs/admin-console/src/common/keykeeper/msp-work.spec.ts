@@ -29,7 +29,7 @@ const USER = "user-1" as UserId;
 
 function setup() {
   const requests = mock<KeykeeperMspRequests>();
-  requests.organizationsPending.mockResolvedValue([]);
+  requests.organizationsWaiting.mockResolvedValue({ pending: [], joining: [] });
   const sender = mock<KeykeeperTemplateSender>();
   const accountService = mock<AccountService>();
   accountService.activeAccount$ = new BehaviorSubject({ id: USER } as any);
@@ -140,10 +140,10 @@ describe("MSP background work", () => {
         { id: "family", name: "Family", isOwner: false, isAdmin: false } as Organization,
       ]),
     );
-    requests.organizationsPending.mockResolvedValue([
-      member("dental", "ana"),
-      member("family", "mallory"),
-    ]);
+    requests.organizationsWaiting.mockResolvedValue({
+      pending: [member("dental", "ana"), member("family", "mallory")],
+      joining: [],
+    });
     requests.list.mockResolvedValue([]);
 
     expect(await work.run()).toEqual([]);
@@ -183,14 +183,26 @@ describe("MSP background work", () => {
 
   it("in the background, confirms where the organization does so automatically and leaves the rest for an admin", async () => {
     const { work, requests, organizationUserService } = setup();
-    requests.organizationsPending.mockResolvedValue([
-      member("dental", "ana"),
-      member("dental", "ben", false),
-    ]);
+    requests.organizationsWaiting.mockResolvedValue({
+      pending: [member("dental", "ana"), member("dental", "ben", false)],
+      joining: [],
+    });
     requests.list.mockResolvedValue([]);
     expect(await work.run()).toEqual([]);
     expect(organizationUserService.confirmUser).toHaveBeenCalledTimes(1);
     expect(organizationUserService.confirmUser.mock.calls[0][1]).toBe("ana");
+  });
+
+  it("checks every organization's joining seal on each run, whether or not anyone is waiting", async () => {
+    const { work, requests, joinChecks, organizationUserService } = setup();
+    const joining = [
+      { organizationId: "dental", autoConfirm: false, domains: [], seal: "v3.own.1.seal" },
+    ];
+    requests.organizationsWaiting.mockResolvedValue({ pending: [], joining });
+    requests.list.mockResolvedValue([]);
+    expect(await work.run()).toEqual([]);
+    expect(joinChecks.learnJoining).toHaveBeenCalledWith(USER, joining);
+    expect(organizationUserService.confirmUser).not.toHaveBeenCalled();
   });
 
   it("doesn't ask who's waiting when the person isn't an owner or admin anywhere", async () => {
@@ -200,12 +212,12 @@ describe("MSP background work", () => {
     );
     requests.list.mockResolvedValue([]);
     await work.run();
-    expect(requests.organizationsPending).not.toHaveBeenCalled();
+    expect(requests.organizationsWaiting).not.toHaveBeenCalled();
   });
 
   it("only MSP admins write templates", async () => {
     const { work, requests } = setup();
-    requests.organizationsPending.mockResolvedValue([]);
+    requests.organizationsWaiting.mockResolvedValue({ pending: [], joining: [] });
     requests.list.mockResolvedValue([{ id: "msp-1", name: "Northwind IT", role: "technician" }]);
     await work.run();
     expect(requests.getTemplates).not.toHaveBeenCalled();

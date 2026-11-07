@@ -260,6 +260,18 @@ export type PendingMember = {
   enrollmentSecret?: string | null;
 };
 
+/**
+ * An organization's joining setting with its seal, for each organization
+ * where the person is an owner or admin, so their apps remember the newest
+ * seal of each (DESIGN.md, "Joins a hacked server can't forge").
+ */
+export type OrganizationJoining = {
+  organizationId: string;
+  autoConfirm: boolean;
+  domains: string[];
+  seal: string | null;
+};
+
 /** How people join an organization. See DESIGN.md, "Joining". */
 export type Joining = { autoConfirm: boolean; inviteHours: number };
 
@@ -306,6 +318,12 @@ export type UnacceptedRole = {
   organizationId: string;
   name: string;
   role: "owner" | "admin" | "custom";
+  /**
+   * Revoked until they accept it: they held the role before the organization
+   * required two-step login for it. Accepting restores them. Older servers
+   * leave it out.
+   */
+  revoked?: boolean;
 };
 
 /** A script token as its organization's admins see it (docs/script-access.md). */
