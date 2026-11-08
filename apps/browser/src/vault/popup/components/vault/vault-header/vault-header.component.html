@@ -8,7 +8,15 @@
 @if (pickedPlace$ | async; as place) {
   <div class="tw-mt-2 tw-flex" data-testid="keykeeper-picked-place">
     <span data-kk="picked">
-      <i class="bwi bwi-fw {{ placeIcon(place) }}" aria-hidden="true"></i>
+      @if (place.tile) {
+        <vault-keykeeper-category-tile
+          [look]="place.tile"
+          [size]="18"
+          data-testid="keykeeper-folder-tile"
+        />
+      } @else {
+        <i class="bwi bwi-fw {{ placeIcon(place) }}" aria-hidden="true"></i>
+      }
       <span class="tw-truncate">{{ placeLabel(place) }}</span>
       <button
         type="button"

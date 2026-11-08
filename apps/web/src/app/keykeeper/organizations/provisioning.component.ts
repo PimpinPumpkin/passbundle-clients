@@ -3,8 +3,8 @@ import { ActivatedRoute } from "@angular/router";
 import { firstValueFrom } from "rxjs";
 
 import { ProvisioningView } from "@bitwarden/admin-console/common";
-import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { DialogService, ToastService } from "@bitwarden/components";
 
 import { HeaderModule } from "../../layouts/header/header.module";
@@ -176,8 +176,9 @@ import { KeykeeperMspWorkService } from "../msp/msp-work.service";
           <ol class="tw-list-decimal tw-pl-6" data-testid="provisioning-steps">
             <li>
               In the Microsoft Entra admin center, go to Enterprise applications, then New
-              application, then Create your own application. Name it PassBundle, and choose to
-              integrate an application you don't find in the gallery.
+              application, then Create your own application. Name it
+              {{ "keykeeperProductName" | i18n }}, and choose to integrate an application you don't
+              find in the gallery.
             </li>
             <li>
               In the new application, open Provisioning and choose Automatic (or New configuration).
@@ -366,7 +367,7 @@ export class KeykeeperProvisioningComponent implements OnInit {
     try {
       await work();
     } catch (e) {
-      const message = e instanceof ErrorResponse ? e.getSingleMessage() : String(e);
+      const message = plainErrorMessage(e);
       this.toastService.showToast({ variant: "error", message });
     }
   }

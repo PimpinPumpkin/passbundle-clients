@@ -12,6 +12,7 @@ import {
 } from "@bitwarden/components";
 import { ShareLinkMenuItemDirective } from "@bitwarden/tools-share";
 import {
+  KeykeeperCategoryTileComponent,
   KeykeeperExpirationBadgeComponent,
   KeykeeperItemTileComponent,
   KeykeeperTemplateBadgeComponent,
@@ -43,6 +44,7 @@ import { VaultItemsComponent } from "./vault-items.component";
     GroupNameBadgeComponent,
     PipesModule,
     VaultItemCopyActionsComponent,
+    KeykeeperCategoryTileComponent,
     KeykeeperExpirationBadgeComponent,
     KeykeeperItemTileComponent,
     KeykeeperTemplateBadgeComponent,

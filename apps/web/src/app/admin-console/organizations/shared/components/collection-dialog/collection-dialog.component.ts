@@ -45,6 +45,7 @@ import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.servic
 import { getById } from "@bitwarden/common/platform/misc";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
 import { CollectionId, OrganizationId } from "@bitwarden/common/types/guid";
+import { FolderLook, sameFolderLook } from "@bitwarden/common/vault/keykeeper/folder-looks";
 import {
   DIALOG_DATA,
   CopyClickDirective,
@@ -55,7 +56,12 @@ import {
   DialogService,
   ToastService,
 } from "@bitwarden/components";
-import { Vfo1I18nPipe, Vfo1IconPipe, Vfo1TerminologyService } from "@bitwarden/vault";
+import {
+  KeykeeperFolderLookPickerComponent,
+  Vfo1I18nPipe,
+  Vfo1IconPipe,
+  Vfo1TerminologyService,
+} from "@bitwarden/vault";
 
 import { openChangePlanDialog } from "../../../../../billing/organizations/change-plan-dialog.component";
 import { SharedModule } from "../../../../../shared";
@@ -99,6 +105,7 @@ type ButtonType = (typeof ButtonType)[keyof typeof ButtonType];
     SelectModule,
     Vfo1IconPipe,
     Vfo1I18nPipe,
+    KeykeeperFolderLookPickerComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -134,6 +141,9 @@ export class CollectionDialogComponent implements OnInit {
     parent: undefined as string | undefined,
     access: [[] as AccessItemValue[]],
     selectedOrg: "" as OrganizationId,
+    // Keykeeper: the folder's icon and color (DESIGN.md, "Folder icons"),
+    // null for the plain folder. Whoever can rename the folder can change it.
+    look: null as FolderLook | null,
   });
 
   private readonly externalIdValue = toSignal(
@@ -403,6 +413,7 @@ export class CollectionDialogComponent implements OnInit {
             externalId: collection.externalId,
             parent: parentName,
             access: mapToAccessSelections(collection),
+            look: collection.keykeeperLook ?? null,
           });
         } else {
           const nestOptions: CollectionView[] = this.params.limitNestedCollections
@@ -536,6 +547,19 @@ export class CollectionDialogComponent implements OnInit {
       ? await this.collectionAdminService.update(collectionView, userId)
       : await this.collectionAdminService.create(collectionView, userId);
 
+    // Keykeeper: the icon and color, only when they changed (DESIGN.md,
+    // "Folder icons"), once the folder is saved and has its id.
+    const look = this.formGroup.controls.look.value ?? null;
+    if (!sameFolderLook(look, collection?.keykeeperLook)) {
+      await this.collectionAdminService.setLook(
+        collectionView.organizationId,
+        collectionResponse.id,
+        look,
+        userId,
+      );
+      collectionView.keykeeperLook = look ?? undefined;
+    }
+
     const vfo1Enabled = this.vfo1TerminologyService.enabled();
     const savedMessageKey = this.editMode
       ? vfo1Enabled
@@ -605,6 +629,7 @@ export class CollectionDialogComponent implements OnInit {
       this.formGroup.controls.access.disable();
       this.formGroup.controls.name.disable();
       this.formGroup.controls.parent.disable();
+      this.formGroup.controls.look.disable();
       return;
     }
 
@@ -613,6 +638,7 @@ export class CollectionDialogComponent implements OnInit {
     if (!this.editMode) {
       this.formGroup.controls.name.enable();
       this.formGroup.controls.parent.enable();
+      this.formGroup.controls.look.enable();
       return;
     }
 
@@ -623,6 +649,8 @@ export class CollectionDialogComponent implements OnInit {
     const canEditName = collection.canEditName(this.organization()!);
     this.formGroup.controls.name[canEditName ? "enable" : "disable"]();
     this.formGroup.controls.parent[canEditName ? "enable" : "disable"]();
+    // Keykeeper: the icon goes with the name: whoever can rename the folder.
+    this.formGroup.controls.look[canEditName ? "enable" : "disable"]();
   }
 
   private close(action: CollectionDialogAction, collection?: CollectionResponse | CollectionView) {

@@ -18,6 +18,8 @@ import {
 } from "@bitwarden/common/admin-console/models/collections";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
+import { KeykeeperCategoryLook } from "@bitwarden/common/vault/keykeeper/categories";
+import { folderTileLook } from "@bitwarden/common/vault/keykeeper/folder-looks";
 import { CipherViewLike } from "@bitwarden/common/vault/utils/cipher-view-like-utils";
 import { MenuTriggerForDirective } from "@bitwarden/components";
 import { Vfo1TerminologyService } from "@bitwarden/vault";
@@ -101,6 +103,21 @@ export class VaultCollectionRowComponent<C extends CipherViewLike> {
   @Output() checkedToggled = new EventEmitter<void>();
 
   constructor(private i18nService: I18nService) {}
+
+  private lookFor?: CollectionView["keykeeperLook"];
+  private tileLook?: KeykeeperCategoryLook;
+
+  /**
+   * Keykeeper: the folder's tile, when it has an icon and color of its own
+   * (DESIGN.md, "Folder icons"). The same object while the look is.
+   */
+  get look(): KeykeeperCategoryLook | undefined {
+    if (this.collection?.keykeeperLook !== this.lookFor) {
+      this.lookFor = this.collection?.keykeeperLook;
+      this.tileLook = folderTileLook(this.lookFor);
+    }
+    return this.tileLook;
+  }
 
   get collectionGroups() {
     if (!(this.collection instanceof CollectionAdminView)) {

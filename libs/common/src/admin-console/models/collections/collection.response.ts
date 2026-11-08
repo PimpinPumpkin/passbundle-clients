@@ -12,6 +12,11 @@ export class CollectionResponse extends BaseResponse {
   defaultUserCollectionEmail: string | undefined;
   externalId: string | undefined;
   type: CollectionType = CollectionTypes.SharedCollection;
+  /**
+   * Keykeeper: the folder's icon and color, encrypted with the organization's
+   * key as its name is, from our server (DESIGN.md, "Folder icons").
+   */
+  keykeeperLook?: string;
 
   constructor(response: any) {
     super(response);
@@ -21,6 +26,7 @@ export class CollectionResponse extends BaseResponse {
     this.externalId = this.getResponseProperty("ExternalId");
     this.defaultUserCollectionEmail = this.getResponseProperty("DefaultUserCollectionEmail");
     this.type = this.getResponseProperty("Type") ?? CollectionTypes.SharedCollection;
+    this.keykeeperLook = this.getResponseProperty("KeykeeperLook") ?? undefined;
   }
 }
 

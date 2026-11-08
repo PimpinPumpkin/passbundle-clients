@@ -282,6 +282,8 @@ function apply() {
   }
   ownMessages.keykeeperInstallScriptMacLinux = { message: BRAND.installScriptMacLinux };
   ownMessages.keykeeperMacProfile = { message: BRAND.macProfile };
+  // The product's name, for our own pages, which never type it themselves.
+  ownMessages.keykeeperProductName = { message: BRAND.name };
   for (const rel of trackedFiles(
     "apps/browser/src/_locales/en/messages.json",
     "apps/web/src/locales/en/messages.json",

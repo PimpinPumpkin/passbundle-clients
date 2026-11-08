@@ -1,5 +1,3 @@
-// FIXME: Update this file to be type safe and remove this and next line
-// @ts-strict-ignore
 // Keykeeper: see item-history.ts.
 import { mock } from "jest-mock-extended";
 
@@ -72,7 +70,7 @@ describe("itemHistory", () => {
       savedBy: editor,
       replacedBy: editor,
     });
-    expect(versions[0].item.login.password).toBe("old-password");
+    expect(versions[0].item!.login!.password).toBe("old-password");
   });
 
   it("gives when and by whom only when the server hides the passwords", async () => {

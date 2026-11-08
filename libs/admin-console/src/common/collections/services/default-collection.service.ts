@@ -25,6 +25,7 @@ import { Utils } from "@bitwarden/common/platform/misc/utils";
 import { SingleUserState, StateProvider } from "@bitwarden/common/platform/state";
 import { CollectionId, OrganizationId, UserId } from "@bitwarden/common/types/guid";
 import { OrgKey } from "@bitwarden/common/types/key";
+import { decryptFolderLook } from "@bitwarden/common/vault/keykeeper/folder-looks";
 import { TreeNode } from "@bitwarden/common/vault/models/domain/tree-node";
 import { ServiceUtils } from "@bitwarden/common/vault/service-utils";
 import { KeyService } from "@bitwarden/key-management";
@@ -118,13 +119,13 @@ export class DefaultCollectionService implements CollectionService {
       this.encryptedCollections$(userId),
       this.keyService.orgKeys$(userId).pipe(filter((orgKeys) => !!orgKeys)),
     ]).pipe(
-      switchMap(([collections]) => {
+      switchMap(([collections, orgKeys]) => {
         const decryptMeasurement = this.logService.startMeasurement(
           PerfTrackGroup.Unlock,
           "Collections",
           "decryptMany",
         );
-        return this.collectionEncryptionService.decryptMany(collections ?? [], userId).pipe(
+        return from(this.decryptWithLooks(collections ?? [], orgKeys, userId)).pipe(
           tap((views) => decryptMeasurement.finish([["Items", views.length]])),
           map((views) => views.sort(Utils.getSortFunction(this.i18nService, "name"))),
           // Cache successful decryptions (delayWhen only runs on emitted values, so a failure
@@ -157,11 +158,10 @@ export class DefaultCollectionService implements CollectionService {
       return collections;
     });
 
-    const decryptedCollections = await firstValueFrom(
-      this.collectionEncryptionService.decryptMany(
-        [Collection.fromCollectionData(toUpdate)],
-        userId,
-      ),
+    const decryptedCollections = await this.decryptWithLooks(
+      [Collection.fromCollectionData(toUpdate)],
+      undefined,
+      userId,
     );
 
     await this.decryptedState(userId).update((collections) => {
@@ -183,6 +183,38 @@ export class DefaultCollectionService implements CollectionService {
 
       return collections;
     });
+  }
+
+  /**
+   * Keykeeper: the collections, opened, each with its icon and color
+   * (DESIGN.md, "Folder icons"), which the SDK doesn't know: opened here
+   * with the organization's key, as the name is. The keys are read only
+   * when some folder has a look, unless they're given.
+   */
+  private async decryptWithLooks(
+    collections: Collection[],
+    orgKeys: Record<OrganizationId, OrgKey> | null | undefined,
+    userId: UserId,
+  ): Promise<CollectionView[]> {
+    const views = await firstValueFrom(
+      this.collectionEncryptionService.decryptMany(collections, userId),
+    );
+    if (!collections.some((c) => c.keykeeperLook)) {
+      return views;
+    }
+    orgKeys ??= await firstValueFrom(this.keyService.orgKeys$(userId));
+    const byId = new Map(collections.map((c) => [c.id, c]));
+    for (const view of views) {
+      const collection = byId.get(view.id);
+      if (collection?.keykeeperLook) {
+        view.keykeeperLook = await decryptFolderLook(
+          collection.keykeeperLook,
+          orgKeys?.[view.organizationId],
+          this.encryptService,
+        );
+      }
+    }
+    return views;
   }
 
   async replace(collections: Record<CollectionId, CollectionData>, userId: UserId): Promise<void> {

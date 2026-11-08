@@ -16,7 +16,7 @@ import {
 } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
-import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { CollectionId, OrganizationId, UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
@@ -60,7 +60,7 @@ export function templateSourceProblem(
     return "That template is a copy from an MSP, so it can't be sent on.";
   }
   if (source.organizationId == null) {
-    return "That template is in your own vault. Move it to an organization your MSP's admins share to send it to clients.";
+    return "That template is in Personal. Move it to an organization your MSP's admins share to send it to clients.";
   }
   if (new Set(clientIds).has(source.organizationId)) {
     return "That template is one of your clients' own, so it can't go to the others.";
@@ -184,7 +184,7 @@ export class KeykeeperTemplateSender {
         copies.push({ organizationId: client.id, cipherId: saved.id, sourceRevision: revision });
         result.sent.push(client);
       } catch (e) {
-        result.failed.push({ ...client, error: errorMessage(e) });
+        result.failed.push({ ...client, error: plainErrorMessage(e) });
       }
     }
     if (copies.length > 0) {
@@ -249,12 +249,4 @@ export class KeykeeperTemplateSender {
     state.collections[orgId] = id;
     return id;
   }
-}
-
-function errorMessage(e: unknown): string {
-  return e instanceof ErrorResponse
-    ? e.getSingleMessage()
-    : e instanceof Error
-      ? e.message
-      : String(e);
 }

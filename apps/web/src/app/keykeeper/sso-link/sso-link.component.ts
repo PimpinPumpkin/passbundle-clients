@@ -4,7 +4,9 @@ import { firstValueFrom } from "rxjs";
 
 import { KEYKEEPER_SSO_LINK_SESSION, KeykeeperSsoLinkSession } from "@bitwarden/auth/angular";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
+import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
 import { ToastService } from "@bitwarden/components";
 
@@ -64,7 +66,9 @@ type PendingLink = {
       @case ("pending") {
         @if (pending(); as p) {
           <div data-testid="sso-link-confirm">
-            <p bitTypography="body1">Link this Microsoft account to your PassBundle account?</p>
+            <p bitTypography="body1">
+              Link this Microsoft account to your {{ "keykeeperProductName" | i18n }} account?
+            </p>
             <dl class="tw-mb-4 tw-grid tw-grid-cols-[auto_1fr] tw-gap-x-4 tw-gap-y-1">
               <dt class="tw-font-semibold">Microsoft account</dt>
               <dd data-testid="sso-link-microsoft">
@@ -74,14 +78,14 @@ type PendingLink = {
                     : p.microsoftEmail
                 }}
               </dd>
-              <dt class="tw-font-semibold">PassBundle account</dt>
+              <dt class="tw-font-semibold">{{ "keykeeperProductName" | i18n }} account</dt>
               <dd data-testid="sso-link-account">{{ p.accountEmail }}</dd>
               <dt class="tw-font-semibold">Organization</dt>
               <dd>{{ p.organizationName }}</dd>
             </dl>
             <p bitTypography="body2">
-              Only link a Microsoft account that's yours: it will sign in to this PassBundle
-              account. You'll get an email about it.
+              Only link a Microsoft account that's yours: it will sign in to this
+              {{ "keykeeperProductName" | i18n }} account. You'll get an email about it.
             </p>
             <div class="tw-flex tw-gap-2">
               <button
@@ -104,7 +108,7 @@ type PendingLink = {
         <div data-testid="sso-link-problem">
           <p bitTypography="body1">{{ problem() }}</p>
           <button bitButton buttonType="secondary" type="button" (click)="leave()">
-            {{ linking() ? "Back to sign in" : "Back to your vault" }}
+            {{ linking() ? "Back to sign in" : "Back to your items" }}
           </button>
         </div>
       }
@@ -147,7 +151,7 @@ export class KeykeeperSsoLinkComponent implements OnInit {
           this.step.set("pending");
         }
       } catch (e) {
-        this.fail(errorMessage(e));
+        this.fail(plainErrorMessage(e));
       }
       return;
     }
@@ -185,7 +189,7 @@ export class KeykeeperSsoLinkComponent implements OnInit {
       window.location.assign(url);
     } catch (e) {
       this.busy.set(false);
-      this.fail(errorMessage(e));
+      this.fail(plainErrorMessage(e));
     }
   }
 
@@ -215,7 +219,7 @@ export class KeykeeperSsoLinkComponent implements OnInit {
       }
     } catch (e) {
       this.busy.set(false);
-      this.fail(errorMessage(e));
+      this.fail(plainErrorMessage(e));
     }
   }
 
@@ -255,7 +259,7 @@ export class KeykeeperSsoLinkComponent implements OnInit {
     });
     const json = await response.json().catch((): unknown => null);
     if (!response.ok) {
-      throw new Error(serverMessage(json) ?? "Something went wrong. Sign in again.");
+      throw new ErrorResponse(json, response.status);
     }
     return json;
   }
@@ -269,17 +273,4 @@ function readLinkingSession(): KeykeeperSsoLinkSession | null {
   } catch {
     return null;
   }
-}
-
-function serverMessage(json: unknown): string | null {
-  const body = json as { message?: string; ErrorModel?: { Message?: string } } | null;
-  return body?.message || body?.ErrorModel?.Message || null;
-}
-
-/** An Error's message, or an ErrorResponse's (what ApiService throws). */
-function errorMessage(e: unknown): string {
-  const message = (e as { message?: unknown } | null)?.message;
-  return typeof message === "string" && message !== ""
-    ? message
-    : "Something went wrong. Try again.";
 }

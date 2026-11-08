@@ -86,14 +86,12 @@ function organizationTree() {
   return head;
 }
 
-function collectionTree() {
+function collectionTree(more: Record<string, unknown>[] = []) {
   const head = new TreeNode<CollectionFilter>({ id: "AllCollections" } as CollectionFilter, null!);
   head.children = [
-    new TreeNode<CollectionFilter>(
-      { id: "c-office", name: "Office", organizationId: ORG } as unknown as CollectionFilter,
-      head,
-    ),
-  ];
+    { id: "c-office", name: "Office", organizationId: ORG, icon: "bwi-collection-shared" },
+    ...more,
+  ].map((c) => new TreeNode<CollectionFilter>(c as unknown as CollectionFilter, head));
   return head;
 }
 
@@ -121,11 +119,13 @@ describe("KeykeeperVaultMenuComponent", () => {
   const sideNav = { open: signal(true), isOverlay: signal(false), version: signal("default") };
   const ciphers$ = new BehaviorSubject<CipherViewLike[]>([]);
   const healthCount$ = new BehaviorSubject<HealthCount | undefined>(undefined);
+  const collectionTree$ = new BehaviorSubject(collectionTree());
 
   beforeEach(async () => {
     sideNav.open.set(true);
     sideNav.isOverlay.set(false);
     healthCount$.next(undefined);
+    collectionTree$.next(collectionTree());
     ciphers$.next([
       item(CipherType.Login, { favorite: true, folderId: "f-bank" }),
       item(CipherType.Login, { organizationId: ORG, collectionIds: ["c-office"] }),
@@ -139,7 +139,7 @@ describe("KeykeeperVaultMenuComponent", () => {
       new TreeNode<CipherTypeFilter>({ id: "AllItems", name: "allItems", type: "all" }, null!),
     );
     vaultFilterService.organizationTree$ = of(organizationTree());
-    vaultFilterService.collectionTree$ = of(collectionTree());
+    vaultFilterService.collectionTree$ = collectionTree$;
     vaultFilterService.folderTree$ = of(folderTree());
 
     const policyService = mock<PolicyService>();
@@ -345,6 +345,42 @@ describe("KeykeeperVaultMenuComponent", () => {
     await settle();
     expect(el().querySelector("vault-keykeeper-category-tile")).toBeNull();
     expect(el().querySelector("bit-nav-item bit-icon")).not.toBeNull();
+  });
+
+  it("shows a shared folder's own icon and color as its tile, and the plain glyph until it has one", async () => {
+    collectionTree$.next(
+      collectionTree([
+        {
+          id: "c-bank",
+          name: "Accounts",
+          organizationId: ORG,
+          icon: "bwi-collection-shared",
+          keykeeperLook: { icon: "bank", tone: "emerald" },
+        },
+      ]),
+    );
+    await settle();
+
+    const row = (name: string) =>
+      Array.from(el().querySelectorAll<HTMLElement>("bit-nav-item")).find(
+        (r) => r.querySelector("[data-testid=nav-item-interactive]")?.textContent?.trim() === name,
+      )!;
+    const banking = row("Accounts");
+    const tile = banking.querySelector<HTMLElement>(
+      "[data-testid=keykeeper-folder-tile] [data-jewel]",
+    )!;
+    expect(tile).not.toBeNull();
+    expect(tile.style.getPropertyValue("--pb-jewel")).toBe("#0E7A47");
+    expect(tile.querySelector("path")!.getAttribute("d")).toContain("M3 9l9-5 9 5");
+    expect(banking.querySelector("bit-icon")).toBeNull();
+    // Office has no look: its plain glyph, no tile.
+    expect(row("Office").querySelector("vault-keykeeper-category-tile")).toBeNull();
+    expect(row("Office").querySelector("bit-icon")).not.toBeNull();
+
+    // Closed to icons, the folders aren't on the rail at all.
+    sideNav.open.set(false);
+    await settle();
+    expect(el().querySelector("[data-testid=keykeeper-folder-tile]")).toBeNull();
   });
 
   /** The rows upstream's nav item shows as active. */

@@ -13,14 +13,24 @@
 </td>
 <td bitCell [ngClass]="RowHeightClass" class="tw-min-w-fit">
   <div aria-hidden="true">
-    <bit-icon
-      fixedWidth
-      class="bwi-lg"
-      [name]="
-        (collection.type === DefaultCollectionType ? 'bwi-user' : 'bwi-collection-shared')
-          | vfo1Icon
-      "
-    />
+    <!-- Keykeeper: the folder's own icon and color, if it has one (DESIGN.md,
+         "Folder icons"); otherwise the plain glyph. -->
+    @if (look; as look) {
+      <vault-keykeeper-category-tile
+        [look]="look"
+        [size]="40"
+        data-testid="keykeeper-folder-tile"
+      />
+    } @else {
+      <bit-icon
+        fixedWidth
+        class="bwi-lg"
+        [name]="
+          (collection.type === DefaultCollectionType ? 'bwi-user' : 'bwi-collection-shared')
+            | vfo1Icon
+        "
+      />
+    }
   </div>
 </td>
 <td bitCell [ngClass]="RowHeightClass">

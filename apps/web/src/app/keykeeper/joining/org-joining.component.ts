@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, effect, input, signal } f
 import { FormBuilder } from "@angular/forms";
 
 import { OrgJoining } from "@bitwarden/admin-console/common";
-import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { ToastService } from "@bitwarden/components";
 
 import { SharedModule } from "../../shared";
@@ -24,9 +24,9 @@ import { describeJoining, inviteChoices } from "./joining";
       <section data-testid="org-joining">
         <h1 bitTypography="h1" class="tw-mt-16 tw-pb-2.5">Joining</h1>
         <p bitTypography="body1">
-          When someone accepts an invitation, the web app or browser extension of an owner or admin
-          gives them access in the background, usually within a few minutes. It needs one of them
-          unlocked: the server never holds this organization's key.
+          When someone accepts an invitation, the web vault or browser extension of an owner or
+          admin gives them access in the background, usually within a few minutes. It needs one of
+          them unlocked: the server never holds this organization's key.
         </p>
         <p bitTypography="body2" data-testid="org-joining-source">
           @switch (j.source) {
@@ -125,7 +125,7 @@ export class KeykeeperOrgJoiningComponent {
       this.show(await this.api.setOrgJoining(this.organizationId(), this.form.getRawValue()));
       this.toastService.showToast({ variant: "success", message: "Saved how people join" });
     } catch (e) {
-      const message = e instanceof ErrorResponse ? e.getSingleMessage() : String(e);
+      const message = plainErrorMessage(e);
       this.toastService.showToast({ variant: "error", message });
     }
   };

@@ -764,7 +764,7 @@
     "message": "Where's your vault?"
   },
   "keykeeperMyOwnServer": {
-    "message": "My own server"
+    "message": "Self-hosted"
   },
   "keykeeperServerAddress": {
     "message": "Server address"
@@ -853,6 +853,27 @@
   },
   "keykeeperServerAddressNeeded": {
     "message": "Type your server's address first."
+  },
+  "keykeeperServerChecking": {
+    "message": "Checking the server…"
+  },
+  "keykeeperServerUnreachable": {
+    "message": "Couldn't reach a server at that address. Check it for typos, and that you're online."
+  },
+  "keykeeperServerSlow": {
+    "message": "The server at that address didn't answer in time. Check the address, then try again."
+  },
+  "keykeeperServerNotAServer": {
+    "message": "There's no $BRAND$ server at that address. Check it for typos.",
+    "placeholders": {
+      "brand": {
+        "content": "$1",
+        "example": "Acme Vault"
+      }
+    }
+  },
+  "keykeeperServerBroken": {
+    "message": "The server at that address had a problem. Try again in a few minutes, or ask whoever runs it."
   },
   "keykeeperCustomServerAddresses": {
     "message": "This browser uses custom server addresses."
@@ -1035,5 +1056,26 @@
   },
   "keykeeperOpenAndFillHint": {
     "message": "Open and fill doesn't need this setting: the open button beside a login opens its website in a new tab and fills it there, once, and only on that site. It never submits the form."
+  },
+  "keykeeperFolderLook": {
+    "message": "Icon and color"
+  },
+  "keykeeperFolderLookPreview": {
+    "message": "How it shows in the menu"
+  },
+  "keykeeperFolderLookUnnamed": {
+    "message": "This shared folder"
+  },
+  "keykeeperFolderLookIcon": {
+    "message": "Icon"
+  },
+  "keykeeperFolderLookColor": {
+    "message": "Color"
+  },
+  "keykeeperFolderLookPlain": {
+    "message": "Plain folder"
+  },
+  "keykeeperFolderLookHint": {
+    "message": "Everyone who has this folder sees its icon. It's encrypted, like the folder's name."
   }
 }

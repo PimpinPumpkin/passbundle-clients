@@ -8,6 +8,7 @@ import { View } from "../../../models/view/view";
 import { asUuid, uuidAsString } from "../../../platform/abstractions/sdk/sdk.service";
 import { CollectionId, OrganizationId } from "../../../types/guid";
 import { OrgKey } from "../../../types/key";
+import { decryptFolderLook, FolderLook } from "../../../vault/keykeeper/folder-looks";
 import { ITreeNodeObject } from "../../../vault/models/domain/tree-node";
 import { FolderGrid, gridOf } from "../../keykeeper/folder-permissions";
 import { Organization } from "../domain/organization";
@@ -38,6 +39,11 @@ export class CollectionView implements View, ITreeNodeObject {
   decryptionFailure: boolean = false;
   /** True when an enabled PAM access rule gates the collection's items. Derived by the server. */
   hasEnabledAccessRule: boolean = false;
+  /**
+   * Keykeeper: the folder's icon and color, opened; none for the plain
+   * folder (DESIGN.md, "Folder icons").
+   */
+  keykeeperLook?: FolderLook;
 
   private _name: string;
 
@@ -162,6 +168,7 @@ export class CollectionView implements View, ITreeNodeObject {
       view.keykeeper = collection.keykeeper;
     }
     view.hasEnabledAccessRule = collection.hasEnabledAccessRule;
+    view.keykeeperLook = await decryptFolderLook(collection.keykeeperLook, key, encryptService);
     return view;
   }
 
@@ -189,6 +196,7 @@ export class CollectionView implements View, ITreeNodeObject {
       view.keykeeper = collection.keykeeper;
     }
     view.hasEnabledAccessRule = collection.hasEnabledAccessRule;
+    view.keykeeperLook = await decryptFolderLook(collection.keykeeperLook, orgKey, encryptService);
     return view;
   }
 

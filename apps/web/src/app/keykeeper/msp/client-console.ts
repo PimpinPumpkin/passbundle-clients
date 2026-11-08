@@ -24,6 +24,6 @@ export function clientConsoleWay(
 /** Why a client has no Admin console link, and what to do. */
 export function noConsoleHelp(client: MspClient): string {
   return client.you?.vaultItems !== false
-    ? `Your role in ${client.name} doesn't include its admin console. Its items are in your vault.`
+    ? `Your role in ${client.name} doesn't include its admin console. Its items are under ${client.name} in the menu.`
     : `Your role in ${client.name} doesn't include its admin console or its items. An MSP admin can change your access.`;
 }

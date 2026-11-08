@@ -2,8 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from "@an
 import { firstValueFrom } from "rxjs";
 
 import { PolicyType } from "@bitwarden/common/admin-console/enums";
-import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { DialogService, ToastService } from "@bitwarden/components";
 
 import { BasePolicyEditDefinition } from "../../admin-console/organizations/policies";
@@ -326,12 +326,7 @@ export class KeykeeperDefaultPoliciesComponent {
     try {
       await action();
     } catch (e) {
-      const message =
-        e instanceof ErrorResponse
-          ? e.getSingleMessage()
-          : e instanceof Error
-            ? e.message
-            : String(e);
+      const message = plainErrorMessage(e);
       this.toastService.showToast({ variant: "error", message });
     }
   }

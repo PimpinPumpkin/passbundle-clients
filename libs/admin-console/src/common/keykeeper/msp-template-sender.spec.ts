@@ -80,9 +80,7 @@ describe("MSP template sources", () => {
   });
 
   it("are never someone's own template, whatever the server names as the source", () => {
-    expect(templateSourceProblem(template("a", null, "fw"), ["dental"])).toMatch(
-      /in your own vault/,
-    );
+    expect(templateSourceProblem(template("a", null, "fw"), ["dental"])).toMatch(/in Personal/);
   });
 
   it("aren't sent from someone's own vault", async () => {
@@ -90,7 +88,7 @@ describe("MSP template sources", () => {
     const { sender, cipherService } = setup([source]);
     await expect(
       sender.send(msp, source, [{ id: "dental", name: "Acme Dental" }], state("x")),
-    ).rejects.toThrow(/in your own vault/);
+    ).rejects.toThrow(/in Personal/);
     expect(cipherService.createWithServer).not.toHaveBeenCalled();
   });
 

@@ -33,6 +33,12 @@ export class Collection extends Domain {
   keykeeper?: FolderGrid;
   /** True when an enabled PAM access rule gates the collection's items. Derived by the server. */
   hasEnabledAccessRule: boolean = false;
+  /**
+   * Keykeeper: the folder's icon and color, encrypted with the organization's
+   * key (DESIGN.md, "Folder icons"). The SDK doesn't know it, so the
+   * collection service opens it beside the name (default-collection.service.ts).
+   */
+  keykeeperLook?: string;
 
   constructor(c: { id: CollectionId; name: EncString; organizationId: OrganizationId }) {
     super();
@@ -61,6 +67,9 @@ export class Collection extends Domain {
       collection.keykeeper = obj.keykeeper;
     }
     collection.hasEnabledAccessRule = obj.hasEnabledAccessRule;
+    if (obj.keykeeperLook) {
+      collection.keykeeperLook = obj.keykeeperLook;
+    }
 
     return collection;
   }

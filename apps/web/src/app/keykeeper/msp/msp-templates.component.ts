@@ -23,7 +23,7 @@ import {
 } from "@bitwarden/admin-console/common";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
-import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { DialogService, ToastService } from "@bitwarden/components";
@@ -145,7 +145,7 @@ import { KeykeeperTemplateClientsDialogComponent } from "./template-clients-dial
                 }
               </select>
               <bit-hint
-                >Your organizations' templates, never one in your own vault or a client's.</bit-hint
+                >Your organizations' templates, never one in Personal or a client's.</bit-hint
               >
             </bit-form-field>
             <bit-radio-group formControlName="scope" [block]="true">
@@ -347,7 +347,13 @@ export class KeykeeperMspTemplatesComponent {
   /** Tries again for clients that don't have the latest version. */
   protected async update(row: TemplateRow) {
     await this.attempt(async () => {
-      this.report(`Updated ${row.name ?? "the template"}.`, await this.work.run(true));
+      const failures = await this.work.run(true);
+      this.report(
+        failures.length > 0
+          ? `${row.name ?? "This template"} isn't up to date everywhere yet.`
+          : `Updated ${row.name ?? "the template"}.`,
+        failures,
+      );
     });
   }
 
@@ -385,9 +391,14 @@ export class KeykeeperMspTemplatesComponent {
     });
   }
 
+  /** What was done, then what didn't work yet, each in its own words, and what to do about it. */
   private report(done: string, failures: string[]) {
     if (failures.length > 0) {
-      this.toast("warning", `${done} Not yet: ${failures.join("; ")}`);
+      const list = failures.map((f) => f.trim().replace(/\.+$/, "")).join("; ");
+      this.toast(
+        "warning",
+        `${done} Some of it didn't work yet: ${list}. Use Update to try again.`,
+      );
     } else {
       this.toast("success", done);
     }
@@ -398,12 +409,7 @@ export class KeykeeperMspTemplatesComponent {
     try {
       await action();
     } catch (e) {
-      const message =
-        e instanceof ErrorResponse
-          ? e.getSingleMessage()
-          : e instanceof Error
-            ? e.message
-            : String(e);
+      const message = plainErrorMessage(e);
       this.toast("error", message);
     }
   }

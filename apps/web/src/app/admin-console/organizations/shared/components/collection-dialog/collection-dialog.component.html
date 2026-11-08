@@ -37,6 +37,14 @@
             <bit-label>{{ "name" | i18n }}</bit-label>
             <input bitInput appAutofocus formControlName="name" />
           </bit-form-field>
+          <!-- Keykeeper: the folder's icon and color (DESIGN.md, "Folder icons"). -->
+          <fieldset class="tw-mb-2 tw-border-0 tw-p-0 tw-m-0">
+            <legend class="tw-mb-2 tw-font-semibold">{{ "keykeeperFolderLook" | i18n }}</legend>
+            <vault-keykeeper-folder-look-picker
+              formControlName="look"
+              [name]="formGroup.controls.name.value"
+            />
+          </fieldset>
           @if (showOrgSelector()) {
             <bit-form-field>
               <bit-label>{{ "organization" | i18n }}</bit-label>

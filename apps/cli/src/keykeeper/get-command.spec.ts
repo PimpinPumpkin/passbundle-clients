@@ -1,5 +1,3 @@
-// FIXME: Update this file to be type safe and remove this and next line
-// @ts-strict-ignore
 // Keykeeper: `get` for items whose secrets the person can't see
 // (hidden-items.ts), item templates (templates.ts), and item history
 // (item-history.ts), through upstream's GetCommand.
@@ -128,7 +126,7 @@ describe("GetCommand with PassBundle's rules", () => {
       "admin@contoso.example",
     );
     const shown = (await command.run("item", ID, {})).data as CipherResponse;
-    expect(shown.login.username).toBe("admin@contoso.example");
+    expect(shown.login!.username).toBe("admin@contoso.example");
     expect(JSON.stringify(shown)).not.toContain("real-password");
     expect(JSON.stringify(shown)).not.toContain("JBSWY3DPEHPK3PXP");
   });

@@ -19,8 +19,8 @@ import { AccountService } from "@bitwarden/common/auth/abstractions/account.serv
 import { AuthService } from "@bitwarden/common/auth/abstractions/auth.service";
 import { AuthenticationStatus } from "@bitwarden/common/auth/enums/authentication-status";
 import { getOptionalUserId } from "@bitwarden/common/auth/services/account.service";
-import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { UserId } from "@bitwarden/common/types/guid";
@@ -229,14 +229,14 @@ function otherServerProblem(
     return {
       title: "Couldn't join your organization",
       message:
-        "Your IT's install command doesn't say which server it's for, so this browser can't join you to your organization. Ask your IT to run it again with the server's address.",
+        "Your IT admin's install command doesn't say which server it's for, so this browser can't join you to your organization. Ask your IT admin to run it again with the server's address.",
     };
   }
   const host = new URL(server).host;
   const yours = signedInTo == null ? "another server" : new URL(signedInTo).host;
   return {
     title: `Sign in to ${host} to join your organization`,
-    message: `Your IT set up this browser for ${host}, but you're signed in to ${yours}. To join your organization, sign in to ${host} instead.`,
+    message: `Your IT admin set up this browser for ${host}, but you're signed in to ${yours}. To join your organization, sign in to ${host} instead.`,
   };
 }
 
@@ -370,12 +370,12 @@ export class KeykeeperEnrollment {
             : await this.seals.fingerprint(Utils.fromB64ToArray(info.publicKey));
         if (fingerprint !== parts.orgKey) {
           throw new Error(
-            `${info.organizationName}'s key isn't the one your IT's install command names. Ask your IT before joining.`,
+            `${info.organizationName}'s key isn't the one your IT admin's install command names. Ask your IT admin before joining.`,
           );
         }
       } else if (info.accountRecovery) {
         throw new Error(
-          `Joining ${info.organizationName} needs a newer install command. Ask your IT to run it again.`,
+          `Joining ${info.organizationName} needs a newer install command. Ask your IT admin to run it again.`,
         );
       }
       const organizations = await firstValueFrom(this.organizationService.organizations$(userId));
@@ -430,7 +430,7 @@ export class KeykeeperEnrollment {
       await this.syncService.fullSync(true);
       return "joined";
     } catch (e) {
-      const error = e instanceof ErrorResponse ? e.getSingleMessage() : String(e);
+      const error = plainErrorMessage(e);
       await this.tellOnce(state, userId, tokenHash, previous, {
         title: "Couldn't join your organization",
         message: error,

@@ -80,7 +80,7 @@ export function describeEvent(
     case "staff_invite_accepted":
       return `${target} accepted the invitation and joined as ${roleName(e.detail)}`;
     case "staff_invite_cancelled":
-      return `${actor} cancelled the invitation for ${target}`;
+      return `${actor} canceled the invitation for ${target}`;
     case "staff_role_changed":
       return `${actor} made ${target} ${roleName(e.detail)}`;
     case "staff_access_changed":
@@ -109,8 +109,10 @@ export function describeEvent(
       return `${org} removed ${target} (${e.actorEmail ?? "its directory"}); they stay out until ${org} invites them again`;
     case "client_revoked_staff":
       return `${org} revoked ${target} (${e.actorEmail ?? "its directory"}); they stay out until ${org} restores them`;
+    case "templates_collection_set":
+      return `${actor} set ${org}'s Templates folder`;
     case "templates_collection_gone":
-      return `${org} deleted its Templates collection; the next template sent there makes a new one`;
+      return `${org} deleted its Templates folder; the next template sent there makes a new one`;
     case "script_token_created": {
       // "<token name>: <n> items"
       const split = detail.lastIndexOf(": ");
@@ -157,6 +159,14 @@ export function describeEvent(
     case "sso_unlinked":
       return `${actor} unlinked ${target}'s single sign-on in ${org}`;
     default:
-      return `${e.event} by ${actor}`;
+      // A newer server's, which this page has no sentence for yet: readable
+      // anyway, never the bare code.
+      return `${readableCode(e.event)}${e.organizationName ? ` in ${e.organizationName}` : ""} (by ${actor})`;
   }
+}
+
+/** An event's code as words: "client_seat_report" is "Client seat report". */
+function readableCode(code: string): string {
+  const words = code.replace(/[_-]+/g, " ").trim();
+  return words === "" ? "Something changed" : words[0].toUpperCase() + words.slice(1);
 }

@@ -1,5 +1,3 @@
-// FIXME: Update this file to be type safe and remove this and next line
-// @ts-strict-ignore
 // Keykeeper: every kind of item, through every way the tool shows items
 // (`get item`, `list items`, and `serve`, which runs the same commands), for
 // someone who can't see the item's passwords: each value the shared allowlist
