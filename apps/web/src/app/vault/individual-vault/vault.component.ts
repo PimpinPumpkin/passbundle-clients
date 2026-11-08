@@ -1,13 +1,14 @@
 import {
+  afterNextRender,
   ChangeDetectorRef,
   Component,
   inject,
+  Injector,
   NgZone,
   OnDestroy,
   OnInit,
   viewChild,
 } from "@angular/core";
-import { toSignal } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, NavigationExtras, Params, Router } from "@angular/router";
 import { combineLatest, firstValueFrom, lastValueFrom, Observable, of, Subject } from "rxjs";
 import {
@@ -58,9 +59,7 @@ import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions/account/billing-account-profile-state.service";
 import { BillingApiServiceAbstraction } from "@bitwarden/common/billing/abstractions/billing-api.service.abstraction";
 import { EventCollectionService, EventType } from "@bitwarden/common/dirt/event-logs";
-import { FeatureFlag } from "@bitwarden/common/enums/feature-flag.enum";
 import { BroadcasterService } from "@bitwarden/common/platform/abstractions/broadcaster.service";
-import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { MessagingService } from "@bitwarden/common/platform/abstractions/messaging.service";
@@ -100,7 +99,6 @@ import {
   AttachmentsV2Component,
   BULK_DELETE_DIALOG,
   BulkDeleteDialogResult,
-  BulkMoveDialogResult,
   CANT_COPY_ITEM_KEY,
   CipherFormConfig,
   CollectionAssignmentResult,
@@ -115,7 +113,6 @@ import {
   newTemplateDefinitionField,
   NewItemResult,
   templateFieldsFromItem,
-  openBulkMoveDialog,
   OrganizationFilter,
   PasswordRepromptService,
   RoutedVaultFilterBridgeService,
@@ -133,8 +130,10 @@ import {
   VaultItemDialogParams,
   VaultItemDialogResult,
   VaultItemsTransferService,
+  openDeleteSharedFolderDialog,
   VaultOrganizationUserNotificationsComponent,
   Vfo1TerminologyService,
+  VAULT_RENDERED_MARK,
 } from "@bitwarden/vault";
 import { OrganizationWarningsService } from "@bitwarden/web-vault/app/billing/organizations/warnings/services";
 
@@ -155,7 +154,6 @@ import { WebVaultPromptService } from "../services/web-vault-prompt.service";
 
 import { openBulkDeleteDialog } from "./bulk-action-dialogs/bulk-delete-dialog/bulk-delete-dialog.component";
 import { BulkDeleteDialogWebAdapter } from "./bulk-action-dialogs/bulk-delete-dialog-web.adapter";
-import { openDeleteSharedFolderDialog } from "./bulk-action-dialogs/delete-shared-folder-dialog/delete-shared-folder-dialog.component";
 import { VaultBannersComponent } from "./vault-banners/vault-banners.component";
 import { VaultHeaderComponent } from "./vault-header/vault-header.component";
 import { VaultOnboardingComponent } from "./vault-onboarding/vault-onboarding.component";
@@ -204,6 +202,7 @@ type EmptyStateMap = Record<EmptyStateType, EmptyStateItem>;
 export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestroy {
   private readonly vfo1TerminologyService = inject(Vfo1TerminologyService);
   private readonly cipherAuthorizationService = inject(CipherAuthorizationService);
+  private readonly injector = inject(Injector);
 
   readonly vaultItemsComponent = viewChild(VaultItemsComponent);
 
@@ -219,7 +218,6 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
   protected refreshing = false;
   protected processingEvent = false;
   protected filter: RoutedVaultFilterModel = {};
-  protected showBulkMove: boolean = false;
   protected canAccessPremium: boolean = false;
   protected allCollections: CollectionView[] = [];
   protected allOrganizations: Organization[] = [];
@@ -252,16 +250,6 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
   private destroyed = false;
 
   protected showAddCipherBtn: boolean = false;
-
-  protected readonly vaultBatchBarFeatureFlag = toSignal(
-    this.configService.getFeatureFlag$(FeatureFlag.PM37785_VaultBatchBar),
-    { initialValue: false },
-  );
-
-  protected readonly btnTextAddCreateFeatureFlag = toSignal(
-    this.configService.getFeatureFlag$(FeatureFlag.PM32380_BtnTextAddCreate),
-    { initialValue: false },
-  );
 
   organizations$ = this.accountService.activeAccount$
     .pipe(map((a) => a?.id))
@@ -384,7 +372,6 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
     private premiumUpgradePromptService: PremiumUpgradePromptService,
     private webVaultPromptService: WebVaultPromptService,
     private vaultBatchBarService: VaultBatchBarService<C>,
-    private configService: ConfigService,
   ) {}
 
   async ngOnInit() {
@@ -465,8 +452,9 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
         }),
       );
 
+    // The vault list is the only surface that renders PAM-gated ("partial") rows.
     const _ciphers = this.cipherService
-      .cipherListViews$(activeUserId)
+      .cipherListViewsWithPartials$(activeUserId)
       .pipe(filter((c) => c !== null));
 
     /**
@@ -669,14 +657,21 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
             (o) => o.canCreateNewCollections && !o.isProviderUser,
           );
 
-          this.showBulkMove = filter.type !== "trash";
           this.isEmpty = collections?.length === 0 && ciphers?.length === 0;
+          const initialLoad = this.performingInitialLoad;
           this.performingInitialLoad = false;
           this.refreshing = false;
 
           // Explicitly mark for check to ensure the view is updated
           // Some sources are not always emitted within the Angular zone (e.g. ciphers updated via WS server notifications)
           this.changeDetectorRef.markForCheck();
+
+          // Marks when the first vault list is painted, the end point of unlock/login perf traces
+          if (initialLoad) {
+            afterNextRender(() => this.logService.mark(VAULT_RENDERED_MARK), {
+              injector: this.injector,
+            });
+          }
         },
       );
 
@@ -686,10 +681,15 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
       .pipe(takeUntil(this.destroy$))
       .subscribe(() => this.refresh());
 
-    combineLatest([allCollections$, ciphers$.pipe(map((c) => c.length > 0))])
+    combineLatest([allCollections$, ciphers$.pipe(map((c) => c.length > 0)), filter$])
       .pipe(takeUntil(this.destroy$))
-      .subscribe(([allCollections, hasCiphers]) =>
-        this.vaultBatchBarService.setConfig({ isOrgVault: false, allCollections, hasCiphers }),
+      .subscribe(([allCollections, hasCiphers, filter]) =>
+        this.vaultBatchBarService.setConfig({
+          isOrgVault: false,
+          allCollections,
+          hasCiphers,
+          inTrash: filter.type === "trash",
+        }),
       );
   }
 
@@ -728,9 +728,6 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
           break;
         case "delete":
           await this.handleDeleteEvent(event.items);
-          break;
-        case "moveToFolder":
-          await this.bulkMove(event.items);
           break;
         case "copyField":
           await this.copy(event.item, event.field);
@@ -1741,30 +1738,6 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
 
     const result = await lastValueFrom(dialog.closed);
     if (result === BulkDeleteDialogResult.Deleted) {
-      this.refresh();
-    }
-  }
-
-  async bulkMove(ciphers: C[]) {
-    if (!(await this.repromptCipher(ciphers))) {
-      return;
-    }
-
-    const selectedCipherIds = ciphers.map((cipher) => uuidAsString(cipher.id));
-    if (selectedCipherIds.length === 0) {
-      this.toastService.showToast({
-        variant: "error",
-        message: this.i18nService.t("nothingSelected"),
-      });
-      return;
-    }
-
-    const dialog = openBulkMoveDialog(this.dialogService, {
-      data: { cipherIds: selectedCipherIds },
-    });
-
-    const result = await lastValueFrom(dialog.closed);
-    if (result === BulkMoveDialogResult.Moved) {
       this.refresh();
     }
   }

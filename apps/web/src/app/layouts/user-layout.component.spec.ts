@@ -8,17 +8,18 @@ import { of } from "rxjs";
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { mockAccountServiceWith } from "@bitwarden/common/spec";
 import { UserId } from "@bitwarden/common/types/guid";
 import { NavigationModule, PopoverModule, SideNavService, SvgModule } from "@bitwarden/components";
 import { SendPolicyService } from "@bitwarden/send-ui";
+import { CoachmarkComponent, CoachmarkService } from "@bitwarden/vault";
 import { PremiumSubscriptionRoutingService } from "@bitwarden/web-vault/app/billing/individual/services/premium-subscription-routing.service";
 
 import { KeykeeperMspApiService } from "../keykeeper/msp/msp-api.service";
 import { KEYKEEPER_MENU_BUTTON } from "../keykeeper/vault-menu/menu-button";
-import { CoachmarkComponent, CoachmarkService } from "../vault/components/coachmark";
 
 import { UserLayoutComponent } from "./user-layout.component";
 
@@ -61,6 +62,7 @@ describe("UserLayoutComponent", () => {
     open,
     isOverlay: computed(() => open() && !pushMode()),
     toggle: jest.fn(),
+    version: signal("default"),
   };
   let mspList: jest.Mock;
 
@@ -86,6 +88,8 @@ describe("UserLayoutComponent", () => {
           { path: "sends", component: PageComponent },
         ]),
         { provide: I18nService, useValue: { t: (key: string) => key } },
+        // Upstream's new vault look (VFO1) stays off, as on our server.
+        { provide: ConfigService, useValue: { getFeatureFlag$: () => of(false) } },
         { provide: SyncService, useValue: { fullSync: jest.fn() } },
         { provide: AccountService, useValue: mockAccountServiceWith("user-1" as UserId) },
         { provide: PolicyService, useValue: policyService },

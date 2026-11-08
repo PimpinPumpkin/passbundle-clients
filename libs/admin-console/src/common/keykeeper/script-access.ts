@@ -1,3 +1,5 @@
+// eslint-disable-next-line no-restricted-imports
+import { EncryptService, EncString, SymmetricCryptoKey } from "@bitwarden/legacy-crypto";
 // Keykeeper: script access (docs/script-access.md in the meta repo). A
 // token's seed is made here, in the admin's browser; from it come the auth
 // secret the script sends and the token key that encrypts its copies, which
@@ -9,10 +11,6 @@
 // can't pair a token's key with an item it was never granted; and both say
 // when the token ends, so a server can't have apps refresh a copy after
 // that). The unit tests check both (copies sit next to them).
-
-import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
-import { EncString } from "@bitwarden/common/key-management/crypto/models/enc-string";
-import { SymmetricCryptoKey } from "@bitwarden/common/platform/models/domain/symmetric-crypto-key";
 
 const encoder = new TextEncoder();
 const copy = (bytes: Uint8Array) => new Uint8Array(bytes) as Uint8Array<ArrayBuffer>;

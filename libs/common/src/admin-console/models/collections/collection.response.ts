@@ -36,6 +36,8 @@ export class CollectionDetailsResponse extends CollectionResponse {
   hidePasswords: boolean;
   /** Keykeeper: the person's own capabilities in the folder, from our server. */
   keykeeper?: FolderGrid;
+  /** True when an enabled PAM access rule gates the collection's items. Derived by the server. */
+  hasEnabledAccessRule: boolean;
 
   /**
    * Flag indicating the user has been explicitly assigned to this Collection
@@ -48,6 +50,7 @@ export class CollectionDetailsResponse extends CollectionResponse {
     this.manage = this.getResponseProperty("Manage") || false;
     this.hidePasswords = this.getResponseProperty("HidePasswords") || false;
     this.keykeeper = this.getResponseProperty("Keykeeper") ?? undefined;
+    this.hasEnabledAccessRule = this.getResponseProperty("HasEnabledAccessRule") || false;
 
     // Temporary until the API is updated to return this property in AC-2084
     // For now, we can assume that if the object is 'collectionDetails' then the user is assigned

@@ -285,10 +285,14 @@ describe("keepHiddenSecrets", () => {
     expect(edited.fields.find((f) => f.name === "API key")!.value).toBe("k-123");
   });
 
-  it("gives the item's own key, wrapped, so an edit sends it back", () => {
+  // The item's own key is decrypted in the view now (web-v2026.10.1), so the
+  // output never has it; upstream's edit keeps the key the item has.
+  it("never prints the item's own key", () => {
     const item = login(false);
-    item.key = { encryptedString: "2.item-key" } as any;
-    expect(new CipherResponse(item).key).toBe("2.item-key");
+    item.key = { toBase64: () => "decrypted-item-key" } as any;
+    const json = JSON.stringify(new CipherResponse(item));
+    expect(new CipherResponse(item).key).toBeUndefined();
+    expect(json).not.toContain("decrypted-item-key");
   });
 
   it("refuses an SSH key that isn't one, without throwing", () => {

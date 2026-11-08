@@ -50,7 +50,6 @@ import { IdentityKeykeeperTwoStepSetupResponse } from "../auth/models/response/i
 import { IdentitySsoRequiredResponse } from "../auth/models/response/identity-sso-required.response";
 import { IdentityTokenResponse } from "../auth/models/response/identity-token.response";
 import { IdentityTwoFactorResponse } from "../auth/models/response/identity-two-factor.response";
-import { KeyConnectorUserKeyResponse } from "../auth/models/response/key-connector-user-key.response";
 import { SsoPreValidateResponse } from "../auth/models/response/sso-pre-validate.response";
 import { BitPayInvoiceRequest } from "../billing/models/request/bit-pay-invoice.request";
 import { BillingHistoryResponse } from "../billing/models/response/billing-history.response";
@@ -76,19 +75,14 @@ import { SyncResponse } from "../platform/sync";
 import { UserId } from "../types/guid";
 import { AttachmentRequest } from "../vault/models/request/attachment.request";
 import { CipherBulkDeleteRequest } from "../vault/models/request/cipher-bulk-delete.request";
-import { CipherBulkMoveRequest } from "../vault/models/request/cipher-bulk-move.request";
 import { CipherBulkRestoreRequest } from "../vault/models/request/cipher-bulk-restore.request";
-import { CipherBulkShareRequest } from "../vault/models/request/cipher-bulk-share.request";
-import { CipherCollectionsRequest } from "../vault/models/request/cipher-collections.request";
 import { CipherCreateRequest } from "../vault/models/request/cipher-create.request";
 import { CipherPartialRequest } from "../vault/models/request/cipher-partial.request";
-import { CipherShareRequest } from "../vault/models/request/cipher-share.request";
 import { CipherRequest } from "../vault/models/request/cipher.request";
 import { AttachmentUploadDataResponse } from "../vault/models/response/attachment-upload-data.response";
 import { AttachmentResponse } from "../vault/models/response/attachment.response";
-import { CipherMiniResponse, CipherResponse } from "../vault/models/response/cipher.response";
+import { CipherResponse } from "../vault/models/response/cipher.response";
 import { DeleteAttachmentResponse } from "../vault/models/response/delete-attachment.response";
-import { OptionalCipherResponse } from "../vault/models/response/optional-cipher.response";
 
 /**
  * @deprecated The `ApiService` class is deprecated and calls should be extracted into individual
@@ -161,7 +155,6 @@ export abstract class ApiService {
     id: string,
     request: SecretVerificationRequest,
   ): Promise<ApiKeyResponse>;
-  abstract postConvertToKeyConnector(): Promise<void>;
   //passwordless
   abstract getAuthRequest(id: string): Promise<AuthRequestResponse>;
   abstract putAuthRequest(
@@ -199,17 +192,6 @@ export abstract class ApiService {
   abstract deleteCipherAdmin(id: string): Promise<any>;
   abstract deleteManyCiphers(request: CipherBulkDeleteRequest): Promise<any>;
   abstract deleteManyCiphersAdmin(request: CipherBulkDeleteRequest): Promise<any>;
-  abstract putMoveCiphers(request: CipherBulkMoveRequest): Promise<any>;
-  abstract putShareCipher(id: string, request: CipherShareRequest): Promise<CipherResponse>;
-  abstract putShareCiphers(request: CipherBulkShareRequest): Promise<ListResponse<CipherResponse>>;
-  abstract putCipherCollections(
-    id: string,
-    request: CipherCollectionsRequest,
-  ): Promise<OptionalCipherResponse>;
-  abstract putCipherCollectionsAdmin(
-    id: string,
-    request: CipherCollectionsRequest,
-  ): Promise<CipherMiniResponse>;
   abstract postPurgeCiphers(
     request: SecretVerificationRequest,
     organizationId?: string,
@@ -267,6 +249,9 @@ export abstract class ApiService {
     id: string,
   ): Promise<CollectionAccessDetailsResponse>;
   abstract getManyCollectionsWithAccessDetails(
+    orgId: string,
+  ): Promise<ListResponse<CollectionAccessDetailsResponse>>;
+  abstract getManyCollectionsWithOrganizationDetails(
     orgId: string,
   ): Promise<ListResponse<CollectionAccessDetailsResponse>>;
   abstract postCollection(
@@ -433,8 +418,9 @@ export abstract class ApiService {
    * Posts events for a user
    * @param request The array of events to upload
    * @param userId The optional user id the events belong to. If no user id is provided the active user id is used.
+   * @returns The list of events that failed to upload, or an empty array if all events were uploaded successfully.
    */
-  abstract postEventsCollect(request: EventRequest[], userId?: UserId): Promise<any>;
+  abstract postEventsCollect(request: EventRequest[], userId?: UserId): Promise<EventRequest[]>;
 
   abstract deleteSsoUser(organizationId: string): Promise<void>;
   abstract getSsoUserIdentifier(): Promise<string>;
@@ -485,9 +471,6 @@ export abstract class ApiService {
     request: OrganizationSponsorshipRedeemRequest,
   ): Promise<void>;
 
-  abstract getMasterKeyFromKeyConnector(
-    keyConnectorUrl: string,
-  ): Promise<KeyConnectorUserKeyResponse>;
   abstract postUserKeyToKeyConnector(
     keyConnectorUrl: string,
     request: KeyConnectorUserKeyRequest,

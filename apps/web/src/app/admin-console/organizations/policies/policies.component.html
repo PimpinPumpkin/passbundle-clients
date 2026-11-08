@@ -1,9 +1,19 @@
-<app-header></app-header>
+<app-header>
+  @if (showBreadcrumbs()) {
+    <bit-breadcrumbs slot="breadcrumbs">
+      <bit-breadcrumb [route]="['/organizations', orgId(), 'settings']" icon="bwi-cog">{{
+        "settings" | i18n
+      }}</bit-breadcrumb>
+      <bit-breadcrumb [route]="[]" queryParamsHandling="preserve">{{
+        "policies" | i18n
+      }}</bit-breadcrumb>
+    </bit-breadcrumbs>
+  }
+</app-header>
 
 @let policySections = policySections$ | async;
 @let policiesEnabledMap = policiesEnabledMap$ | async;
 @let organization = organization$ | async;
-@let drawerEnabled = useDrawer();
 @let keykeeperMspInfo = keykeeperMsp();
 
 <bit-container>
@@ -31,12 +41,12 @@
             <!-- Keykeeper: one the MSP requires for every client can't be edited here -->
             @let required = keykeeperRequiredBy(keykeeperMspInfo, p.type);
             <bit-item>
+              @let nk = nameKeys(p);
+              @let dk = descriptionKeys(p);
               @if (required) {
                 <bit-item-content data-testid="keykeeper-required-policy">
-                  {{ (drawerEnabled && p.v2?.name ? p.v2.name : p.name) | i18n }}
-                  <span slot="secondary">{{
-                    (drawerEnabled && p.v2?.description ? p.v2.description : p.description) | i18n
-                  }}</span>
+                  {{ nk[0] | vfo1I18n: nk[1] }}
+                  <span slot="secondary">{{ dk[0] | vfo1I18n: dk[1] }}</span>
                   <span
                     bitBadge
                     variant="primary"
@@ -58,10 +68,8 @@
                 </bit-item-content>
               } @else {
                 <button type="button" bit-item-content (click)="edit(p, organization)">
-                  {{ (drawerEnabled && p.v2?.name ? p.v2.name : p.name) | i18n }}
-                  <span slot="secondary">{{
-                    (drawerEnabled && p.v2?.description ? p.v2.description : p.description) | i18n
-                  }}</span>
+                  {{ nk[0] | vfo1I18n: nk[1] }}
+                  <span slot="secondary">{{ dk[0] | vfo1I18n: dk[1] }}</span>
                   @if (policiesEnabledMap.get(p.type)) {
                     <span bitBadge variant="success" slot="end">{{ "on" | i18n }}</span>
                   } @else {

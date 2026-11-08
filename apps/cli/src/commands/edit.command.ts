@@ -10,7 +10,6 @@ import { PolicyType } from "@bitwarden/common/admin-console/enums";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions";
-import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
 import { CipherExport } from "@bitwarden/common/models/export/cipher.export";
 import { CollectionExport } from "@bitwarden/common/models/export/collection.export";
 import { FolderExport } from "@bitwarden/common/models/export/folder.export";
@@ -23,6 +22,8 @@ import { FieldType } from "@bitwarden/common/vault/enums";
 import { Folder } from "@bitwarden/common/vault/models/domain/folder";
 import { CipherAuthorizationService } from "@bitwarden/common/vault/services/cipher-authorization.service";
 import { KeyService } from "@bitwarden/key-management";
+// eslint-disable-next-line no-restricted-imports
+import { EncryptService } from "@bitwarden/legacy-crypto";
 
 import { OrganizationCollectionRequest } from "../admin-console/models/request/organization-collection.request";
 import { OrganizationCollectionResponse } from "../admin-console/models/response/organization-collection.response";
@@ -277,18 +278,36 @@ export class EditCommand {
     req: OrganizationCollectionRequest,
     options: Options,
   ) {
-    if (options.organizationId == null || options.organizationId === "") {
-      return Response.badRequest("`organizationid` option is required.");
-    }
     if (!Utils.isGuid(id)) {
       return Response.badRequest("`" + id + "` is not a GUID.");
     }
-    if (!Utils.isGuid(options.organizationId)) {
-      return Response.badRequest("`" + options.organizationId + "` is not a GUID.");
+    // The organization id can come from either the `organizationid` option (e.g. a CLI flag, or a
+    // query string parameter when using `bw serve`) or the request body's `organizationId` property.
+    // If both are provided, they must agree; otherwise whichever one was provided is used.
+    const organizationId = Utils.isNullOrWhitespace(options.organizationId)
+      ? req?.organizationId
+      : options.organizationId;
+    if (Utils.isNullOrWhitespace(organizationId)) {
+      return Response.badRequest(
+        "An organization id is required, either via the `--organizationid` option " +
+          "(or `organizationId` query parameter when using `bw serve`), " +
+          "or the request's `organizationId` property.",
+      );
     }
-    if (options.organizationId !== req.organizationId) {
-      return Response.badRequest("`organizationid` option does not match request object.");
+    if (!Utils.isGuid(organizationId)) {
+      return Response.badRequest("`" + organizationId + "` is not a GUID.");
     }
+    if (
+      !Utils.isNullOrWhitespace(options.organizationId) &&
+      !Utils.isNullOrWhitespace(req.organizationId) &&
+      options.organizationId !== req.organizationId
+    ) {
+      return Response.badRequest(
+        "The `--organizationid` option (or `organizationId` query parameter) does not match " +
+          "the request's `organizationId` property.",
+      );
+    }
+    req.organizationId = organizationId as OrganizationId;
     if (req.name == null || req.name.trim() === "") {
       return Response.badRequest("Collection name is required.");
     }
@@ -297,7 +316,7 @@ export class EditCommand {
         this.accountService.activeAccount$.pipe(
           getUserId,
           switchMap((userId) => this.keyService.orgKeys$(userId)),
-          map((orgKeys) => orgKeys[options.organizationId as OrganizationId] ?? null),
+          map((orgKeys) => orgKeys[organizationId as OrganizationId] ?? null),
         ),
       );
       if (orgKey == null) {
@@ -308,7 +327,7 @@ export class EditCommand {
       const users = req.users == null ? null : req.users.map((u) => selectionRequest(u));
       const request = new UpdateCollectionRequest({
         name: await this.encryptService.encryptString(req.name, orgKey),
-        externalId: req.externalId,
+        externalId: req.externalId ?? undefined,
         users,
         groups,
       });

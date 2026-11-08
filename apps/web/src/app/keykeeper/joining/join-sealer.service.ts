@@ -11,13 +11,17 @@ import {
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
-import { CryptoFunctionService } from "@bitwarden/common/key-management/crypto/abstractions/crypto-function.service";
-import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
-import { EncString } from "@bitwarden/common/key-management/crypto/models/enc-string";
 import { StateProvider } from "@bitwarden/common/platform/state";
 import { OrganizationId, UserId } from "@bitwarden/common/types/guid";
 import { OrgKey } from "@bitwarden/common/types/key";
 import { KeyService } from "@bitwarden/key-management";
+// eslint-disable-next-line no-restricted-imports
+import {
+  CryptoFunctionService,
+  EncryptService,
+  EncString,
+  LegacyCompatKeyService,
+} from "@bitwarden/legacy-crypto";
 
 export type { ReportedJoining };
 
@@ -43,6 +47,7 @@ export class KeykeeperJoinSealer {
     private readonly cryptoFunctionService: CryptoFunctionService,
     private readonly apiService: ApiService,
     private readonly stateProvider: StateProvider,
+    private readonly legacyCompatKeyService: LegacyCompatKeyService,
   ) {}
 
   /** The newest joining seal this device has seen for each organization. */
@@ -251,7 +256,7 @@ export class KeykeeperJoinSealer {
       return {
         secret,
         fingerprint: await this.seals.fingerprint(publicKey),
-        phrase: await this.keyService.getFingerprint(organizationId, publicKey),
+        phrase: await this.legacyCompatKeyService.getFingerprint(organizationId, publicKey),
       };
     } catch {
       return null;

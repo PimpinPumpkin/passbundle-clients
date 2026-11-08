@@ -14,11 +14,12 @@ import {
   CollectionData,
 } from "@bitwarden/common/admin-console/models/collections";
 import { SelectionReadOnlyRequest } from "@bitwarden/common/admin-console/models/request/selection-read-only.request";
-import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
 import { CollectionId, OrganizationId, UserId } from "@bitwarden/common/types/guid";
 import { OrgKey } from "@bitwarden/common/types/key";
 import { encryptFolderLook, FolderLook } from "@bitwarden/common/vault/keykeeper/folder-looks";
 import { KeyService } from "@bitwarden/key-management";
+// eslint-disable-next-line no-restricted-imports
+import { EncryptService } from "@bitwarden/legacy-crypto";
 
 import { CollectionAdminService, CollectionService } from "../abstractions";
 import {

@@ -19,14 +19,18 @@ import { AccountService } from "@bitwarden/common/auth/abstractions/account.serv
 import { AuthService } from "@bitwarden/common/auth/abstractions/auth.service";
 import { AuthenticationStatus } from "@bitwarden/common/auth/enums/authentication-status";
 import { getOptionalUserId } from "@bitwarden/common/auth/services/account.service";
-import { CryptoFunctionService } from "@bitwarden/common/key-management/crypto/abstractions/crypto-function.service";
-import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
 import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { UserId } from "@bitwarden/common/types/guid";
 import { KeyService } from "@bitwarden/key-management";
+// eslint-disable-next-line no-restricted-imports
+import {
+  CryptoFunctionService,
+  EncryptService,
+  LegacyCompatKeyService,
+} from "@bitwarden/legacy-crypto";
 
 import { BrowserApi } from "../platform/browser/browser-api";
 import BrowserPopupUtils from "../platform/browser/browser-popup-utils";
@@ -245,6 +249,7 @@ export class KeykeeperEnrollment {
     private readonly authService: AuthService,
     private readonly apiService: ApiService,
     private readonly keyService: KeyService,
+    private readonly legacyCompatKeyService: LegacyCompatKeyService,
     private readonly encryptService: EncryptService,
     private readonly syncService: SyncService,
     private readonly environmentService: EnvironmentService,
@@ -384,7 +389,7 @@ export class KeykeeperEnrollment {
           organizationName: info.organizationName,
           accountRecovery: info.accountRecovery,
           fingerprint: info.publicKey
-            ? await this.keyService.getFingerprint(
+            ? await this.legacyCompatKeyService.getFingerprint(
                 info.organizationId,
                 Utils.fromB64ToArray(info.publicKey),
               )

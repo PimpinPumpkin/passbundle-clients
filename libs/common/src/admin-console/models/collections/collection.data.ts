@@ -17,6 +17,8 @@ export class CollectionData {
   type: CollectionType = CollectionTypes.SharedCollection;
   /** Keykeeper: the person's own capabilities in the folder. */
   keykeeper?: FolderGrid;
+  /** True when an enabled PAM access rule gates the collection's items. Derived by the server. */
+  hasEnabledAccessRule: boolean = false;
   /** Keykeeper: the folder's icon and color, encrypted (DESIGN.md, "Folder icons"). */
   keykeeperLook?: string;
 
@@ -33,6 +35,7 @@ export class CollectionData {
     if (response.keykeeper != null) {
       this.keykeeper = response.keykeeper;
     }
+    this.hasEnabledAccessRule = response.hasEnabledAccessRule;
     if (response.keykeeperLook) {
       this.keykeeperLook = response.keykeeperLook;
     }

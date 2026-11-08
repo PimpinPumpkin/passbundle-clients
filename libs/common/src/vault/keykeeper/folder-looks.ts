@@ -12,9 +12,8 @@
 // app/lib/folder_looks.dart) know the same names. A name an app doesn't know
 // (a newer icon, say) still shows: the folder glyph, or the gray tone.
 
-import { EncryptService } from "../../key-management/crypto/abstractions/encrypt.service";
-import { EncString } from "../../key-management/crypto/models/enc-string";
-import { SymmetricCryptoKey } from "../../platform/models/domain/symmetric-crypto-key";
+// eslint-disable-next-line no-restricted-imports
+import { EncryptService, EncString, SymmetricCryptoKey } from "@bitwarden/legacy-crypto";
 
 import type { KeykeeperCategoryLook } from "./categories";
 import { KEYKEEPER_GLYPHS } from "./glyphs";

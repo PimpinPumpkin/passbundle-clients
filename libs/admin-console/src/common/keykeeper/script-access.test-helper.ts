@@ -2,6 +2,7 @@
 // Node, standing in for the EncryptService (which needs the SDK). The meta
 // repo checks the same vectors with upstream's own crypto
 // (check-script-vectors.mjs, run in tier 1).
+
 import {
   createCipheriv,
   createDecipheriv,
@@ -10,9 +11,8 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 
-import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
-import { EncString } from "@bitwarden/common/key-management/crypto/models/enc-string";
-import { SymmetricCryptoKey } from "@bitwarden/common/platform/models/domain/symmetric-crypto-key";
+// eslint-disable-next-line no-restricted-imports
+import { EncryptService, EncString, SymmetricCryptoKey } from "@bitwarden/legacy-crypto";
 
 export const nodeEncrypt = {
   async encryptString(plaintext: string, key: SymmetricCryptoKey) {

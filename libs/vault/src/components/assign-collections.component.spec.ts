@@ -1,12 +1,13 @@
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
 import { MockProxy, mock } from "jest-mock-extended";
-import { BehaviorSubject, of } from "rxjs";
+import { BehaviorSubject, firstValueFrom, of } from "rxjs";
 
 // This import has been flagged as unallowed for this class. It may be involved in a circular dependency loop.
 // eslint-disable-next-line no-restricted-imports
 import { CollectionService } from "@bitwarden/admin-console/common";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
+import { OrganizationUserStatusType } from "@bitwarden/common/admin-console/enums";
 import { GRID_NONE } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import {
   CollectionView,
@@ -15,7 +16,6 @@ import {
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { ProductTierType } from "@bitwarden/common/billing/enums";
-import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { FakeAccountService, mockAccountServiceWith } from "@bitwarden/common/spec";
 import { CollectionId, OrganizationId, UserId } from "@bitwarden/common/types/guid";
@@ -124,9 +124,6 @@ describe("AssignCollectionsComponent", () => {
   let toastService: MockProxy<ToastService>;
 
   async function setup(vfo1Enabled = false) {
-    const configService = mock<ConfigService>();
-    configService.getFeatureFlag$.mockReturnValue(of(vfo1Enabled));
-
     toastService = mock<ToastService>();
 
     await TestBed.configureTestingModule({
@@ -140,10 +137,6 @@ describe("AssignCollectionsComponent", () => {
         { provide: ToastService, useValue: toastService },
         { provide: AccountService, useValue: accountService },
         { provide: I18nService, useValue: { t: (...keys: string[]) => keys.join(" ") } },
-        {
-          provide: ConfigService,
-          useValue: configService,
-        },
         {
           provide: Vfo1TerminologyService,
           useValue: { iconClass: (icon: string) => icon, enabled: () => vfo1Enabled },
@@ -276,6 +269,63 @@ describe("AssignCollectionsComponent", () => {
     });
   });
 
+  describe("orgIconTiles", () => {
+    // Must satisfy the enabled/Confirmed filter `organizations$` applies before mapping tiles.
+    const tieredOrg = (id: string, productTierType: ProductTierType) =>
+      ({
+        id,
+        name: id,
+        productTierType,
+        enabled: true,
+        status: OrganizationUserStatusType.Confirmed,
+      }) as Organization;
+
+    // The org list is read on every subscription, so restore the suite-wide default rather than
+    // leaving a tier-specific list in place for later tests.
+    afterEach(() => {
+      organizations$.mockReturnValue(of([org]));
+    });
+
+    it("colors each org's tile by its product tier", async () => {
+      organizations$.mockReturnValue(
+        of([
+          tieredOrg("family-org", ProductTierType.Families),
+          tieredOrg("business-org", ProductTierType.Enterprise),
+        ]),
+      );
+      TestBed.resetTestingModule();
+      await setup(true);
+
+      await firstValueFrom(component["organizations$"]);
+
+      expect(component["orgIconTiles"].get("family-org")).toEqual({
+        icon: "bwi-family",
+        variant: "teal",
+        emphasis: "bold",
+      });
+      expect(component["orgIconTiles"].get("business-org")).toEqual({
+        icon: "bwi-business",
+        variant: "purple",
+        emphasis: "bold",
+      });
+    });
+
+    // bit-select maps its options in an afterRenderEffect that re-runs on a changed reference, so a
+    // fresh tile object per read would re-trigger that effect indefinitely.
+    it("returns a stable tile reference across reads", async () => {
+      organizations$.mockReturnValue(of([tieredOrg("org-id", ProductTierType.Enterprise)]));
+      TestBed.resetTestingModule();
+      await setup(true);
+
+      await firstValueFrom(component["organizations$"]);
+
+      const tile = component["orgIconTiles"].get(org.id);
+
+      expect(tile).toEqual({ icon: "bwi-business", variant: "purple", emphasis: "bold" });
+      expect(component["orgIconTiles"].get(org.id)).toBe(tile);
+    });
+  });
+
   describe("transferWarningSegments", () => {
     it("splits the plural sentence around the org name so it can be italicized", () => {
       expect(component["transferWarningSegments"]("Acme", 3)).toEqual({
@@ -376,9 +426,7 @@ describe("AssignCollectionsComponent", () => {
       },
     );
 
-    it("moveToOrganization falls back to the organization label when no org name is resolved", async () => {
-      component["orgName"] = undefined;
-
+    it("moveToOrganization shows collection-count toast (1 cipher, 0 collections)", async () => {
       await component["moveToOrganization"](
         "org-id" as OrganizationId,
         [{ id: "c1" } as CipherView],
@@ -387,7 +435,7 @@ describe("AssignCollectionsComponent", () => {
       );
 
       expect(toastService.showToast).toHaveBeenCalledWith(
-        expect.objectContaining({ message: "itemMovedToOrg organization" }),
+        expect.objectContaining({ message: "itemMovedToCollections" }),
       );
     });
   });
@@ -447,9 +495,7 @@ describe("AssignCollectionsComponent", () => {
       },
     );
 
-    it("moveToOrganization falls back to the vault label when no org name is resolved", async () => {
-      component["orgName"] = undefined;
-
+    it("moveToOrganization shows collection-count toast (1 cipher, 0 collections)", async () => {
       await component["moveToOrganization"](
         "org-id" as OrganizationId,
         [{ id: "c1" } as CipherView],
@@ -458,7 +504,7 @@ describe("AssignCollectionsComponent", () => {
       );
 
       expect(toastService.showToast).toHaveBeenCalledWith(
-        expect.objectContaining({ message: "itemMovedToOrg vault" }),
+        expect.objectContaining({ message: "itemAddedToSharedFolders" }),
       );
     });
   });

@@ -213,8 +213,11 @@
     "continueWithLogIn": {
       "message": "Continue signing in"
     },
-    "couldNotDecryptVaultItemsBelow": {
-      "message": "The items listed below could not be decrypted."
+    "couldNotDecryptVaultItems": {
+      "message": "The items listed below could not be decrypted. Contact support with the item IDs below to see if they can be recovered."
+    },
+    "couldNotDecryptVaultItem": {
+      "message": "The item listed below could not be decrypted. Contact support with the item ID below to see if it can be recovered."
     },
     "createFoldersToOrganize": {
       "message": "Create folders to organize your items"
@@ -579,9 +582,6 @@
     "nestCollectionUnder": {
       "message": "Nest shared folder under"
     },
-    "newCollection": {
-      "message": "New shared folder"
-    },
     "newDeviceLoginProtection": {
       "message": "New device sign-in"
     },
@@ -645,11 +645,11 @@
     "orgsReportsDescV2": {
       "message": "Identify and close security gaps in your organization by clicking the reports below."
     },
-    "passkeyLoginFoundReportDesc": {
-      "message": "We found $COUNT$ login(s) that support passkeys. To further secure these accounts, consider setting up a passkey where available. Sourced from passkeys.2fa.directory"
+    "passkeyLoginFoundInfoSuffixSingular": {
+      "message": " that support passkeys. To further secure these accounts, consider setting up a passkey where available. Sourced from passkeys.2fa.directory"
     },
-    "passkeyLoginFoundReportDescPlural": {
-      "message": "We found $COUNT$ login(s) that support passkeys. To further secure these accounts, consider setting up a passkey where available. Sourced from passkeys.2fa.directory"
+    "passkeyLoginFoundInfoSuffixPlural": {
+      "message": " that support passkeys. To further secure these accounts, consider setting up a passkey where available. Sourced from passkeys.2fa.directory"
     },
     "passkeyLoginReportDesc": {
       "message": "Passkeys are a secure, phishing-resistant alternative to passwords. See which of your accounts support passkeys for a simpler, passwordless sign-in experience. Learn"
@@ -680,9 +680,6 @@
     },
     "premiumSubscriptionEndedDesc": {
       "message": "To regain access to your archive, restart your Premium subscription. If you edit details for an archived item before restarting, it'll be moved back out of the archive."
-    },
-    "promptUsersToMoveItems": {
-      "message": "Prompt users to move their personal items to the organization"
     },
     "promptUsersToMoveItemsV2": {
       "message": "Prompt users to move their personal items to the organization"
@@ -795,9 +792,6 @@
     "selectCollectionsToAssign": {
       "message": "Select shared folders to add to"
     },
-    "selectImportCollection": {
-      "message": "Select a shared folder"
-    },
     "sessionTimeout": {
       "message": "Your session has timed out. Please go back and try signing in again."
     },
@@ -812,9 +806,6 @@
     },
     "sharedUnlockUnavailableUntrustedDevice": {
       "message": "Shared unlock is not available because you chose not to remember this device. To enable this setting, try signing in again."
-    },
-    "sharedUnlockWithWeb": {
-      "message": "Share unlock with the web vault"
     },
     "showAfterEveryLogin": {
       "message": "Show after every sign-in"
@@ -1004,6 +995,12 @@
     },
     "yourVaultIsEmpty": {
       "message": "You don't have any items yet"
+    },
+    "importDataLoginTitle": {
+      "message": "Sign in to $VENDOR$"
+    },
+    "onePasswordEmailHint": {
+      "message": "Enter the email you use to sign in to 1Password"
     }
   },
   "web": {
@@ -1046,14 +1043,8 @@
     "weakPasswordsFoundReportDesc": {
       "message": "We found $COUNT$ items with passwords that are not strong. You should update them to use stronger passwords."
     },
-    "requireSsoPolicyDesc": {
-      "message": "Require members to sign in with the organization's single sign-on (Microsoft Entra ID). Owners and your IT provider's staff can still use their passwords."
-    },
     "requireSsoPolicyDescV2": {
       "message": "Require members to sign in with single sign-on. Owners and your IT provider's staff can still use their passwords, so nobody is locked out."
-    },
-    "requireSsoPolicyReq": {
-      "message": "Turn on single sign-on (Settings, Single sign-on) and the Single organization policy before turning this on."
     },
     "requireSsoPolicyReqV2": {
       "message": "Turn on single sign-on and the Single organization policy first."
@@ -1064,8 +1055,14 @@
     "firstSsoLogin": {
       "message": "$ID$ linked their Microsoft account and signed in with single sign-on for the first time."
     },
+    "promptUsersToMoveItemsV2": {
+      "message": "Prompt users to move their personal items to the organization"
+    },
     "loginPageEmailEntryScreenTitle": {
       "message": "Sign in to {brand}"
+    },
+    "requireSsoPolicyDescListV2Vfo1": {
+      "message": "Require members to sign in with single sign-on."
     }
   },
   "browser": {
@@ -1083,9 +1080,6 @@
     },
     "premiumManageAlert": {
       "message": "You can manage your membership in the web vault. Do you want to visit the website now?"
-    },
-    "sharedUnlockWithWebDescription": {
-      "message": "When enabled, unlock state will be shared with the web vault."
     },
     "vault": {
       "message": "Items"

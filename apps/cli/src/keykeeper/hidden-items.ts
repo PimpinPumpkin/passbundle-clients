@@ -43,8 +43,9 @@ export function itemWithoutSecrets(item: CipherView): CipherView {
   shown.deletedDate = item.deletedDate;
   shown.archivedDate = item.archivedDate;
   shown.attachments = item.attachments;
-  // The item's own key, wrapped, as upstream's output has it: an edit sends it
-  // back, and saving without it would drop it.
+  // The item's own key, as on the item. It's decrypted in the view, so the
+  // output leaves it out (CipherResponse), as upstream's does, and an edit
+  // keeps the key the item has.
   shown.key = item.key;
   shown.passwordHistory = [];
   shown.fields = (item.fields ?? []).map((field) => {

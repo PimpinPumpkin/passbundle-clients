@@ -272,7 +272,7 @@ describe("Keykeeper fill picker menu", () => {
               ["fill_by_opid", "__3", "C-12345"],
             ],
             // Upstream's warnings: before an http page, and for a frame the item isn't for.
-            savedUrls: ["https://bank.example.test/login"],
+            requiresInsecurePageConfirmation: false,
             untrustedIframe: false,
           }),
         }),
@@ -385,6 +385,21 @@ describe("Keykeeper fill picker menu", () => {
 
       expect(filled()).toBe(false);
       expect(readFillRules(cipher)).toEqual([]);
+    });
+
+    it("asks first before filling an http page of a site the item has as https, as upstream does", async () => {
+      frameUrl = "http://bank.example.test/login";
+
+      await click("u");
+
+      expect(tabSendMessage).toHaveBeenCalledWith(
+        tab,
+        expect.objectContaining({
+          command: "fillForm",
+          fillScript: expect.objectContaining({ requiresInsecurePageConfirmation: true }),
+        }),
+        { frameId: 0 },
+      );
     });
 
     it("fills a frame on another part of the same site", async () => {

@@ -1,8 +1,7 @@
 import { mock } from "jest-mock-extended";
 
-import { EncryptService } from "../../key-management/crypto/abstractions/encrypt.service";
-import { EncString } from "../../key-management/crypto/models/enc-string";
-import { SymmetricCryptoKey } from "../../platform/models/domain/symmetric-crypto-key";
+// eslint-disable-next-line no-restricted-imports
+import { EncryptService, EncString, SymmetricCryptoKey } from "@bitwarden/legacy-crypto";
 
 import { KEYKEEPER_CATEGORY_LOOKS } from "./categories";
 import { flatTileFailures } from "./flat-tile-contrast.spec-util";

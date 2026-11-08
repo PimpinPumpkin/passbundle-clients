@@ -62,10 +62,11 @@ import {
   VaultFilterSection,
   KeykeeperCategoryTileComponent,
   Vfo1TerminologyService,
+  CoachmarkComponent,
+  CoachmarkService,
 } from "@bitwarden/vault";
 
 import { openCollectionDialog } from "../../admin-console/organizations/shared/components/collection-dialog";
-import { CoachmarkComponent, CoachmarkService } from "../../vault/components/coachmark";
 import { OrganizationOptionsComponent } from "../../vault/individual-vault/vault-filter/components/organization-options.component";
 import { VaultFilterComponent } from "../../vault/individual-vault/vault-filter/components/vault-filter.component";
 import { OptionsInput } from "../../vault/individual-vault/vault-filter/shared/components/vault-filter-section.component";

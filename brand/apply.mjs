@@ -845,11 +845,6 @@ function brandCli() {
       /"https:\/\/send\.bitwarden\.com\/#"/,
       JSON.stringify(u.send),
     ],
-    [
-      "apps/cli/src/vault/create.command.ts",
-      /https:\/\/help\.bitwarden\.com\/article\/update-encryption-key\//,
-      u.help,
-    ],
   ];
   for (const [rel, pattern, replacement] of examples) {
     replaceAnchored(rel, pattern, replacement);

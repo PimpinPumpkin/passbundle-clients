@@ -222,7 +222,7 @@ describe("VaultItemCopyActionsComponent", () => {
   });
 
   describe("findSingleCopyableItem", () => {
-    it("returns the single item with value and translates its key", () => {
+    it("returns the single item with value", () => {
       const items = [
         { key: "copyUsername", field: "username" as const },
         { key: "copyPassword", field: "password" as const },
@@ -236,10 +236,9 @@ describe("VaultItemCopyActionsComponent", () => {
       const result = component.findSingleCopyableItem(component.cipher(), items);
 
       expect(result).toEqual({
-        key: "translated-copyUsername",
+        key: "copyUsername",
         field: "username",
       });
-      expect(i18nService.t).toHaveBeenCalledWith("copyUsername");
     });
 
     it("returns null when no items have a value", () => {
@@ -288,10 +287,9 @@ describe("VaultItemCopyActionsComponent", () => {
       const result = component.singleCopyableLogin;
 
       expect(result).toEqual({
-        key: "translated-username",
+        key: "copyUsername",
         field: "username",
       });
-      expect(i18nService.t).toHaveBeenCalledWith("username");
     });
 
     it("Keykeeper: offers only the username when the password is hidden, since one-time codes are hidden too", () => {
@@ -305,7 +303,7 @@ describe("VaultItemCopyActionsComponent", () => {
 
       const result = component.singleCopyableLogin;
 
-      expect(result).toEqual({ key: "translated-username", field: "username" });
+      expect(result).toEqual({ key: "copyUsername", field: "username" });
     });
 
     it("returns null when password is hidden and password is the only populated login field", () => {
@@ -331,7 +329,7 @@ describe("VaultItemCopyActionsComponent", () => {
       expect(findSingleCopyableItemSpy).toHaveBeenCalled();
     });
 
-    it("returns a field-name-only key so copyFieldCipherName does not produce 'Copy copy'", () => {
+    it("returns a full copy-action translation key rather than a bare field name", () => {
       (component.cipher() as CipherView).viewPassword = true;
 
       (component.cipher() as any).__copyable = {
@@ -342,10 +340,9 @@ describe("VaultItemCopyActionsComponent", () => {
 
       const result = component.singleCopyableLogin;
 
-      // The key should be the translated field name (e.g. "username"), NOT "Copy username",
-      // because the template wraps it in copyFieldCipherName = "Copy $FIELD$, $CIPHERNAME$".
-      expect(result?.key).toBe("translated-username");
-      expect(result?.key).not.toContain("copy");
+      // The key must be the existing full-phrase key ("Copy username"), not a lowercased
+      // noun fragment composed into a sentence at render time — fragments localize poorly.
+      expect(result?.key).toBe("copyUsername");
     });
   });
 
@@ -359,10 +356,9 @@ describe("VaultItemCopyActionsComponent", () => {
       const result = component.singleCopyableCard;
 
       expect(result).toEqual({
-        key: "translated-securityCode",
+        key: "copySecurityCode",
         field: "securityCode",
       });
-      expect(i18nService.t).toHaveBeenCalledWith("securityCode");
     });
 
     it("returns null when both card number and security code are available", () => {
@@ -389,10 +385,9 @@ describe("VaultItemCopyActionsComponent", () => {
       const result = component.singleCopyableIdentity;
 
       expect(result).toEqual({
-        key: "translated-email",
+        key: "copyEmail",
         field: "email",
       });
-      expect(i18nService.t).toHaveBeenCalledWith("email");
     });
 
     it("returns null when multiple identity fields are available", () => {
@@ -421,10 +416,9 @@ describe("VaultItemCopyActionsComponent", () => {
       const result = component.singleCopyableBankAccount;
 
       expect(result).toEqual({
-        key: "translated-accountNumber",
+        key: "copyAccountNumber",
         field: "accountNumber",
       });
-      expect(i18nService.t).toHaveBeenCalledWith("accountNumber");
     });
 
     it("returns null when multiple bank account fields are available", () => {
@@ -476,10 +470,9 @@ describe("VaultItemCopyActionsComponent", () => {
       const result = component.singleCopyableDriversLicense;
 
       expect(result).toEqual({
-        key: "translated-licenseNumber",
+        key: "copyLicenseNumber",
         field: "licenseNumber",
       });
-      expect(i18nService.t).toHaveBeenCalledWith("licenseNumber");
     });
 
     it("returns null when multiple drivers license fields are available", () => {
@@ -855,7 +848,7 @@ describe("VaultItemCopyActionsComponent", () => {
       const result = component.singleCopyablePassport;
 
       expect(result).toEqual({
-        key: "translated-passportNumber",
+        key: "copyPassportNumber",
         field: "passportNumber",
       });
     });
@@ -927,7 +920,7 @@ describe("VaultItemCopyActionsComponent", () => {
         swiftCode: true,
       };
       expect(component.singleCopyableBankAccount).toEqual({
-        key: "translated-nameOnAccount",
+        key: "copyNameOnAccount",
         field: "nameOnAccount",
       });
 

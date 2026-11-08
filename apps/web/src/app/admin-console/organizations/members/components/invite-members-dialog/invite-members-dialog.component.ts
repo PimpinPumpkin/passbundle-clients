@@ -66,9 +66,14 @@ import {
   getEmailBatchLimit,
   inputEmailLimitValidator,
   isDynamicSeatPlan,
+  isSeatConstrainedEmailBatch,
 } from "../member-dialog/validators/input-email-limit.validator";
+import { parseCommaSeparatedEmails } from "../member-dialog/validators/parse-comma-separated-emails";
 import { revokedEmailsValidator } from "../member-dialog/validators/revoked-emails.validator";
 
+// TODO(guided-tour removal): delete this import along with the rest of the guided tour. See the
+// header comment in by-link-tab-tour.component.ts for the full removal checklist.
+import { ByLinkTabTourComponent } from "./by-link-tab-tour.component";
 import { ByLinkTabComponent } from "./by-link-tab.component";
 
 export interface InviteMembersDialogParams {
@@ -76,6 +81,9 @@ export interface InviteMembersDialogParams {
   isOnSecretsManagerStandalone: boolean;
   occupiedSeatCount: number;
   allOrganizationUsers: OrganizationUserView[];
+  // TODO(guided-tour removal): delete this field along with the rest of the guided tour. See the
+  // header comment in by-link-tab-tour.component.ts for the full removal checklist.
+  showCoachMarks?: boolean;
 }
 
 @Component({
@@ -90,6 +98,9 @@ export interface InviteMembersDialogParams {
     AsyncPipe,
     ButtonModule,
     ByLinkTabComponent,
+    // TODO(guided-tour removal): remove this entry along with the rest of the guided tour. See
+    // the header comment in by-link-tab-tour.component.ts for the full removal checklist.
+    ByLinkTabTourComponent,
     CheckboxModule,
     DialogModule,
     DisclosureComponent,
@@ -124,7 +135,10 @@ export class InviteMembersDialogComponent {
   protected readonly organizationUserType = OrganizationUserType;
   protected readonly PermissionMode = PermissionMode;
   protected readonly isOnSecretsManagerStandalone = this.params.isOnSecretsManagerStandalone;
-  protected readonly selectedTabIndex = signal(0);
+  // TODO(guided-tour removal): change back to `signal(0)`, dropping the `showCoachMarks`
+  // ternary. See the header comment in by-link-tab-tour.component.ts for the full removal
+  // checklist.
+  protected readonly selectedTabIndex = signal(this.params.showCoachMarks ? 1 : 0);
   protected readonly moreSettingsOpen = signal(false);
 
   protected byLinkTabDirty(): boolean {
@@ -142,6 +156,12 @@ export class InviteMembersDialogComponent {
   readonly deactivateLink = async () => {
     await this.byLinkTab()?.deactivateLink();
   };
+
+  // TODO(guided-tour removal): delete this method along with the rest of the guided tour. See
+  // the header comment in by-link-tab-tour.component.ts for the full removal checklist.
+  protected finishTour(): void {
+    this.close(MemberDialogResult.Canceled);
+  }
 
   protected readonly formGroup = this.formBuilder.group({
     emails: [""],
@@ -243,24 +263,49 @@ export class InviteMembersDialogComponent {
   private readonly formTypeValue = toSignal(this.formGroup.controls.type.valueChanges, {
     initialValue: this.formGroup.value.type ?? OrganizationUserType.User,
   });
+  /**
+   * Keykeeper: whether a permission our server enforces for custom roles is
+   * checked. Those roles can't also manage all collections yet (the server
+   * refuses it), so the dialog doesn't offer both.
+   */
+  protected get keykeeperPermissionChecked(): boolean {
+    const p = this.permissionsGroup.value;
+    return !!(
+      p.manageUsers ||
+      p.manageResetPassword ||
+      p.managePolicies ||
+      p.accessEventLogs ||
+      p.accessImportExport
+    );
+  }
+
   protected readonly customUserTypeSelected = computed(
     () => this.formTypeValue() === OrganizationUserType.Custom,
   );
 
   constructor() {
     this.organization$.pipe(takeUntilDestroyed()).subscribe((organization) => {
-      const emailBatchLimit = getEmailBatchLimit(organization, this.params.occupiedSeatCount);
-      this.setFormValidators(emailBatchLimit);
+      this.setFormValidators(organization);
     });
   }
 
-  private setFormValidators(emailBatchLimit: number) {
+  private setFormValidators(organization: Organization) {
+    const batchLimit = getEmailBatchLimit(organization, this.params.occupiedSeatCount);
+    const seatConstrained = isSeatConstrainedEmailBatch(
+      organization,
+      this.params.occupiedSeatCount,
+    );
+
     const emailsControlValidators = [
       Validators.required,
       commaSeparatedEmails,
       inputEmailLimitValidator(
-        emailBatchLimit,
-        (maxEmailsCount: number) => this.i18nService.t("tooManyEmails", maxEmailsCount),
+        batchLimit,
+        (maxEmailsCount: number) =>
+          this.i18nService.t(
+            seatConstrained ? "tooManyEmailsForRemainingSeats" : "tooManyEmails",
+            maxEmailsCount,
+          ),
         this.params.allOrganizationUsers.map((u) => u.email),
       ),
       revokedEmailsValidator(
@@ -278,7 +323,11 @@ export class InviteMembersDialogComponent {
     if (clearPermissions) {
       return new PermissionsApi();
     }
-    const { manageAllCollectionsGroup, ...permissionFields } = this.permissionsGroup.value;
+    const { manageAllCollectionsGroup: chosen, ...permissionFields } = this.permissionsGroup.value;
+    // Keykeeper: never ask for both (see keykeeperPermissionChecked).
+    const manageAllCollectionsGroup = this.keykeeperPermissionChecked
+      ? { createNewCollections: false, editAnyCollection: false, deleteAnyCollection: false }
+      : chosen;
     return Object.assign(new PermissionsApi(), {
       ...permissionFields,
       createNewCollections: manageAllCollectionsGroup?.createNewCollections,
@@ -288,7 +337,7 @@ export class InviteMembersDialogComponent {
   }
 
   private async handleInviteUsers(organizationId: OrganizationId) {
-    const emails = [...new Set((this.formGroup.value.emails ?? "").trim().split(/\s*,\s*/))];
+    const emails = [...new Set(parseCommaSeparatedEmails(this.formGroup.value.emails))];
     const type = this.formGroup.value.type ?? OrganizationUserType.User;
     const groups = (this.formGroup.value.groups ?? []).map((m) => m.id);
     const accessSecretsManager = this.formGroup.value.accessSecretsManager ?? false;
