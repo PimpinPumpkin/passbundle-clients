@@ -764,7 +764,12 @@ export class KeykeeperPasswordChange {
     }
     run.phase = "handover";
     run.watchUntil = this.now() + HANDOVER_MS;
-    return this.note(run, answer.restInvalid ? "handoverForm" : fill.handover);
+    // Handed over on purpose (a CAPTCHA, a code, a button it isn't sure of), or
+    // meant to press and something else in the form must be filled first.
+    if (!fill.submit) {
+      return this.note(run, fill.handover);
+    }
+    return this.note(run, answer.restInvalid ? "handoverForm" : "handoverButton");
   }
 
   /** Looks at the page after the press (or while the person finishes) for the result. */
