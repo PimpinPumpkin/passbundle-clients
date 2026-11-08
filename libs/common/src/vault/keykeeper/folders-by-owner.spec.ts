@@ -85,6 +85,17 @@ describe("ownerPlaces", () => {
     expect(places[0].key).toBe("personal");
   });
 
+  it("carries a shared folder's own icon and color, and nothing for the plain ones", () => {
+    const bank = { icon: "bank", tone: "emerald" };
+    const places = ownerPlaces({
+      ...input,
+      collections: input.collections.map((c) => (c.id === "c-admins" ? { ...c, look: bank } : c)),
+    });
+    expect(places.find((p) => p.key === "shared:c-admins")?.look).toEqual(bank);
+    expect(places.find((p) => p.key === "shared:c-everyone")).not.toHaveProperty("look");
+    expect(places.filter((p) => p.look).map((p) => p.key)).toEqual(["shared:c-admins"]);
+  });
+
   it("shows an organization even when the person reaches none of its shared folders", () => {
     const places = ownerPlaces({ ...input, collections: [] });
     expect(places.filter((p) => p.kind === "organization").map((p) => p.label)).toEqual([

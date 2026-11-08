@@ -4,6 +4,8 @@
 // The web vault's menu shows them so; the extension's folder filter and its
 // item editor's Folder picker use this for the same order and nesting.
 
+import type { FolderLook } from "./folder-looks";
+
 /** Folders nest by name: "Work/Clients" is Clients inside Work. */
 export const FOLDER_NESTING = "/";
 
@@ -23,6 +25,8 @@ export type OwnerPlace = {
   folderId?: string | null;
   /** A shared folder's id. */
   collectionId?: string;
+  /** A shared folder's own icon and color, if it has one (DESIGN.md, "Folder icons"). */
+  look?: FolderLook;
 };
 
 export type OwnerPlacesInput = {
@@ -31,8 +35,8 @@ export type OwnerPlacesInput = {
   /** The person's own folders, without upstream's "no folder" entry. */
   folders: { id: string; name: string }[];
   organizations: { id: string; name: string }[];
-  /** Shared folders, each in its organization. */
-  collections: { id: string; name: string; organizationId: string }[];
+  /** Shared folders, each in its organization, with their icon and color if they have one. */
+  collections: { id: string; name: string; organizationId: string; look?: FolderLook }[];
   /** Sorts names as the apps do (I18nService's collator). */
   compare?: (a: string, b: string) => number;
 };
@@ -126,6 +130,7 @@ export function ownerPlaces(input: OwnerPlacesInput): OwnerPlace[] {
         depth,
         organizationId: org.id,
         collectionId: item.id,
+        ...(item.look ? { look: item.look } : {}),
       });
     }
   }

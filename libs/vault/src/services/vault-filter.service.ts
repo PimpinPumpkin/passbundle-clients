@@ -346,6 +346,8 @@ export class VaultFilterService implements VaultFilterServiceAbstraction {
         collectionCopy.icon = this.vfo1TerminologyService.iconClass(
           c.type === CollectionTypes.DefaultUserCollection ? "bwi-user" : "bwi-collection-shared",
         );
+        // Keykeeper: the folder's icon and color, for the menu (DESIGN.md, "Folder icons").
+        collectionCopy.keykeeperLook = c.keykeeperLook;
         const parts = c.name ? c.name.replace(/^\/+|\/+$/g, "").split(NestingDelimiter) : [];
         ServiceUtils.nestedTraverse(nodes, 0, parts, collectionCopy, undefined, NestingDelimiter);
       }

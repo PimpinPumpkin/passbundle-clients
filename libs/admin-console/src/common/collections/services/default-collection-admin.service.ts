@@ -17,6 +17,7 @@ import { SelectionReadOnlyRequest } from "@bitwarden/common/admin-console/models
 import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
 import { CollectionId, OrganizationId, UserId } from "@bitwarden/common/types/guid";
 import { OrgKey } from "@bitwarden/common/types/key";
+import { encryptFolderLook, FolderLook } from "@bitwarden/common/vault/keykeeper/folder-looks";
 import { KeyService } from "@bitwarden/key-management";
 
 import { CollectionAdminService, CollectionService } from "../abstractions";
@@ -126,6 +127,51 @@ export class DefaultCollectionAdminService implements CollectionAdminService {
     );
   }
 
+  async setLook(
+    organizationId: OrganizationId,
+    collectionId: CollectionId,
+    look: FolderLook | null,
+    userId: UserId,
+  ): Promise<void> {
+    const key = await this.orgKey(organizationId, userId);
+    const response = await this.apiService.send(
+      "PUT",
+      `/keykeeper/organizations/${organizationId}/collections/${collectionId}/look`,
+      { look: await encryptFolderLook(look, key, this.encryptService) },
+      true,
+      true,
+    );
+    // The person's own copy of the folder, if they have one, shows it at once.
+    const own = await firstValueFrom(this.collectionService.encryptedCollections$(userId));
+    if (own?.some((c) => c.id === collectionId)) {
+      await this.collectionService.upsert(
+        new CollectionData(new CollectionDetailsResponse(response)),
+        userId,
+      );
+    }
+  }
+
+  /** An organization's key, for the person. */
+  private async orgKey(organizationId: string, userId: UserId): Promise<OrgKey> {
+    return await firstValueFrom(
+      this.keyService.orgKeys$(userId).pipe(
+        map((orgKeys) => {
+          if (!orgKeys) {
+            throw new Error("No keys for the provided userId.");
+          }
+
+          const key = orgKeys[organizationId as OrganizationId];
+
+          if (key == null) {
+            throw new Error("No key for this collection's organization.");
+          }
+
+          return key;
+        }),
+      ),
+    );
+  }
+
   private async decryptMany(
     organizationId: string,
     collections: CollectionResponse[] | CollectionAccessDetailsResponse[],
@@ -160,23 +206,7 @@ export class DefaultCollectionAdminService implements CollectionAdminService {
       throw new Error("Collection has no organization id.");
     }
 
-    const key = await firstValueFrom(
-      this.keyService.orgKeys$(userId).pipe(
-        map((orgKeys) => {
-          if (!orgKeys) {
-            throw new Error("No keys for the provided userId.");
-          }
-
-          const key = orgKeys[model.organizationId];
-
-          if (key == null) {
-            throw new Error("No key for this collection's organization.");
-          }
-
-          return key;
-        }),
-      ),
-    );
+    const key = await this.orgKey(model.organizationId, userId);
 
     const groups = model.groups.map(
       (group) =>

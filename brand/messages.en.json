@@ -1056,5 +1056,26 @@
   },
   "keykeeperOpenAndFillHint": {
     "message": "Open and fill doesn't need this setting: the open button beside a login opens its website in a new tab and fills it there, once, and only on that site. It never submits the form."
+  },
+  "keykeeperFolderLook": {
+    "message": "Icon and color"
+  },
+  "keykeeperFolderLookPreview": {
+    "message": "How it shows in the menu"
+  },
+  "keykeeperFolderLookUnnamed": {
+    "message": "This shared folder"
+  },
+  "keykeeperFolderLookIcon": {
+    "message": "Icon"
+  },
+  "keykeeperFolderLookColor": {
+    "message": "Color"
+  },
+  "keykeeperFolderLookPlain": {
+    "message": "Plain folder"
+  },
+  "keykeeperFolderLookHint": {
+    "message": "Everyone who has this folder sees its icon. It's encrypted, like the folder's name."
   }
 }
