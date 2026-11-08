@@ -80,7 +80,7 @@
               bitLink
               linkType="primary"
               class="tw-text-sm tw-mt-2"
-              [bitAction]="sendEmail"
+              (click)="sendEmail()"
             >
               {{ "keykeeperNewDeviceSendAnother" | i18n }}
             </button>
@@ -148,13 +148,7 @@
       }
 
       <div class="tw-text-center tw-mt-4">
-        <button
-          type="button"
-          bitLink
-          linkType="secondary"
-          class="tw-text-sm"
-          [bitAction]="startOver"
-        >
+        <button type="button" bitLink linkType="secondary" class="tw-text-sm" (click)="startOver()">
           {{ "keykeeperNewDeviceStartOver" | i18n }}
         </button>
       </div>
