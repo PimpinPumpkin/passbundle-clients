@@ -66,7 +66,9 @@ type PendingLink = {
       @case ("pending") {
         @if (pending(); as p) {
           <div data-testid="sso-link-confirm">
-            <p bitTypography="body1">Link this Microsoft account to your PassBundle account?</p>
+            <p bitTypography="body1">
+              Link this Microsoft account to your {{ "keykeeperProductName" | i18n }} account?
+            </p>
             <dl class="tw-mb-4 tw-grid tw-grid-cols-[auto_1fr] tw-gap-x-4 tw-gap-y-1">
               <dt class="tw-font-semibold">Microsoft account</dt>
               <dd data-testid="sso-link-microsoft">
@@ -76,14 +78,14 @@ type PendingLink = {
                     : p.microsoftEmail
                 }}
               </dd>
-              <dt class="tw-font-semibold">PassBundle account</dt>
+              <dt class="tw-font-semibold">{{ "keykeeperProductName" | i18n }} account</dt>
               <dd data-testid="sso-link-account">{{ p.accountEmail }}</dd>
               <dt class="tw-font-semibold">Organization</dt>
               <dd>{{ p.organizationName }}</dd>
             </dl>
             <p bitTypography="body2">
-              Only link a Microsoft account that's yours: it will sign in to this PassBundle
-              account. You'll get an email about it.
+              Only link a Microsoft account that's yours: it will sign in to this
+              {{ "keykeeperProductName" | i18n }} account. You'll get an email about it.
             </p>
             <div class="tw-flex tw-gap-2">
               <button
@@ -106,7 +108,7 @@ type PendingLink = {
         <div data-testid="sso-link-problem">
           <p bitTypography="body1">{{ problem() }}</p>
           <button bitButton buttonType="secondary" type="button" (click)="leave()">
-            {{ linking() ? "Back to sign in" : "Back to your vault" }}
+            {{ linking() ? "Back to sign in" : "Back to your items" }}
           </button>
         </div>
       }

@@ -51,7 +51,7 @@ export type ReportedField = {
       <section class="tw-px-1 tw-py-2" data-testid="site-problem">
         @if (sent()) {
           <bit-callout type="success" [title]="null">
-            Sent. Thank you: reports like this tell us which sites need work.
+            Sent. Thank you: reports like this show which sites need work.
           </bit-callout>
         } @else if (host(); as site) {
           <p bitTypography="body2">

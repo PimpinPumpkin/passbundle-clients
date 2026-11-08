@@ -40,13 +40,14 @@ import { KeykeeperMspApiService } from "../msp/msp-api.service";
           <p bitTypography="body1">
             Let people here sign in with their Microsoft 365 work account (Microsoft Entra ID).
             Microsoft confirms who they are; their master password still unlocks their items, so
-            nobody, PassBundle included, can open them without it.
+            nobody, {{ "keykeeperProductName" | i18n }} included, can open them without it.
           </p>
           <p bitTypography="body2" data-testid="sso-how-people-link">
             People you invite who don't have an account yet just sign in with Microsoft and choose a
             master password. People who already have an account link it themselves: they open this
             organization's menu in their vault, choose Link SSO, confirm their master password, pick
-            their Microsoft account, and confirm the link. With single sign-on required, PassBundle
+            their Microsoft account, and confirm the link. With single sign-on required,
+            {{ "keykeeperProductName" | i18n }}
             asks them to when they next sign in with their password. After that, Microsoft signs
             them in. Each link is emailed to the account.
           </p>
@@ -262,8 +263,9 @@ import { KeykeeperMspApiService } from "../msp/msp-api.service";
                 These members aren't linked yet, so they'd be asked to link if you require it.
               }
               Their open sessions end at their next refresh. When they next sign in with their email
-              and master password (and two-step login, if they use it), PassBundle asks them to link
-              their Microsoft account before anything else; then Microsoft signs them in.
+              and master password (and two-step login, if they use it),
+              {{ "keykeeperProductName" | i18n }} asks them to link their Microsoft account before
+              anything else; then Microsoft signs them in.
             </p>
             <ul class="tw-list-none tw-p-0" data-testid="sso-unlinked">
               @for (u of v.unlinked; track u.userId) {
@@ -289,8 +291,8 @@ import { KeykeeperMspApiService } from "../msp/msp-api.service";
               registration.
             </li>
             <li>
-              Name it PassBundle. For Supported account types, choose accounts in this
-              organizational directory only (single tenant).
+              Name it {{ "keykeeperProductName" | i18n }}. For Supported account types, choose
+              accounts in this organizational directory only (single tenant).
             </li>
             <li>
               For Redirect URI, choose Web and paste the redirect URI from this page. Register.

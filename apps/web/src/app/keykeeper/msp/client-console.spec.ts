@@ -74,7 +74,7 @@ describe("clientConsoleWay", () => {
 
   it("says why, and what to do", () => {
     expect(noConsoleHelp(client(true))).toBe(
-      "Your role in Acme Dental doesn't include its admin console. Its items are in your vault.",
+      "Your role in Acme Dental doesn't include its admin console. Its items are under Acme Dental in the menu.",
     );
     expect(noConsoleHelp(client(false))).toBe(
       "Your role in Acme Dental doesn't include its admin console or its items. An MSP admin can change your access.",
