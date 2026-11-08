@@ -15,8 +15,13 @@ import { OrganizationService } from "@bitwarden/common/admin-console/abstraction
 import { itemLike } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
+import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
+import {
+  isUnreachable,
+  plainErrorMessage,
+} from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { CipherId, UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { HIDDEN_VALUE_MASK, maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
@@ -393,8 +398,12 @@ export class KeykeeperItemHistoryPageComponent implements OnInit {
       this.logService.error(e);
       this.toastService.showToast({
         variant: "error",
-        // The server refuses a restore over an edit made since (a stale copy).
-        message: this.i18nService.t("keykeeperRestoreFailed"),
+        // The server's reason, in plain words: it refuses a restore over an
+        // edit made since (a stale copy), say.
+        message:
+          e instanceof ErrorResponse || isUnreachable(e)
+            ? plainErrorMessage(e)
+            : this.i18nService.t("keykeeperRestoreFailed"),
       });
       return;
     }
@@ -427,7 +436,8 @@ export class KeykeeperItemHistoryPageComponent implements OnInit {
       this.logService.error(e);
       this.toastService.showToast({
         variant: "error",
-        message: this.i18nService.t("errorOccurred"),
+        // The server's reason, such as who may clear an item's history.
+        message: plainErrorMessage(e),
       });
       return;
     }
@@ -463,7 +473,8 @@ export class KeykeeperItemHistoryPageComponent implements OnInit {
       this.logService.error(e);
       this.toastService.showToast({
         variant: "error",
-        message: this.i18nService.t("errorOccurred"),
+        // The server's reason, such as who may clear an item's history.
+        message: plainErrorMessage(e),
       });
     }
     await this.load(item);

@@ -10,7 +10,7 @@ import {
 import { FormBuilder } from "@angular/forms";
 
 import { MspJoining } from "@bitwarden/admin-console/common";
-import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { ToastService } from "@bitwarden/components";
 
 import { SharedModule } from "../../shared";
@@ -136,7 +136,7 @@ export class KeykeeperMspJoiningComponent {
       this.toastService.showToast({ variant: "success", message: "Saved the joining default" });
       this.changed.emit();
     } catch (e) {
-      const message = e instanceof ErrorResponse ? e.getSingleMessage() : String(e);
+      const message = plainErrorMessage(e);
       this.toastService.showToast({ variant: "error", message });
     }
   };

@@ -9,8 +9,11 @@ import {
 } from "@angular/core";
 import { firstValueFrom } from "rxjs";
 
+import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
+import { PolicyType } from "@bitwarden/common/admin-console/enums";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import {
   AsyncActionsModule,
@@ -29,6 +32,7 @@ import {
   detectBrowser,
   detectComputer,
   guideFor,
+  isEmptyPasswordExport,
   PreparedImport,
   prepareImport,
 } from "./browser-import";
@@ -39,7 +43,8 @@ import {
  * browser and computer, imports the file with upstream's importer for that
  * browser into their own vault, leaves out what's already there, sets aside
  * logins whose password differs, and then says to delete the export. See
- * browser-import.ts and DESIGN.md, "Browser import".
+ * browser-import.ts and DESIGN.md, "Browser import". Where an organization's
+ * policy keeps items out of Personal, it says so first, and what to do.
  */
 @Component({
   selector: "tools-keykeeper-browser-import",
@@ -47,7 +52,13 @@ import {
   imports: [AsyncActionsModule, ButtonModule, CalloutModule, TypographyModule],
   template: `
     <section class="tw-max-w-2xl" data-testid="browser-import">
-      @if (summary(); as s) {
+      @if (personalBlocked()) {
+        <bit-callout type="info" data-testid="browser-import-blocked">
+          Your organization keeps everyone's items in its shared folders, so this can't import into
+          Personal. Ask an admin for a shared folder you can add to, then import into it with Import
+          and export in the web vault.
+        </bit-callout>
+      } @else if (summary(); as s) {
         <h2 bitTypography="h4">Imported from {{ guide().name }}</h2>
         <p bitTypography="body1" data-testid="browser-import-summary">{{ summaryText(s) }}</p>
         <bit-callout type="warning" title="Delete the export now">
@@ -162,18 +173,27 @@ export class KeykeeperBrowserImportComponent implements OnInit {
   protected readonly file = signal<File | null>(null);
   protected readonly error = signal<string | null>(null);
   protected readonly summary = signal<PreparedImport | null>(null);
+  /** An organization's policy keeps items out of Personal, where this imports. */
+  protected readonly personalBlocked = signal(false);
 
   constructor(
     private readonly importService: ImportServiceAbstraction,
     private readonly cipherService: CipherService,
     private readonly accountService: AccountService,
+    private readonly policyService: PolicyService,
   ) {}
 
-  ngOnInit() {
+  async ngOnInit() {
     const start = this.startWith();
     if (start != null && this.browsers().includes(start)) {
       this.browser.set(start);
     }
+    const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
+    this.personalBlocked.set(
+      await firstValueFrom(
+        this.policyService.policyAppliesToUser$(PolicyType.OrganizationDataOwnership, userId),
+      ),
+    );
   }
 
   protected nameOf(id: BrowserId): string {
@@ -224,10 +244,13 @@ export class KeykeeperBrowserImportComponent implements OnInit {
     }
     const guide = this.guide();
     const importer = this.importService.getImporter(guide.format, () => Promise.resolve(""), null);
-    const parsed = await importer.parse(await file.text()).catch((): ImportResult | null => null);
+    const text = await file.text();
+    const parsed = await importer.parse(text).catch((): ImportResult | null => null);
     if (parsed == null || !parsed.success || parsed.ciphers.length === 0) {
       this.error.set(
-        `That file doesn't look like a ${guide.name} export. Export again with the steps above, or choose your browser above if it's a different one.`,
+        isEmptyPasswordExport(text)
+          ? `That export has no passwords in it. If ${guide.name} has saved passwords, export again with the steps above; if it has none, there's nothing to bring over.`
+          : `That file doesn't look like a ${guide.name} export. Export again with the steps above, or choose your browser above if it's a different one.`,
       );
       return;
     }
@@ -238,7 +261,13 @@ export class KeykeeperBrowserImportComponent implements OnInit {
       this.checkFolder(),
     );
     if (prepared.result.ciphers.length > 0) {
-      await this.importService.importImportResult(prepared.result);
+      try {
+        await this.importService.importImportResult(prepared.result);
+      } catch (e) {
+        // The server's reason (an organization's policy, say), in plain words.
+        this.error.set(plainErrorMessage(e));
+        return;
+      }
     }
     this.summary.set(prepared);
   };
