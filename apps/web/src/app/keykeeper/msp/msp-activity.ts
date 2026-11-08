@@ -51,6 +51,10 @@ export function describeEvent(
       return detail === "off"
         ? `${actor} stopped requiring two-step login of ${org}'s admins`
         : `${actor} required two-step login of ${org}'s admins`;
+    case "client_everyone_two_step_set":
+      return detail === "off"
+        ? `${actor} stopped requiring two-step login of everyone in ${org}`
+        : `${actor} required two-step login of everyone in ${org}`;
     case "template_added":
       return `${actor} added ${theTemplate} for ${clients || "clients"}`;
     case "template_changed":

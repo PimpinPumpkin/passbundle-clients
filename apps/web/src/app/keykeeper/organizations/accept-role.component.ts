@@ -8,12 +8,12 @@ import { KeykeeperMspApiService } from "../msp/msp-api.service";
 /**
  * Keykeeper: on the vault page, each role an organization gave this person
  * on a server that sends no email, which joined them without asking, where
- * the organization requires two-step login for it. Two-step login for admins
- * doesn't count the role until they accept it here; accepting without a
- * method that counts signs them out, to set one up as they sign in again. A
- * role they held before the organization required it is revoked until they
- * accept it, and accepting restores it. Nothing shows otherwise. See
- * DESIGN.md, "Two-step login for admins".
+ * the organization requires two-step login for it (of its admins, or of
+ * everyone). Two-step login for admins doesn't count the role until they
+ * accept it here; accepting without a method that counts signs them out, to
+ * set one up as they sign in again. A role they held before the organization
+ * required it is revoked until they accept it, and accepting restores it.
+ * Nothing shows otherwise. See DESIGN.md, "Two-step login for admins".
  */
 @Component({
   selector: "app-keykeeper-accept-role",
@@ -68,6 +68,10 @@ export class KeykeeperAcceptRoleComponent implements OnInit {
         return "an owner";
       case "admin":
         return "an admin";
+      // Keykeeper: where the organization requires it of everyone (DESIGN.md,
+      // "Two-step login for everyone").
+      case "member":
+        return "a member";
       default:
         return "a custom role";
     }

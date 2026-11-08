@@ -93,6 +93,18 @@ describe("two-step login settings with the person's proof", () => {
     );
   });
 
+  it("requires it of everyone in an organization, beside the admins", async () => {
+    const { apiService, api } = setUp();
+    await api.setOrgAdminTwoStep(ORG, true, { masterPasswordHash: "server-hash" }, true);
+    expect(apiService.send).toHaveBeenCalledWith(
+      "PUT",
+      `/keykeeper/organizations/${ORG}/admin-two-step`,
+      { required: true, everyone: true, masterPasswordHash: "server-hash" },
+      true,
+      true,
+    );
+  });
+
   it("turns the MSP's staff requirement on or off with a code", async () => {
     const { apiService, api } = setUp();
     await api.setMspStaffTwoStep(ORG, true, { otp: "123456" });

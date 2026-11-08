@@ -342,6 +342,13 @@ export type MspSiteFixes = {
 export type TwoStepNeeded = { organizationId: string; name: string };
 
 /**
+ * Whether to show the nudge to set up two-step login: the person has none at
+ * all and no rule requires it of them. See DESIGN.md, "A nudge for everyone
+ * else".
+ */
+export type TwoStepNudge = { show: boolean };
+
+/**
  * A role the server joined someone to without asking them (a server that
  * sends no email), which two-step login for admins doesn't count until they
  * accept it. See DESIGN.md, "Two-step login for admins".
@@ -349,7 +356,8 @@ export type TwoStepNeeded = { organizationId: string; name: string };
 export type UnacceptedRole = {
   organizationId: string;
   name: string;
-  role: "owner" | "admin" | "custom";
+  /** "member" where the organization requires it of everyone. Older servers never say so. */
+  role: "owner" | "admin" | "custom" | "member";
   /**
    * Revoked until they accept it: they held the role before the organization
    * required two-step login for it. Accepting restores them. Older servers
@@ -528,7 +536,11 @@ export type TwoStepNotSetUp = {
   userId: string;
   email: string;
   name: string | null;
-  /** "owner", "admin", or "custom" in an organization; "admin" or "technician" on an MSP's staff. */
+  /**
+   * "owner", "admin", "custom", or "member" (anyone else, where the
+   * organization requires it of everyone) in an organization; "admin" or
+   * "technician" on an MSP's staff.
+   */
   role: string | null;
   /** The membership came through the MSP. */
   fromMsp?: boolean;
@@ -539,19 +551,38 @@ export type TwoStepNotSetUp = {
 /** An organization's two-step login for admins, as its Settings page shows it. */
 export type OrgAdminTwoStep = {
   required: boolean;
+  /**
+   * Everyone else too (DESIGN.md, "Two-step login for everyone"); only with
+   * `required`. Older servers leave it out.
+   */
+  everyone?: boolean;
   /** The MSP that manages the organization, if one does. */
   msp: { id: string; name: string } | null;
   /** The MSP requires it for every client, so it can't be changed here. Older servers leave it out. */
   requiredByMsp?: boolean;
   /** Who it covers (or would) without a method that counts. */
   notSetUp: TwoStepNotSetUp[];
+  /**
+   * The organization's other members without a method that counts: who
+   * requiring it of everyone covers, or would. Older servers leave it out.
+   */
+  membersNotSetUp?: TwoStepNotSetUp[];
 };
 
 /** An MSP's two-step login: for its staff, and each client's own admins. */
 export type MspTwoStep = {
   staffRequired: boolean;
   staffNotSetUp: TwoStepNotSetUp[];
-  clients: { id: string; name: string; required: boolean; notSetUp: TwoStepNotSetUp[] }[];
+  clients: {
+    id: string;
+    name: string;
+    required: boolean;
+    /** The client requires it of everyone. Older servers leave it out. */
+    everyone?: boolean;
+    notSetUp: TwoStepNotSetUp[];
+    /** Its other members without one, where it requires it of everyone. */
+    membersNotSetUp?: TwoStepNotSetUp[];
+  }[];
 };
 
 /**

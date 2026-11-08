@@ -80,6 +80,7 @@ import {
 
 import { CurrentAccountComponent } from "../../../../auth/popup/account-switching/current-account.component";
 import { KeykeeperTwoStepNeededComponent } from "../../../../keykeeper/popup/two-step-needed.component";
+import { KeykeeperTwoStepNudgeComponent } from "../../../../keykeeper/popup/two-step-nudge.component";
 import { PopOutComponent } from "../../../../platform/popup/components/pop-out.component";
 import { PopupPageComponent } from "../../../../platform/popup/layout/popup-page.component";
 import { ImportUpgradeNavigationService } from "../../../../tools/popup/settings/import/import-upgrade-navigation.service";
@@ -128,6 +129,7 @@ const NEW_EXPERIENCE_DARK_IMG = "../../../../images/new-experience/new-experienc
   templateUrl: "vault.component.html",
   imports: [
     KeykeeperTwoStepNeededComponent,
+    KeykeeperTwoStepNudgeComponent,
     BlockedInjectionBanner,
     FillAssistActiveBannerComponent,
     PopupPageComponent,

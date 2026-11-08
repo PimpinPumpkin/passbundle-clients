@@ -205,6 +205,7 @@ describe("VaultComponent", () => {
           provide: KeykeeperMspApiService,
           useValue: {
             twoStepNeeded: () => Promise.resolve([]),
+            twoStepNudge: () => Promise.resolve(false),
             unacceptedRoles: () => Promise.resolve([]),
           },
         },

@@ -20,6 +20,7 @@ import {
   StaleScriptGrant,
   TemplateCopy,
   TwoStepNeeded,
+  TwoStepNudge,
 } from "./msp-types";
 
 /**
@@ -93,6 +94,31 @@ export class KeykeeperMspRequests {
     } catch {
       return [];
     }
+  }
+
+  /**
+   * Whether to nudge the person to set up two-step login. Never from a server
+   * that doesn't say, or one that can't be reached: the nudge never holds
+   * anything up.
+   */
+  async twoStepNudge(): Promise<boolean> {
+    try {
+      const answer: TwoStepNudge = await this.apiService.send(
+        "GET",
+        "/keykeeper/two-step-nudge",
+        null,
+        true,
+        true,
+      );
+      return answer?.show === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** "Not now": the server hides the nudge for 90 days, on every device. */
+  async dismissTwoStepNudge(): Promise<void> {
+    await this.apiService.send("POST", "/keykeeper/two-step-nudge/dismiss", null, true, true);
   }
 
   async getOrgJoining(orgId: string): Promise<OrgJoining> {
