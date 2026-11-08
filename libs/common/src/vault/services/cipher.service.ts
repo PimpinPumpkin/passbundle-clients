@@ -47,6 +47,7 @@ import {
 import { CipherFileUploadService } from "../abstractions/file-upload/cipher-file-upload.service";
 import { FieldType } from "../enums";
 import { CipherType } from "../enums/cipher-type";
+import { withCardExpirations } from "../keykeeper/expiration";
 import { keepHiddenItemWebsites } from "../keykeeper/hidden-websites";
 import { CipherData } from "../models/data/cipher.data";
 import { LocalData } from "../models/data/local.data";
@@ -194,7 +195,15 @@ export class CipherService implements CipherServiceAbstraction {
         );
       }),
       switchMap(async (ciphers) => {
-        return await this.decryptCiphersWithSdk(ciphers, userId, false);
+        const [decrypted, failures] = await this.decryptCiphersWithSdk(ciphers, userId, false);
+        // Keykeeper: a card's expiry for Expiring soon, which list views lack
+        // (keykeeper/expiration.ts).
+        const byId = new Map(ciphers.map((cipher) => [cipher.id, cipher]));
+        await withCardExpirations(decrypted, async (view) => {
+          const cipher = view.id == null ? undefined : byId.get(uuidAsString(view.id));
+          return cipher == null ? null : (await this.decrypt(cipher, userId)).card;
+        });
+        return [decrypted, failures] as const;
       }),
       tap(([decrypted, failures]) => {
         void Promise.all([this.setFailedDecryptedCiphers(failures, userId)]);

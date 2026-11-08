@@ -29,7 +29,56 @@ export const EXPIRING_SOON_DAYS = 30;
 
 type FieldLike = { name?: string | null; value?: string | null };
 type CardLike = { expMonth?: string | null; expYear?: string | null };
-export type ItemWithExpiration = { fields?: FieldLike[] | null; card?: CardLike | null };
+/**
+ * An item, as a full view (`card`) or as the SDK's list view, whose card
+ * part (`type.card`) carries the expiry the cipher service adds to it
+ * (withCardExpirations, below).
+ */
+export type ItemWithExpiration = {
+  fields?: FieldLike[] | null;
+  card?: CardLike | null;
+  type?: unknown;
+};
+
+/** The card part of a full view or of a list view. */
+function cardOf(item: ItemWithExpiration): CardLike | null {
+  if (item.card != null) {
+    return item.card;
+  }
+  const type = item.type;
+  return typeof type === "object" && type != null && "card" in type
+    ? ((type as { card: CardLike | null }).card ?? null)
+    : null;
+}
+
+/**
+ * The SDK's list views (every list since web-v2026.10.1) don't carry a card's
+ * expiry, which Expiring soon reads. For each card list view, this opens the
+ * card in full and copies its month and year (plain values, like its brand)
+ * onto the list view's card part. Cards are few, and nothing secret is copied.
+ */
+export async function withCardExpirations<
+  View extends { id?: unknown; type?: unknown; partial?: boolean },
+>(views: View[], openCard: (view: View) => Promise<CardLike | null | undefined>): Promise<View[]> {
+  for (const view of views) {
+    const type = view.type;
+    if (view.partial || typeof type !== "object" || type == null || !("card" in type)) {
+      continue;
+    }
+    const card = (type as { card: CardLike | null }).card;
+    if (card == null) {
+      continue;
+    }
+    try {
+      const full = await openCard(view);
+      card.expMonth = full?.expMonth ?? null;
+      card.expYear = full?.expYear ?? null;
+    } catch {
+      // Without its expiry, the card just doesn't count as expiring.
+    }
+  }
+  return views;
+}
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -157,7 +206,7 @@ export function itemExpiration(item: ItemWithExpiration | null | undefined): Dat
   if (!item) {
     return null;
   }
-  return parseIsoDate(storedExpiration(item)) ?? cardExpiration(item.card);
+  return parseIsoDate(storedExpiration(item)) ?? cardExpiration(cardOf(item));
 }
 
 export type ExpirationStatus = {
