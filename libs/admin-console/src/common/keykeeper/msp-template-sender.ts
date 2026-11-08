@@ -59,7 +59,7 @@ export function templateSourceProblem(
     return "That template is a copy from an MSP, so it can't be sent on.";
   }
   if (source.organizationId == null) {
-    return "That template is in your own vault. Move it to an organization your MSP's admins share to send it to clients.";
+    return "That template is in Personal. Move it to an organization your MSP's admins share to send it to clients.";
   }
   if (new Set(clientIds).has(source.organizationId)) {
     return "That template is one of your clients' own, so it can't go to the others.";

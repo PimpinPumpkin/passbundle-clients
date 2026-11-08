@@ -127,7 +127,7 @@ describe("MSP activity sentences", () => {
     ],
     [
       { event: "templates_collection_gone", actorEmail: null, targetEmail: null },
-      "Acme Dental deleted its Templates collection; the next template sent there makes a new one",
+      "Acme Dental deleted its Templates folder; the next template sent there makes a new one",
     ],
     [
       { event: "script_token_created", detail: "Join domain: 2 items" },

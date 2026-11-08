@@ -176,8 +176,9 @@ import { KeykeeperMspWorkService } from "../msp/msp-work.service";
           <ol class="tw-list-decimal tw-pl-6" data-testid="provisioning-steps">
             <li>
               In the Microsoft Entra admin center, go to Enterprise applications, then New
-              application, then Create your own application. Name it PassBundle, and choose to
-              integrate an application you don't find in the gallery.
+              application, then Create your own application. Name it
+              {{ "keykeeperProductName" | i18n }}, and choose to integrate an application you don't
+              find in the gallery.
             </li>
             <li>
               In the new application, open Provisioning and choose Automatic (or New configuration).

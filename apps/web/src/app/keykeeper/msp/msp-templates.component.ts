@@ -145,7 +145,7 @@ import { KeykeeperTemplateClientsDialogComponent } from "./template-clients-dial
                 }
               </select>
               <bit-hint
-                >Your organizations' templates, never one in your own vault or a client's.</bit-hint
+                >Your organizations' templates, never one in Personal or a client's.</bit-hint
               >
             </bit-form-field>
             <bit-radio-group formControlName="scope" [block]="true">

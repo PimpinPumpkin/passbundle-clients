@@ -186,7 +186,7 @@ describe("Keykeeper enrollment through the install command", () => {
     expect(t.notices).toEqual([
       [
         "Sign in to vault.example.test to join your organization",
-        "Your IT set up this browser for vault.example.test, but you're signed in to vault.other.test. To join your organization, sign in to vault.example.test instead.",
+        "Your IT admin set up this browser for vault.example.test, but you're signed in to vault.other.test. To join your organization, sign in to vault.example.test instead.",
       ],
     ]);
     // Not at every unlock, and still nothing sent.
@@ -210,7 +210,7 @@ describe("Keykeeper enrollment through the install command", () => {
       expect(t.notices).toEqual([
         [
           "Couldn't join your organization",
-          "Your IT's install command doesn't say which server it's for, so this browser can't join you to your organization. Ask your IT to run it again with the server's address.",
+          "Your IT admin's install command doesn't say which server it's for, so this browser can't join you to your organization. Ask your IT admin to run it again with the server's address.",
         ],
       ]);
       expect(t.apiService.send).not.toHaveBeenCalled();
@@ -327,7 +327,7 @@ describe("Keykeeper enrollment through the install command", () => {
     expect(t.asked).toEqual([]);
     expect(t.paths()).not.toContain("/keykeeper/enrollment/join");
     expect(t.encryptService.encapsulateKeyUnsigned).not.toHaveBeenCalled();
-    expect(t.notices[0][1]).toContain("isn't the one your IT's install command names");
+    expect(t.notices[0][1]).toContain("isn't the one your IT admin's install command names");
   });
 
   it("needs a command that names the organization's key before escrowing for account recovery", async () => {
@@ -408,7 +408,7 @@ describe("Keykeeper enrollment through the install command", () => {
     expect(t.encryptService.encapsulateKeyUnsigned).not.toHaveBeenCalled();
     expect(t.paths()).not.toContain("/keykeeper/enrollment/join");
     // The command names a key, and the server gave none.
-    expect(t.notices[0][1]).toContain("isn't the one your IT's install command names");
+    expect(t.notices[0][1]).toContain("isn't the one your IT admin's install command names");
   });
 
   it("runs once at a time for an account", async () => {

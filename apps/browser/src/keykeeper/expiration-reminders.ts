@@ -170,7 +170,7 @@ export function reminderText(levels: ReminderLevel[]): { title: string; message:
         : `${items} expire soon or have expired`;
   const message =
     count === 1
-      ? "Open your vault to see which. Renew or rotate it, then update its expiration date."
-      : "Open your vault to see which. Renew or rotate them, then update their expiration dates.";
+      ? "Open the extension to see which. Renew or rotate it, then update its expiration date."
+      : "Open the extension to see which. Renew or rotate them, then update their expiration dates.";
   return { title, message };
 }
