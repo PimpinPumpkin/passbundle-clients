@@ -30,7 +30,8 @@ export type KeykeeperCategory =
   | "certificate"
   // Not kinds of items: the web vault's menu entries for them (DESIGN.md, "The left menu").
   | "favorites"
-  | "health";
+  | "health"
+  | "expiring";
 
 export type KeykeeperCategoryLook = {
   /** The tone on light backgrounds: the glyph's color, and the tile's tint. */
@@ -72,6 +73,7 @@ const glyphs = {
   badge: "M12 14a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z M8.6 12.6 7 21l5-2.6 5 2.6-1.6-8.4",
   star: "M12 4l2.5 5 5.5.8-4 3.9.9 5.5L12 16.6 7.1 19.2l.9-5.5-4-3.9 5.5-.8Z",
   shield: "M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6Z M8.5 12l2.5 2.5 4.5-5",
+  clock: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z M12 7v5l3.5 2",
 };
 
 export const KEYKEEPER_CATEGORY_LOOKS: Readonly<Record<KeykeeperCategory, KeykeeperCategoryLook>> =
@@ -104,6 +106,8 @@ export const KEYKEEPER_CATEGORY_LOOKS: Readonly<Record<KeykeeperCategory, Keykee
     // a shade deeper than the star's, so its glyph keeps 3:1 on its tint.
     favorites: { light: "#946A0C", dark: "#ECC25E", glyph: glyphs.star },
     health: { light: "#0E7A47", dark: "#6FDBA0", glyph: glyphs.shield },
+    // Expiring soon, in topaz, the color of an "Expires in" badge.
+    expiring: { light: "#A9600C", dark: "#F2B766", glyph: glyphs.clock },
   };
 
 /** A login without a site icon shows its first letter on a tint of the login color. */

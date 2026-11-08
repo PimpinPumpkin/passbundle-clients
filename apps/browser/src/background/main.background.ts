@@ -114,6 +114,10 @@ import {
 } from "@bitwarden/common/dirt/event-logs";
 import { EventCollectionService } from "@bitwarden/common/dirt/event-logs/services/event-collection.service";
 import { EventUploadService } from "@bitwarden/common/dirt/event-logs/services/event-upload.service";
+import {
+  KeykeeperOwnHealthReporter,
+  KeykeeperOwnHealthWatch,
+} from "@bitwarden/common/dirt/keykeeper/own-health";
 import { PhishingDetectionSettingsServiceAbstraction } from "@bitwarden/common/dirt/services/abstractions/phishing-detection-settings.service.abstraction";
 import { HibpApiService } from "@bitwarden/common/dirt/services/hibp-api.service";
 import { PhishingDetectionSettingsService } from "@bitwarden/common/dirt/services/phishing-detection/phishing-detection-settings.service";
@@ -1975,6 +1979,17 @@ export default class MainBackground {
       this.encryptService,
       this.stateProvider,
       this.logService,
+    ).start();
+    // Keykeeper: how many of someone's own passwords are weak or reused, in
+    // numbers only, for their organizations' admins (DESIGN.md, "Members' own
+    // passwords").
+    new KeykeeperOwnHealthWatch(
+      this.accountService,
+      this.authService,
+      this.cipherService,
+      (password, hints) =>
+        this.passwordStrengthService.getPasswordStrength(password, null, hints)?.score ?? null,
+      new KeykeeperOwnHealthReporter(this.apiService, this.organizationService, this.logService),
     ).start();
     this.commandsBackground.init();
     this.contextMenusBackground?.init();

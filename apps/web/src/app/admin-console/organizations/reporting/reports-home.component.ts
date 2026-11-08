@@ -76,7 +76,7 @@ export class ReportsHomeComponent implements OnInit, AfterViewInit, OnDestroy {
           .organizations$(userId)
           .pipe(getOrganizationById(params.organizationId)),
       ),
-      switchMap((org) => this.buildReports(org.productTierType)),
+      switchMap((org) => this.buildReports(org.productTierType, org.isAdmin)),
     );
   }
 
@@ -120,7 +120,10 @@ export class ReportsHomeComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  private async buildReports(productType: ProductTierType): Promise<ReportEntry[]> {
+  private async buildReports(
+    productType: ProductTierType,
+    isAdmin = false,
+  ): Promise<ReportEntry[]> {
     const reportRequiresUpgrade =
       productType == ProductTierType.Free ? ReportVariant.RequiresUpgrade : ReportVariant.Enabled;
 
@@ -152,6 +155,16 @@ export class ReportsHomeComponent implements OnInit, AfterViewInit, OnDestroy {
             ? ReportVariant.Enabled
             : ReportVariant.RequiresEnterprise,
       },
+      // Keykeeper: the organization's items that expire (DESIGN.md, "Expiration dates").
+      {
+        ...reports[ReportType.KeykeeperExpiringItems],
+        variant: ReportVariant.Enabled,
+      },
+      // Keykeeper: members' own passwords, in numbers, for owners and admins
+      // (DESIGN.md, "Members' own passwords"); the server shows nobody else.
+      ...(isAdmin
+        ? [{ ...reports[ReportType.KeykeeperMemberHealth], variant: ReportVariant.Enabled }]
+        : []),
     ];
 
     const passkeyReportEnabled = await firstValueFrom(

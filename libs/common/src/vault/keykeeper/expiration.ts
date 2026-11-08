@@ -2,12 +2,27 @@
 // as a text custom field named EXPIRES_FIELD_NAME holding an ISO date
 // (YYYY-MM-DD). It is a text field, not hidden, because a date isn't secret and
 // list views only carry text fields' values, so lists can show badges without
-// decrypting every item. Cards also expire on their own expiry month.
+// decrypting every item. Cards also expire on their own expiry month. The days
+// to remind on before the date sit beside it the same way (REMIND_FIELD_NAME).
 
 import { FieldType } from "../enums";
 import { FieldView } from "../models/view/field.view";
 
 export const EXPIRES_FIELD_NAME = "keykeeper.expires";
+
+/**
+ * The days before an item's date to remind on, when they aren't the default:
+ * a text field beside the date holding whole days, comma-separated
+ * ("90,30,7,1"), each from 1 to 365, or "none". See DESIGN.md, "Reminder
+ * days, per item".
+ */
+export const REMIND_FIELD_NAME = "keykeeper.remind";
+
+/** The days every item is reminded on unless it says otherwise. */
+export const DEFAULT_REMIND_DAYS: readonly number[] = [30, 7, 1];
+
+/** The most days ahead a reminder can be. */
+export const MAX_REMIND_DAYS = 365;
 
 /** Items count as expiring soon this many days ahead. */
 export const EXPIRING_SOON_DAYS = 30;
@@ -54,6 +69,76 @@ export function setStoredExpiration(
   cipher.fields = [...others, field];
 }
 
+/**
+ * Reminder days as stored: the days, largest first, or "none". Null when the
+ * value isn't one, which counts as the default.
+ */
+export function parseRemindDays(value: string | null | undefined): number[] | "none" | null {
+  const text = (value ?? "").trim();
+  if (text.toLowerCase() === "none") {
+    return "none";
+  }
+  const parts = text.split(",").map((part) => part.trim());
+  if (parts.some((part) => !/^\d{1,3}$/.test(part))) {
+    return null;
+  }
+  const days = [...new Set(parts.map(Number))];
+  if (days.some((day) => day < 1 || day > MAX_REMIND_DAYS)) {
+    return null;
+  }
+  return days.sort((a, b) => b - a);
+}
+
+/** The reminder days as they'd be stored, or null for the default. */
+export function remindValue(days: readonly number[] | "none"): string | null {
+  if (days === "none") {
+    return "none";
+  }
+  const canonical = parseRemindDays(days.join(","));
+  if (canonical == null || canonical === "none") {
+    return null;
+  }
+  return canonical.join(",") === DEFAULT_REMIND_DAYS.join(",") ? null : canonical.join(",");
+}
+
+/** The reminder days stored on the item, as stored, when there's a valid value. */
+export function storedRemind(item: ItemWithExpiration): string | null {
+  const value = (item.fields ?? []).find((f) => f.name === REMIND_FIELD_NAME)?.value ?? null;
+  const days = parseRemindDays(value);
+  return days == null ? null : remindValue(days);
+}
+
+/**
+ * The days before its date to remind about an item on, largest first, or
+ * null when it says not to remind at all. Every list also reminds once the
+ * item has expired.
+ */
+export function remindDays(item: ItemWithExpiration): number[] | null {
+  const days = parseRemindDays(
+    (item.fields ?? []).find((f) => f.name === REMIND_FIELD_NAME)?.value ?? null,
+  );
+  return days === "none" ? null : (days ?? [...DEFAULT_REMIND_DAYS]);
+}
+
+/**
+ * Sets the reminder days (a value as `remindValue` gives it), or clears them
+ * back to the default with null. The caller saves the item.
+ */
+export function setStoredRemind(cipher: { fields?: FieldView[] }, value: string | null): void {
+  const others = (cipher.fields ?? []).filter((f) => f.name !== REMIND_FIELD_NAME);
+  const days = parseRemindDays(value);
+  const stored = days == null ? null : remindValue(days);
+  if (stored == null) {
+    cipher.fields = others;
+    return;
+  }
+  const field = new FieldView();
+  field.name = REMIND_FIELD_NAME;
+  field.type = FieldType.Text;
+  field.value = stored;
+  cipher.fields = [...others, field];
+}
+
 /** A card expires at the end of its expiry month. */
 export function cardExpiration(card: CardLike | null | undefined): Date | null {
   const month = Number(card?.expMonth);
@@ -90,6 +175,15 @@ export function expirationStatus(expires: Date, today: Date = new Date()): Expir
   const state =
     days < 0 ? "expired" : days === 0 ? "today" : days <= EXPIRING_SOON_DAYS ? "soon" : "later";
   return { state, days };
+}
+
+/** Whether an item has expired or expires within EXPIRING_SOON_DAYS. */
+export function isExpiringSoon(
+  item: ItemWithExpiration | null | undefined,
+  today: Date = new Date(),
+): boolean {
+  const expires = itemExpiration(item);
+  return expires != null && expirationStatus(expires, today).state !== "later";
 }
 
 // English until Keykeeper's own strings are translated.

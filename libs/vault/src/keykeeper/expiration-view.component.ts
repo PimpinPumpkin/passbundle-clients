@@ -13,7 +13,10 @@ import {
   expirationStatus,
   itemExpiration,
   ItemWithExpiration,
+  remindDays,
+  storedRemind,
 } from "./expiration";
+import { remindLabel } from "./expiration-field.component";
 
 /** Keykeeper: when an item expires, in the item view. Nothing shows when it doesn't. */
 @Component({
@@ -31,6 +34,11 @@ import {
             <span bitTypography="body1">{{ info.date }}</span>
             <span bitBadge [variant]="info.variant">{{ info.label }}</span>
           </div>
+          @if (info.remind) {
+            <p bitTypography="helper" class="tw-mb-0 tw-mt-1" data-testid="keykeeper-remind-days">
+              {{ info.remind }}
+            </p>
+          }
         </bit-card>
       </section>
     }
@@ -45,10 +53,20 @@ export class KeykeeperExpirationViewComponent {
       return null;
     }
     const status = expirationStatus(expires);
+    // The reminder days, when they aren't the default.
+    const cipher = this.cipher() ?? {};
+    const days = remindDays(cipher);
+    const remind =
+      storedRemind(cipher) == null
+        ? null
+        : days == null
+          ? "No reminders"
+          : `Reminders ${remindLabel(days)}`;
     return {
       date: new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(expires),
       label: expirationLabel(status),
       variant: expirationBadgeVariant(status),
+      remind,
     };
   });
 }

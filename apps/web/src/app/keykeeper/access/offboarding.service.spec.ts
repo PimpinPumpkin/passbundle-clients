@@ -37,10 +37,10 @@ function member(extra: Partial<AccessMemberInput>): AccessMemberInput {
   };
 }
 
-function loaded(m: AccessMemberInput): LoadedAccess {
+function loaded(m: AccessMemberInput, ...others: AccessMemberInput[]): LoadedAccess {
   return {
     review: reviewAccess({
-      members: [m],
+      members: [m, ...others],
       groups: [],
       folders,
       items,
@@ -63,7 +63,7 @@ describe("KeykeeperOffboardingService", () => {
     accessReview = mock<KeykeeperAccessReviewService>();
     dialogService = mock<DialogService>();
     logService = mock<LogService>();
-    const i18n = mock<I18nService>();
+    const i18n = mock<I18nService>({ translationLocale: "en" });
     i18n.t.mockImplementation((key: string, ...args: any[]) =>
       args.length ? `${key}(${args.join("|")})` : key,
     );
@@ -117,6 +117,78 @@ describe("KeykeeperOffboardingService", () => {
 
     expect(await service.prepare(org, "alex", "Alex")).toBeNull();
     expect(logService.error).toHaveBeenCalled();
+  });
+
+  it("works out several people at once, loading what the admin console shows once", async () => {
+    const sam = member({
+      id: "sam",
+      name: "Sam",
+      collections: [{ id: "payroll", readOnly: true, hidePasswords: false, manage: false }],
+    });
+    accessReview.load.mockResolvedValue(loaded(member({}), sam));
+
+    const prepared = await service.prepareMany(org, [
+      { id: "alex", name: "Alex" },
+      { id: "sam", name: "Sam" },
+      { id: "gone", name: "Nobody" },
+    ]);
+
+    expect(accessReview.load).toHaveBeenCalledTimes(1);
+    expect([...prepared.keys()]).toEqual(["alex", "sam"]);
+    expect(prepared.get("sam")!.dialog.passwords.map((p) => p.item.name)).toEqual(["Bank"]);
+  });
+
+  it("after a bulk removal, lists the passwords any of those removed could see, saying who", async () => {
+    const openSpy = jest
+      .spyOn(KeykeeperSeenPasswordsDialogComponent, "open")
+      .mockReturnValue(null!);
+    const sam = member({
+      id: "sam",
+      name: "Sam",
+      collections: [
+        { id: "front", readOnly: true, hidePasswords: false, manage: false },
+        { id: "payroll", readOnly: true, hidePasswords: false, manage: false },
+      ],
+    });
+    const jo = member({ id: "jo", name: "Jo", status: "pending" });
+    accessReview.load.mockResolvedValue(loaded(member({}), sam, jo));
+    const prepared = await service.prepareMany(org, [
+      { id: "alex", name: "Alex" },
+      { id: "sam", name: "Sam" },
+      { id: "jo", name: "Jo" },
+    ]);
+
+    service.showPasswordsOfMany(prepared, ["alex", "sam", "jo"]);
+
+    const shown = openSpy.mock.calls[0][1];
+    expect(shown.name).toBe("Alex and Sam");
+    expect(shown.people).toEqual([
+      { name: "Alex", everyItem: false },
+      { name: "Sam", everyItem: false },
+    ]);
+    expect(shown.passwords.map((p) => [p.item.name, p.who])).toEqual([
+      ["Bank", ["Sam"]],
+      ["Wi-Fi", ["Alex", "Sam"]],
+    ]);
+    openSpy.mockRestore();
+  });
+
+  it("after a bulk removal that removed one person who saw anything, shows their own list", async () => {
+    const openSpy = jest
+      .spyOn(KeykeeperSeenPasswordsDialogComponent, "open")
+      .mockReturnValue(null!);
+    accessReview.load.mockResolvedValue(loaded(member({}), member({ id: "sam", name: "Sam" })));
+    const prepared = await service.prepareMany(org, [
+      { id: "alex", name: "Alex" },
+      { id: "sam", name: "Sam" },
+    ]);
+
+    service.showPasswordsOfMany(prepared, []);
+    expect(openSpy).not.toHaveBeenCalled();
+
+    service.showPasswordsOfMany(prepared, ["sam"]);
+    expect(openSpy).toHaveBeenCalledWith(dialogService, prepared.get("sam")!.dialog);
+    openSpy.mockRestore();
   });
 
   it("shows the list once there's something to change, and only then", async () => {

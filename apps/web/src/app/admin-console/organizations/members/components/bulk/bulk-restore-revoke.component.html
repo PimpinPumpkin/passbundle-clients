@@ -59,6 +59,14 @@
                       <div class="tw-truncate" [title]="user.email">{{ user.email }}</div>
                     }
                   </div>
+                  <!-- Keykeeper: what they can open, as revoking one member says -->
+                  @if (keykeeperReach.get(user.id); as reach) {
+                    <small
+                      class="tw-block tw-text-muted tw-whitespace-normal"
+                      data-testid="keykeeper-reach"
+                      >{{ reach }}</small
+                    >
+                  }
                 </td>
                 @if (showNoMasterPasswordWarning()) {
                   <td bitCell class="tw-w-1/2">

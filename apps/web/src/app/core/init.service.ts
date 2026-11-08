@@ -30,6 +30,7 @@ import { TaskService } from "@bitwarden/common/vault/tasks";
 import { KeykeeperGeneratorSettingsSync } from "@bitwarden/generator-core";
 import { KeyService as KeyServiceAbstraction } from "@bitwarden/key-management";
 
+import { breachCheckSyncedPart } from "../keykeeper/health/breach-check-setting.service";
 import { KeykeeperMspWorkService } from "../keykeeper/msp/msp-work.service";
 import { KeykeeperReloadKeyService } from "../keykeeper/reload-key/reload-key.service";
 import { VersionService } from "../platform/version.service";
@@ -40,7 +41,8 @@ export class InitService {
   private readonly keykeeperMspWork = inject(KeykeeperMspWorkService);
   // Keykeeper: a tab stays unlocked across a reload, within its timeout.
   private readonly keykeeperReloadKey = inject(KeykeeperReloadKeyService);
-  // Keykeeper: the generator's settings follow someone to each device.
+  // Keykeeper: the generator's settings, and the breach check's switch,
+  // follow someone to each device.
   private readonly keykeeperGeneratorSettings = new KeykeeperGeneratorSettingsSync(
     inject(ApiService),
     inject(AccountService),
@@ -50,6 +52,9 @@ export class InitService {
     inject(EncryptService),
     inject(StateProvider),
     inject(LogService),
+    undefined,
+    undefined,
+    [breachCheckSyncedPart(inject(StateProvider))],
   );
 
   constructor(

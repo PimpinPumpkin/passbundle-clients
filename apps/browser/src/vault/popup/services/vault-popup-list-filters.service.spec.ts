@@ -608,6 +608,37 @@ describe("VaultPopupListFiltersService", () => {
       service.filterForm.patchValue({ collection: { id: templates } as CollectionView });
     });
 
+    // Keykeeper: Expiring soon, the category chips' last.
+    it("keeps only items expired or expiring within 30 days when Expiring soon is picked", (done) => {
+      const soon = new Date();
+      soon.setDate(soon.getDate() + 10);
+      const iso = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const expiring = {
+        type: CipherType.SecureNote,
+        collectionIds: [],
+        organizationId: null,
+        fields: [{ name: "keykeeper.expires", value: iso(soon) }],
+      } as unknown as CipherView;
+      const card = {
+        type: CipherType.Card,
+        collectionIds: [],
+        organizationId: null,
+        // A card expires at the end of its month: this month's always within 30 days.
+        card: {
+          expMonth: String(new Date().getMonth() + 1),
+          expYear: String(new Date().getFullYear()),
+        },
+      } as unknown as CipherView;
+
+      service.filterFunction$.subscribe((filterFunction) => {
+        expect(filterFunction([...ciphers, expiring, card])).toEqual([expiring, card]);
+        done();
+      });
+
+      service.filterForm.patchValue({ keykeeperExpiring: true });
+    });
+
     it("filters by folder", (done) => {
       const folder = { id: "5432" } as FolderView;
 
@@ -729,6 +760,8 @@ describe("VaultPopupListFiltersService", () => {
         },
         folder: { id: "test-folder-id", name: "Test Folder" },
         cipherType: CipherType.Login,
+        // Keykeeper: Expiring soon, off unless it was picked.
+        keykeeperExpiring: false,
       });
       discardPeriodicTasks();
     }));
@@ -786,6 +819,8 @@ describe("VaultPopupListFiltersService", () => {
         collectionId: "test-collection-id",
         folderId: "test-folder-id",
         cipherType: CipherType.Card,
+        // Keykeeper: Expiring soon, kept with the rest.
+        keykeeperExpiring: false,
       });
       discardPeriodicTasks();
     }));
