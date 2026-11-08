@@ -31,6 +31,7 @@ import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.servi
 import { SearchService } from "@bitwarden/common/vault/abstractions/search.service";
 import { VaultSettingsService } from "@bitwarden/common/vault/abstractions/vault-settings/vault-settings.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
+import { isExpiringSoon } from "@bitwarden/common/vault/keykeeper/expiration";
 import { RestrictedItemTypesService } from "@bitwarden/common/vault/services/restricted-item-types.service";
 import {
   CipherViewLike,
@@ -307,6 +308,23 @@ export class VaultPopupItemsService {
    * the vault holds, not what the search matches.
    */
   activeCiphers$: Observable<PopupCipherViewLike[]> = this._activeCipherList$;
+
+  /**
+   * Keykeeper: how many items have expired or expire within 30 days, for the
+   * category chips' "Expiring soon".
+   */
+  keykeeperExpiringCount$: Observable<number> = this._activeCipherList$.pipe(
+    map(
+      (ciphers) =>
+        ciphers.filter(
+          (cipher) =>
+            !CipherViewLikeUtils.isDeleted(cipher) &&
+            isExpiringSoon(cipher as Parameters<typeof isExpiringSoon>[0]),
+        ).length,
+    ),
+    distinctUntilChanged(),
+    shareReplay({ refCount: true, bufferSize: 1 }),
+  );
 
   /**
    * Observable that indicates whether there are no ciphers to show with the current filter.

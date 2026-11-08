@@ -94,8 +94,72 @@
   "keykeeperExpiringItemsFoundDesc": {
     "message": "These items have expired or expire in the next 30 days. Renew or rotate them, then update their expiration dates."
   },
+  "keykeeperMemberHealthReport": {
+    "message": "Members' own passwords"
+  },
+  "keykeeperMemberHealthReportDesc": {
+    "message": "How many of each member's own logins, in their Personal items, have weak, reused, or exposed passwords."
+  },
+  "keykeeperMemberHealthPrivacy": {
+    "message": "Each member's apps count their own logins and send only these numbers. Neither you nor the server sees which logins, their names, or their passwords. This organization's items are in the other reports."
+  },
+  "keykeeperMemberHealthCouldntLoad": {
+    "message": "The numbers couldn't be loaded. Try again later."
+  },
+  "keykeeperMemberHealthLogins": {
+    "message": "Logins"
+  },
+  "keykeeperMemberHealthWeak": {
+    "message": "Weak"
+  },
+  "keykeeperMemberHealthReused": {
+    "message": "Reused"
+  },
+  "keykeeperMemberHealthExposed": {
+    "message": "Exposed"
+  },
+  "keykeeperMemberHealthReported": {
+    "message": "Reported"
+  },
+  "keykeeperMemberHealthNotReported": {
+    "message": "Not reported yet: their apps send the numbers after they next unlock."
+  },
+  "keykeeperMemberHealthNotChecked": {
+    "message": "Not checked"
+  },
+  "keykeeperMemberHealthExposedNote": {
+    "message": "Exposed passwords are counted only by the web vault, while its breach check is on. Members who use only the browser extension or the apps show Not checked."
+  },
+  "keykeeperMemberHealthSummary": {
+    "message": "$REPORTED$ of $MEMBERS$ members reported.",
+    "placeholders": {
+      "reported": {
+        "content": "$1"
+      },
+      "members": {
+        "content": "$2"
+      }
+    }
+  },
+  "keykeeperMemberHealthTotals": {
+    "message": "In their own items: $WEAK$ weak and $REUSED$ reused passwords.",
+    "placeholders": {
+      "weak": {
+        "content": "$1"
+      },
+      "reused": {
+        "content": "$2"
+      }
+    }
+  },
+  "keykeeperOwnHealthSeenBy": {
+    "message": "Owners and admins of the organizations you're a member of see how many of your own passwords are weak, reused, or exposed. Never which ones."
+  },
   "keykeeperExpires": {
     "message": "Expires"
+  },
+  "keykeeperExpiringSoon": {
+    "message": "Expiring soon"
   },
   "keykeeperVersionHistory": {
     "message": "Version history"
@@ -627,6 +691,33 @@
       }
     }
   },
+  "keykeeperSeenPasswordsTitleMany": {
+    "message": "Passwords these $COUNT$ people could see",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "keykeeperSeenPasswordsIntroMany": {
+    "message": "$NAMES$ could see these logins' passwords in the shared folders they could open. They may still know them, so change them.",
+    "placeholders": {
+      "names": {
+        "content": "$1"
+      }
+    }
+  },
+  "keykeeperSeenPasswordsEveryItemMany": {
+    "message": "$NAMES$ could see every item in this organization, so they may know any of its passwords.",
+    "placeholders": {
+      "names": {
+        "content": "$1"
+      }
+    }
+  },
+  "keykeeperSeenPasswordsWho": {
+    "message": "Who could see it"
+  },
   "keykeeperExposedPrivacy": {
     "message": "Each password is checked against Have I Been Pwned's list of breached passwords without sending it: only the first 5 characters of its SHA-1 hash leave your browser, the answer lists hundreds of possible matches, and the match is made here."
   },
@@ -643,7 +734,7 @@
     }
   },
   "keykeeperHealthToFix": {
-    "message": "$COUNT$ items to fix: weak, reused, or exposed passwords",
+    "message": "$COUNT$ items to fix: weak, reused, or exposed passwords, or items that expire soon",
     "placeholders": {
       "count": {
         "content": "$1",
@@ -661,7 +752,7 @@
     "message": "For the count beside Health (for MSP staff, every client item you can edit) and the MSP console's Exposed column. Each check sends Have I Been Pwned the first 5 characters of each password's SHA-1 hash. Turned off, nothing is sent unless you open the exposed passwords report or press Check. Creating or changing your master password checks it the same way while \"Check known data breaches for this password\" is ticked there, as it is at first."
   },
   "keykeeperHealthToFixOne": {
-    "message": "1 item to fix: a weak, reused, or exposed password"
+    "message": "1 item to fix: a weak, reused, or exposed password, or an item that expires soon"
   },
   "keykeeperHealthCouldntCheck": {
     "message": "Couldn't check for breaches"

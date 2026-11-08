@@ -1,5 +1,6 @@
 import { Unassigned } from "@bitwarden/common/admin-console/models/collections";
 import { CipherType } from "@bitwarden/common/vault/enums";
+import { isExpiringSoon } from "@bitwarden/common/vault/keykeeper/expiration";
 import { isMspTemplateCopy } from "@bitwarden/common/vault/keykeeper/templates";
 import {
   CipherViewLike,
@@ -43,6 +44,13 @@ export function createFilterFunction(filter: RoutedVaultFilterModel): FilterFunc
       return false;
     }
     if (filter.type === "trash" && !isDeleted) {
+      return false;
+    }
+    // Keykeeper: Expiring soon, whatever the kind of item.
+    if (
+      filter.type === "expiring" &&
+      !isExpiringSoon(cipher as Parameters<typeof isExpiringSoon>[0])
+    ) {
       return false;
     }
     // Hide trash unless explicitly selected

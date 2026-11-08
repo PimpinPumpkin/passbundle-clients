@@ -155,6 +155,7 @@ describe("Keykeeper: imports never plant our own fields", () => {
         bitwardenExport([
           { name: "keykeeper.fill", value: PLANTED_RULE, type: FieldType.Hidden },
           { name: "keykeeper.expires", value: "2027-01-31", type: FieldType.Text },
+          { name: "keykeeper.remind", value: " 7, 90 ", type: FieldType.Text },
           {
             name: "keykeeper.template",
             value: JSON.stringify({ id: "api-key", name: "API key", v: 1, extra: "x" }),
@@ -167,6 +168,8 @@ describe("Keykeeper: imports never plant our own fields", () => {
       expect(cipher.fields.map((f: FieldView) => [f.name, f.value])).toEqual([
         ["keykeeper.fill", PLANTED_RULE],
         ["keykeeper.expires", "2027-01-31"],
+        // Reminder days, rewritten as the editor stores them.
+        ["keykeeper.remind", "90,7"],
         ["keykeeper.template", JSON.stringify({ id: "api-key", name: "API key", v: 1 })],
       ]);
     });
@@ -195,6 +198,7 @@ describe("Keykeeper: imports never plant our own fields", () => {
           // A rule shown as text was never ours.
           { name: "keykeeper.fill", value: PLANTED_RULE, type: FieldType.Text },
           { name: "keykeeper.expires", value: "someday", type: FieldType.Text },
+          { name: "keykeeper.remind", value: "every day", type: FieldType.Text },
           { name: "keykeeper.surprise", value: "x", type: FieldType.Text },
           {
             name: "keykeeper.fill",
@@ -213,6 +217,7 @@ describe("Keykeeper: imports never plant our own fields", () => {
         "Imported keykeeper.fill",
         "Imported keykeeper.fill",
         "Imported keykeeper.expires",
+        "Imported keykeeper.remind",
         "Imported keykeeper.surprise",
         "Imported keykeeper.fill",
       ]);

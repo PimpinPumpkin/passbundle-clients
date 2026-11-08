@@ -10,10 +10,12 @@ import {
   AccessItemInput,
   AccessMemberInput,
   AccessReviewInput,
+  combineSeen,
   folderMatches,
   howText,
   levelOf,
   levelText,
+  listNames,
   memberMatches,
   mergeFlags,
   passwordListText,
@@ -420,6 +422,15 @@ describe("passwordListText", () => {
     );
   });
 
+  it("says who could see each login when the list is several people's", () => {
+    const text = passwordListText(
+      [{ item: item("Wi-Fi", ["front"]), folders: [folders[0]], who: ["Ana", "Ben"] }],
+      { name: "Name", folders: "Shared folders", noFolder: "-", who: "Who could see it" },
+    );
+
+    expect(text).toBe("Name\tShared folders\tWho could see it\nWi-Fi\tFront desk\tAna, Ben\n");
+  });
+
   it("carries nothing from an item but its name", () => {
     const secretItem = {
       ...item("Router", ["front"]),
@@ -434,6 +445,59 @@ describe("passwordListText", () => {
     });
 
     expect(text).not.toMatch(/hunter2|admin|otpauth|1234/);
+  });
+});
+
+describe("combineSeen", () => {
+  it("lists each login once, with every folder and everyone who could see it, by name", () => {
+    const wifi = item("Wi-Fi", ["front", "it"]);
+    const bank = item("Bank", ["payroll"]);
+    const router = item("Router", ["it"]);
+
+    const combined = combineSeen([
+      {
+        name: "Ana",
+        seen: [
+          { item: wifi, folders: [folders[0]] },
+          { item: bank, folders: [folders[1]] },
+        ],
+      },
+      {
+        name: "Ben",
+        seen: [
+          { item: wifi, folders: [folders[2]] },
+          { item: router, folders: [folders[2]] },
+        ],
+      },
+    ]);
+
+    expect(combined.map((s) => [s.item.name, s.folders.map((f) => f.name), s.who])).toEqual([
+      ["Bank", ["Payroll"], ["Ana"]],
+      ["Router", ["IT"], ["Ben"]],
+      ["Wi-Fi", ["Front desk", "IT"], ["Ana", "Ben"]],
+    ]);
+  });
+
+  it("adds nothing that wasn't in someone's own list", () => {
+    const wifi = item("Wi-Fi", ["front"]);
+    expect(
+      combineSeen([
+        { name: "Ana", seen: [] },
+        { name: "Ben", seen: [] },
+      ]),
+    ).toEqual([]);
+    expect(combineSeen([{ name: "Ana", seen: [{ item: wifi, folders: [folders[0]] }] }])).toEqual([
+      { item: wifi, folders: [folders[0]], who: ["Ana"] },
+    ]);
+  });
+});
+
+describe("listNames", () => {
+  it("joins names as the language does", () => {
+    expect(listNames(["Ana"], "en")).toBe("Ana");
+    expect(listNames(["Ana", "Ben"], "en")).toBe("Ana and Ben");
+    expect(listNames(["Ana", "Ben", "Cy"], "en")).toBe("Ana, Ben, and Cy");
+    expect(listNames(["Ana", "Ben"], "not a language")).toBe("Ana, Ben");
   });
 });
 

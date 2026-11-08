@@ -10,7 +10,9 @@ import { PasswordStrengthServiceAbstraction } from "@bitwarden/common/tools/pass
 import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
+import { EXPIRES_FIELD_NAME } from "@bitwarden/common/vault/keykeeper/expiration";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
+import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
 import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
 
 import { KeykeeperBreachCheckSetting } from "./breach-check-setting.service";
@@ -88,6 +90,35 @@ describe("Health's count of items to fix", () => {
       { toFix: 3, couldntCheck: false },
       { toFix: 4, couldntCheck: false },
     ]);
+  });
+
+  it("counts items expired or expiring within 30 days too, each item once", async () => {
+    const expiresIn = (cipher: CipherView, days: number) => {
+      const date = new Date();
+      date.setDate(date.getDate() + days);
+      const field = new FieldView();
+      field.name = EXPIRES_FIELD_NAME;
+      field.value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+      cipher.fields = [field];
+      return cipher;
+    };
+    const note = () => {
+      const cipher = new CipherView();
+      cipher.id = `item-${nextId++}`;
+      cipher.type = CipherType.SecureNote;
+      return cipher;
+    };
+    const items = [
+      ...vault(),
+      // Weak and expiring: still one item to fix.
+      expiresIn(login("short3"), 3),
+      expiresIn(note(), -1),
+      expiresIn(note(), 60),
+    ];
+    const counts = await firstValueFrom(
+      service.count(items, { checkExposed: false }).pipe(toArray()),
+    );
+    expect(counts).toEqual([{ toFix: 5, couldntCheck: false }]);
   });
 
   it("says it couldn't check when the breach check can't be made, keeping weak and reused", async () => {

@@ -129,11 +129,13 @@ export class MemberDialogManagerService {
   async openBulkRemoveDialog(
     organization: Organization,
     users: OrganizationUserView[],
+    keykeeperReach?: Map<string, string>,
   ): Promise<void> {
     const dialogRef = BulkRemoveDialogComponent.open(this.dialogService, {
       data: {
         organizationId: organization.id,
         users: users,
+        keykeeperReach,
       },
     });
 
@@ -173,11 +175,13 @@ export class MemberDialogManagerService {
     organization: Organization,
     users: OrganizationUserView[],
     isRevoking: boolean,
+    keykeeperReach?: Map<string, string>,
   ): Promise<void> {
     const ref = BulkRestoreRevokeComponent.open(this.dialogService, {
       organizationId: organization.id,
       users: users,
       isRevoking: isRevoking,
+      keykeeperReach,
     });
 
     await firstValueFrom(ref.closed);

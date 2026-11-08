@@ -44,6 +44,7 @@ import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { FolderService } from "@bitwarden/common/vault/abstractions/folder/folder.service.abstraction";
 import { CipherType } from "@bitwarden/common/vault/enums";
+import { isExpiringSoon } from "@bitwarden/common/vault/keykeeper/expiration";
 import { OwnerPlace, ownerPlaces } from "@bitwarden/common/vault/keykeeper/folders-by-owner";
 import { isMspTemplateCopy } from "@bitwarden/common/vault/keykeeper/templates";
 import { ITreeNodeObject, TreeNode } from "@bitwarden/common/vault/models/domain/tree-node";
@@ -72,6 +73,7 @@ export interface CachedFilterState {
   collectionId?: string;
   folderId?: string;
   cipherType?: CipherType | null;
+  keykeeperExpiring?: boolean;
 }
 
 /** All available cipher filters */
@@ -80,6 +82,11 @@ export type PopupListFilter = {
   collection: CollectionView | null;
   folder: FolderView | null;
   cipherType: CipherType | null;
+  /**
+   * Keykeeper: only items expired or expiring within 30 days, the category
+   * chips' "Expiring soon" (DESIGN.md, "Expiration dates").
+   */
+  keykeeperExpiring?: boolean;
 };
 
 /**
@@ -110,6 +117,13 @@ export function passesPopupFilters(cipher: PopupCipherViewLike, filters: PopupLi
   }
 
   if (filters.cipherType !== null && CipherViewLikeUtils.getType(cipher) !== filters.cipherType) {
+    return false;
+  }
+
+  if (
+    filters.keykeeperExpiring &&
+    !isExpiringSoon(cipher as Parameters<typeof isExpiringSoon>[0])
+  ) {
     return false;
   }
 
@@ -159,6 +173,7 @@ const INITIAL_FILTERS: PopupListFilter = {
   collection: null,
   folder: null,
   cipherType: null,
+  keykeeperExpiring: false,
 };
 
 @Injectable({
@@ -208,6 +223,7 @@ export class VaultPopupListFiltersService {
       collectionId: this.filterForm.value.collection?.id,
       folderId: this.filterForm.value.folder?.id,
       cipherType: this.filterForm.value.cipherType,
+      keykeeperExpiring: this.filterForm.value.keykeeperExpiring ?? false,
     };
   }
 
@@ -224,6 +240,7 @@ export class VaultPopupListFiltersService {
           collection: null,
           folder: null,
           cipherType: null,
+          keykeeperExpiring: state.keykeeperExpiring === true,
         };
 
         if (state.organizationId) {

@@ -313,6 +313,8 @@ export type SeenPassword = {
   item: AccessItemInput;
   /** Empty for an item in no shared folder, which only people who see every item reach. */
   folders: AccessFolderInput[];
+  /** After removing or revoking several people at once: which of them could see it. */
+  who?: string[];
 };
 
 /**
@@ -353,22 +355,68 @@ export function passwordsSeenBy(
 }
 
 /**
+ * Several people's lists as one, for removing or revoking them at once: each
+ * login once, with every shared folder any of them saw it through and who
+ * could see it, in the same order as one person's list. Only what each list
+ * already holds: it adds nothing anyone couldn't see.
+ */
+export function combineSeen(lists: { name: string; seen: SeenPassword[] }[]): SeenPassword[] {
+  const byItem = new Map<string, SeenPassword>();
+  for (const { name, seen } of lists) {
+    for (const s of seen) {
+      const had = byItem.get(s.item.id);
+      if (had == null) {
+        byItem.set(s.item.id, { item: s.item, folders: [...s.folders], who: [name] });
+        continue;
+      }
+      for (const f of s.folders) {
+        if (!had.folders.some((g) => g.id === f.id)) {
+          had.folders.push(f);
+        }
+      }
+      if (!had.who!.includes(name)) {
+        had.who!.push(name);
+      }
+    }
+  }
+  const combined = [...byItem.values()];
+  for (const s of combined) {
+    s.folders.sort((a, b) => byName(a.name, b.name));
+  }
+  return combined.sort((a, b) => byName(a.item.name, b.item.name) || byName(a.item.id, b.item.id));
+}
+
+/** "Alex, Sam, and Jo", in the given language. */
+export function listNames(names: string[], locale: string | undefined): string {
+  try {
+    return new Intl.ListFormat(locale || "en", { style: "long", type: "conjunction" }).format(
+      names,
+    );
+  } catch {
+    return names.join(", ");
+  }
+}
+
+/**
  * The list to paste into a ticket or a spreadsheet: a header and one line per
- * login, with its name and shared folders, tab separated. Names and folders
- * only, never a username, password, or anything else in the item.
+ * login, with its name and shared folders, tab separated, and who could see
+ * it when the list is several people's. Names and folders only, never a
+ * username, password, or anything else in the item.
  */
 export function passwordListText(
   seen: SeenPassword[],
-  labels: { name: string; folders: string; noFolder: string },
+  labels: { name: string; folders: string; noFolder: string; who?: string },
 ): string {
   const clean = (s: string) => s.replace(/[\t\r\n]+/g, " ").trim();
+  const withWho = labels.who != null && seen.some((s) => s.who != null);
   const lines = seen.map(
     (s) =>
       `${clean(s.item.name)}\t${
         s.folders.length > 0 ? s.folders.map((f) => clean(f.name)).join(", ") : labels.noFolder
-      }`,
+      }${withWho ? `\t${(s.who ?? []).map(clean).join(", ")}` : ""}`,
   );
-  return [`${labels.name}\t${labels.folders}`, ...lines].join("\n") + "\n";
+  const header = `${labels.name}\t${labels.folders}${withWho ? `\t${labels.who}` : ""}`;
+  return [header, ...lines].join("\n") + "\n";
 }
 
 type Translate = (key: string, ...args: string[]) => string;

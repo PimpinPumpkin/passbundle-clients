@@ -182,6 +182,7 @@ describe("MembersComponent", () => {
     mockFileDownloadService = mock<FileDownloadService>();
     mockKeykeeperOffboarding = mock<KeykeeperOffboardingService>();
     mockKeykeeperOffboarding.prepare.mockResolvedValue(null);
+    mockKeykeeperOffboarding.prepareMany.mockResolvedValue(new Map());
 
     await TestBed.configureTestingModule({
       imports: [MembersComponent],
@@ -641,7 +642,11 @@ describe("MembersComponent", () => {
 
       await component.bulkRemove(mockOrg);
 
-      expect(mockMemberDialogManager.openBulkRemoveDialog).toHaveBeenCalledWith(mockOrg, users);
+      expect(mockMemberDialogManager.openBulkRemoveDialog).toHaveBeenCalledWith(
+        mockOrg,
+        users,
+        new Map(),
+      );
       expect(mockOrganizationMetadataService.refreshMetadataCache).toHaveBeenCalled();
       expect(mockMemberService.loadUsers).toHaveBeenCalledWith(mockOrg);
     });
@@ -678,6 +683,7 @@ describe("MembersComponent", () => {
           mockOrg,
           users,
           isRevoking,
+          isRevoking ? new Map() : undefined,
         );
         expect(mockMemberService.loadUsers).toHaveBeenCalledWith(mockOrg);
       },
@@ -723,7 +729,72 @@ describe("MembersComponent", () => {
         mockOrg,
         users,
         true,
+        new Map(),
       );
+    });
+  });
+
+  describe("Keykeeper: what several members could see", () => {
+    const person = (id: string, email: string, status = OrganizationUserStatusType.Confirmed) =>
+      ({ ...mockUser, id, email, status }) as OrganizationUserView;
+    const ana = person("ana", "ana@example.com");
+    const ben = person("ben", "ben@example.com");
+    const cy = person("cy", "cy@example.com", OrganizationUserStatusType.Revoked);
+    const prepared = new Map([
+      ["ana", { summary: "Ana can open 1 shared folder with 2 items." } as KeykeeperOffboarding],
+      ["ben", { summary: "Ben can open 2 shared folders with 3 items." } as KeykeeperOffboarding],
+    ]);
+
+    beforeEach(() => {
+      mockKeykeeperOffboarding.prepareMany.mockResolvedValue(prepared);
+      mockBillingConstraint.seatLimitReached.mockResolvedValue(false);
+    });
+
+    it("says what each can open when removing them, then lists only the removed ones' passwords", async () => {
+      jest.spyOn(component["dataSource"](), "getCheckedUsersWithLimit").mockReturnValue([ana, ben]);
+      // The server kept Ben (say, the organization's last owner).
+      mockMemberService.loadUsers.mockResolvedValue([ben]);
+
+      await component.bulkRemove(mockOrg);
+
+      expect(mockKeykeeperOffboarding.prepareMany).toHaveBeenCalledWith(mockOrg, [
+        { id: "ana", name: "Test User" },
+        { id: "ben", name: "Test User" },
+      ]);
+      expect(mockMemberDialogManager.openBulkRemoveDialog).toHaveBeenCalledWith(
+        mockOrg,
+        [ana, ben],
+        new Map([
+          ["ana", "Ana can open 1 shared folder with 2 items."],
+          ["ben", "Ben can open 2 shared folders with 3 items."],
+        ]),
+      );
+      expect(mockKeykeeperOffboarding.showPasswordsOfMany).toHaveBeenCalledWith(prepared, ["ana"]);
+    });
+
+    it("lists the passwords of those revoked now, not of anyone revoked before", async () => {
+      jest
+        .spyOn(component["dataSource"](), "getCheckedUsersWithLimit")
+        .mockReturnValue([ana, ben, cy]);
+      mockMemberService.loadUsers.mockResolvedValue([
+        person("ana", "ana@example.com", OrganizationUserStatusType.Revoked),
+        ben,
+        cy,
+      ]);
+
+      await component.bulkRevokeOrRestore(true, mockOrg);
+
+      expect(mockKeykeeperOffboarding.showPasswordsOfMany).toHaveBeenCalledWith(prepared, ["ana"]);
+    });
+
+    it("works nothing out when restoring", async () => {
+      jest.spyOn(component["dataSource"](), "getCheckedUsersWithLimit").mockReturnValue([cy]);
+      mockMemberService.loadUsers.mockResolvedValue([cy]);
+
+      await component.bulkRevokeOrRestore(false, mockOrg);
+
+      expect(mockKeykeeperOffboarding.prepareMany).not.toHaveBeenCalled();
+      expect(mockKeykeeperOffboarding.showPasswordsOfMany).not.toHaveBeenCalled();
     });
   });
 

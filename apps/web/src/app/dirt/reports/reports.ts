@@ -25,6 +25,7 @@ export enum ReportType {
   PasskeyLogin = "passkeyLogin",
   // Keykeeper
   KeykeeperExpiringItems = "keykeeperExpiringItems",
+  KeykeeperMemberHealth = "keykeeperMemberHealth",
 }
 
 type ReportWithoutVariant = Omit<ReportEntry, "variant">;
@@ -83,5 +84,12 @@ export const reports: Record<ReportType, ReportWithoutVariant> = {
     description: "keykeeperExpiringItemsReportDesc",
     route: "expiring-items-report",
     icon: ItemTypes,
+  },
+  // Keykeeper: an organization's owners and admins only (DESIGN.md, "Members' own passwords").
+  [ReportType.KeykeeperMemberHealth]: {
+    title: "keykeeperMemberHealthReport",
+    description: "keykeeperMemberHealthReportDesc",
+    route: "member-health-report",
+    icon: UserLockIcon,
   },
 };

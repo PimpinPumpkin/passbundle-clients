@@ -48,10 +48,13 @@ export class ReportsHomeComponent {
 
   protected readonly reports$ = this.route.params.pipe(
     switchMap((params) => this.organizations$.pipe(getById(params.organizationId))),
-    switchMap((org) => this.buildReports(org?.productTierType)),
+    switchMap((org) => this.buildReports(org?.productTierType, org?.isAdmin)),
   );
 
-  private async buildReports(productType: ProductTierType | undefined): Promise<ReportEntry[]> {
+  private async buildReports(
+    productType: ProductTierType | undefined,
+    isAdmin = false,
+  ): Promise<ReportEntry[]> {
     const reportRequiresUpgrade =
       productType == ProductTierType.Free ? ReportVariant.RequiresUpgrade : ReportVariant.Enabled;
 
@@ -83,6 +86,16 @@ export class ReportsHomeComponent {
             ? ReportVariant.Enabled
             : ReportVariant.RequiresEnterprise,
       },
+      // Keykeeper: the organization's items that expire (DESIGN.md, "Expiration dates").
+      {
+        ...reports[ReportType.KeykeeperExpiringItems],
+        variant: ReportVariant.Enabled,
+      },
+      // Keykeeper: members' own passwords, in numbers, for owners and admins
+      // (DESIGN.md, "Members' own passwords"); the server shows nobody else.
+      ...(isAdmin
+        ? [{ ...reports[ReportType.KeykeeperMemberHealth], variant: ReportVariant.Enabled }]
+        : []),
     ];
 
     const passkeyReportEnabled = await firstValueFrom(
