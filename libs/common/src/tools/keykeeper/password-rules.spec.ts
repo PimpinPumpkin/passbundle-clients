@@ -1,9 +1,12 @@
 import {
+  combineRules,
   meetsRules,
   parsePasswordRules,
+  passwordForChange,
   passwordForRules,
   passwordForSite,
   PasswordRules,
+  rulesForFields,
   rulesForHost,
   secureRandomInt,
 } from "./password-rules";
@@ -216,6 +219,100 @@ describe("passwordForSite", () => {
   it("shortens it to the site's maximum", () => {
     const password = passwordForSite("a".repeat(5) + "B1!" + "c".repeat(40), "163.com");
     expect(password).toHaveLength(16);
+  });
+});
+
+describe("combineRules", () => {
+  it("holds when every one of them does", () => {
+    const rules = combineRules(
+      // In the rules language, the characters a rule names are all it allows.
+      parsePasswordRules("minlength: 8; maxlength: 20; required: digit; allowed: lower, upper;"),
+      parsePasswordRules("minlength: 10; maxlength: 16; allowed: lower, digit;"),
+    )!;
+    expect(rules.minLength).toBe(10);
+    expect(rules.maxLength).toBe(16);
+    expect(rules.required).toEqual(["0123456789"]);
+    expect(sorted(rules.allowed)).toBe(sorted("abcdefghijklmnopqrstuvwxyz0123456789"));
+  });
+
+  it("is null with nothing to combine, and passes one set of rules through", () => {
+    expect(combineRules(null, undefined)).toBeNull();
+    const one = parsePasswordRules("minlength: 8;")!;
+    expect(combineRules(one, null)).toEqual(one);
+  });
+});
+
+describe("rulesForFields", () => {
+  it("reads a field's passwordrules, minlength, and maxlength", () => {
+    const rules = rulesForFields([
+      { passwordRules: "required: upper; required: digit;", minLength: 12, maxLength: 16 },
+    ])!;
+    expect(rules.minLength).toBe(12);
+    expect(rules.maxLength).toBe(16);
+    expect(rules.required.map(sorted)).toEqual([sorted(LETTERS.slice(0, 26)), "0123456789"]);
+  });
+
+  it("takes the strictest of the new and confirm fields", () => {
+    const rules = rulesForFields([{ maxLength: 24 }, { maxLength: 16, minLength: 10 }])!;
+    expect(rules.maxLength).toBe(16);
+    expect(rules.minLength).toBe(10);
+  });
+
+  it("ignores the lengths a browser reports when none is set, and passwordrules it can't read", () => {
+    expect(rulesForFields([{ minLength: -1, maxLength: -1, passwordRules: "" }])).toBeNull();
+    expect(rulesForFields([{ maxLength: 524288 }])).toBeNull();
+    expect(rulesForFields([{ passwordRules: "required: [abc" }])).toBeNull();
+    expect(rulesForFields([])).toBeNull();
+  });
+});
+
+describe("passwordForChange", () => {
+  it("keeps the generated password when every rule accepts it", () => {
+    expect(
+      passwordForChange("Abcdefgh1234!xyz", "example.test", [rulesForFields([{ maxLength: 20 }])]),
+    ).toBe("Abcdefgh1234!xyz");
+  });
+
+  it("follows the site's published rules and the field's own at once", () => {
+    // airfrance.com: 8 to 12; the field adds a minimum of 10 and asks for a digit.
+    const field = rulesForFields([
+      { minLength: 10, passwordRules: "required: digit; allowed: ascii-printable;" },
+    ]);
+    const both = combineRules(rulesForHost("airfrance.com"), field)!;
+    for (let i = 0; i < 50; i++) {
+      const password = passwordForChange("Abcdefghijklmnopqrst!", "www.airfrance.com", [field])!;
+      expect(password.length).toBeGreaterThanOrEqual(10);
+      expect(password.length).toBeLessThanOrEqual(12);
+      expect(meetsRules(password, both)).toBe(true);
+    }
+  });
+
+  it("follows a field's maxlength and passwordrules on a site without published rules", () => {
+    const field = rulesForFields([
+      {
+        maxLength: 16,
+        minLength: 12,
+        passwordRules: "required: lower; required: digit; allowed: [-_];",
+      },
+    ]);
+    for (let i = 0; i < 50; i++) {
+      const password = passwordForChange("Abcdefghijklmnopqrst!1", "accounts.example.test", [
+        field,
+      ])!;
+      expect(password).toMatch(/^[a-z0-9_-]{12,16}$/);
+      expect(password).toMatch(/[0-9]/);
+    }
+  });
+
+  it("is null when nothing can meet every rule", () => {
+    const tooShort = rulesForFields([{ maxLength: 6 }]);
+    const tooLong = rulesForFields([{ minLength: 10 }]);
+    expect(passwordForChange("Abcdefgh1!", "example.test", [tooShort, tooLong])).toBeNull();
+    const nothingAllowed = combineRules(
+      parsePasswordRules("allowed: digit;"),
+      parsePasswordRules("allowed: lower;"),
+    );
+    expect(passwordForChange("Abcdefgh1!", "example.test", [nothingAllowed])).toBeNull();
   });
 });
 

@@ -194,6 +194,8 @@ export * from "./keykeeper/item-hero.component";
 export * from "./keykeeper/password-health-line.component";
 export * from "./keykeeper/item-history.service";
 export * from "./keykeeper/open-and-fill.service";
+export * from "./keykeeper/password-change.service";
+export * from "./keykeeper/password-change-card.component";
 export { CANT_COPY_ITEM_KEY, mayCloneItem } from "./keykeeper/may-clone";
 export {
   distinctVersions,

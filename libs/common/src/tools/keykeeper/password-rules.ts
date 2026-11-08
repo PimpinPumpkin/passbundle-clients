@@ -261,6 +261,125 @@ export function passwordForRules(
 }
 
 /**
+ * Rules that hold when every one of the given rules does: the longest
+ * minimum, the shortest maximum and run, every required set (as far as it's
+ * allowed), and only characters each allows. Null when there are none.
+ */
+export function combineRules(...all: (PasswordRules | null | undefined)[]): PasswordRules | null {
+  const rules = all.filter((r): r is PasswordRules => r != null);
+  if (rules.length === 0) {
+    return null;
+  }
+  const lowest = (values: (number | undefined)[]) => {
+    const set = values.filter((v): v is number => v != null);
+    return set.length ? Math.min(...set) : undefined;
+  };
+  const highest = (values: (number | undefined)[]) => {
+    const set = values.filter((v): v is number => v != null);
+    return set.length ? Math.max(...set) : undefined;
+  };
+  let allowed: string | null = null;
+  for (const r of rules) {
+    if (r.allowed != null) {
+      allowed =
+        allowed == null ? r.allowed : [...allowed].filter((c) => r.allowed!.includes(c)).join("");
+    }
+  }
+  const combined: PasswordRules = {
+    required: rules.flatMap((r) => r.required),
+    allowed,
+  };
+  const minLength = highest(rules.map((r) => r.minLength));
+  const maxLength = lowest(rules.map((r) => r.maxLength));
+  const maxConsecutive = lowest(rules.map((r) => r.maxConsecutive));
+  if (minLength != null) {
+    combined.minLength = minLength;
+  }
+  if (maxLength != null) {
+    combined.maxLength = maxLength;
+  }
+  if (maxConsecutive != null) {
+    combined.maxConsecutive = maxConsecutive;
+  }
+  return combined;
+}
+
+/** What a page's new-password field says about the password it takes. */
+export type FieldPasswordRules = {
+  /** Its `passwordrules` attribute, in Apple's password rules language. */
+  passwordRules?: string | null;
+  /** Its `minlength` and `maxlength` attributes, where set. */
+  minLength?: number | null;
+  maxLength?: number | null;
+};
+
+/** The rules a page's fields set: their `passwordrules`, `minlength`, and `maxlength`. */
+export function rulesForFields(fields: FieldPasswordRules[]): PasswordRules | null {
+  const rules: (PasswordRules | null)[] = [];
+  for (const field of fields) {
+    if (typeof field.passwordRules === "string" && field.passwordRules.trim() !== "") {
+      rules.push(parsePasswordRules(field.passwordRules));
+    }
+    const lengths: PasswordRules = { required: [], allowed: null };
+    // A browser reports a missing minlength or maxlength as -1 (and some
+    // pages set silly ones); only a positive length counts.
+    if (Number.isInteger(field.minLength) && field.minLength! > 0) {
+      lengths.minLength = field.minLength!;
+    }
+    if (Number.isInteger(field.maxLength) && field.maxLength! > 0 && field.maxLength! < 10_000) {
+      lengths.maxLength = field.maxLength!;
+    }
+    if (lengths.minLength != null || lengths.maxLength != null) {
+      rules.push(lengths);
+    }
+  }
+  return combineRules(...rules);
+}
+
+/**
+ * The new password for an assisted password change: the generated one when
+ * every rule accepts it, otherwise one made to them, as `passwordForSite`
+ * does, but with the site's published rules, a recipe's, and the form's own
+ * fields all at once. Null when nothing can meet them: a password the site
+ * rejects is no use, and one that breaks a rule is never offered.
+ */
+export function passwordForChange(
+  generated: string,
+  host: string | null | undefined,
+  more: (PasswordRules | null | undefined)[] = [],
+  randomInt: (n: number) => number = secureRandomInt,
+): string | null {
+  const rules = combineRules(rulesForHost(host), ...more);
+  if (!rules || meetsRules(generated, rules)) {
+    return generated;
+  }
+  const made = madeToRules(generated, rules, randomInt);
+  return made != null && meetsRules(made, rules) ? made : null;
+}
+
+/**
+ * A password made to the rules, keeping the generated one's length and kinds
+ * of characters wherever the rules allow; null when the rules can't be met.
+ */
+function madeToRules(
+  generated: string,
+  rules: PasswordRules,
+  randomInt: (n: number) => number,
+): string | null {
+  const length = [...generated].length;
+  const kinds = [UPPER, LOWER, DIGIT, SPECIAL]
+    .filter((kind) => [...generated].some((c) => kind.includes(c)))
+    .map((kind) =>
+      [...kind].filter((c) => c !== " " && (rules.allowed ?? ASCII_PRINTABLE).includes(c)).join(""),
+    )
+    .filter((allowedOfKind) => allowedOfKind !== "");
+  return (
+    passwordForRules({ ...rules, required: [...rules.required, ...kinds] }, length, randomInt) ??
+    passwordForRules(rules, length, randomInt)
+  );
+}
+
+/**
  * The password to offer on a page: the generated one when the site's rules
  * accept it (or the site has none), otherwise one made to its rules. That one
  * keeps the generated password's length and kinds of characters (uppercase,

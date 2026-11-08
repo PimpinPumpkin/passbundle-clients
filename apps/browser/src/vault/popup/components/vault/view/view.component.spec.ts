@@ -44,6 +44,7 @@ import { ShareLinkService } from "@bitwarden/tools-share";
 import {
   ArchiveCipherUtilitiesService,
   CopyCipherFieldService,
+  KeykeeperPasswordChangeService,
   PasswordRepromptService,
 } from "@bitwarden/vault";
 
@@ -97,6 +98,12 @@ describe("ViewComponent", () => {
     driversLicense: {},
   } as unknown as CipherView;
 
+  // Keykeeper: assisted password change, which the extension provides.
+  const mockPasswordChange = {
+    available: jest.fn(() => true),
+    confirmAndStart: jest.fn(async () => true),
+    status: jest.fn(async (): Promise<null> => null),
+  };
   const mockPasswordRepromptService = {
     showPasswordPrompt,
   };
@@ -204,6 +211,7 @@ describe("ViewComponent", () => {
           provide: PasswordRepromptService,
           useValue: mockPasswordRepromptService,
         },
+        { provide: KeykeeperPasswordChangeService, useValue: mockPasswordChange },
         {
           provide: CipherArchiveService,
           useValue: cipherArchiveService,
@@ -1240,6 +1248,30 @@ describe("ViewComponent", () => {
       expect(mockNavigate).toHaveBeenCalledWith(["/keykeeper-item-history"], {
         queryParams: { cipherId: mockCipher.id },
       });
+    });
+  });
+
+  describe("Keykeeper: Change password", () => {
+    beforeEach(() => {
+      mockPasswordChange.available.mockReturnValue(true);
+      component.cipher = mockCipher;
+    });
+
+    it("offers it for an item the extension can change the password of", () => {
+      expect(component.canChangePassword()).toBe(true);
+      expect(mockPasswordChange.available).toHaveBeenCalledWith(mockCipher);
+      mockPasswordChange.available.mockReturnValue(false);
+      expect(component.canChangePassword()).toBe(false);
+    });
+
+    it("doesn't offer it for an archived item", () => {
+      component.cipher = { ...mockCipher, isArchived: true } as unknown as CipherView;
+      expect(component.canChangePassword()).toBe(false);
+    });
+
+    it("asks, then starts the change", async () => {
+      await component.changePassword();
+      expect(mockPasswordChange.confirmAndStart).toHaveBeenCalledWith(mockCipher);
     });
   });
 });

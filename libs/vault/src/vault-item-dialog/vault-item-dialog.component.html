@@ -41,6 +41,14 @@
 
   <div bitDialogContent #dialogContent>
     @if (showCipherView) {
+      <!-- Keykeeper: an unfinished password change, with the old password one click away -->
+      @if (!formConfig.isAdminConsole) {
+        <vault-keykeeper-password-change-card
+          class="tw-block tw-mb-4"
+          [cipher]="cipher"
+          (saved)="onCipherSaved($event)"
+        />
+      }
       <app-cipher-view
         [cipher]="cipher"
         [collections]="collections"

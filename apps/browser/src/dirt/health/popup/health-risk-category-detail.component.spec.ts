@@ -31,7 +31,7 @@ import {
   DialogService,
   ScrollLayoutHostDirective,
 } from "@bitwarden/components";
-import { PasswordRepromptService } from "@bitwarden/vault";
+import { KeykeeperPasswordChangeService, PasswordRepromptService } from "@bitwarden/vault";
 
 import { CurrentAccountComponent } from "../../../auth/popup/account-switching/current-account.component";
 import { PopOutComponent } from "../../../platform/popup/components/pop-out.component";
@@ -164,6 +164,7 @@ describe("HealthRiskCategoryDetailComponent", () => {
   let router: MockProxy<Router>;
   let changeLoginPasswordService: MockProxy<ChangeLoginPasswordService>;
   let passwordRepromptService: MockProxy<PasswordRepromptService>;
+  let passwordChangeService: MockProxy<KeykeeperPasswordChangeService>;
   let platformUtilsService: MockProxy<PlatformUtilsService>;
   let dialogService: MockProxy<DialogService>;
   let compactModeService: MockProxy<CompactModeService>;
@@ -375,6 +376,11 @@ describe("HealthRiskCategoryDetailComponent", () => {
     passwordRepromptService = mock<PasswordRepromptService>();
     passwordRepromptService.passwordRepromptCheck.mockResolvedValue(true);
 
+    // Keykeeper: assisted password change, off for these items unless a test says otherwise.
+    passwordChangeService = mock<KeykeeperPasswordChangeService>();
+    passwordChangeService.available.mockReturnValue(false);
+    passwordChangeService.confirmAndStart.mockResolvedValue(true);
+
     platformUtilsService = mock<PlatformUtilsService>();
     platformUtilsService.launchUri.mockImplementation(() => {});
     // `onDeleteItem` only awaits `open()`, so a minimal `DialogRef`-shaped return is enough.
@@ -399,6 +405,7 @@ describe("HealthRiskCategoryDetailComponent", () => {
         { provide: CipherService, useValue: cipherService },
         { provide: ChangeLoginPasswordService, useValue: changeLoginPasswordService },
         { provide: PasswordRepromptService, useValue: passwordRepromptService },
+        { provide: KeykeeperPasswordChangeService, useValue: passwordChangeService },
         { provide: DialogService, useValue: dialogService },
         { provide: I18nService, useValue: { t: (key: string) => key } },
         { provide: PlatformUtilsService, useValue: platformUtilsService },
@@ -821,6 +828,23 @@ describe("HealthRiskCategoryDetailComponent", () => {
       expect(platformUtilsService.launchUri).toHaveBeenCalledWith(
         "https://another.example.com/password",
       );
+    });
+
+    it("changes the password on the site for an item that allows it, instead of only opening the page", async () => {
+      setReport(RiskCategory.Exposed, [
+        buildLogin({ id: "cipher-1", uris: ["https://example.com"] }),
+      ]);
+      passwordChangeService.available.mockReturnValue(true);
+      await initComponent();
+
+      changePasswordButton(0)!.click();
+      await fixture.whenStable();
+
+      expect(passwordChangeService.confirmAndStart).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "cipher-1" }),
+      );
+      expect(changeLoginPasswordService.getChangePasswordUrl).not.toHaveBeenCalled();
+      expect(platformUtilsService.launchUri).not.toHaveBeenCalled();
     });
   });
 

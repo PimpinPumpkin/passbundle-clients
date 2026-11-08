@@ -77,6 +77,7 @@ import { CipherViewComponent } from "../cipher-view/cipher-view.component";
 import { DecryptionFailureDialogComponent } from "../components/decryption-failure-dialog/decryption-failure-dialog.component";
 import { historyAccess, HistoryAccess } from "../keykeeper/item-versions";
 import { KeykeeperItemVersionsComponent } from "../keykeeper/item-versions.component";
+import { KeykeeperPasswordChangeCardComponent } from "../keykeeper/password-change-card.component";
 import { printItem } from "../keykeeper/print-item";
 import { VaultViewPasswordHistoryService } from "../services/view-password-history.service";
 import { SHARE_ITEM_ENTRY_POINT } from "../tokens/share-item-entry-point.token";
@@ -153,6 +154,7 @@ let nextFormId = 0;
     CipherViewComponent,
     // Keykeeper: the item's earlier versions (DESIGN.md, "Item history")
     KeykeeperItemVersionsComponent,
+    KeykeeperPasswordChangeCardComponent,
     DialogModule,
     CommonModule,
     CipherFormModule,
