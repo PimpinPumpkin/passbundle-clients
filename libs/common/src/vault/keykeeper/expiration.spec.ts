@@ -7,10 +7,17 @@ import {
   expirationBadgeVariant,
   expirationLabel,
   expirationStatus,
+  isExpiringSoon,
   itemExpiration,
   parseIsoDate,
+  parseRemindDays,
+  REMIND_FIELD_NAME,
+  remindDays,
+  remindValue,
   setStoredExpiration,
+  setStoredRemind,
   storedExpiration,
+  storedRemind,
 } from "./expiration";
 
 const field = (name: string, value: string) => {
@@ -106,6 +113,61 @@ describe("Keykeeper expiration dates", () => {
       expect(status).toEqual({ state, days });
       expect(expirationLabel(status)).toBe(label);
       expect(expirationBadgeVariant(status)).toBe(variant);
+    });
+
+    it("counts expired and within 30 days as expiring soon, and nothing else", () => {
+      const on = (date: string) => ({ fields: [field(EXPIRES_FIELD_NAME, date)] });
+      expect(isExpiringSoon(on("2026-10-12"), today)).toBe(true);
+      expect(isExpiringSoon(on("2026-11-13"), today)).toBe(true);
+      expect(isExpiringSoon(on("2026-11-14"), today)).toBe(false);
+      expect(isExpiringSoon({ card: { expMonth: "10", expYear: "2026" } }, today)).toBe(true);
+      expect(isExpiringSoon({ fields: [] }, today)).toBe(false);
+      expect(isExpiringSoon(null, today)).toBe(false);
+    });
+  });
+
+  describe("reminder days", () => {
+    it("reads whole days from 1 to 365 in any order, repeats once, largest first", () => {
+      expect(parseRemindDays("90,30,7,1")).toEqual([90, 30, 7, 1]);
+      expect(parseRemindDays(" 7, 90 ,7 ")).toEqual([90, 7]);
+      expect(parseRemindDays("365")).toEqual([365]);
+      expect(parseRemindDays("none")).toBe("none");
+      expect(parseRemindDays(" None ")).toBe("none");
+    });
+
+    it("treats anything else as the default", () => {
+      for (const value of ["", "0", "366", "1.5", "-1", "7,,1", "seven", "1000", null, undefined]) {
+        expect(parseRemindDays(value)).toBeNull();
+        expect(remindDays({ fields: [field(REMIND_FIELD_NAME, value ?? "")] })).toEqual([30, 7, 1]);
+      }
+    });
+
+    it("is the default without a field, nothing with none, and the list otherwise", () => {
+      expect(remindDays({ fields: [] })).toEqual([30, 7, 1]);
+      expect(remindDays({ fields: [field(REMIND_FIELD_NAME, "none")] })).toBeNull();
+      expect(remindDays({ fields: [field(REMIND_FIELD_NAME, "1,7")] })).toEqual([7, 1]);
+    });
+
+    it("stores only what isn't the default, as a text field, the same way every time", () => {
+      expect(remindValue([30, 7, 1])).toBeNull();
+      expect(remindValue([1, 30, 7])).toBeNull();
+      expect(remindValue([1, 7, 90, 30])).toBe("90,30,7,1");
+      expect(remindValue("none")).toBe("none");
+
+      const cipher = { fields: [field("Customer ID", "C-1")] };
+      setStoredRemind(cipher, "7,1");
+      expect(cipher.fields.map((f) => [f.name, f.value, f.type])).toEqual([
+        ["Customer ID", "C-1", FieldType.Text],
+        [REMIND_FIELD_NAME, "7,1", FieldType.Text],
+      ]);
+      expect(storedRemind(cipher)).toBe("7,1");
+      setStoredRemind(cipher, "30,7,1");
+      expect(cipher.fields.map((f) => f.name)).toEqual(["Customer ID"]);
+      setStoredRemind(cipher, "none");
+      expect(storedRemind(cipher)).toBe("none");
+      setStoredRemind(cipher, null);
+      expect(storedRemind(cipher)).toBeNull();
+      expect(cipher.fields.map((f) => f.name)).toEqual(["Customer ID"]);
     });
   });
 });

@@ -41,8 +41,10 @@ describe("KeykeeperSeenPasswordsDialogComponent", () => {
   let toast: MockProxy<ToastService>;
 
   function create(d: SeenPasswordsDialogData) {
-    const i18n = mock<I18nService>();
-    i18n.t.mockImplementation((key: string) => key);
+    const i18n = mock<I18nService>({ translationLocale: "en" });
+    i18n.t.mockImplementation((key: string, ...args: string[]) =>
+      args.length ? `${key}(${args.join("|")})` : key,
+    );
     return new KeykeeperSeenPasswordsDialogComponent(
       d,
       dialogRef,
@@ -70,6 +72,56 @@ describe("KeykeeperSeenPasswordsDialogComponent", () => {
     );
     expect(toast.showToast).toHaveBeenCalledWith(
       expect.objectContaining({ message: "keykeeperSeenPasswordsCopied" }),
+    );
+  });
+
+  it("names one person, or says how many and who could see each login", () => {
+    const one = create(data());
+    expect(one["title"]).toBe("keykeeperSeenPasswordsTitle(Alex)");
+    expect(one["intro"]).toBe("keykeeperSeenPasswordsIntro(Alex)");
+    expect(one["many"]).toBe(false);
+
+    const people = [
+      { name: "Alex", everyItem: false },
+      { name: "Sam", everyItem: false },
+    ];
+    const many = create(data({ name: "Alex and Sam", people }));
+    expect(many["title"]).toBe("keykeeperSeenPasswordsTitleMany(2)");
+    expect(many["intro"]).toBe("keykeeperSeenPasswordsIntroMany(Alex and Sam)");
+    expect(many["who"]({ ...data().passwords[0], who: ["Alex", "Sam"] })).toBe("Alex and Sam");
+
+    const everyItem = create(
+      data({
+        name: "Alex and Sam",
+        everyItem: true,
+        people: [people[0], { name: "Sam", everyItem: true }],
+      }),
+    );
+    expect(everyItem["intro"]).toBe("keykeeperSeenPasswordsEveryItemMany(Sam)");
+  });
+
+  it("copies who could see each login when the list is several people's", () => {
+    const component = create(
+      data({
+        name: "Alex and Sam",
+        people: [
+          { name: "Alex", everyItem: false },
+          { name: "Sam", everyItem: false },
+        ],
+        passwords: [
+          {
+            item: login("wifi", "Wi-Fi"),
+            folders: [{ id: "front", name: "Front desk" }],
+            who: ["Alex", "Sam"],
+          },
+        ],
+      }),
+    );
+
+    component["copy"]();
+
+    expect(platformUtils.copyToClipboard).toHaveBeenCalledWith(
+      "name\tkeykeeperSeenPasswordsFolders\tkeykeeperSeenPasswordsWho\nWi-Fi\tFront desk\tAlex, Sam\n",
     );
   });
 

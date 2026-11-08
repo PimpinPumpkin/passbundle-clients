@@ -9,10 +9,10 @@ import { DIALOG_DATA, DialogRef, DialogService, ToastService } from "@bitwarden/
 
 import { SharedModule } from "../../shared";
 
-import { passwordListText, SeenPassword } from "./access-review";
+import { listNames, passwordListText, SeenPassword } from "./access-review";
 
 export type SeenPasswordsDialogData = {
-  /** Who was removed or revoked. */
+  /** Who was removed or revoked: one name, or several ("Alex, Sam, and Jo"). */
   name: string;
   organizationId: string;
   /** Whether "Open" goes to the admin console's vault, or the person's own. */
@@ -22,6 +22,8 @@ export type SeenPasswordsDialogData = {
   passwords: SeenPassword[];
   /** The decrypted items, for their icons. */
   items: Map<string, CipherView>;
+  /** After a bulk remove or revoke: each of the people, so the list says who could see what. */
+  people?: { name: string; everyItem: boolean }[];
 };
 
 /**
@@ -36,18 +38,9 @@ export type SeenPasswordsDialogData = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [SharedModule, IconComponent],
   template: `
-    <bit-dialog
-      dialogSize="large"
-      [title]="'keykeeperSeenPasswordsTitle' | i18n: data.name"
-      data-testid="seen-passwords"
-    >
+    <bit-dialog dialogSize="large" [title]="title" data-testid="seen-passwords">
       <div bitDialogContent>
-        <p>
-          {{
-            (data.everyItem ? "keykeeperSeenPasswordsEveryItem" : "keykeeperSeenPasswordsIntro")
-              | i18n: data.name
-          }}
-        </p>
+        <p data-testid="seen-passwords-intro">{{ intro }}</p>
         @if (!showing()) {
           <button type="button" bitButton buttonType="secondary" (click)="showing.set(true)">
             {{
@@ -63,6 +56,9 @@ export type SeenPasswordsDialogData = {
                 <th bitCell class="tw-w-12"></th>
                 <th bitCell>{{ "name" | i18n }}</th>
                 <th bitCell>{{ "keykeeperSeenPasswordsFolders" | i18n }}</th>
+                @if (many) {
+                  <th bitCell>{{ "keykeeperSeenPasswordsWho" | i18n }}</th>
+                }
                 <th bitCell class="tw-w-20"></th>
               </tr>
             </ng-container>
@@ -76,6 +72,9 @@ export type SeenPasswordsDialogData = {
                   </td>
                   <td bitCell class="tw-break-all">{{ seen.item.name }}</td>
                   <td bitCell data-testid="seen-password-folders">{{ folders(seen) }}</td>
+                  @if (many) {
+                    <td bitCell data-testid="seen-password-who">{{ who(seen) }}</td>
+                  }
                   <td bitCell class="tw-text-right">
                     <button
                       type="button"
@@ -116,6 +115,9 @@ export class KeykeeperSeenPasswordsDialogComponent {
   /** For someone who saw every item, the list waits for a click. */
   protected readonly showing = signal(!this.data.everyItem);
 
+  /** Several people were removed or revoked at once. */
+  protected readonly many = (this.data.people?.length ?? 0) > 1;
+
   constructor(
     @Inject(DIALOG_DATA) protected readonly data: SeenPasswordsDialogData,
     private readonly dialogRef: DialogRef,
@@ -133,6 +135,32 @@ export class KeykeeperSeenPasswordsDialogComponent {
       closeOnNavigation: false,
       disableClose: true,
     });
+  }
+
+  protected get title(): string {
+    return this.many
+      ? this.i18nService.t("keykeeperSeenPasswordsTitleMany", String(this.data.people!.length))
+      : this.i18nService.t("keykeeperSeenPasswordsTitle", this.data.name);
+  }
+
+  protected get intro(): string {
+    if (!this.many) {
+      return this.i18nService.t(
+        this.data.everyItem ? "keykeeperSeenPasswordsEveryItem" : "keykeeperSeenPasswordsIntro",
+        this.data.name,
+      );
+    }
+    const sawEvery = this.data.people!.filter((p) => p.everyItem).map((p) => p.name);
+    return sawEvery.length > 0
+      ? this.i18nService.t(
+          "keykeeperSeenPasswordsEveryItemMany",
+          listNames(sawEvery, this.i18nService.translationLocale),
+        )
+      : this.i18nService.t("keykeeperSeenPasswordsIntroMany", this.data.name);
+  }
+
+  protected who(seen: SeenPassword): string {
+    return listNames(seen.who ?? [], this.i18nService.translationLocale);
   }
 
   protected folders(seen: SeenPassword): string {
@@ -166,6 +194,7 @@ export class KeykeeperSeenPasswordsDialogComponent {
       name: this.i18nService.t("name"),
       folders: this.i18nService.t("keykeeperSeenPasswordsFolders"),
       noFolder: this.i18nService.t("keykeeperSeenPasswordsNoFolder"),
+      who: this.many ? this.i18nService.t("keykeeperSeenPasswordsWho") : undefined,
     });
     this.platformUtilsService.copyToClipboard(text);
     this.toastService.showToast({

@@ -65,6 +65,8 @@ export interface VaultMenuEntry {
 export interface VaultMenu {
   all: VaultMenuEntry;
   favorites?: VaultMenuEntry;
+  /** Items expired or expiring within 30 days, while there are any (or it's picked). */
+  expiring?: VaultMenuEntry;
   categories: VaultMenuEntry[];
   /**
    * Personal with the person's own folders right after it, a level in, then
@@ -83,6 +85,7 @@ export interface VaultMenuState {
   /** Items the person may see. Undefined while they load. */
   ciphers?: CipherViewLike[];
   allItemsLabel: string;
+  expiringLabel: string;
   /** All items, with the categories that have items (and the one showing). */
   typeTree?: TreeNode<CipherTypeFilter>;
   organizationTree?: TreeNode<OrganizationFilter>;
@@ -102,6 +105,13 @@ export interface VaultMenuActions {
   /** A personal folder, whatever Personal or organization was showing (folderPick). */
   folder: (node: TreeNode<FolderFilter>) => Promise<void>;
   archive: (node: TreeNode<CipherTypeFilter>) => Promise<void>;
+  /** Expiring soon, in Personal or the organization showing, as a category is. */
+  expiring: () => Promise<void>;
+}
+
+/** Where picking Expiring soon goes: like a category, inside the place showing. */
+export function expiringPick(routed: RoutedVaultFilterModel): RoutedVaultFilterModel {
+  return { ...routed, type: "expiring", folderId: undefined, collectionId: undefined };
 }
 
 /**
@@ -204,6 +214,26 @@ export function buildVaultMenu(state: VaultMenuState, actions: VaultMenuActions)
     select: () => actions.all(),
   };
 
+  // Keykeeper: Expiring soon, while anything is (DESIGN.md, "Expiration dates").
+  const expiringNow = ciphers?.filter(createFilterFunction({ type: "expiring" })).length ?? 0;
+  const expiring: VaultMenuEntry | undefined =
+    expiringNow > 0 || (state.onVault && routed.type === "expiring")
+      ? {
+          key: "expiring",
+          label: state.expiringLabel,
+          icon: "bwi-clock",
+          tile: "expiring",
+          count:
+            ciphers == null
+              ? undefined
+              : ciphers.filter(createFilterFunction(expiringPick(routed))).length,
+          depth: 0,
+          active: picked(routed.type === "expiring"),
+          scope: false,
+          select: () => actions.expiring(),
+        }
+      : undefined;
+
   const types = state.typeTree?.children ?? [];
   const favorites = types.find((t) => t.node.type === "favorites");
   const categories = types
@@ -275,6 +305,7 @@ export function buildVaultMenu(state: VaultMenuState, actions: VaultMenuActions)
   return {
     all,
     favorites: favorites ? typeEntry(favorites, actions.type) : undefined,
+    expiring,
     categories,
     places,
     archive: state.archive
@@ -295,6 +326,7 @@ export function pickedLabel(menu: VaultMenu): string | undefined {
   const entries = [
     menu.all,
     menu.favorites,
+    menu.expiring,
     ...menu.categories,
     ...menu.places,
     menu.archive,

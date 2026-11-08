@@ -1,4 +1,4 @@
-import { Injectable } from "@angular/core";
+import { Injectable, Optional } from "@angular/core";
 import {
   combineLatest,
   debounceTime,
@@ -12,9 +12,16 @@ import {
   timer,
 } from "rxjs";
 
+import { ApiService } from "@bitwarden/common/abstractions/api.service";
+import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { AuthService } from "@bitwarden/common/auth/abstractions/auth.service";
 import { AuthenticationStatus } from "@bitwarden/common/auth/enums/authentication-status";
+import {
+  KeykeeperOwnHealthReporter,
+  OwnHealthCounts,
+  ownHealthCounts,
+} from "@bitwarden/common/dirt/keykeeper/own-health";
 import {
   checksPassword,
   isWeakScore,
@@ -23,13 +30,26 @@ import {
   passwordScore,
 } from "@bitwarden/common/dirt/keykeeper/password-health";
 import { PwnedPasswordsCancelledError } from "@bitwarden/common/dirt/keykeeper/pwned-passwords";
+import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { PasswordStrengthServiceAbstraction } from "@bitwarden/common/tools/password-strength";
 import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
+import { isExpiringSoon } from "@bitwarden/common/vault/keykeeper/expiration";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 
 import { KeykeeperBreachCheckSetting } from "./breach-check-setting.service";
 import { KeykeeperExposureChecks } from "./exposure-checks.service";
+
+/**
+ * Keykeeper: sends the numbers for someone's own logins to the server, for
+ * their organizations' admins (DESIGN.md, "Members' own passwords").
+ */
+@Injectable({ providedIn: "root" })
+export class KeykeeperWebOwnHealthReporter extends KeykeeperOwnHealthReporter {
+  constructor(apiService: ApiService, organizationService: OrganizationService, log: LogService) {
+    super(apiService, organizationService, log);
+  }
+}
 
 /** Items to fix, and whether the breach check couldn't be made for some of them. */
 export type HealthCount = { toFix: number; couldntCheck: boolean };
@@ -46,15 +66,19 @@ const pause = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 /**
  * Keykeeper: the count beside Health in the web vault's menu: how many items
  * the person's Health would ask them to fix (a weak, reused, or exposed
- * password), by the reports' own rules (password-health.ts), so it matches
- * what Health lists. It's worked out after the vault is unlocked and showing,
+ * password, or an item expired or expiring within 30 days), each item once,
+ * by the reports' own rules (password-health.ts, expiration.ts), so it
+ * matches what Health lists. It's worked out after the vault is unlocked and showing,
  * a few passwords at a time, so it never holds anything up: weak and reused
  * first, then exposed once the k-anonymity breach check answers (only 5
  * characters of each password's SHA-1 hash leave the browser). When that
  * check can't be made, the count is weak and reused, with a hint that it
  * couldn't check. When the person turned off "Check my passwords against
  * known breaches after unlocking", the count is weak and reused and nothing
- * is sent. See DESIGN.md, "The left menu".
+ * is sent. See DESIGN.md, "The left menu". Each count also gives the numbers
+ * for the person's own logins (Personal) to their organizations' admins,
+ * with exposed only when every one was checked (DESIGN.md, "Members' own
+ * passwords").
  */
 @Injectable({ providedIn: "root" })
 export class KeykeeperHealthCountService {
@@ -71,6 +95,7 @@ export class KeykeeperHealthCountService {
     private readonly passwordStrengthService: PasswordStrengthServiceAbstraction,
     private readonly exposureChecks: KeykeeperExposureChecks,
     private readonly breachCheck: KeykeeperBreachCheckSetting,
+    @Optional() private readonly ownHealth?: KeykeeperWebOwnHealthReporter,
   ) {
     this.count$ = accountService.activeAccount$.pipe(
       switchMap((account) =>
@@ -91,6 +116,8 @@ export class KeykeeperHealthCountService {
   }
 
   private countFor(userId: UserId): Observable<HealthCount | undefined> {
+    // A new unlock reports again.
+    this.ownHealth?.forget(userId);
     return timer(HEALTH_COUNT_START_MS).pipe(
       switchMap(() =>
         combineLatest([
@@ -108,6 +135,7 @@ export class KeykeeperHealthCountService {
           // before the setting was turned off (here or in another tab) sends
           // nothing.
           mayAsk: () => firstValueFrom(this.breachCheck.checksAfterUnlock$(userId)),
+          own: (counts) => void this.ownHealth?.report(userId, counts),
         }),
       ),
     );
@@ -117,14 +145,20 @@ export class KeykeeperHealthCountService {
    * The items to fix among these: weak and reused first, then with exposed,
    * unless `checkExposed` is off. Never fails; a breach check that couldn't
    * be made is said with `couldntCheck`. Unsubscribing calls off the checks
-   * still waiting.
+   * still waiting. Once it's done, `own` gets the numbers for the person's
+   * own logins, with exposed only when every one of them was checked.
    */
   count(
     ciphers: CipherView[],
     {
       checkExposed = true,
       mayAsk,
-    }: { checkExposed?: boolean; mayAsk?: () => Promise<boolean> } = {},
+      own,
+    }: {
+      checkExposed?: boolean;
+      mayAsk?: () => Promise<boolean>;
+      own?: (counts: OwnHealthCounts) => void;
+    } = {},
   ): Observable<HealthCount> {
     return new Observable<HealthCount>((subscriber) => {
       const calledOff = new AbortController();
@@ -143,9 +177,15 @@ export class KeykeeperHealthCountService {
           }
         }
         const rules = { needsEdit: true, weak: (cipher: CipherView) => weak.has(cipher) };
-        const toFix = passwordProblems(checked, rules).filter(needsFixing).length;
+        // Expired or expiring within 30 days: the Expiring items report's.
+        const expiring = ciphers.filter((cipher) => !cipher.isDeleted && isExpiringSoon(cipher));
+        const toFixOf = (problems: ReturnType<typeof passwordProblems>) =>
+          new Set([...problems.filter(needsFixing).map((found) => found.cipher), ...expiring]).size;
+        const toFix = toFixOf(passwordProblems(checked, rules));
         subscriber.next({ toFix, couldntCheck: false });
+        const isWeak = (cipher: CipherView) => weak.has(cipher);
         if (!checkExposed) {
+          own?.(ownHealthCounts(checked, isWeak));
           subscriber.complete();
           return;
         }
@@ -159,15 +199,17 @@ export class KeykeeperHealthCountService {
         } catch (e) {
           if (!(e instanceof PwnedPasswordsCancelledError)) {
             subscriber.next({ toFix, couldntCheck: true });
+            own?.(ownHealthCounts(checked, isWeak));
           }
           subscriber.complete();
           return;
         }
         const problems = passwordProblems(checked, { ...rules, exposed });
         subscriber.next({
-          toFix: problems.filter(needsFixing).length,
+          toFix: toFixOf(problems),
           couldntCheck: problems.some((found) => found.exposed === null),
         });
+        own?.(ownHealthCounts(checked, isWeak, exposed));
         subscriber.complete();
       };
       run().catch(() => {

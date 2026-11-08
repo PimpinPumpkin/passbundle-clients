@@ -1,6 +1,7 @@
 // Keykeeper: on-device reminders before items expire. The extension checks
 // every few hours while the vault is unlocked and shows a browser notification
-// at 30, 7, and 1 day before an item expires, and once when it has expired.
+// on each of an item's reminder days (30, 7, and 1 day before unless the item
+// says otherwise, or never), and once when it has expired.
 // Nothing leaves the device; what was already shown is remembered on it, per
 // account and cleared at logout, so each step notifies once. The notification
 // says how many items, never which: the system shows it on the lock screen and
@@ -14,9 +15,11 @@ import { AuthenticationStatus } from "@bitwarden/common/auth/enums/authenticatio
 import { getOptionalUserId } from "@bitwarden/common/auth/services/account.service";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import {
+  DEFAULT_REMIND_DAYS,
   ExpirationStatus,
   expirationStatus,
   itemExpiration,
+  remindDays,
 } from "@bitwarden/common/vault/keykeeper/expiration";
 import { KEYKEEPER_REMINDERS_DISK, StateProvider, UserKeyDefinition } from "@bitwarden/state";
 
@@ -27,25 +30,31 @@ export const REMINDER_ALARM = "keykeeper-expiration-reminders";
 const OLD_STORAGE_KEY = "keykeeper.expirationReminders";
 const CHECK_EVERY_MINUTES = 6 * 60;
 
-/** How urgent a reminder is, from least to most. */
-export type ReminderLevel = "30" | "7" | "1" | "expired";
-const LEVEL_ORDER: ReminderLevel[] = ["30", "7", "1", "expired"];
+/**
+ * The reminder step an item is at: one of its reminder days, as text ("30",
+ * "7", "1" by default), or "expired". Fewer days ahead is more urgent.
+ */
+export type ReminderLevel = string;
 
-/** The reminder step an item is at, or null when it's more than 30 days out. */
-export function reminderLevel(status: ExpirationStatus): ReminderLevel | null {
+/** How urgent a step is: once expired is the most, then fewer days ahead. */
+function urgency(level: ReminderLevel): number {
+  return level === "expired" ? Number.POSITIVE_INFINITY : -Number(level);
+}
+
+/**
+ * The reminder step an item is at: the fewest of its reminder days that are
+ * still ahead of it or today, "expired" once it has, or null when it's
+ * further out than all of them.
+ */
+export function reminderLevel(
+  status: ExpirationStatus,
+  days: readonly number[] = DEFAULT_REMIND_DAYS,
+): ReminderLevel | null {
   if (status.days < 0) {
     return "expired";
   }
-  if (status.days <= 1) {
-    return "1";
-  }
-  if (status.days <= 7) {
-    return "7";
-  }
-  if (status.days <= 30) {
-    return "30";
-  }
-  return null;
+  const step = [...days].sort((a, b) => a - b).find((day) => status.days <= day);
+  return step == null ? null : String(step);
 }
 
 /** What was already shown for an item: its expiry date and the last step. */
@@ -69,7 +78,7 @@ export function shouldRemind(
   if (!shown || shown.date !== date) {
     return true;
   }
-  return LEVEL_ORDER.indexOf(level) > LEVEL_ORDER.indexOf(shown.level);
+  return urgency(level) > urgency(shown.level);
 }
 
 const isoDate = (date: Date) =>
@@ -114,11 +123,13 @@ export class KeykeeperExpirationReminders {
     const due: ReminderLevel[] = [];
     for (const cipher of await this.cipherService.getAllDecrypted(userId)) {
       const expires = itemExpiration(cipher);
-      if (!cipher.id || cipher.isDeleted || !expires) {
+      const days = remindDays(cipher);
+      // An item that says not to remind about it never does.
+      if (!cipher.id || cipher.isDeleted || !expires || days == null) {
         continue;
       }
       const status = expirationStatus(expires, now);
-      const level = reminderLevel(status);
+      const level = reminderLevel(status, days);
       const date = isoDate(expires);
       if (!level || !shouldRemind(shown[cipher.id], date, level)) {
         continue;

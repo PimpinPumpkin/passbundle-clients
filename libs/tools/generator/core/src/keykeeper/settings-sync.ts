@@ -81,20 +81,47 @@ const PASSPHRASE = storage<PassphraseGenerationOptions>(
 );
 
 /**
- * What the server has, as far as this app knows: the document, and the
- * generator's part as this app took it. Kept on the device across sign-outs,
- * so a change not saved yet survives closing the app, and an older copy from
- * the server can be told apart.
+ * Another part of the settings document that an app keeps on the device, such
+ * as the web vault's breach check switch (`health`), synced on its own, as
+ * the generator's settings are: a change made here that the server hasn't got
+ * wins at the next sync, and otherwise the server's is taken. Its name in the
+ * document is its own; the rest of the document stays as it is.
  */
-type Known = { settings: SyncedSettings; generator: string };
+export interface KeykeeperSyncedPart {
+  readonly name: string;
+  /** Its value here in the document's terms, and whether anyone set it on this device. */
+  here$(userId: UserId): Observable<{ value: Record<string, unknown>; chosen: boolean }>;
+  /**
+   * Takes the document's value for it here (missing or malformed, too),
+   * unless it changed here since `seen` (its text as this app last took it):
+   * then it writes nothing and answers false, and this device's goes back.
+   */
+  take(userId: UserId, value: unknown, seen: string | undefined): Promise<boolean>;
+}
+
+/**
+ * What the server has, as far as this app knows: the document, and the
+ * generator's part (and each other part's) as this app took it. Kept on the
+ * device across sign-outs, so a change not saved yet survives closing the
+ * app, and an older copy from the server can be told apart.
+ */
+type Known = { settings: SyncedSettings; generator: string; parts?: Record<string, string> };
 const KNOWN = new UserKeyDefinition<Known | null>(GENERATOR_DISK, "keykeeperSyncedSettings", {
   deserializer: (value) => value,
   clearOn: [],
 });
 
 /** The generator's settings here, and whether anyone chose them on this
- *  device since signing in (upstream forgets them at sign-out). */
-type Here = { text: string; chosen: boolean };
+ *  device since signing in (upstream forgets them at sign-out); and each
+ *  other part's. */
+type Here = {
+  text: string;
+  chosen: boolean;
+  parts: Record<string, { text: string; chosen: boolean; value: Record<string, unknown> }>;
+};
+
+/** How a save writes the document: the generator's settings, and which other parts, from here. */
+type Writes = { seen?: number; generator?: boolean; parts?: string[] };
 
 const generatorText = (generator: SyncedGenerator) => settingsText({ generator });
 
@@ -110,6 +137,7 @@ export class KeykeeperGeneratorSettingsSync {
     private readonly logService: LogService,
     private readonly saveAfterMs = SAVE_AFTER_MS,
     private readonly readAfterMs = READ_AFTER_MS,
+    private readonly parts: KeykeeperSyncedPart[] = [],
   ) {}
 
   /** Follows whoever is signed in and unlocked. */
@@ -154,8 +182,11 @@ export class KeykeeperGeneratorSettingsSync {
       debounceTime(this.readAfterMs),
       map(() => "read" as const),
     );
-    const changed$ = this.local$(userId).pipe(
-      map((local) => generatorText(toSynced(local))),
+    const changed$ = combineLatest([
+      this.local$(userId).pipe(map((local) => generatorText(toSynced(local)))),
+      ...this.parts.map((part) => part.here$(userId).pipe(map(({ value }) => settingsText(value)))),
+    ]).pipe(
+      map((texts) => texts.join("\u0000")),
       distinctUntilChanged(),
       debounceTime(this.saveAfterMs),
       map(() => "save" as const),
@@ -210,7 +241,44 @@ export class KeykeeperGeneratorSettingsSync {
 
   private async here(userId: UserId): Promise<Here> {
     const local = await firstValueFrom(this.local$(userId));
-    return { text: generatorText(toSynced(local)), chosen: local.chosen };
+    const parts: Here["parts"] = {};
+    for (const part of this.parts) {
+      const { value, chosen } = await firstValueFrom(part.here$(userId));
+      parts[part.name] = { text: settingsText(value), chosen, value };
+    }
+    return { text: generatorText(toSynced(local)), chosen: local.chosen, parts };
+  }
+
+  /** The other parts changed here since this app last took or saved them. */
+  private changedParts(known: Known | null, here: Here): string[] {
+    return this.parts
+      .map((part) => part.name)
+      .filter((name) => here.parts[name].chosen && here.parts[name].text !== known?.parts?.[name]);
+  }
+
+  /**
+   * Takes the document's other parts here, except those changed here.
+   * Answers the parts whose value here goes back to the server: those changed
+   * here, and any changed while it was taking.
+   */
+  private async takeParts(
+    userId: UserId,
+    settings: SyncedSettings,
+    known: Known | null,
+    changed: string[],
+    live: () => void,
+  ): Promise<string[]> {
+    const ours = [...changed];
+    for (const part of this.parts) {
+      if (changed.includes(part.name)) {
+        continue;
+      }
+      live();
+      if (!(await part.take(userId, settings[part.name], known?.parts?.[part.name]))) {
+        ours.push(part.name);
+      }
+    }
+    return ours;
   }
 
   /**
@@ -220,8 +288,9 @@ export class KeykeeperGeneratorSettingsSync {
    */
   private async read(userId: UserId, known: Known | null, live: () => void): Promise<Known> {
     const before = await this.here(userId);
+    const changed = this.changedParts(known, before);
     if (known != null && before.chosen && before.text !== known.generator) {
-      return this.send(userId, before.text, known.settings, live);
+      return this.send(userId, before, known.settings, live, known, { parts: changed });
     }
     const response: { data?: string | null } | null = await this.apiService.send(
       "GET",
@@ -231,47 +300,90 @@ export class KeykeeperGeneratorSettingsSync {
       true,
     );
     const remote = response?.data == null ? null : await this.open(userId, response.data);
+    const allParts = this.parts.map((part) => part.name);
     if (remote == null) {
-      return this.send(userId, before.text, {}, live, revOf(known?.settings));
+      return this.send(userId, before, {}, live, known, {
+        seen: revOf(known?.settings),
+        parts: allParts,
+      });
     }
     if (known != null && revOf(remote) < revOf(known.settings)) {
       // Older than a copy this app had: a server handing back an old one.
       this.logService.warning("The server's generator settings are older than these; kept these.");
       await this.apply(userId, known.settings, before, live);
-      return this.send(userId, (await this.here(userId)).text, known.settings, live);
+      await this.takeParts(userId, known.settings, known, changed, live);
+      return this.send(userId, await this.here(userId), known.settings, live, known, {
+        parts: allParts,
+      });
     }
     if (!(await this.apply(userId, remote, before, live))) {
       // Changed here while the server answered: this device's go back.
-      return this.send(userId, (await this.here(userId)).text, remote, live);
+      const ours = await this.takeParts(userId, remote, known, changed, live);
+      return this.send(userId, await this.here(userId), remote, live, known, { parts: ours });
     }
-    return { settings: remote, generator: (await this.here(userId)).text };
+    const ours = await this.takeParts(userId, remote, known, changed, live);
+    const after = await this.here(userId);
+    if (ours.length > 0) {
+      // Another part changed here: it goes back, with the server's generator settings.
+      return this.send(userId, after, remote, live, known, {
+        generator: false,
+        parts: ours,
+        knownGenerator: after.text,
+      });
+    }
+    return { settings: remote, generator: after.text, parts: this.partTexts(after) };
+  }
+
+  private partTexts(here: Here): Record<string, string> {
+    return Object.fromEntries(Object.entries(here.parts).map(([name, p]) => [name, p.text]));
   }
 
   private async save(userId: UserId, known: Known | null, live: () => void): Promise<Known | null> {
     const here = await this.here(userId);
-    if (known == null || !here.chosen || here.text === known.generator) {
+    if (known == null) {
       return known;
     }
-    return this.send(userId, here.text, known.settings, live);
+    const generator = here.chosen && here.text !== known.generator;
+    const parts = this.changedParts(known, here);
+    if (!generator && parts.length === 0) {
+      return known;
+    }
+    return this.send(userId, here, known.settings, live, known, { generator, parts });
   }
 
   /**
-   * Saves the generator's settings over the document's, keeping the rest of
-   * it (and generator settings other apps add), numbered after `seen`.
+   * Saves the generator's settings (unless `generator` is false) and the
+   * other parts named over the document's, keeping the rest of it (and
+   * settings other apps add to a part), numbered after `seen`.
    */
   private async send(
     userId: UserId,
-    here: string,
+    here: Here,
     base: SyncedSettings,
     live: () => void,
-    seen = revOf(base),
+    known: Known | null,
+    {
+      seen = revOf(base),
+      generator = true,
+      parts = [],
+      knownGenerator,
+    }: Writes & { knownGenerator?: string } = {},
   ): Promise<Known> {
     const settings: SyncedSettings = {
       ...base,
       type: SETTINGS_TYPE,
       rev: nextRev(seen),
-      generator: { ...(base.generator ?? {}), ...JSON.parse(here).generator },
+      generator: generator
+        ? { ...(base.generator ?? {}), ...JSON.parse(here.text).generator }
+        : base.generator,
     };
+    for (const name of parts) {
+      const was = base[name];
+      settings[name] = {
+        ...(was != null && typeof was === "object" && !Array.isArray(was) ? was : {}),
+        ...here.parts[name].value,
+      };
+    }
     const key = await firstValueFrom(this.keyService.userKey$(userId));
     if (key == null) {
       throw new Error("locked");
@@ -279,7 +391,11 @@ export class KeykeeperGeneratorSettingsSync {
     const data = await this.encryptService.encryptString(settingsText(settings), key);
     live();
     await this.apiService.send("PUT", PATH, { data: data.encryptedString }, true, true);
-    return { settings, generator: here };
+    return {
+      settings,
+      generator: generator ? here.text : (knownGenerator ?? known?.generator ?? here.text),
+      parts: this.partTexts(here),
+    };
   }
 
   /** The server's settings, or none if this account's key can't open them. */

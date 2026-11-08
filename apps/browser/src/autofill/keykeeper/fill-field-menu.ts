@@ -13,6 +13,7 @@ import { AuthenticationStatus } from "@bitwarden/common/auth/enums/authenticatio
 import { getOptionalUserId } from "@bitwarden/common/auth/services/account.service";
 import { ROOT_ID } from "@bitwarden/common/autofill/constants";
 import { UriMatchStrategy } from "@bitwarden/common/models/domain/domain-service";
+import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
@@ -53,28 +54,51 @@ export const keykeeperFillPicker = {
   itemMatches: async (_cipher: CipherView, _url: string): Promise<boolean> => false,
 };
 
-// English until Keykeeper's own strings are translated.
-const STRINGS = {
-  fillThisFieldWith: "Fill this field with",
+/**
+ * The menu's words, by message key: ours from brand/messages.en.json, and
+ * upstream's own for the values, which come translated. Here in English for
+ * a build without our strings (and tests).
+ */
+const ENGLISH = {
+  keykeeperFillThisFieldWith: "Fill this field with",
   username: "Username",
   password: "Password",
   verificationCode: "Verification code",
-  neverFillThisField: "Never fill this field",
+  keykeeperNeverFillThisField: "Never fill this field",
 };
+
+export type FillPickerWord = keyof typeof ENGLISH;
+
+/** Gives the menu's words. */
+export type FillPickerWords = (word: FillPickerWord) => string;
+
+/** The menu's words in English. */
+export const englishFillPickerWords: FillPickerWords = (word) => ENGLISH[word];
+
+/**
+ * The menu's words in the person's language, English for any word that
+ * isn't translated yet. Our own strings are English in every language for now.
+ */
+export function fillPickerWords(i18n: Pick<I18nService, "t">): FillPickerWords {
+  return (word) => i18n.t(word) || ENGLISH[word];
+}
 
 export type FillChoice = { key: string; title: string; source: FillSource };
 
-/** What an item can fill into a field, in menu order. */
-export function choicesFor(cipher: CipherView): FillChoice[] {
+/** What an item can fill into a field, in menu order, named in `words`. */
+export function choicesFor(
+  cipher: CipherView,
+  words: FillPickerWords = englishFillPickerWords,
+): FillChoice[] {
   const choices: FillChoice[] = [];
   if (cipher.login?.username) {
-    choices.push({ key: "u", title: STRINGS.username, source: { from: "username" } });
+    choices.push({ key: "u", title: words("username"), source: { from: "username" } });
   }
   if (cipher.login?.password && maySeeSecrets(cipher)) {
-    choices.push({ key: "p", title: STRINGS.password, source: { from: "password" } });
+    choices.push({ key: "p", title: words("password"), source: { from: "password" } });
   }
   if (cipher.login?.totp) {
-    choices.push({ key: "t", title: STRINGS.verificationCode, source: { from: "totp" } });
+    choices.push({ key: "t", title: words("verificationCode"), source: { from: "totp" } });
   }
   visibleCustomFields(cipher).forEach((field, index) => {
     // Hidden fields stay hidden from someone who can't see the item's passwords.
@@ -89,7 +113,11 @@ export function choicesFor(cipher: CipherView): FillChoice[] {
       });
     }
   });
-  choices.push({ key: "n", title: STRINGS.neverFillThisField, source: { from: "never" } });
+  choices.push({
+    key: "n",
+    title: words("keykeeperNeverFillThisField"),
+    source: { from: "never" },
+  });
   return choices;
 }
 
@@ -117,9 +145,15 @@ function create(options: chrome.contextMenus.CreateProperties): Promise<void> {
 /** Menu ids created since the last reset, for tests and to skip duplicates. */
 export const createdFillFieldMenuIds = new Set<string>();
 
-export async function initFillFieldMenu(): Promise<void> {
+export async function initFillFieldMenu(
+  words: FillPickerWords = englishFillPickerWords,
+): Promise<void> {
   createdFillFieldMenuIds.clear();
-  await create({ id: FILL_FIELD_ID, parentId: ROOT_ID, title: STRINGS.fillThisFieldWith });
+  await create({
+    id: FILL_FIELD_ID,
+    parentId: ROOT_ID,
+    title: words("keykeeperFillThisFieldWith"),
+  });
   createdFillFieldMenuIds.add(FILL_FIELD_ID);
 }
 
@@ -138,7 +172,10 @@ export async function removeFillFieldMenu(): Promise<void> {
 }
 
 /** Adds an item, with its values, under "Fill this field with". */
-export async function addCipherToFillFieldMenu(cipher: CipherView | undefined): Promise<void> {
+export async function addCipherToFillFieldMenu(
+  cipher: CipherView | undefined,
+  words: FillPickerWords = englishFillPickerWords,
+): Promise<void> {
   if (!cipher?.id || cipher.type !== CipherType.Login) {
     return;
   }
@@ -148,7 +185,7 @@ export async function addCipherToFillFieldMenu(cipher: CipherView | undefined): 
   }
   await create({ id: parentId, parentId: FILL_FIELD_ID, title: sanitizeTitle(cipher.name ?? "") });
   createdFillFieldMenuIds.add(parentId);
-  for (const choice of choicesFor(cipher)) {
+  for (const choice of choicesFor(cipher, words)) {
     if (choice.source.from === "never") {
       await create({ id: `${parentId}_separator`, parentId, type: "separator" });
     }

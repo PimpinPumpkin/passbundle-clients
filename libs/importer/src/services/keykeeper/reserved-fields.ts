@@ -13,7 +13,12 @@
 //   under our names keeps its value under a visible name.
 
 import { FieldType } from "@bitwarden/common/vault/enums";
-import { EXPIRES_FIELD_NAME, parseIsoDate } from "@bitwarden/common/vault/keykeeper/expiration";
+import {
+  EXPIRES_FIELD_NAME,
+  parseIsoDate,
+  parseRemindDays,
+  REMIND_FIELD_NAME,
+} from "@bitwarden/common/vault/keykeeper/expiration";
 import {
   FILL_RULE_FIELD_NAME,
   FillRule,
@@ -113,6 +118,11 @@ function wellFormed(field: FieldView, seen: Set<string>): string | null {
     }
     case EXPIRES_FIELD_NAME:
       return !seen.has(name) && parseIsoDate(field.value) ? (field.value ?? null) : null;
+    case REMIND_FIELD_NAME: {
+      // Reminder days, rewritten the way the editor stores them.
+      const days = !seen.has(name) ? parseRemindDays(field.value) : null;
+      return days == null ? null : days === "none" ? "none" : days.join(",");
+    }
     case TEMPLATE_FIELD_NAME:
       return !seen.has(name) ? wellFormedMarker(field.value) : null;
     case TEMPLATE_DEFINITION_FIELD_NAME: {

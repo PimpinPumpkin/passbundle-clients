@@ -46,6 +46,12 @@
                   @if (user.name) {
                     <small class="tw-text-muted tw-block">{{ user.name }}</small>
                   }
+                  <!-- Keykeeper: what they can open, as removing one member says -->
+                  @if (keykeeperReach.get(user.id); as reach) {
+                    <small class="tw-text-muted tw-block" data-testid="keykeeper-reach">{{
+                      reach
+                    }}</small>
+                  }
                 </td>
                 @if (showNoMasterPasswordWarning()) {
                   <td bitCell>

@@ -14,6 +14,8 @@ import { ExposedPasswordsReportComponent } from "../../../dirt/reports/pages/org
 // eslint-disable-next-line no-restricted-imports
 import { InactiveTwoFactorReportComponent } from "../../../dirt/reports/pages/organizations/inactive-two-factor-report.component";
 // eslint-disable-next-line no-restricted-imports
+import { KeykeeperOrgExpiringItemsReportComponent } from "../../../dirt/reports/pages/organizations/keykeeper-expiring-items-report.component";
+// eslint-disable-next-line no-restricted-imports
 import { OrgPasskeyReportComponent } from "../../../dirt/reports/pages/organizations/org-passkey-report.component";
 // eslint-disable-next-line no-restricted-imports
 import { ReusedPasswordsReportComponent } from "../../../dirt/reports/pages/organizations/reused-passwords-report.component";
@@ -85,6 +87,26 @@ const routes: Routes = [
               titleId: "weakPasswordsReport",
             },
             canActivate: [isPaidOrgGuard()],
+          },
+          // Keykeeper: the organization's items that expire (DESIGN.md, "Expiration dates").
+          {
+            path: "expiring-items-report",
+            component: KeykeeperOrgExpiringItemsReportComponent,
+            data: {
+              titleId: "keykeeperExpiringItemsReport",
+            },
+          },
+          // Keykeeper: members' own passwords, in numbers, for owners and admins.
+          {
+            path: "member-health-report",
+            loadComponent: () =>
+              import("../../../keykeeper/health/member-health-report.component").then(
+                (m) => m.KeykeeperMemberHealthReportComponent,
+              ),
+            canActivate: [organizationPermissionsGuard((org) => org.isAdmin)],
+            data: {
+              titleId: "keykeeperMemberHealthReport",
+            },
           },
           {
             path: "passkey-report",

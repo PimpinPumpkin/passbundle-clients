@@ -7,7 +7,11 @@ import {
 } from "@bitwarden/common/spec";
 import { UserId } from "@bitwarden/common/types/guid";
 
-import { CHECK_AFTER_UNLOCK, KeykeeperBreachCheckSetting } from "./breach-check-setting.service";
+import {
+  breachCheckSyncedPart,
+  CHECK_AFTER_UNLOCK,
+  KeykeeperBreachCheckSetting,
+} from "./breach-check-setting.service";
 
 const ALEX = "8f1c6a52-0b0e-4f3e-9a51-2c7d1e9b0a11" as UserId;
 const SAM = "1d2e3f40-5a6b-4c7d-8e9f-a0b1c2d3e4f5" as UserId;
@@ -58,5 +62,56 @@ describe("Check my passwords against known breaches after unlocking", () => {
     );
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(await firstValueFrom(setting.checksAfterUnlock$(ALEX))).toBe(true);
+  });
+
+  describe("following the account (the settings document's health part)", () => {
+    let stateProvider: FakeStateProvider;
+    const on = () => firstValueFrom(stateProvider.getUser(ALEX, CHECK_AFTER_UNLOCK).state$);
+
+    beforeEach(() => {
+      stateProvider = new FakeStateProvider(accountService);
+    });
+
+    it("keeps never set apart from on when read back from the browser's storage", () => {
+      expect(CHECK_AFTER_UNLOCK.deserializer(null as never)).toBeNull();
+      expect(CHECK_AFTER_UNLOCK.deserializer(false)).toBe(false);
+      expect(CHECK_AFTER_UNLOCK.deserializer(true)).toBe(true);
+    });
+
+    it("says what's here in the document's terms, and whether it was set here", async () => {
+      const part = breachCheckSyncedPart(stateProvider);
+      expect(part.name).toBe("health");
+      expect(await firstValueFrom(part.here$(ALEX))).toEqual({
+        value: { checkAfterUnlock: true },
+        chosen: false,
+      });
+      await stateProvider.getUser(ALEX, CHECK_AFTER_UNLOCK).update(() => false);
+      expect(await firstValueFrom(part.here$(ALEX))).toEqual({
+        value: { checkAfterUnlock: false },
+        chosen: true,
+      });
+    });
+
+    it("takes the document's switch, unless it changed here since it was last taken", async () => {
+      const part = breachCheckSyncedPart(stateProvider);
+      expect(await part.take(ALEX, { checkAfterUnlock: false }, undefined)).toBe(true);
+      expect(await on()).toBe(false);
+
+      // Turned back on here after taking "off": this device's goes back.
+      await stateProvider.getUser(ALEX, CHECK_AFTER_UNLOCK).update(() => true);
+      expect(await part.take(ALEX, { checkAfterUnlock: false }, '{"checkAfterUnlock":false}')).toBe(
+        false,
+      );
+      expect(await on()).toBe(true);
+    });
+
+    it("keeps what's here when the document has nothing it understands", async () => {
+      const part = breachCheckSyncedPart(stateProvider);
+      await stateProvider.getUser(ALEX, CHECK_AFTER_UNLOCK).update(() => false);
+      for (const nothing of [undefined, null, {}, { checkAfterUnlock: "no" }, "off"]) {
+        expect(await part.take(ALEX, nothing, '{"checkAfterUnlock":false}')).toBe(true);
+        expect(await on()).toBe(false);
+      }
+    });
   });
 });

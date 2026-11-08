@@ -3,10 +3,13 @@
 // FIXME(https://bitwarden.atlassian.net/browse/CL-1062): `OnPush` components should not use mutable properties
 /* eslint-disable @bitwarden/components/enforce-readonly-angular-properties */
 import { ChangeDetectionStrategy, Component, OnInit, signal } from "@angular/core";
-import { firstValueFrom } from "rxjs";
+import { toSignal } from "@angular/core/rxjs-interop";
+import { firstValueFrom, of, switchMap } from "rxjs";
 
+import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions/account/billing-account-profile-state.service";
+import { confirmedMemberOfAny } from "@bitwarden/common/dirt/keykeeper/own-health";
 import { FeatureFlag } from "@bitwarden/common/enums/feature-flag.enum";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 
@@ -21,11 +24,24 @@ import { ReportEntry, ReportVariant } from "../shared";
 })
 export class ReportsHomeComponent implements OnInit {
   readonly reports = signal<ReportEntry[]>([]);
+  /**
+   * Keykeeper: whether their organizations' admins see their own passwords'
+   * numbers, following a sync that confirms them somewhere.
+   */
+  readonly keykeeperSeenByAdmins = toSignal(
+    this.accountService.activeAccount$.pipe(
+      switchMap((account) =>
+        account == null ? of(false) : confirmedMemberOfAny(this.organizationService, account.id),
+      ),
+    ),
+    { initialValue: false },
+  );
 
   constructor(
     private billingAccountProfileStateService: BillingAccountProfileStateService,
     private accountService: AccountService,
     private configService: ConfigService,
+    private organizationService: OrganizationService,
   ) {}
 
   async ngOnInit(): Promise<void> {

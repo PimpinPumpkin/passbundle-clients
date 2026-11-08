@@ -14,6 +14,7 @@ import {
 
 import {
   buildVaultMenu,
+  expiringPick,
   filterAfter,
   folderPick,
   pickedLabel,
@@ -33,6 +34,7 @@ function item(
     favorite?: boolean;
     isDeleted?: boolean;
     isArchived?: boolean;
+    fields?: { name: string; value: string }[];
   } = {},
 ): CipherViewLike {
   return {
@@ -160,6 +162,7 @@ function state(
     routed: { organizationIdParamType: "query", ...routed },
     ciphers,
     allItemsLabel: "All items",
+    expiringLabel: "Expiring soon",
     typeTree: typeTree(favorites, login, card),
     organizationTree: organizations(),
     collectionTree: collections(),
@@ -179,8 +182,67 @@ function actions(): jest.Mocked<VaultMenuActions> {
     collection: jest.fn(),
     folder: jest.fn(),
     archive: jest.fn(),
+    expiring: jest.fn(),
   };
 }
+
+/** "YYYY-MM-DD", some days from today. */
+function inDays(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+describe("Keykeeper: Expiring soon", () => {
+  const expires = (days: number) => [{ name: "keykeeper.expires", value: inDays(days) }];
+  const withExpiring = [
+    ...ciphers,
+    item(CipherType.SecureNote, { fields: expires(5) }),
+    item(CipherType.Login, { organizationId: ORG, fields: expires(-2) }),
+    item(CipherType.SecureNote, { fields: expires(90) }),
+    item(CipherType.SecureNote, { fields: expires(1), isDeleted: true }),
+  ];
+
+  it("shows only while something has expired or expires within 30 days, with its count", () => {
+    expect(buildVaultMenu(state(), actions()).expiring).toBeUndefined();
+
+    const menu = buildVaultMenu(state({}, { ciphers: withExpiring }), actions());
+    expect(menu.expiring).toMatchObject({ label: "Expiring soon", tile: "expiring", count: 2 });
+    expect(menu.expiring!.active).toBe(false);
+  });
+
+  it("counts inside the place showing, as a category does, and stays while picked", () => {
+    const inPersonal = buildVaultMenu(
+      state({ organizationId: Unassigned, type: "expiring" }, { ciphers: withExpiring }),
+      actions(),
+    );
+    expect(inPersonal.expiring).toMatchObject({ count: 1, active: true });
+    expect(pickedLabel(inPersonal)).toBe("Expiring soon");
+
+    const nothingLeft = buildVaultMenu(state({ type: "expiring" }), actions());
+    expect(nothingLeft.expiring).toMatchObject({ count: 0, active: true });
+  });
+
+  it("picks like a category: inside the place showing, out of any folder", async () => {
+    const acts = actions();
+    const menu = buildVaultMenu(state({}, { ciphers: withExpiring }), acts);
+    await menu.expiring!.select();
+    expect(acts.expiring).toHaveBeenCalled();
+
+    expect(
+      expiringPick({
+        organizationId: ORG,
+        collectionId: "c-office" as CollectionId,
+        type: "login",
+      }),
+    ).toEqual({
+      organizationId: ORG,
+      collectionId: undefined,
+      folderId: undefined,
+      type: "expiring",
+    });
+  });
+});
 
 describe("buildVaultMenu", () => {
   it("counts what each entry shows: no trash or archive in the rest", () => {

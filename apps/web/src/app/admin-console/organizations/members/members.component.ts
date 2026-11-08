@@ -45,7 +45,10 @@ import { OrganizationUserStatusType } from "@bitwarden/sdk-internal";
 import { UserId } from "@bitwarden/user-core";
 import { BillingConstraintService } from "@bitwarden/web-vault/app/billing/members/billing-constraint/billing-constraint.service";
 import { OrganizationWarningsService } from "@bitwarden/web-vault/app/billing/organizations/warnings/services";
-import { KeykeeperOffboardingService } from "@bitwarden/web-vault/app/keykeeper/access/offboarding.service";
+import {
+  KeykeeperOffboarding,
+  KeykeeperOffboardingService,
+} from "@bitwarden/web-vault/app/keykeeper/access/offboarding.service";
 
 import {
   MaxCheckedCount,
@@ -430,9 +433,20 @@ export class MembersComponent {
 
   async bulkRemove(organization: Organization) {
     const users = this.dataSource().getCheckedUsersWithLimit(MaxCheckedCount);
-    await this.memberDialogManager.openBulkRemoveDialog(organization, users);
+    // Keykeeper: what each of them can open, then the passwords they could see.
+    const offboarding = await this.keykeeperPrepareMany(organization, users);
+    await this.memberDialogManager.openBulkRemoveDialog(
+      organization,
+      users,
+      this.keykeeperReach(offboarding),
+    );
     this.organizationMetadataService.refreshMetadataCache();
     await this.load(organization);
+    const left = new Set((this.dataSource().data ?? []).map((u) => u.id));
+    this.keykeeperOffboarding.showPasswordsOfMany(
+      offboarding,
+      users.filter((u) => !left.has(u.id)).map((u) => u.id),
+    );
   }
 
   async bulkDelete(organization: Organization) {
@@ -451,8 +465,44 @@ export class MembersComponent {
     }
 
     const users = this.dataSource().getCheckedUsersWithLimit(MaxCheckedCount);
-    await this.memberDialogManager.openBulkRestoreRevokeDialog(organization, users, isRevoking);
+    // Keykeeper: revoking says what each of them can open, then the passwords they could see.
+    const offboarding = isRevoking
+      ? await this.keykeeperPrepareMany(organization, users)
+      : new Map<string, KeykeeperOffboarding>();
+    await this.memberDialogManager.openBulkRestoreRevokeDialog(
+      organization,
+      users,
+      isRevoking,
+      isRevoking ? this.keykeeperReach(offboarding) : undefined,
+    );
     await this.load(organization);
+    if (isRevoking) {
+      // Only those revoked now: someone already revoked had been offboarded before.
+      const revoked = new Set(
+        (this.dataSource().data ?? [])
+          .filter((u) => u.status === OrganizationUserStatusType.Revoked)
+          .map((u) => u.id),
+      );
+      this.keykeeperOffboarding.showPasswordsOfMany(
+        offboarding,
+        users
+          .filter((u) => u.status !== OrganizationUserStatusType.Revoked && revoked.has(u.id))
+          .map((u) => u.id),
+      );
+    }
+  }
+
+  /** Keykeeper: what each of these members can open, for a bulk remove or revoke. */
+  private keykeeperPrepareMany(organization: Organization, users: OrganizationUserView[]) {
+    return this.keykeeperOffboarding.prepareMany(
+      organization,
+      users.map((u) => ({ id: u.id, name: this.userNamePipe.transform(u) })),
+    );
+  }
+
+  /** Keykeeper: the confirmation's sentence for each of them, by member id. */
+  private keykeeperReach(offboarding: Map<string, KeykeeperOffboarding>): Map<string, string> {
+    return new Map([...offboarding].map(([id, o]) => [id, o.summary]));
   }
 
   async bulkReinvite(organization: Organization) {

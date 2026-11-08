@@ -28,6 +28,8 @@ import { BulkUserDetails } from "./bulk-status.component";
 type BulkRemoveDialogParams = {
   organizationId: string;
   users: BulkUserDetails[];
+  /** Keykeeper: what each of them can open, by member id (DESIGN.md, "Access and offboarding"). */
+  keykeeperReach?: Map<string, string>;
 };
 
 @Component({
@@ -53,6 +55,7 @@ export class BulkRemoveDialogComponent extends BaseBulkRemoveComponent {
 
   protected readonly organizationId = signal(this.dialogParams.organizationId);
   protected readonly users = signal(this.dialogParams.users);
+  protected readonly keykeeperReach = this.dialogParams.keykeeperReach ?? new Map<string, string>();
 
   constructor() {
     super();

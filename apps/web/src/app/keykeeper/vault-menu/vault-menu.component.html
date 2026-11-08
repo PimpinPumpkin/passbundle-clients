@@ -20,6 +20,10 @@
 @if (m.favorites; as favorites) {
   <ng-container *ngTemplateOutlet="entry; context: { $implicit: favorites, rail: true }" />
 }
+<!-- Keykeeper: Expiring soon, while anything is (DESIGN.md, "Expiration dates"). -->
+@if (m.expiring; as expiring) {
+  <ng-container *ngTemplateOutlet="entry; context: { $implicit: expiring, rail: true }" />
+}
 <bit-nav-item
   [icon]="open ? undefined : 'bwi-dashboard'"
   [text]="'keykeeperHealth' | i18n"
