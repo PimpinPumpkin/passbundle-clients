@@ -17,7 +17,7 @@ import { DialogService, ToastService } from "@bitwarden/components";
 
 import { SharedModule } from "../../shared";
 import { KeykeeperConfirmChangeService } from "../confirm-change/confirm-change.service";
-import { twoStepRoleLabel } from "../organizations/admin-two-step.component";
+import { membersPhrase, twoStepRoleLabel } from "../organizations/admin-two-step.component";
 
 import { KeykeeperMspApiService } from "./msp-api.service";
 
@@ -25,8 +25,10 @@ import { KeykeeperMspApiService } from "./msp-api.service";
  * Keykeeper: two-step login in the MSP console. Whether everyone on the
  * MSP's staff must use it (MSP admins change it), who on the staff hasn't set
  * it up, and each client's own admins who haven't where the client requires
- * it. Each client's setting is one of the default policies ("Two-step login
- * for admins"). See DESIGN.md, "Two-step login for admins".
+ * it, with how many of its other members haven't where it requires it of
+ * everyone. Each client's setting is one of the default policies ("Two-step
+ * login for admins"). See DESIGN.md, "Two-step login for admins" and
+ * "Two-step login for everyone".
  */
 @Component({
   selector: "app-keykeeper-msp-two-step",
@@ -94,6 +96,12 @@ import { KeykeeperMspApiService } from "./msp-api.service";
               @for (p of c.notSetUp; track p.userId; let last = $last) {
                 {{ p.name || p.email }} ({{ roleLabel(p) | lowercase }}){{ last ? "" : ", " }}
               }
+              @if (c.membersNotSetUp?.length; as members) {
+                <span data-testid="msp-two-step-client-members">
+                  {{ c.notSetUp.length > 0 ? "; " : "" }}{{ membersWords(members) }} without it
+                  (required of everyone)
+                </span>
+              }
             </li>
           } @empty {
             <li class="tw-text-muted">Every client's admins have set it up.</li>
@@ -119,9 +127,12 @@ export class KeykeeperMspTwoStepComponent {
     return me != null && (this.view()?.staffNotSetUp ?? []).some((p) => p.userId === me);
   });
   protected readonly clientsNotSetUp = computed(() =>
-    (this.view()?.clients ?? []).filter((c) => c.notSetUp.length > 0),
+    (this.view()?.clients ?? []).filter(
+      (c) => c.notSetUp.length > 0 || (c.membersNotSetUp?.length ?? 0) > 0,
+    ),
   );
   protected readonly roleLabel = twoStepRoleLabel;
+  protected readonly membersWords = membersPhrase;
 
   constructor(
     private readonly api: KeykeeperMspApiService,

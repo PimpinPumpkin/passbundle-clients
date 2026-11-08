@@ -212,6 +212,14 @@ describe("MSP activity sentences", () => {
       "ana@northwind.test stopped requiring two-step login of Acme Dental's admins",
     ],
     [
+      { event: "client_everyone_two_step_set", detail: "on" },
+      "ana@northwind.test required two-step login of everyone in Acme Dental",
+    ],
+    [
+      { event: "client_everyone_two_step_set", detail: "off" },
+      "ana@northwind.test stopped requiring two-step login of everyone in Acme Dental",
+    ],
+    [
       { event: "staff_invited", detail: "admin" },
       "ana@northwind.test invited ben@northwind.test to join as an admin",
     ],

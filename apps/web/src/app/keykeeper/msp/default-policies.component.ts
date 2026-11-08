@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from "@angular/core";
 import { firstValueFrom } from "rxjs";
 
+import { KEYKEEPER_ADMIN_TWO_STEP_POLICY } from "@bitwarden/admin-console/common";
 import { PolicyType } from "@bitwarden/common/admin-console/enums";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
@@ -9,6 +10,7 @@ import { DialogService, ToastService } from "@bitwarden/components";
 import { BasePolicyEditDefinition } from "../../admin-console/organizations/policies";
 import { SharedModule } from "../../shared";
 
+import { requiresEveryone } from "./admin-two-step-policy";
 import { KeykeeperDefaultPolicyDialogComponent } from "./default-policy-dialog.component";
 import { KeykeeperMspApiService, MspPolicies } from "./msp-api.service";
 import {
@@ -20,6 +22,10 @@ import {
   describePolicyResult,
   rowClientsSummary,
 } from "./msp-policies";
+
+/** Requiring two-step login of everyone signs out members without it, so the console asks first. */
+const SIGNS_OUT_EVERYONE =
+  "Members without an authenticator app, a security key or passkey, or Duo are signed out, and set one up the next time they sign in.";
 
 /** Turning these on revokes some of a client's members, so the console asks first. */
 const REVOKING: Partial<Record<PolicyType, string>> = {
@@ -70,6 +76,16 @@ const REVOKING: Partial<Record<PolicyType, string>> = {
               <td bitCell data-testid="msp-policy-default">
                 @if (row.default.enabled) {
                   <span bitBadge variant="success">On</span>
+                  @if (everyoneOf(row)) {
+                    <span
+                      bitBadge
+                      variant="success"
+                      class="tw-ml-1"
+                      data-testid="msp-policy-everyone"
+                      title="Everyone else too"
+                      >Everyone</span
+                    >
+                  }
                 } @else {
                   <span bitBadge variant="secondary">Off</span>
                 }
@@ -178,6 +194,11 @@ export class KeykeeperDefaultPoliciesComponent {
     return rowClientsSummary(row);
   }
 
+  /** Two-step login for admins, required of everyone else too. */
+  protected everyoneOf(row: DefaultPolicyRow): boolean {
+    return row.type === KEYKEEPER_ADMIN_TWO_STEP_POLICY && requiresEveryone(row.default.data);
+  }
+
   protected nameOf(type: number): string {
     const definition = this.definitionOf(type);
     return definition ? this.i18nService.t(definition.name) : String(type);
@@ -225,9 +246,14 @@ export class KeykeeperDefaultPoliciesComponent {
       const changes = clientsRequiringChanges(this.policies(), row.type, saved);
       if (!row.required || changes.length > 0) {
         const revoking =
-          revokes && changes.some((c) => !c.enabled)
+          (revokes && changes.some((c) => !c.enabled)
             ? ` ${revokes} MSP staff aren't affected.`
-            : "";
+            : "") +
+          (row.type === KEYKEEPER_ADMIN_TWO_STEP_POLICY &&
+          requiresEveryone(saved.data) &&
+          changes.length > 0
+            ? ` ${SIGNS_OUT_EVERYONE}`
+            : "");
         const confirmed = await this.dialogService.openSimpleDialog({
           title: row.required
             ? `Change ${name} in every client?`
@@ -249,6 +275,21 @@ export class KeykeeperDefaultPoliciesComponent {
       }
     } else {
       const reached = followers.length - saved.keep.length;
+      const everyoneNow =
+        row.type === KEYKEEPER_ADMIN_TWO_STEP_POLICY &&
+        requiresEveryone(saved.data) &&
+        !this.everyoneOf(row);
+      if (everyoneNow && reached > 0) {
+        const confirmed = await this.dialogService.openSimpleDialog({
+          title: `Require two-step login of everyone in ${reached === 1 ? "1 client" : reached + " clients"}?`,
+          content: `${SIGNS_OUT_EVERYONE} Clients with their own setting keep it.`,
+          acceptButtonText: "Require it",
+          type: "warning",
+        });
+        if (!confirmed) {
+          return;
+        }
+      }
       if (saved.enabled && !row.default.enabled && revokes && reached > 0) {
         const confirmed = await this.dialogService.openSimpleDialog({
           title: `Turn on ${name} in ${reached === 1 ? "1 client" : reached + " clients"}?`,

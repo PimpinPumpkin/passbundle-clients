@@ -84,3 +84,47 @@ describe("script token requests", () => {
     });
   });
 });
+
+describe("the nudge to set up two-step login", () => {
+  const setUp = () => {
+    const apiService = mock<ApiService>();
+    return { apiService, requests: new KeykeeperMspRequests(apiService) };
+  };
+
+  it("shows only when the server says so", async () => {
+    const { apiService, requests } = setUp();
+    apiService.send.mockResolvedValueOnce({ show: true });
+    expect(await requests.twoStepNudge()).toBe(true);
+    expect(apiService.send).toHaveBeenCalledWith(
+      "GET",
+      "/keykeeper/two-step-nudge",
+      null,
+      true,
+      true,
+    );
+    apiService.send.mockResolvedValueOnce({ show: false });
+    expect(await requests.twoStepNudge()).toBe(false);
+    // An older server answers something else.
+    apiService.send.mockResolvedValueOnce(null);
+    expect(await requests.twoStepNudge()).toBe(false);
+  });
+
+  it("never shows when the server can't be asked", async () => {
+    const { apiService, requests } = setUp();
+    apiService.send.mockRejectedValueOnce(new Error("offline"));
+    expect(await requests.twoStepNudge()).toBe(false);
+  });
+
+  it("is dismissed on the server, for every device", async () => {
+    const { apiService, requests } = setUp();
+    apiService.send.mockResolvedValueOnce({ show: false });
+    await requests.dismissTwoStepNudge();
+    expect(apiService.send).toHaveBeenCalledWith(
+      "POST",
+      "/keykeeper/two-step-nudge/dismiss",
+      null,
+      true,
+      true,
+    );
+  });
+});
