@@ -1089,5 +1089,193 @@
   },
   "keykeeperFolderLookHint": {
     "message": "Everyone who has this folder sees its icon. It's encrypted, like the folder's name."
+  },
+  "keykeeperPasswordChangeConfirmTitle": {
+    "message": "Change the password on $SITE$?",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "accounts.example.com"
+      }
+    }
+  },
+  "keykeeperPasswordChangeConfirmText": {
+    "message": "A new tab opens the site's change-password page. A new password is saved to this item first, then filled in and submitted. The old one stays in password history, and one click puts it back."
+  },
+  "keykeeperPasswordChangeNotStartedRunning": {
+    "message": "Another password change is still running. Finish it or close its tab first."
+  },
+  "keykeeperPasswordChangeNotStartedNotAllowed": {
+    "message": "This item's password can't be changed here."
+  },
+  "keykeeperPasswordChangeNotStartedNoWebsite": {
+    "message": "This item needs an https website to change its password on."
+  },
+  "keykeeperPasswordChangeNotStartedLocked": {
+    "message": "Unlock first, then try again."
+  },
+  "keykeeperPasswordChangeNotStartedReprompt": {
+    "message": "Confirm your master password first."
+  },
+  "keykeeperPasswordChangeUnsureTitle": {
+    "message": "Did the new password work?"
+  },
+  "keykeeperPasswordChangeUnsureText": {
+    "message": "On $DATE$, this item got a new password for $SITE$, but it isn't clear whether the site took it. Try signing in to the site with the new password.",
+    "placeholders": {
+      "date": {
+        "content": "$1",
+        "example": "Nov 8, 2026, 10:42 AM"
+      },
+      "site": {
+        "content": "$2",
+        "example": "accounts.example.com"
+      }
+    }
+  },
+  "keykeeperPasswordChangeRefusedTitle": {
+    "message": "The site didn't take the new password"
+  },
+  "keykeeperPasswordChangeRefusedText": {
+    "message": "On $DATE$, $SITE$ didn't take this item's new password, so the site still has the old one. Put the old password back so the item matches the site.",
+    "placeholders": {
+      "date": {
+        "content": "$1",
+        "example": "Nov 8, 2026, 10:42 AM"
+      },
+      "site": {
+        "content": "$2",
+        "example": "accounts.example.com"
+      }
+    }
+  },
+  "keykeeperPasswordChangeRunningTitle": {
+    "message": "Changing the password"
+  },
+  "keykeeperPasswordChangePutBack": {
+    "message": "Put the old password back"
+  },
+  "keykeeperPasswordChangeItWorked": {
+    "message": "It worked"
+  },
+  "keykeeperPasswordChangePutBackDone": {
+    "message": "The old password is back. The new one is in password history."
+  },
+  "keykeeperPasswordChangeItWorkedDone": {
+    "message": "Saved. The item keeps the new password."
+  },
+  "keykeeperPasswordChangeSaveFailed": {
+    "message": "The item couldn't be saved. Open it again and try once more."
+  },
+  "keykeeperPasswordChangeNoteTitle": {
+    "message": "Password change"
+  },
+  "keykeeperPasswordChangeFinding": {
+    "message": "Looking for the change-password form on $SITE$.",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "accounts.example.com"
+      }
+    }
+  },
+  "keykeeperPasswordChangeSignIn": {
+    "message": "Sign in to $SITE$ first. This carries on when the change-password form shows.",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "accounts.example.com"
+      }
+    }
+  },
+  "keykeeperPasswordChangeNoForm": {
+    "message": "There's no change-password form on this page. Go to the site's change-password page in this tab, and this carries on there."
+  },
+  "keykeeperPasswordChangeCaptchaFirst": {
+    "message": "The site wants you to prove you're not a robot. Do that, and this carries on when the change-password form shows."
+  },
+  "keykeeperPasswordChangeSaving": {
+    "message": "Saving a new password to the item first."
+  },
+  "keykeeperPasswordChangeSubmitting": {
+    "message": "Submitting the new password to $SITE$.",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "accounts.example.com"
+      }
+    }
+  },
+  "keykeeperPasswordChangeHandoverCaptcha": {
+    "message": "The site wants you to prove you're not a robot. Do that, then submit the form. The new password is saved and filled in."
+  },
+  "keykeeperPasswordChangeHandoverCode": {
+    "message": "The site asks for a code. Enter it, then submit the form. The new password is saved and filled in."
+  },
+  "keykeeperPasswordChangeHandoverEmail": {
+    "message": "The site sent you a message to confirm the change. Follow it to finish, then open the item to say whether it worked."
+  },
+  "keykeeperPasswordChangeHandoverForm": {
+    "message": "Finish the rest of the form, then submit it. The new password is saved and filled in."
+  },
+  "keykeeperPasswordChangeHandoverButton": {
+    "message": "Submit the form to finish. The new password is saved and filled in."
+  },
+  "keykeeperPasswordChangeChanged": {
+    "message": "Password changed. The new one is saved in the item."
+  },
+  "keykeeperPasswordChangeRefused": {
+    "message": "$SITE$ didn't take the new password. Open the item to put the old one back.",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "accounts.example.com"
+      }
+    }
+  },
+  "keykeeperPasswordChangeUnsure": {
+    "message": "It isn't clear whether $SITE$ took the new password. Open the item to say whether it worked.",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "accounts.example.com"
+      }
+    }
+  },
+  "keykeeperPasswordChangeStoppedClosed": {
+    "message": "The tab closed, so the password change stopped. Nothing was changed."
+  },
+  "keykeeperPasswordChangeStoppedElsewhere": {
+    "message": "The tab went to another site, so the password change stopped. Nothing was changed."
+  },
+  "keykeeperPasswordChangeStoppedLocked": {
+    "message": "Locked, so the password change stopped. Nothing was changed."
+  },
+  "keykeeperPasswordChangeStoppedGone": {
+    "message": "The item is gone, so the password change stopped. Nothing was changed."
+  },
+  "keykeeperPasswordChangeStoppedTimeout": {
+    "message": "No change-password form showed up in time, so this stopped. Nothing was changed."
+  },
+  "keykeeperPasswordChangeStoppedNoCurrent": {
+    "message": "This form doesn't ask for the current password, so it may not be for your own account. Nothing was changed. Change the password yourself."
+  },
+  "keykeeperPasswordChangeStoppedAmbiguous": {
+    "message": "This page has more than one form like this, so it isn't clear which one to use. Nothing was changed. Change the password yourself."
+  },
+  "keykeeperPasswordChangeStoppedRules": {
+    "message": "No password fits this site's rules, so nothing was changed."
+  },
+  "keykeeperPasswordChangeStoppedChangedMeanwhile": {
+    "message": "The item changed since you started, so this stopped. Nothing was changed."
+  },
+  "keykeeperPasswordChangeStoppedSaveFailed": {
+    "message": "The new password couldn't be saved, so nothing was changed on the site."
+  },
+  "keykeeperPasswordChangeElsewhereAfterSave": {
+    "message": "The tab went to another site after the new password was saved. Open the item to say whether it worked."
+  },
+  "keykeeperPasswordChangeLockedAfterSave": {
+    "message": "Locked after the new password was saved. Unlock and open the item to say whether it worked."
   }
 }

@@ -198,6 +198,7 @@ import {
   DefaultSshImportPromptService,
   DefaultVaultNavService,
   KeykeeperOpenAndFillService,
+  KeykeeperPasswordChangeService,
   PasswordRepromptService,
   SshImportPromptService,
   VAULT_BASE_ROUTE,
@@ -259,6 +260,7 @@ import {
 import { fromChromeRuntimeMessaging } from "../../platform/utils/from-chrome-runtime-messaging";
 import { BrowserAutofillNudgeService } from "../../vault/popup/services/browser-autofill-nudge.service";
 import { BrowserOpenAndFillService } from "../../vault/popup/services/keykeeper-open-and-fill.service";
+import { BrowserPasswordChangeService } from "../../vault/popup/services/keykeeper-password-change.service";
 import { Fido2UserVerificationService } from "../../vault/services/fido2-user-verification.service";
 import { ExtensionAnonLayoutWrapperDataService } from "../components/extension-anon-layout-wrapper/extension-anon-layout-wrapper-data.service";
 
@@ -840,6 +842,12 @@ const safeProviders: SafeProvider[] = [
   safeProvider({
     provide: KeykeeperOpenAndFillService,
     useClass: BrowserOpenAndFillService,
+    deps: [],
+  }),
+  // Keykeeper: assisted password change, from the item view and Health.
+  safeProvider({
+    provide: KeykeeperPasswordChangeService,
+    useClass: BrowserPasswordChangeService,
     deps: [],
   }),
   safeProvider({
