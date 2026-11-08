@@ -2,38 +2,39 @@ import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from "@ang
 import { RouterLink } from "@angular/router";
 
 import { KeykeeperTwoStepNudge, TWO_STEP_NUDGE } from "@bitwarden/admin-console/common";
-import { ButtonModule, CalloutModule } from "@bitwarden/components";
+import { BannerModule, LinkModule } from "@bitwarden/components";
 
 import { KeykeeperMspApiService } from "../msp/msp-api.service";
 
 /**
  * Keykeeper: on the vault page, a nudge to set up two-step login for someone
- * who has none at all and whom no rule requires it of. "Not now" hides it for
- * 90 days on every device. It never blocks anything: nothing shows when the
- * server can't be asked. See DESIGN.md, "A nudge for everyone else".
+ * who has none at all and whom no rule requires it of. A one-line banner, as
+ * upstream's own vault banners are, so it doesn't push the list far down.
+ * "Not now" hides it for 90 days on every device. It never blocks anything:
+ * nothing shows when the server can't be asked. See DESIGN.md, "A nudge for
+ * everyone else".
  */
 @Component({
   selector: "app-keykeeper-two-step-nudge",
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ButtonModule, CalloutModule, RouterLink],
+  imports: [BannerModule, LinkModule, RouterLink],
   template: `
     @if (show()) {
-      <bit-callout
-        type="info"
-        [title]="words.title"
-        class="tw-mb-4 tw-block"
+      <bit-banner
+        variant="primary"
+        icon="bwi-lock"
+        [useAlertRole]="false"
         data-testid="two-step-nudge"
       >
-        <p class="tw-mb-2">{{ words.text }}</p>
-        <div class="tw-flex tw-flex-wrap tw-gap-2">
-          <a bitButton buttonType="primary" routerLink="/settings/security/two-factor">
-            {{ words.setUp }}
-          </a>
-          <button bitButton buttonType="secondary" type="button" (click)="notNow()">
-            {{ words.notNow }}
-          </button>
-        </div>
-      </bit-callout>
+        {{ words.text }}
+        <a bitLink linkType="secondary" routerLink="/settings/security/two-factor">{{
+          words.setUp
+        }}</a>
+        ·
+        <button type="button" bitLink linkType="secondary" (click)="notNow()">
+          {{ words.notNow }}
+        </button>
+      </bit-banner>
     }
   `,
 })
