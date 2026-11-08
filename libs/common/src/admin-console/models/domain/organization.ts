@@ -101,6 +101,8 @@ export class Organization {
   ssoEnabled: boolean;
   ssoMemberDecryptionType?: MemberDecryptionType;
   usePhishingBlocker: boolean;
+  /** Keykeeper: the browser extension may change its items' passwords on their sites. */
+  keykeeperPasswordChange: boolean;
   useMyItems: boolean;
   useInviteLinks: boolean;
 
@@ -170,6 +172,7 @@ export class Organization {
     this.ssoEnabled = obj.ssoEnabled;
     this.ssoMemberDecryptionType = obj.ssoMemberDecryptionType;
     this.usePhishingBlocker = obj.usePhishingBlocker;
+    this.keykeeperPasswordChange = obj.keykeeperPasswordChange === true;
     this.useMyItems = obj.useMyItems;
     this.useInviteLinks = obj.useInviteLinks;
   }

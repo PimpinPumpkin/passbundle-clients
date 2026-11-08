@@ -53,6 +53,11 @@ export enum EventType {
   // (libs/vault/src/keykeeper/item-versions.ts).
   Keykeeper_CipherHistoryCleared = 1190,
   Keykeeper_CipherVersionDeleted = 1191,
+  // Keykeeper: an assisted password change saved a new password to the item,
+  // and someone put its earlier password back after one. The extension and the
+  // web vault send them (DESIGN.md, "Assisted password change", "Activity").
+  Keykeeper_CipherPasswordChanged = 1192,
+  Keykeeper_CipherPasswordPutBack = 1193,
 
   Collection_Created = 1300,
   Collection_Updated = 1301,
@@ -143,6 +148,10 @@ export enum EventType {
   // its admins only. See DESIGN.md, "Two-step login for everyone".
   Keykeeper_EveryoneTwoStepOn = 1697,
   Keykeeper_EveryoneTwoStepOff = 1698,
+  // Keykeeper: the organization allowed assisted password change on its items
+  // again, or turned it off.
+  Keykeeper_PasswordChangeOn = 1680,
+  Keykeeper_PasswordChangeOff = 1681,
 
   Policy_Updated = 1700,
 

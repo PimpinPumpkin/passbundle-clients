@@ -7,6 +7,7 @@ import { LoginView } from "../models/view/login.view";
 import { PasswordHistoryView } from "../models/view/password-history.view";
 
 import {
+  allowedIn,
   fieldsWithMarker,
   mayChangePassword,
   newPasswordChangeMarker,
@@ -113,12 +114,23 @@ describe("Keykeeper assisted password change: who may start one", () => {
     expect(mayChangePassword(trashed)).toBe(false);
   });
 
-  it("waits for the organization's own switch for an organization's item, which none has yet", () => {
+  it("is for an organization's item where its organization allows it, as the person's sync says", () => {
     const shared = login();
     shared.organizationId = "org-1";
+    expect(
+      mayChangePassword(shared, allowedIn([{ id: "org-1", keykeeperPasswordChange: true }])),
+    ).toBe(true);
+    // Turned off, an older server that doesn't say, or an organization the person isn't in.
+    expect(
+      mayChangePassword(shared, allowedIn([{ id: "org-1", keykeeperPasswordChange: false }])),
+    ).toBe(false);
+    expect(mayChangePassword(shared, allowedIn([{ id: "org-1" }]))).toBe(false);
+    expect(
+      mayChangePassword(shared, allowedIn([{ id: "org-2", keykeeperPasswordChange: true }])),
+    ).toBe(false);
     expect(mayChangePassword(shared)).toBe(false);
-    expect(mayChangePassword(shared, organizationAllowsPasswordChange)).toBe(false);
-    // With the switch on, the item's folder permissions decide, as for a personal item.
+    expect(organizationAllowsPasswordChange(null, "org-1")).toBe(false);
+    // Allowed, the item's folder permissions decide, as for a personal item.
     expect(mayChangePassword(shared, () => true)).toBe(true);
     shared.edit = false;
     expect(mayChangePassword(shared, () => true)).toBe(false);

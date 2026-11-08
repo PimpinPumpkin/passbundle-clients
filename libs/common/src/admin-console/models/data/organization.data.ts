@@ -68,6 +68,7 @@ export class OrganizationData {
   ssoEnabled: boolean;
   ssoMemberDecryptionType?: MemberDecryptionType;
   usePhishingBlocker: boolean;
+  keykeeperPasswordChange: boolean;
   useMyItems: boolean;
   useInviteLinks: boolean;
 
@@ -137,6 +138,7 @@ export class OrganizationData {
     this.ssoEnabled = response.ssoEnabled;
     this.ssoMemberDecryptionType = response.ssoMemberDecryptionType;
     this.usePhishingBlocker = response.usePhishingBlocker;
+    this.keykeeperPasswordChange = response.keykeeperPasswordChange === true;
     this.useMyItems = response.useMyItems;
     this.useInviteLinks = response.useInviteLinks;
 

@@ -51,6 +51,10 @@ export function describeEvent(
       return detail === "off"
         ? `${actor} stopped requiring two-step login of ${org}'s admins`
         : `${actor} required two-step login of ${org}'s admins`;
+    case "client_password_change_set":
+      return detail === "off"
+        ? `${actor} turned off assisted password change in ${org}`
+        : `${actor} turned on assisted password change in ${org}`;
     case "client_everyone_two_step_set":
       return detail === "off"
         ? `${actor} stopped requiring two-step login of everyone in ${org}`

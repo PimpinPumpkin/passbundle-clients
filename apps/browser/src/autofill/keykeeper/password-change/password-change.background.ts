@@ -46,7 +46,7 @@ import { CipherType } from "@bitwarden/common/vault/enums";
 import { openAndFillUrl } from "@bitwarden/common/vault/keykeeper/open-and-fill";
 import {
   mayChangePassword,
-  organizationAllowsPasswordChange,
+  allowedIn,
   PasswordChangeState,
   withChangeConfirmed,
   withChangeState,
@@ -83,6 +83,8 @@ const DRAWING_MS = 10_000;
 const NEXT_PAGE_MS = 3_000;
 /** The longest one look at the page takes, so the background keeps checking the tab in between. */
 const WATCH_CHUNK_MS = 20_000;
+/** Upstream's event type for "Changed an item's password on its website", PassBundle's own (1192). */
+export const PASSWORD_CHANGED_EVENT = 1192;
 /** How often a running change looks at its tab. */
 const TICK_MS = 1_000;
 /** How often a page without the form is read again, besides on a load or a return to the front. */
@@ -216,7 +218,17 @@ export type PasswordChangeDependencies = {
   send: (tabId: number, message: object) => Promise<unknown>;
   /** The extension's words. */
   t: (key: string, ...substitutions: string[]) => string;
-  organizationAllows?: (organizationId: string) => boolean;
+  /**
+   * Which of the person's organizations allow it on their items, as their
+   * sync says (`allowedIn`). Without it, none do.
+   */
+  organizationsAllowing?: (userId: UserId) => Promise<(organizationId: string) => boolean>;
+  /**
+   * Tells an organization's event log that a change saved a new password to
+   * one of its items (upstream's client events, sent at once). Personal items
+   * get none.
+   */
+  collectEvent?: (type: number, cipherId: string, organizationId: string) => Promise<void>;
   recipeFor?: (host: string) => PasswordChangeRecipe | null;
   changePageFor?: (host: string) => string | null;
   logError: (error: unknown) => void;
@@ -261,13 +273,15 @@ export class KeykeeperPasswordChange {
   private again = false;
   private ticker: ReturnType<typeof setInterval> | null = null;
   private readonly now: () => number;
-  private readonly organizationAllows: (organizationId: string) => boolean;
+  private readonly organizationsAllowing: (
+    userId: UserId,
+  ) => Promise<(organizationId: string) => boolean>;
   private readonly recipeFor: (host: string) => PasswordChangeRecipe | null;
   private readonly changePageFor: (host: string) => string | null;
 
   constructor(private readonly deps: PasswordChangeDependencies) {
     this.now = deps.now ?? (() => Date.now());
-    this.organizationAllows = deps.organizationAllows ?? organizationAllowsPasswordChange;
+    this.organizationsAllowing = deps.organizationsAllowing ?? (async () => allowedIn([]));
     this.recipeFor = deps.recipeFor ?? ((host) => recipeForHost(host));
     this.changePageFor = deps.changePageFor ?? ((host) => changePasswordUrlFor(host));
   }
@@ -355,7 +369,7 @@ export class KeykeeperPasswordChange {
       return { started: false, reason: "locked" };
     }
     const cipher = await this.cipherFor(userId, request.cipherId);
-    if (cipher == null || !mayChangePassword(cipher, this.organizationAllows)) {
+    if (cipher == null || !mayChangePassword(cipher, await this.organizationsAllowing(userId))) {
       return { started: false, reason: "notAllowed" };
     }
     if (!request.repromptPassed && (await this.deps.passwordRepromptRequired(cipher))) {
@@ -662,7 +676,7 @@ export class KeykeeperPasswordChange {
     const fresh = await this.cipherFor(run.userId, run.cipherId);
     if (
       fresh == null ||
-      !mayChangePassword(fresh, this.organizationAllows) ||
+      !mayChangePassword(fresh, await this.organizationsAllowing(run.userId)) ||
       fresh.login.password !== run.oldPassword
     ) {
       return this.stop(run, "changedMeanwhile");
@@ -691,6 +705,15 @@ export class KeykeeperPasswordChange {
     }
     run.saving = false;
     run.saved = true;
+    // An organization's item: its event log says the password changed this
+    // way, not by hand (DESIGN.md, "Assisted password change", "Activity").
+    if (fresh.organizationId != null) {
+      try {
+        await this.deps.collectEvent?.(PASSWORD_CHANGED_EVENT, fresh.id, fresh.organizationId);
+      } catch (error) {
+        this.deps.logError(error);
+      }
+    }
     if (run.stopRequested != null) {
       // Stopped while it saved: nothing went to the site, and the item asks.
       return this.stop(run, run.stopRequested);

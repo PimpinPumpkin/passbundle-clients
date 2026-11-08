@@ -1277,5 +1277,35 @@
   },
   "keykeeperPasswordChangeLockedAfterSave": {
     "message": "Locked after the new password was saved. Unlock and open the item to say whether it worked."
+  },
+  "keykeeperPasswordChangedItemId": {
+    "message": "Changed the password of item $ID$ on its website.",
+    "placeholders": {
+      "id": {
+        "content": "$1",
+        "example": "Google"
+      }
+    }
+  },
+  "keykeeperPasswordPutBackItemId": {
+    "message": "Put back the earlier password of item $ID$ after a password change.",
+    "placeholders": {
+      "id": {
+        "content": "$1",
+        "example": "Google"
+      }
+    }
+  },
+  "keykeeperPasswordChangeOnEvent": {
+    "message": "Turned on assisted password change."
+  },
+  "keykeeperPasswordChangeOffEvent": {
+    "message": "Turned off assisted password change."
+  },
+  "keykeeperPasswordChangeOffPolicy": {
+    "message": "Turn off assisted password change"
+  },
+  "keykeeperPasswordChangeOffPolicyDesc": {
+    "message": "Change password in the browser extension won't change the passwords of this organization's items on their sites. It only opens the site's change-password page, and people change it themselves."
   }
 }
