@@ -353,6 +353,25 @@ describe("buildVaultMenu", () => {
     expect(menu.places.find((v) => v.key === "collection-c-office")?.count).toBe(1);
   });
 
+  it("gives a shared folder with its own icon and color that tile, and the others their glyph", () => {
+    const tree = collections();
+    (tree.children[0].node as unknown as Record<string, unknown>).keykeeperLook = {
+      icon: "server",
+      tone: "garnet",
+    };
+    const menu = buildVaultMenu(state({}, { collectionTree: tree }), actions());
+
+    const office = menu.places.find((v) => v.key === "collection-c-office")!;
+    expect(office.look).toEqual({
+      light: "#A8291F",
+      dark: "#FF9D92",
+      glyph: "M4 4h16v6H4Z M4 14h16v6H4Z M8 7h.01 M8 17h.01",
+    });
+    expect(office.icon).toBe("bwi-collection-shared");
+    expect(menu.places.find((v) => v.key === "collection-c-printers")?.look).toBeUndefined();
+    expect(menu.places.find((v) => v.key === "collection-c-other")?.look).toBeUndefined();
+  });
+
   it("offers an organization's options, and not My vault's", () => {
     const menu = buildVaultMenu(state(), actions());
 

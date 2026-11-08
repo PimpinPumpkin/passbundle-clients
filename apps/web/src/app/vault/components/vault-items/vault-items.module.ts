@@ -12,6 +12,7 @@ import {
 } from "@bitwarden/components";
 import {
   CopyCipherFieldDirective,
+  KeykeeperCategoryTileComponent,
   KeykeeperExpirationBadgeComponent,
   KeykeeperItemTileComponent,
   KeykeeperTemplateBadgeComponent,
@@ -44,6 +45,7 @@ import { VaultItemsComponent } from "./vault-items.component";
     PipesModule,
     CopyCipherFieldDirective,
     VaultItemCopyActionsComponent,
+    KeykeeperCategoryTileComponent,
     KeykeeperExpirationBadgeComponent,
     KeykeeperItemTileComponent,
     KeykeeperTemplateBadgeComponent,

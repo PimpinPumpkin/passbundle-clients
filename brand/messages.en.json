@@ -1062,5 +1062,26 @@
   },
   "keykeeperDuoBackToAppDesc": {
     "message": "Your browser opens the app to finish signing in. If it doesn't, select Back to the app."
+  },
+  "keykeeperFolderLook": {
+    "message": "Icon and color"
+  },
+  "keykeeperFolderLookPreview": {
+    "message": "How it shows in the menu"
+  },
+  "keykeeperFolderLookUnnamed": {
+    "message": "This shared folder"
+  },
+  "keykeeperFolderLookIcon": {
+    "message": "Icon"
+  },
+  "keykeeperFolderLookColor": {
+    "message": "Color"
+  },
+  "keykeeperFolderLookPlain": {
+    "message": "Plain folder"
+  },
+  "keykeeperFolderLookHint": {
+    "message": "Everyone who has this folder sees its icon. It's encrypted, like the folder's name."
   }
 }

@@ -875,6 +875,24 @@ describe("VaultPopupListFiltersService", () => {
       expect(list.find((p) => p.key === `shared:${everyoneId}`)?.ownerName).toBe("Lakeside Clinic");
     });
 
+    it("gives a shared folder with its own icon and color its tile, and the others none", async () => {
+      const banking = new CollectionView({
+        id: "a3c2e115-0c0f-4f43-9d55-7a1f0a3c5f0c" as any,
+        organizationId: "o-lake" as any,
+        name: "Banking",
+      });
+      banking.keykeeperLook = { icon: "bank", tone: "emerald" };
+      decryptedCollections$.next([everyone, banking]);
+      const list = await places();
+      expect(list.find((p) => p.label === "Banking")?.tile).toEqual({
+        light: "#0E7A47",
+        dark: "#6FDBA0",
+        glyph: "M3 9l9-5 9 5 M5 10v7 M9.5 10v7 M14.5 10v7 M19 10v7 M3 20h18",
+      });
+      expect(list.find((p) => p.label === "Everyone")?.tile).toBeUndefined();
+      expect(list.filter((p) => p.tile).map((p) => p.label)).toEqual(["Banking"]);
+    });
+
     it("counts with the kind of item picked", async () => {
       service.filterForm.patchValue({ cipherType: CipherType.Card });
       const list = await places();
