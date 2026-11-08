@@ -580,16 +580,21 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     );
   }
 
-  /** Turns it on or off, with the person's proof (ChangeVerification). */
+  /**
+   * Turns it on or off, with the person's proof (ChangeVerification), and
+   * with `everyone`, for everyone else too (it needs `required`). Without
+   * `everyone`, that part stays as it is.
+   */
   async setOrgAdminTwoStep(
     orgId: string,
     required: boolean,
     verification: ChangeVerification,
+    everyone?: boolean,
   ): Promise<OrgAdminTwoStep> {
     return this.apiService.send(
       "PUT",
       `/keykeeper/organizations/${orgId}/admin-two-step`,
-      { required, ...verificationFields(verification) },
+      { required, ...(everyone == null ? {} : { everyone }), ...verificationFields(verification) },
       true,
       true,
     );

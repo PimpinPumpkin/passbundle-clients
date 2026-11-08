@@ -139,6 +139,10 @@ export enum EventType {
   // off. See DESIGN.md, "Two-step login for admins".
   Keykeeper_AdminTwoStepOn = 1695,
   Keykeeper_AdminTwoStepOff = 1696,
+  // Keykeeper: it required two-step login of everyone in it, or went back to
+  // its admins only. See DESIGN.md, "Two-step login for everyone".
+  Keykeeper_EveryoneTwoStepOn = 1697,
+  Keykeeper_EveryoneTwoStepOff = 1698,
 
   Policy_Updated = 1700,
 

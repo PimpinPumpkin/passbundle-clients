@@ -1009,6 +1009,12 @@
   "keykeeperAdminTwoStepOff": {
     "message": "Turned off two-step login for admins."
   },
+  "keykeeperEveryoneTwoStepOn": {
+    "message": "Required two-step login of everyone."
+  },
+  "keykeeperEveryoneTwoStepOff": {
+    "message": "Stopped requiring two-step login of everyone, so it's required for admins only."
+  },
   "keykeeperAdminTwoStepPolicy": {
     "message": "Two-step login for admins"
   },
