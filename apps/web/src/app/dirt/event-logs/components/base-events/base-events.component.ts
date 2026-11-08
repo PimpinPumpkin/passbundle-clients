@@ -1,6 +1,6 @@
 // FIXME: Update this file to be type safe and remove this and next line
 // @ts-strict-ignore
-import { Directive, OnDestroy, signal } from "@angular/core";
+import { computed, Directive, OnDestroy, signal } from "@angular/core";
 import { FormControl, FormGroup } from "@angular/forms";
 import { ActivatedRoute } from "@angular/router";
 import { combineLatest, filter, map, Observable, Subject, switchMap, takeUntil } from "rxjs";
@@ -24,6 +24,12 @@ export abstract class BaseEventsComponent implements OnDestroy {
   readonly loading = signal(true);
   readonly loaded = signal(false);
   readonly events = signal<EventView[]>([]);
+  /** Keykeeper: who to credit for the locations shown, once any is. */
+  readonly keykeeperLocationSource = computed(
+    () =>
+      this.events().find((e) => e.keykeeperLocation && e.keykeeperLocationSource)
+        ?.keykeeperLocationSource ?? null,
+  );
   dirtyDates = true;
   continuationToken: string;
   canUseSM = false;
@@ -236,6 +242,8 @@ export abstract class BaseEventsComponent implements OnDestroy {
           installationId: r.installationId,
           systemUser: r.systemUser,
           serviceAccountId: r.serviceAccountId,
+          keykeeperLocation: r.keykeeperLocation,
+          keykeeperLocationSource: r.keykeeperLocationSource,
         });
       }),
     );

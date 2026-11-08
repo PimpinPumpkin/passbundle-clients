@@ -61,10 +61,15 @@
             <bit-icon
               [name]="$any(r.appIcon)"
               class="bwi-lg tw-text-muted"
-              title="{{ r.appName }}, {{ r.ip }}"
+              title="{{ r.appName }}, {{ r.ip }}{{
+                r.keykeeperLocation ? ', ' + r.keykeeperLocation : ''
+              }}"
               fixedWidth
             ></bit-icon>
-            <span class="tw-sr-only">{{ r.appName }}, {{ r.ip }}</span>
+            <span class="tw-sr-only"
+              >{{ r.appName }}, {{ r.ip
+              }}{{ r.keykeeperLocation ? ", " + r.keykeeperLocation : "" }}</span
+            >
           </td>
           <td bitCell *ngIf="showUser">
             <span appA11yTitle="{{ r.userEmail }}">{{ r.userName }}</span>

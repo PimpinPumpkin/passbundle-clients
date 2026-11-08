@@ -15,6 +15,7 @@ import {
   UserApiLoginCredentials,
   UserDecryptionOptionsServiceAbstraction,
 } from "@bitwarden/auth/common";
+import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { AuthService } from "@bitwarden/common/auth/abstractions/auth.service";
 import { AuthenticationStatus } from "@bitwarden/common/auth/enums/authentication-status";
@@ -22,6 +23,10 @@ import {
   isTwoFactorProviderType,
   TwoFactorProviderType,
 } from "@bitwarden/common/auth/enums/two-factor-provider-type";
+import {
+  keykeeperNewDeviceCheckEmail,
+  keykeeperNewDeviceCheckStatus,
+} from "@bitwarden/common/auth/keykeeper/new-device-check";
 import { AuthResult } from "@bitwarden/common/auth/models/domain/auth-result";
 import { ForceSetPasswordReason } from "@bitwarden/common/auth/models/domain/force-set-password-reason";
 import { TokenTwoFactorRequest } from "@bitwarden/common/auth/models/request/identity-token/token-two-factor.request";
@@ -46,6 +51,7 @@ import { NodeUtils } from "@bitwarden/node/node-utils";
 import { PureCrypto } from "@bitwarden/sdk-internal";
 
 import { ConfirmKeyConnectorDomainCommand } from "../../key-management/confirm-key-connector-domain.command";
+import { keykeeperWaitForNewDevice } from "../../keykeeper/new-device";
 import { ssoPromptMessage, ssoRequiredRefusal } from "../../keykeeper/sign-in";
 import { Response } from "../../models/response";
 import { MessageResponse } from "../../models/response/message.response";
@@ -77,6 +83,8 @@ export class LoginCommand {
     protected masterPasswordService: MasterPasswordServiceAbstraction,
     protected userDecryptionOptionsService: UserDecryptionOptionsServiceAbstraction,
     protected encryptedMigrator: EncryptedMigrator,
+    // Keykeeper: the new-device check's calls (keykeeper/new-device.ts).
+    protected apiService?: ApiService,
   ) {}
 
   async run(email: string, password: string, options: OptionValues) {
@@ -343,6 +351,37 @@ export class LoginCommand {
         response = await this.loginStrategyService.logInTwoFactor(
           new TokenTwoFactorRequest(selectedProvider.type, twoFactorToken),
         );
+      }
+
+      // Keykeeper: the new-device check: print the number to type on a device
+      // already signed in and wait for it, or ask for the emailed code
+      // (DESIGN.md, "New-device check"). The server may answer again with the
+      // check (a token that changed), so a few rounds.
+      for (
+        let round = 0;
+        round < 3 && response.requiresDeviceVerification && response.keykeeperNewDeviceCheck;
+        round++
+      ) {
+        const waited = await keykeeperWaitForNewDevice(response.keykeeperNewDeviceCheck, {
+          status: (c) => keykeeperNewDeviceCheckStatus(this.apiService, c),
+          sendEmail: (c) => keykeeperNewDeviceCheckEmail(this.apiService, c),
+          write: (line) => CliUtils.writeLn(line, false, true),
+          ask: async (question) =>
+            (
+              await inquirer.createPromptModule({ output: process.stderr })({
+                type: "input",
+                name: "code",
+                message: question,
+              })
+            ).code,
+          canInteract: this.canInteract,
+          sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+          now: () => Date.now(),
+        });
+        if ("error" in waited) {
+          return Response.error(waited.error);
+        }
+        response = await this.loginStrategyService.logInNewDeviceVerification(waited.otp);
       }
 
       // Opting for not checking feature flag since the server will not respond with

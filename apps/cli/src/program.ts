@@ -188,6 +188,7 @@ export class Program extends BaseProgram {
             this.serviceContainer.masterPasswordService,
             this.serviceContainer.userDecryptionOptionsService,
             this.serviceContainer.encryptedMigrator,
+            this.serviceContainer.apiService,
           );
           const response = await command.run(email, password, options);
           this.processResponse(response, true);

@@ -14,6 +14,13 @@ export enum EventType {
   User_MigratedKeyToKeyConnector = 1009,
   User_RequestedDeviceApproval = 1010,
   User_TdeOffboardingPasswordSet = 1011,
+  // Keykeeper: the new-device check (DESIGN.md, "New-device check"): a
+  // sign-in on a new device waiting for approval, approved, denied, and a
+  // code by email asked for after the wait.
+  Keykeeper_NewDeviceCheckStarted = 1090,
+  Keykeeper_NewDeviceApproved = 1091,
+  Keykeeper_NewDeviceDenied = 1092,
+  Keykeeper_NewDeviceEmailLater = 1093,
 
   Cipher_Created = 1100,
   Cipher_Updated = 1101,

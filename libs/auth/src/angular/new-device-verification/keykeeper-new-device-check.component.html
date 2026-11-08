@@ -1,0 +1,163 @@
+@switch (phase) {
+  @case ("loading") {
+    <p class="tw-text-center tw-text-muted" data-testid="keykeeper-new-device-loading">
+      {{ "loading" | i18n }}
+    </p>
+  }
+  @case ("denied") {
+    <div data-testid="keykeeper-new-device-denied">
+      <bit-callout type="danger" [title]="'keykeeperNewDeviceDenied' | i18n">
+        {{
+          (check?.deniedWhy === "number"
+            ? "keykeeperNewDeviceDeniedNumber"
+            : "keykeeperNewDeviceDeniedThere"
+          ) | i18n
+        }}
+      </bit-callout>
+      <button type="button" bitButton block buttonType="primary" [bitAction]="startOver">
+        {{ "keykeeperNewDeviceStartOver" | i18n }}
+      </button>
+    </div>
+  }
+  @case ("ended") {
+    <div data-testid="keykeeper-new-device-ended">
+      <p class="tw-text-center">{{ "keykeeperNewDeviceEnded" | i18n }}</p>
+      <button type="button" bitButton block buttonType="primary" [bitAction]="startOver">
+        {{ "keykeeperNewDeviceStartOver" | i18n }}
+      </button>
+    </div>
+  }
+  @default {
+    @if (check; as c) {
+      @if (c.approvers) {
+        <p class="tw-text-center tw-mb-2">{{ "keykeeperNewDeviceTypeThis" | i18n }}</p>
+        <p
+          class="tw-text-center tw-font-semibold tw-tracking-widest tw-mb-2"
+          style="font-size: 3.5rem; line-height: 1"
+          data-testid="keykeeper-new-device-number"
+          [attr.aria-label]="'keykeeperNewDeviceNumberLabel' | i18n: c.number"
+        >
+          {{ c.number }}
+        </p>
+        <p class="tw-text-center tw-text-muted tw-text-sm" data-testid="keykeeper-new-device-wait">
+          @if (phase === "finishing") {
+            {{ "keykeeperNewDeviceFinishing" | i18n }}
+          } @else {
+            {{ "keykeeperNewDeviceWaiting" | i18n: minutesLeft() }}
+          }
+        </p>
+      } @else {
+        <p class="tw-text-center" data-testid="keykeeper-new-device-no-approvers">
+          {{ "keykeeperNewDeviceNoApprovers" | i18n }}
+        </p>
+      }
+
+      @if (c.email === "now") {
+        <div class="tw-mt-4" data-testid="keykeeper-new-device-email">
+          @if (c.codeSent) {
+            <p class="tw-text-sm">
+              {{ "keykeeperNewDeviceCodeSent" | i18n: c.emailTo ?? "" }}
+            </p>
+            <form [formGroup]="codeForm" [bitSubmit]="submitCode">
+              <bit-form-field>
+                <bit-label>{{ "keykeeperNewDeviceCodeLabel" | i18n }}</bit-label>
+                <input
+                  bitInput
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="one-time-code"
+                  formControlName="code"
+                  appInputVerbatim
+                  data-testid="keykeeper-new-device-code"
+                />
+              </bit-form-field>
+              <button type="submit" bitButton bitFormButton block buttonType="primary">
+                {{ "continueLoggingIn" | i18n }}
+              </button>
+            </form>
+            <button
+              type="button"
+              bitLink
+              linkType="primary"
+              class="tw-text-sm tw-mt-2"
+              [bitAction]="sendEmail"
+            >
+              {{ "keykeeperNewDeviceSendAnother" | i18n }}
+            </button>
+          } @else {
+            <button
+              type="button"
+              bitButton
+              block
+              [buttonType]="c.approvers ? 'secondary' : 'primary'"
+              [bitAction]="sendEmail"
+              data-testid="keykeeper-new-device-send-code"
+            >
+              {{ "keykeeperNewDeviceEmailMe" | i18n }}
+            </button>
+          }
+          <p class="tw-text-xs tw-text-muted tw-mt-2">
+            {{ "keykeeperNewDeviceEmailWeaker" | i18n }}
+          </p>
+        </div>
+      }
+
+      @if (c.email === "later") {
+        <div class="tw-mt-4 tw-text-center">
+          @if (!showCantReach) {
+            <button
+              type="button"
+              bitLink
+              linkType="primary"
+              class="tw-text-sm"
+              (click)="showCantReach = true"
+              data-testid="keykeeper-new-device-cant-reach"
+            >
+              {{ "keykeeperNewDeviceCantReach" | i18n }}
+            </button>
+          } @else {
+            <p class="tw-text-sm tw-text-left">{{ "keykeeperNewDeviceLaterExplained" | i18n }}</p>
+            <button
+              type="button"
+              bitButton
+              block
+              buttonType="secondary"
+              [bitAction]="sendEmail"
+              data-testid="keykeeper-new-device-email-later"
+            >
+              {{ "keykeeperNewDeviceEmailLater" | i18n }}
+            </button>
+          }
+        </div>
+      }
+
+      @if (c.email === "waiting") {
+        <bit-callout type="info" class="tw-mt-4" data-testid="keykeeper-new-device-waiting-email">
+          {{ "keykeeperNewDeviceLaterAsked" | i18n: emailAfterText() }}
+        </bit-callout>
+      }
+
+      @if (error) {
+        <p
+          class="tw-text-danger tw-text-sm tw-mt-2"
+          role="alert"
+          data-testid="keykeeper-new-device-error"
+        >
+          {{ error }}
+        </p>
+      }
+
+      <div class="tw-text-center tw-mt-4">
+        <button
+          type="button"
+          bitLink
+          linkType="secondary"
+          class="tw-text-sm"
+          [bitAction]="startOver"
+        >
+          {{ "keykeeperNewDeviceStartOver" | i18n }}
+        </button>
+      </div>
+    }
+  }
+}
