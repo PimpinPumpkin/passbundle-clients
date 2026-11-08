@@ -28,6 +28,12 @@ const info = {
 const answer = (status: number, body: unknown) =>
   ({ status, ok: status >= 200 && status < 300, json: async () => body }) as unknown as Response;
 
+/** The authenticator's details, as Vaultwarden 1.37.5 answers: the key, and the dialog's token. */
+const authenticatorDetails = {
+  authenticator: { enabled: false, key: "KEY" },
+  userVerificationToken: "verification-token",
+};
+
 /** A refusal as Vaultwarden sends it. */
 const refusal = (message: string) => ({
   message,
@@ -101,7 +107,7 @@ describe("Set up two-step login to continue", () => {
   it("says a wrong code is wrong in plain words, never with the server's time or the address", async () => {
     server(
       [`GET ${API}/keykeeper/two-step-setup`, async () => answer(200, info)],
-      [`POST ${API}/two-factor/get-authenticator`, async () => answer(200, { key: "KEY" })],
+      [`POST ${API}/two-factor/get-authenticator`, async () => answer(200, authenticatorDetails)],
       [
         `PUT ${API}/two-factor/authenticator`,
         async () =>
@@ -127,7 +133,7 @@ describe("Set up two-step login to continue", () => {
   it("says the server had a problem, not nothing, when a proxy answers with a page", async () => {
     server(
       [`GET ${API}/keykeeper/two-step-setup`, async () => answer(200, info)],
-      [`POST ${API}/two-factor/get-authenticator`, async () => answer(200, { key: "KEY" })],
+      [`POST ${API}/two-factor/get-authenticator`, async () => answer(200, authenticatorDetails)],
       [`PUT ${API}/two-factor/authenticator`, async () => answer(502, null)],
     );
     const page = setUp();

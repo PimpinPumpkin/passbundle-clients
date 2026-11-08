@@ -18,6 +18,7 @@ import {
   setStoredRemind,
   storedExpiration,
   storedRemind,
+  withCardExpirations,
 } from "./expiration";
 
 const field = (name: string, value: string) => {
@@ -168,6 +169,38 @@ describe("Keykeeper expiration dates", () => {
       setStoredRemind(cipher, null);
       expect(storedRemind(cipher)).toBeNull();
       expect(cipher.fields.map((f) => f.name)).toEqual(["Customer ID"]);
+    });
+  });
+
+  describe("list views (the SDK's, which lists use since web-v2026.10.1)", () => {
+    const today = new Date(2026, 10, 8);
+
+    it("reads a card's expiry from its list view's card part", () => {
+      const listView = { type: { card: { brand: "Visa", expMonth: "11", expYear: "2026" } } };
+      expect(itemExpiration(listView)).toEqual(new Date(2026, 10, 30));
+      expect(isExpiringSoon(listView, today)).toBe(true);
+    });
+
+    it("gives card list views their month and year only, from the full card", async () => {
+      const card = { id: "card-1", type: { card: { brand: "Visa" } } };
+      const login = { id: "login-1", type: { login: { username: "ana" } } };
+      const partial = { id: "card-2", partial: true, type: { card: { brand: "Amex" } } };
+      const opened: string[] = [];
+      await withCardExpirations([card, login, partial], async (view) => {
+        opened.push(view.id);
+        return { expMonth: "1", expYear: "27", number: "4111111111111111", code: "123" } as any;
+      });
+      expect(opened).toEqual(["card-1"]);
+      expect(card.type.card).toEqual({ brand: "Visa", expMonth: "1", expYear: "27" });
+      expect(partial.type.card).toEqual({ brand: "Amex" });
+    });
+
+    it("leaves a card it can't open without an expiry", async () => {
+      const card = { id: "card-1", type: { card: { brand: "Visa" } } };
+      await withCardExpirations([card], async () => {
+        throw new Error("no key");
+      });
+      expect(isExpiringSoon(card, today)).toBe(false);
     });
   });
 });

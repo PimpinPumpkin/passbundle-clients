@@ -147,18 +147,6 @@
           <ng-container slot="end">
             @if (showFillTextOnHover()) {
               <bit-item-action>
-                <button
-                  type="button"
-                  (click)="doAutofill(cipher)"
-                  class="tw-opacity-0 tw-text-primary-600 tw-font-semibold tw-px-2 tw-bg-transparent tw-border-0 group-hover/vault-item:tw-opacity-100 group-focus-within/vault-item:tw-opacity-100"
-                  bitTypography="body2"
-                >
-                  {{ "fill" | i18n }}
-                </button>
-              </bit-item-action>
-            }
-            @if (showAutofillBadge()) {
-              <bit-item-action>
                 <!-- Keykeeper: Fill is a small primary button, as the design has it -->
                 <button
                   type="button"
@@ -167,13 +155,14 @@
                   size="small"
                   data-keykeeper="fill"
                   (click)="doAutofill(cipher)"
-                  [title]="autofillShortcutTooltip() ?? ('autofillTitle' | i18n: cipher.name)"
+                  [title]="'autofillTitle' | i18n: cipher.name"
                   [attr.aria-label]="'autofillTitle' | i18n: cipher.name"
                 >
                   {{ "fill" | i18n }}
                 </button>
               </bit-item-action>
             }
+
             @if (showLaunchButton() && CipherViewLikeUtils.canLaunch(cipher)) {
               <!-- Keykeeper: shown with the row's pointer or focus on it, like More.
                    For a login it opens the website and fills that tab once (DESIGN.md, "Open and fill"). -->
@@ -193,7 +182,7 @@
                     bitIconButton="bwi-external-link"
                     size="small"
                     (click)="launchCipher(cipher)"
-                    [label]="'launchWebsiteForName' | i18n: cipher.name"
+                    [label]="'launchWebsite' | i18n"
                   ></button>
                 }
               </bit-item-action>

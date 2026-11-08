@@ -7,13 +7,21 @@
         [selectedIndex]="selectedTabIndex()"
         (selectedIndexChange)="selectedTabIndex.set($event)"
       >
-        <bit-tab [label]="'byEmail' | i18n">
+        <bit-tab [label]="'byEmail' | i18n" [disabled]="params.showCoachMarks">
           <ng-container
             *ngTemplateOutlet="byEmailForm; context: { organization: organization }"
           ></ng-container>
         </bit-tab>
         <bit-tab [label]="'byLink' | i18n">
-          <app-by-link-tab [organizationId]="params.organizationId" />
+          <!-- TODO(guided-tour removal): collapse this back to a single, unconditional
+          <app-by-link-tab [organizationId]="params.organizationId" />, dropping the @if/@else and
+          the <app-by-link-tab-tour> branch. See the header comment in
+          by-link-tab-tour.component.ts for the full removal checklist. -->
+          @if (params.showCoachMarks) {
+            <app-by-link-tab-tour (tourFinished)="finishTour()" />
+          } @else {
+            <app-by-link-tab [organizationId]="params.organizationId" />
+          }
         </bit-tab>
       </bit-tab-group>
     } @else {
@@ -36,7 +44,10 @@
       <button type="button" bitButton buttonType="secondary" (click)="cancel()">
         {{ "cancel" | i18n }}
       </button>
-    } @else {
+      <!-- TODO(guided-tour removal): change the condition above back to a plain @else and drop
+      `!params.showCoachMarks` from it. See the header comment in by-link-tab-tour.component.ts
+      for the full removal checklist. -->
+    } @else if (!params.showCoachMarks) {
       <button
         type="button"
         bitButton
@@ -138,28 +149,28 @@
           <bit-form-control>
             <input type="checkbox" bitCheckbox formControlName="accessImportExport" />
             <bit-label>{{ "accessImportExport" | i18n }}</bit-label>
+            <!-- Keykeeper: what the permission covers here. -->
+            <bit-hint>{{ "keykeeperImportExportHint" | i18n }}</bit-hint>
           </bit-form-control>
-          <bit-form-control>
-            <input type="checkbox" bitCheckbox formControlName="accessReports" />
-            <bit-label>{{ "accessReports" | i18n }}</bit-label>
-          </bit-form-control>
+          <!-- Keykeeper: our server doesn't support the reports, groups, and SSO
+               permissions yet, so they aren't offered. -->
         </div>
         <div class="tw-col-span-4">
-          <app-nested-checkbox
-            parentId="manageAllCollections"
-            [checkboxes]="permissionsGroup.controls.manageAllCollectionsGroup"
-          ></app-nested-checkbox>
+          <!-- Keykeeper: custom roles with the permissions our server enforces
+               can't also manage all collections yet, so they aren't offered together. -->
+          @if (keykeeperPermissionChecked) {
+            <p class="tw-text-muted" data-testid="custom-role-no-collections">
+              {{ "keykeeperCustomRoleNoCollections" | i18n }}
+            </p>
+          } @else {
+            <app-nested-checkbox
+              parentId="manageAllCollections"
+              [checkboxes]="permissionsGroup.controls.manageAllCollectionsGroup"
+            ></app-nested-checkbox>
+          }
         </div>
         <div class="tw-col-span-4">
           <div class="tw-mb-3">
-            <bit-form-control>
-              <input type="checkbox" bitCheckbox formControlName="manageGroups" />
-              <bit-label>{{ "manageGroups" | i18n }}</bit-label>
-            </bit-form-control>
-            <bit-form-control>
-              <input type="checkbox" bitCheckbox formControlName="manageSso" />
-              <bit-label>{{ "manageSso" | i18n }}</bit-label>
-            </bit-form-control>
             <bit-form-control>
               <input type="checkbox" bitCheckbox formControlName="managePolicies" />
               <bit-label>{{ "managePolicies" | i18n }}</bit-label>
@@ -171,6 +182,8 @@
             <bit-form-control>
               <input type="checkbox" bitCheckbox formControlName="manageResetPassword" />
               <bit-label>{{ "manageAccountRecovery" | i18n }}</bit-label>
+              <!-- Keykeeper: what the permission lets someone do. -->
+              <bit-hint>{{ "keykeeperManageAccountRecoveryHint" | i18n }}</bit-hint>
             </bit-form-control>
           </div>
         </div>

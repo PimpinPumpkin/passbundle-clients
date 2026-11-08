@@ -10,8 +10,8 @@ import {
   TooltipDirective,
   IconModule,
 } from "@bitwarden/components";
+import { ShareLinkMenuItemDirective } from "@bitwarden/tools-share";
 import {
-  CopyCipherFieldDirective,
   KeykeeperCategoryTileComponent,
   KeykeeperExpirationBadgeComponent,
   KeykeeperItemTileComponent,
@@ -22,7 +22,7 @@ import {
 } from "@bitwarden/vault";
 
 import { CollectionNameBadgeComponent } from "../../../admin-console/organizations/collections";
-import { GroupBadgeModule } from "../../../admin-console/organizations/collections/group-badge/group-badge.module";
+import { GroupNameBadgeComponent } from "../../../admin-console/organizations/collections/group-badge/group-name-badge.component";
 import { SharedModule } from "../../../shared/shared.module";
 import { OrganizationBadgeModule } from "../../individual-vault/organization-badge/organization-badge.module";
 import { PipesModule } from "../../individual-vault/pipes/pipes.module";
@@ -41,9 +41,8 @@ import { VaultItemsComponent } from "./vault-items.component";
     TooltipDirective,
     OrganizationBadgeModule,
     CollectionNameBadgeComponent,
-    GroupBadgeModule,
+    GroupNameBadgeComponent,
     PipesModule,
-    CopyCipherFieldDirective,
     VaultItemCopyActionsComponent,
     KeykeeperCategoryTileComponent,
     KeykeeperExpirationBadgeComponent,
@@ -54,6 +53,7 @@ import { VaultItemsComponent } from "./vault-items.component";
     IconModule,
     Vfo1I18nPipe,
     Vfo1IconPipe,
+    ShareLinkMenuItemDirective,
   ],
   declarations: [VaultItemsComponent, VaultCipherRowComponent, VaultCollectionRowComponent],
   exports: [VaultItemsComponent],

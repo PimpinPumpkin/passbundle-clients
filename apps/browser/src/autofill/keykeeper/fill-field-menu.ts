@@ -215,10 +215,25 @@ export type PickDependencies = Pick<
   "cipherService" | "totpService" | "passwordRepromptRequired" | "openReprompt"
 >;
 
-/** The item's websites, for upstream's warning before filling an http page. */
-function savedUrls(cipher: CipherView): string[] {
-  return (cipher.login?.uris ?? []).flatMap((u) =>
-    u.match != UriMatchStrategy.Never && u.uri != null ? [u.uri] : [],
+/**
+ * Upstream's warning before filling an http page: whether the item has an
+ * https website for this page's host. Upstream's page script used to work
+ * this out from the item's websites; it now takes the answer.
+ */
+function requiresInsecurePageConfirmation(cipher: CipherView, pageUrl: string): boolean {
+  let host: string;
+  try {
+    const url = new URL(pageUrl);
+    if (url.protocol !== "http:") {
+      return false;
+    }
+    host = url.hostname;
+  } catch {
+    return false;
+  }
+  return (cipher.login?.uris ?? []).some(
+    (u) =>
+      u.match != UriMatchStrategy.Never && u.uri != null && u.uri.startsWith(`https://${host}`),
   );
 }
 
@@ -376,7 +391,10 @@ async function pickNow(
         : staticValueFor(cipher, choice.source);
     if (value) {
       const fillScript = new AutofillScript();
-      fillScript.savedUrls = savedUrls(cipher);
+      fillScript.requiresInsecurePageConfirmation = requiresInsecurePageConfirmation(
+        cipher,
+        target.url,
+      );
       fillScript.untrustedIframe = target.url !== tab.url && !itemMatches;
       fillScript.script.push(["click_on_opid", target.field.opid]);
       fillScript.script.push(["focus_by_opid", target.field.opid]);

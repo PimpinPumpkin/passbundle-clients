@@ -104,7 +104,13 @@ describe("an item's view, without see passwords", () => {
         { provide: PlatformUtilsService, useValue: mock<PlatformUtilsService>() },
         { provide: ToastService, useValue: mock<ToastService>() },
         { provide: I18nService, useValue: { t: (...keys: string[]) => keys.join(" ") } },
-        { provide: ConfigService, useValue: mock<ConfigService>() },
+        {
+          provide: ConfigService,
+          useValue: mock<ConfigService>({
+            getFeatureFlag$: () => of(false),
+            getFeatureFlag: () => Promise.resolve(false),
+          }),
+        },
         { provide: CipherService, useValue: mock<CipherService>() },
         { provide: ViewPasswordHistoryService, useValue: mock<ViewPasswordHistoryService>() },
         { provide: PasswordRepromptService, useValue: mock<PasswordRepromptService>() },

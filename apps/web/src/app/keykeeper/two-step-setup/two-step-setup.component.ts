@@ -24,7 +24,8 @@ import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/pl
 import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { Fido2Utils } from "@bitwarden/common/platform/services/fido2/fido2-utils";
 import { ToastService } from "@bitwarden/components";
-import { KeyService } from "@bitwarden/key-management";
+// eslint-disable-next-line no-restricted-imports
+import { LegacyCompatKeyService } from "@bitwarden/legacy-crypto";
 
 import { SharedModule } from "../../shared";
 
@@ -265,12 +266,18 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
   /** Duo with this server's own Duo account, the only Duo that counts: no fields. */
   protected readonly duoForm = new FormGroup({});
 
-  /** The setup session, the master password's server hash (in memory only), and the QR script. */
+  /**
+   * The setup session, the master password's server hash (in memory only),
+   * the token the authenticator app's first answer gave (upstream's
+   * userVerificationToken, which turning it on takes instead of the
+   * password), and the QR script.
+   */
   private readonly held: {
     session: KeykeeperTwoStepSetupSession | null;
     masterPasswordHash: string | null;
+    authenticatorToken: string | null;
     qrScript: HTMLScriptElement | null;
-  } = { session: null, masterPasswordHash: null, qrScript: null };
+  } = { session: null, masterPasswordHash: null, authenticatorToken: null, qrScript: null };
   /** Whether the page already has the master password's server hash. */
   protected readonly haveHash = signal(false);
 
@@ -278,7 +285,7 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
     private readonly router: Router,
     private readonly environmentService: EnvironmentService,
     private readonly passwordPreloginService: PasswordPreloginService,
-    private readonly keyService: KeyService,
+    private readonly legacyCompatKeyService: LegacyCompatKeyService,
     private readonly platformUtilsService: PlatformUtilsService,
     private readonly toastService: ToastService,
     private readonly ngZone: NgZone,
@@ -338,8 +345,12 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
     }
     const prelogin = await firstValueFrom(this.passwordPreloginService.getPreloginData$(email));
     this.passwordPreloginService.clearCache();
-    const masterKey = await this.keyService.makeMasterKey(password, email, prelogin.kdfConfig);
-    return this.keyService.hashMasterKey(password, masterKey);
+    const masterKey = await this.legacyCompatKeyService.makeMasterKey(
+      password,
+      email,
+      prelogin.kdfConfig,
+    );
+    return this.legacyCompatKeyService.hashMasterKey(password, masterKey);
   }
 
   /** The server took this hash: keep it for the next step, in memory only. */
@@ -354,12 +365,13 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
       const masterPasswordHash = await this.passwordHash();
       const answer = (await this.call("POST", "/two-factor/get-authenticator", {
         masterPasswordHash,
-      })) as { key: string };
+      })) as { authenticator: { key: string }; userVerificationToken: string };
       this.keepHash(masterPasswordHash);
-      this.key.set(answer.key);
+      this.held.authenticatorToken = answer.userVerificationToken;
+      this.key.set(answer.authenticator.key);
       this.authenticatorForm.controls.code.setValue("");
       this.step.set("authenticator");
-      await this.drawQrCode(answer.key);
+      await this.drawQrCode(answer.authenticator.key);
     });
   }
 
@@ -368,7 +380,7 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
       const answer = (await this.call("PUT", "/two-factor/authenticator", {
         key: this.key(),
         token: this.authenticatorForm.controls.code.value.replace(/\s/g, ""),
-        masterPasswordHash: await this.passwordHash(),
+        userVerificationToken: this.held.authenticatorToken,
       })) as { keykeeperRecoveryCode?: string };
       this.finish(answer);
     });
@@ -383,21 +395,19 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
       const masterPasswordHash = await this.passwordHash();
       const existing = (await this.call("POST", "/two-factor/get-webauthn", {
         masterPasswordHash,
-      })) as { keys?: { id: number }[] };
+      })) as { webAuthn: { keys?: { id: number }[] }; userVerificationToken: string };
       this.keepHash(masterPasswordHash);
-      const used = new Set((existing.keys ?? []).map((k) => k.id));
+      // The token the first answer gave, which the next steps take instead of the password.
+      const userVerificationToken = existing.userVerificationToken;
+      const used = new Set((existing.webAuthn.keys ?? []).map((k) => k.id));
       const id = [1, 2, 3, 4, 5].find((n) => !used.has(n));
       if (id == null) {
         throw new Error("This account already has five security keys.");
       }
-      // The server answers with the creation options themselves; upstream's
-      // newer servers wrap them in "options".
       const offered = (await this.call("POST", "/two-factor/get-webauthn-challenge", {
-        masterPasswordHash,
-      })) as { options?: unknown; Options?: unknown };
-      const challenge = new WebAuthnChallengeResponse(
-        offered.options ?? offered.Options ?? offered,
-      );
+        userVerificationToken,
+      })) as { options: unknown };
+      const challenge = new WebAuthnChallengeResponse(offered.options);
       const credential = (await navigator.credentials
         .create({ publicKey: challenge })
         .catch((e: unknown) => {
@@ -416,7 +426,7 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
       const answer = (await this.call("PUT", "/two-factor/webauthn", {
         id,
         name: this.webAuthnForm.controls.name.value || "Security key",
-        masterPasswordHash,
+        userVerificationToken,
         deviceResponse: {
           id: credential.id,
           rawId: Fido2Utils.arrayToString(Fido2Utils.bufferSourceToUint8Array(credential.rawId)),
@@ -443,12 +453,17 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
 
   protected readonly turnOnDuo = async () => {
     await this.attempt(async () => {
+      const masterPasswordHash = await this.passwordHash();
+      const started = (await this.call("POST", "/two-factor/get-duo", {
+        masterPasswordHash,
+      })) as { userVerificationToken: string };
+      this.keepHash(masterPasswordHash);
       // Empty keys: the server's own Duo account.
       const answer = (await this.call("PUT", "/two-factor/duo", {
         clientId: "",
         clientSecret: "",
         host: "",
-        masterPasswordHash: await this.passwordHash(),
+        userVerificationToken: started.userVerificationToken,
       })) as { keykeeperRecoveryCode?: string };
       this.finish(answer);
     });
@@ -471,6 +486,7 @@ export class KeykeeperTwoStepSetupComponent implements OnInit, OnDestroy {
     sessionStorage.removeItem(KEYKEEPER_TWO_STEP_SETUP);
     this.held.session = null;
     this.held.masterPasswordHash = null;
+    this.held.authenticatorToken = null;
     this.recoveryCode.set(answer.keykeeperRecoveryCode ?? null);
     this.step.set("done");
   }

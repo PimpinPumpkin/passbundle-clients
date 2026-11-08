@@ -6,6 +6,7 @@ import { combineLatest, firstValueFrom, map, Observable, startWith, switchMap } 
 
 import { CollectionService } from "@bitwarden/admin-console/common";
 import { JslibModule } from "@bitwarden/angular/jslib.module";
+import { NoResults } from "@bitwarden/assets/svg";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import {
   gridOf,
@@ -15,6 +16,8 @@ import {
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
+import { FeatureFlag } from "@bitwarden/common/enums/feature-flag.enum";
+import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { CipherId, UserId } from "@bitwarden/common/types/guid";
@@ -30,9 +33,10 @@ import {
   IconButtonModule,
   ItemModule,
   MenuModule,
-  NoItemsModule,
   SectionComponent,
   SectionHeaderComponent,
+  StatusLockupComponent,
+  SvgComponent,
   ToastService,
   TypographyModule,
   CardComponent,
@@ -42,10 +46,13 @@ import {
 import {
   CanDeleteCipherDirective,
   DecryptionFailureDialogComponent,
+  EmptyVaultComponent,
   KeykeeperItemTileComponent,
   OrgIconDirective,
   PasswordRepromptService,
   Vfo1I18nPipe,
+  VaultScope,
+  VaultScopeType,
 } from "@bitwarden/vault";
 
 import { PopOutComponent } from "../../../platform/popup/components/pop-out.component";
@@ -64,7 +71,9 @@ import { ROUTES_AFTER_EDIT_DELETION } from "../services/vault-popup-after-deleti
     PopupPageComponent,
     PopupHeaderComponent,
     PopOutComponent,
-    NoItemsModule,
+    EmptyVaultComponent,
+    StatusLockupComponent,
+    SvgComponent,
     ItemModule,
     MenuModule,
     IconButtonModule,
@@ -94,6 +103,17 @@ export class ArchiveComponent {
   private collectionService = inject(CollectionService);
 
   private userId$: Observable<UserId> = this.accountService.activeAccount$.pipe(getUserId);
+
+  /** Legacy (flag-off) empty-archive icon — see {@link vfo1Enabled}. */
+  protected readonly noItemsIcon = NoResults;
+
+  protected readonly archiveScope: VaultScope = { type: VaultScopeType.Archive };
+
+  /** When enabled, the empty-archive state renders via the shared `EmptyVaultComponent`. */
+  protected readonly vfo1Enabled = toSignal(
+    inject(ConfigService).getFeatureFlag$(FeatureFlag.VFO1Foundation),
+    { initialValue: false },
+  );
 
   private readonly orgMap = toSignal(
     this.userId$.pipe(

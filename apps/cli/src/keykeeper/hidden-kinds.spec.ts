@@ -4,6 +4,7 @@
 // (libs/common/src/vault/keykeeper/hidden-secrets.ts) calls a secret is gone,
 // and each plain one is there. Driven by the allowlist itself, so a value of
 // a new kind is checked as soon as it's listed.
+
 import { mock } from "jest-mock-extended";
 import { of } from "rxjs";
 
@@ -14,7 +15,6 @@ import { OrganizationService } from "@bitwarden/common/admin-console/abstraction
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions/account/billing-account-profile-state.service";
 import { EventCollectionService } from "@bitwarden/common/dirt/event-logs";
-import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { mockAccountInfoWith } from "@bitwarden/common/spec";
 import { UserId } from "@bitwarden/common/types/guid";
@@ -36,6 +36,8 @@ import { Fido2CredentialView } from "@bitwarden/common/vault/models/view/fido2-c
 import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
 import { PasswordHistoryView } from "@bitwarden/common/vault/models/view/password-history.view";
 import { KeyService } from "@bitwarden/key-management";
+// eslint-disable-next-line no-restricted-imports
+import { EncryptService, LegacyCompatKeyService } from "@bitwarden/legacy-crypto";
 
 import { GetCommand } from "../commands/get.command";
 import { ListCommand } from "../commands/list.command";
@@ -147,6 +149,7 @@ describe("every kind of item, for someone who can't see its passwords", () => {
       mock<TotpService>(),
       mock<AuditService>(),
       mock<KeyService>(),
+      mock<LegacyCompatKeyService>(),
       mock<EncryptService>(),
       searchService,
       mock<ApiService>(),

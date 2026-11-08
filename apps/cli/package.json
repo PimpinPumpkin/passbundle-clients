@@ -1,7 +1,7 @@
 {
   "name": "@bitwarden/cli",
   "description": "A secure and free password manager for all of your devices.",
-  "version": "2026.8.0",
+  "version": "2026.10.1",
   "keywords": [
     "bitwarden",
     "password",
@@ -37,7 +37,8 @@
     "package:oss:lin-arm64": "pkg . --targets linux-arm64 --output ./dist/oss/linux-arm64/bw",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:watch:all": "jest --watchAll"
+    "test:watch:all": "jest --watchAll",
+    "debug:cli": "node ./scripts/debug-start.js"
   },
   "bin": {
     "bw": "build/bw.js"
@@ -54,7 +55,7 @@
     "browser-hrtime": "1.1.8",
     "chalk": "4.1.2",
     "commander": "14.0.0",
-    "core-js": "3.49.0",
+    "core-js": "3.50.0",
     "form-data": "4.0.6",
     "https-proxy-agent": "9.1.0",
     "inquirer": "8.2.6",
@@ -65,7 +66,7 @@
     "koa-json": "2.0.2",
     "lowdb": "1.0.0",
     "lunr": "2.3.9",
-    "multer": "2.2.0",
+    "multer": "2.3.0",
     "node-fetch": "2.7.0",
     "node-forge": "1.4.1",
     "open": "8.4.2",
@@ -77,7 +78,7 @@
     "zxcvbn": "4.4.2"
   },
   "engines": {
-    "node": "~22",
-    "npm": "~10"
+    "node": ">=22",
+    "npm": ">=10"
   }
 }

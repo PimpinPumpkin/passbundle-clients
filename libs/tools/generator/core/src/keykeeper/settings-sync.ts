@@ -3,6 +3,7 @@
 // and forgets them at logout; here they're also on the server, encrypted with
 // the account's key, so a length chosen in one app is the length everywhere,
 // and signing out doesn't lose it. The server can't read them.
+
 import {
   combineLatest,
   concatMap,
@@ -25,14 +26,14 @@ import { AccountService } from "@bitwarden/common/auth/abstractions/account.serv
 import { AuthService } from "@bitwarden/common/auth/abstractions/auth.service";
 import { AuthenticationStatus } from "@bitwarden/common/auth/enums/authentication-status";
 import { getOptionalUserId } from "@bitwarden/common/auth/services/account.service";
-import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
-import { EncString } from "@bitwarden/common/key-management/crypto/models/enc-string";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { GENERATOR_DISK, StateProvider, UserKeyDefinition } from "@bitwarden/common/platform/state";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { toUserKeyDefinition } from "@bitwarden/common/tools/state/object-key";
 import { UserId } from "@bitwarden/common/types/guid";
 import { KeyService } from "@bitwarden/key-management";
+// eslint-disable-next-line no-restricted-imports
+import { EncryptService, EncString } from "@bitwarden/legacy-crypto";
 
 import { Algorithm, BuiltIn, CoreProfileMetadata, Profile } from "../metadata";
 import { PREFERENCES } from "../providers/credential-preferences";

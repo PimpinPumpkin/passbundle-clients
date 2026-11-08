@@ -1,7 +1,7 @@
+// eslint-disable-next-line no-restricted-imports
+import { EncryptService, EncString } from "@bitwarden/legacy-crypto";
 import { Collection as SdkCollection } from "@bitwarden/sdk-internal";
 
-import { EncryptService } from "../../../key-management/crypto/abstractions/encrypt.service";
-import { EncString } from "../../../key-management/crypto/models/enc-string";
 import { asUuid, uuidAsString } from "../../../platform/abstractions/sdk/sdk.service";
 import Domain from "../../../platform/models/domain/domain-base";
 import { CollectionId, OrganizationId } from "../../../types/guid";
@@ -31,6 +31,8 @@ export class Collection extends Domain {
   defaultUserCollectionEmail: string | undefined;
   /** Keykeeper: the person's own capabilities in the folder. */
   keykeeper?: FolderGrid;
+  /** True when an enabled PAM access rule gates the collection's items. Derived by the server. */
+  hasEnabledAccessRule: boolean = false;
   /**
    * Keykeeper: the folder's icon and color, encrypted with the organization's
    * key (DESIGN.md, "Folder icons"). The SDK doesn't know it, so the
@@ -64,6 +66,7 @@ export class Collection extends Domain {
     if (obj.keykeeper != null) {
       collection.keykeeper = obj.keykeeper;
     }
+    collection.hasEnabledAccessRule = obj.hasEnabledAccessRule;
     if (obj.keykeeperLook) {
       collection.keykeeperLook = obj.keykeeperLook;
     }
@@ -90,6 +93,7 @@ export class Collection extends Domain {
     if (view.keykeeper != null) {
       collection.keykeeper = view.keykeeper;
     }
+    collection.hasEnabledAccessRule = view.hasEnabledAccessRule;
 
     return collection;
   }

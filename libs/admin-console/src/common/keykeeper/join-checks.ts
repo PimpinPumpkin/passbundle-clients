@@ -9,9 +9,6 @@
 
 import { firstValueFrom } from "rxjs";
 
-import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
-import { EncString } from "@bitwarden/common/key-management/crypto/models/enc-string";
-import { SymmetricCryptoKey } from "@bitwarden/common/platform/models/domain/symmetric-crypto-key";
 import {
   KEYKEEPER_JOINS_DISK,
   StateProvider,
@@ -19,6 +16,8 @@ import {
 } from "@bitwarden/common/platform/state";
 import { OrganizationId, UserId } from "@bitwarden/common/types/guid";
 import { KeyService } from "@bitwarden/key-management";
+// eslint-disable-next-line no-restricted-imports
+import { EncryptService, EncString, SymmetricCryptoKey } from "@bitwarden/legacy-crypto";
 
 import { KeykeeperJoinSeals, parseExpiringSeal } from "./join-seals";
 import { KeykeeperJoiningMemory } from "./joining-memory";

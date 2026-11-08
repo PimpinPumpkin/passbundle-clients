@@ -1,12 +1,14 @@
 import { Subject } from "rxjs";
 import { mergeMap } from "rxjs/operators";
 
+// eslint-disable-next-line no-restricted-imports
+import { CryptoFunctionService } from "@bitwarden/legacy-crypto";
+
 import { ApiService } from "../abstractions/api.service";
 import { AuditService as AuditServiceAbstraction } from "../abstractions/audit.service";
 import { PwnedPasswords, PwnedPasswordsCheckOptions } from "../dirt/keykeeper/pwned-passwords";
 import { BreachAccountResponse } from "../dirt/models/response/breach-account.response";
 import { HibpApiService } from "../dirt/services/hibp-api.service";
-import { CryptoFunctionService } from "../key-management/crypto/abstractions/crypto-function.service";
 
 export class AuditService implements AuditServiceAbstraction {
   // Keykeeper: every check goes through one k-anonymity client, which limits
@@ -23,13 +25,16 @@ export class AuditService implements AuditServiceAbstraction {
     reject: (err: any) => void;
   }>();
 
+  /**
+   * @param maxConcurrent Ceiling on in-flight range lookups, shared by every caller of
+   * {@link passwordLeaked} and {@link passwordLeakedStrict}.
+   */
   constructor(
     private cryptoFunctionService: CryptoFunctionService,
     private apiService: ApiService,
     private hibpApiService: HibpApiService,
-    private readonly maxConcurrent: number = 100, // default to 100, can be overridden
+    private readonly maxConcurrent: number = 100,
   ) {
-    this.maxConcurrent = maxConcurrent;
     this.pwnedPasswords = new PwnedPasswords(
       (text) => this.cryptoFunctionService.hash(text, "sha1"),
       (url, init) => this.apiService.nativeFetch(new Request(url, init)),
@@ -46,7 +51,7 @@ export class AuditService implements AuditServiceAbstraction {
               req.reject(err);
             }
           },
-          this.maxConcurrent, // Limit concurrent API calls
+          this.maxConcurrent,
         ),
       )
       .subscribe();
@@ -56,6 +61,14 @@ export class AuditService implements AuditServiceAbstraction {
     return new Promise<number>((resolve, reject) => {
       this.passwordLeakedSubject.next({ password, options, resolve, reject });
     });
+  }
+
+  /**
+   * Keykeeper: the same check: ours always fails rather than answering 0 when
+   * the service can't be reached, and always asks for padding.
+   */
+  async passwordLeakedStrict(password: string): Promise<number> {
+    return this.passwordLeaked(password);
   }
 
   /**

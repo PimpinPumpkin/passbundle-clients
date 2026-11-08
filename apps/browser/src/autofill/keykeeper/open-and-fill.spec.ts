@@ -15,6 +15,7 @@ import { LoginUriView } from "@bitwarden/common/vault/models/view/login-uri.view
 import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
 
 import { BrowserApi } from "../../platform/browser/browser-api";
+import { AutofillOutcome } from "../enums/autofill-outcome.enum";
 import AutofillPageDetails from "../models/autofill-page-details";
 import { AutofillService, PageDetail } from "../services/abstractions/autofill.service";
 
@@ -214,7 +215,7 @@ describe("Keykeeper Open and fill: the background", () => {
     blocked = false;
     copyToClipboard = jest.fn();
     collect = jest.fn((tab: chrome.tabs.Tab) => of([page(tab)]));
-    doAutoFill = jest.fn().mockResolvedValue({ didAutofill: true });
+    doAutoFill = jest.fn().mockResolvedValue({ outcome: AutofillOutcome.Filled });
 
     jest.spyOn(BrowserApi, "createNewTab").mockImplementation(async (url: string) => {
       const tab = { id: nextTabId++, url: "", active: true, status: "loading" } as chrome.tabs.Tab;
@@ -232,8 +233,8 @@ describe("Keykeeper Open and fill: the background", () => {
     service = new KeykeeperOpenAndFill({
       autofillService: {
         collectPageDetailsFromTab$: collect,
-        doAutoFill,
       } as unknown as AutofillService,
+      fill: doAutoFill,
       cipherService: {
         getAllDecrypted: jest.fn(async () => [item]),
       } as unknown as CipherService,
@@ -302,7 +303,7 @@ describe("Keykeeper Open and fill: the background", () => {
   });
 
   it("tries again when upstream found nothing to fill yet", async () => {
-    doAutoFill.mockResolvedValueOnce({ didAutofill: false });
+    doAutoFill.mockResolvedValueOnce({ outcome: AutofillOutcome.Absent });
     await openTab();
     await load(7, opened);
     expect(service.isArmed(7)).toBe(true);
@@ -315,12 +316,12 @@ describe("Keykeeper Open and fill: the background", () => {
     await openTab();
     tabs.get(7)!.url = opened;
     tabs.get(7)!.status = "loading";
-    doAutoFill.mockResolvedValue({ didAutofill: false });
+    doAutoFill.mockResolvedValue({ outcome: AutofillOutcome.Absent });
     await jest.advanceTimersByTimeAsync(300);
     expect(doAutoFill).toHaveBeenLastCalledWith(
       expect.objectContaining({ skipUsernameOnlyFill: true }),
     );
-    doAutoFill.mockResolvedValue({ didAutofill: true });
+    doAutoFill.mockResolvedValue({ outcome: AutofillOutcome.Filled });
     await load(7, opened);
     expect(doAutoFill).toHaveBeenLastCalledWith(
       expect.objectContaining({ skipUsernameOnlyFill: false }),
@@ -470,10 +471,25 @@ describe("Keykeeper Open and fill: the background", () => {
   });
 
   it("copies the one-time code when upstream's fill hands one back", async () => {
-    doAutoFill.mockResolvedValue({ didAutofill: true, totp: "123456" });
+    doAutoFill.mockResolvedValue({
+      outcome: AutofillOutcome.Filled,
+      totp: "123456",
+      canAutoCopyTotp: true,
+    });
     await openTab();
     await load(7, opened);
     expect(copyToClipboard).toHaveBeenCalledWith("123456");
+  });
+
+  it("leaves the one-time code alone when the person's setting says not to copy it", async () => {
+    doAutoFill.mockResolvedValue({
+      outcome: AutofillOutcome.Filled,
+      totp: "123456",
+      canAutoCopyTotp: false,
+    });
+    await openTab();
+    await load(7, opened);
+    expect(copyToClipboard).not.toHaveBeenCalled();
   });
 
   describe("opening", () => {

@@ -1,7 +1,8 @@
 // Keykeeper: "Open and fill" (DESIGN.md, "Open and fill"). The open button on
 // a login, in the popup's lists and the item view, opens the login's website
 // in a new tab and fills it there, once. The fill itself is upstream's
-// (AutofillService.doAutoFill), so fill rules, never-fill fields, visible
+// (AutofillOrchestrator.fillCipher, which fills only the tab in front and
+// only at the address it was aimed at), so fill rules, never-fill fields, visible
 // fields only, the one-time code rules, and what people who can't see
 // passwords may fill all apply as they do to the popup's Fill. This file
 // decides when and where that one fill may happen:
@@ -37,7 +38,13 @@ import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 
 import { fromExtensionPage } from "../../keykeeper/extension-sender";
 import { BrowserApi } from "../../platform/browser/browser-api";
-import { AutofillService, PageDetail } from "../services/abstractions/autofill.service";
+import { AutofillOutcome } from "../enums/autofill-outcome.enum";
+import {
+  AutofillService,
+  AutoFillOptions,
+  PageDetail,
+} from "../services/abstractions/autofill.service";
+import { FillResult, shouldAutoCopyTotp } from "../types/fill-result";
 
 export { OPEN_AND_FILL } from "./open-and-fill-message";
 
@@ -194,7 +201,10 @@ export class OpenAndFillArmings {
 }
 
 export type OpenAndFillDependencies = {
-  autofillService: AutofillService;
+  /** Reads a tab's fields (AutofillService.collectPageDetailsFromTab$). */
+  autofillService: Pick<AutofillService, "collectPageDetailsFromTab$">;
+  /** Upstream's fill, through its orchestrator (AutofillOrchestrator.fillCipher). */
+  fill: (options: AutoFillOptions) => Promise<FillResult>;
   cipherService: CipherService;
   accountService: AccountService;
   authService: AuthService;
@@ -444,7 +454,7 @@ export class KeykeeperOpenAndFill {
       return this.later(tabId);
     }
 
-    const result = await this.deps.autofillService.doAutoFill({
+    const result = await this.deps.fill({
       tab,
       cipher,
       pageDetails,
@@ -460,12 +470,12 @@ export class KeykeeperOpenAndFill {
       allowUntrustedIframe: false,
       autoSubmitLogin: false,
     });
-    if (!result.didAutofill) {
+    if (result.outcome !== AutofillOutcome.Filled) {
       return this.later(tabId);
     }
     // Once: it's spent, whatever the tab does next.
     this.disarm(tabId);
-    if (result.totp != null) {
+    if (shouldAutoCopyTotp(result)) {
       this.deps.copyToClipboard(result.totp);
     }
   }

@@ -4,7 +4,7 @@
 import { mock } from "jest-mock-extended";
 import { of } from "rxjs";
 
-import { LockService, LogoutService } from "@bitwarden/auth/common";
+import { LogoutService } from "@bitwarden/auth/common";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import {
   VaultTimeout,
@@ -14,6 +14,7 @@ import {
   VaultTimeoutStringType,
 } from "@bitwarden/common/key-management/vault-timeout";
 import { ServerNotificationsService } from "@bitwarden/common/platform/server-notifications";
+import { LockService, LockSource } from "@bitwarden/unlock";
 import { UserId } from "@bitwarden/user-core";
 
 import IdleBackground from "./idle.background";
@@ -70,7 +71,7 @@ describe("IdleBackground", () => {
   it("locks a timeout of on system lock, as upstream does", async () => {
     start(VaultTimeoutStringType.OnLocked, false);
     await computerLocks();
-    expect(lockService.lock).toHaveBeenCalledWith(USER);
+    expect(lockService.lock).toHaveBeenCalledWith(USER, LockSource.VaultTimeout);
   });
 
   it("leaves a timeout in minutes alone without the policy", async () => {
@@ -83,7 +84,7 @@ describe("IdleBackground", () => {
   it("locks a timeout in minutes when a policy says to lock with the computer", async () => {
     start(15, true);
     await computerLocks();
-    expect(lockService.lock).toHaveBeenCalledWith(USER);
+    expect(lockService.lock).toHaveBeenCalledWith(USER, LockSource.VaultTimeout);
   });
 
   it("signs out instead when that's the action", async () => {

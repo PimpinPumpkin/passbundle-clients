@@ -13,15 +13,15 @@ import {
   CollectionData,
   CollectionView,
 } from "@bitwarden/common/admin-console/models/collections";
-import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
-import { EncString } from "@bitwarden/common/key-management/crypto/models/enc-string";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
+import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
-import { SymmetricCryptoKey } from "@bitwarden/common/platform/models/domain/symmetric-crypto-key";
 import { FakeStateProvider, makeEncString, mockAccountServiceWith } from "@bitwarden/common/spec";
 import { CollectionId, OrganizationId, UserId } from "@bitwarden/common/types/guid";
 import { OrgKey } from "@bitwarden/common/types/key";
 import { KeyService } from "@bitwarden/key-management";
+// eslint-disable-next-line no-restricted-imports
+import { EncryptService, EncString, SymmetricCryptoKey } from "@bitwarden/legacy-crypto";
 
 import { CollectionEncryptionService } from "../abstractions/collection-encryption.service";
 import { CollectionService } from "../abstractions/collection.service";
@@ -82,9 +82,11 @@ describe("shared folders' icons", () => {
     stateProvider = new FakeStateProvider(mockAccountServiceWith(userId));
     // The SDK opens the names and knows nothing of the look.
     collectionEncryptionService = mock<CollectionEncryptionService>();
-    collectionEncryptionService.decryptMany.mockImplementation(async (collections: Collection[]) =>
-      collections.map(
-        (c) => new CollectionView({ id: c.id, organizationId: c.organizationId, name: c.id }),
+    collectionEncryptionService.decryptMany.mockImplementation((collections: Collection[]) =>
+      of(
+        collections.map(
+          (c) => new CollectionView({ id: c.id, organizationId: c.organizationId, name: c.id }),
+        ),
       ),
     );
     const i18nService = mock<I18nService>();
@@ -95,6 +97,7 @@ describe("shared folders' icons", () => {
       i18nService,
       stateProvider,
       collectionEncryptionService,
+      mock<LogService>({ startMeasurement: () => ({ finish: () => {} }) as never }),
     );
   });
 

@@ -7,24 +7,153 @@ import {
   FolderGrid,
   GRID_ALL,
 } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
-import { CollectionView } from "@bitwarden/common/admin-console/models/collections";
-import { KeyGenerationService } from "@bitwarden/common/key-management/crypto";
-import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
+import { Collection, CollectionView } from "@bitwarden/common/admin-console/models/collections";
+import { OrganizationExportResponse } from "@bitwarden/common/admin-console/models/response/organization-export.response";
 import { CollectionId, OrganizationId, UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
+import { CipherData } from "@bitwarden/common/vault/models/data/cipher.data";
+import { Cipher } from "@bitwarden/common/vault/models/domain/cipher";
+import { CipherResponse } from "@bitwarden/common/vault/models/response/cipher.response";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
 import { RestrictedItemTypesService } from "@bitwarden/common/vault/services/restricted-item-types.service";
 import { KdfConfigService, KeyService } from "@bitwarden/key-management";
+// eslint-disable-next-line no-restricted-imports
+import {
+  EncryptService,
+  EncString,
+  KeyGenerationService,
+  SymmetricCryptoKey,
+} from "@bitwarden/legacy-crypto";
 
 import { VaultExportApiService } from "./api/vault-export-api.service.abstraction";
 import { OrganizationVaultExportService } from "./org-vault-export.service";
 
+const userId = "user-1" as UserId;
+const organizationId = "org-1" as OrganizationId;
+const ENC_NAME = "2.name==|name==|name==";
+
+/** An ordinary item and a PAM-gated ("partial") one, as the server returns them. */
+function cipherResponses(): CipherResponse[] {
+  return [
+    new CipherResponse({
+      Id: "visible",
+      OrganizationId: organizationId,
+      Type: CipherType.Login,
+      Name: ENC_NAME,
+      Login: {},
+      CollectionIds: ["col-1"],
+      DeletedDate: null,
+    }),
+    new CipherResponse({
+      Id: "gated",
+      OrganizationId: organizationId,
+      Type: CipherType.Login,
+      PartialData: JSON.stringify({ Name: ENC_NAME }),
+      CollectionIds: ["col-1"],
+      DeletedDate: null,
+    }),
+  ];
+}
+
+function exportedIds(data: string): string[] {
+  return JSON.parse(data).items.map((item: { id: string }) => item.id);
+}
+
+describe("OrganizationVaultExportService", () => {
+  let cipherService: MockProxy<CipherService>;
+  let vaultExportApiService: MockProxy<VaultExportApiService>;
+  let collectionService: MockProxy<CollectionService>;
+  let service: OrganizationVaultExportService;
+
+  beforeEach(() => {
+    cipherService = mock<CipherService>();
+    cipherService.decrypt.mockImplementation(async (cipher: Cipher) =>
+      Object.assign(new CipherView(), {
+        id: cipher.id,
+        organizationId: cipher.organizationId,
+        type: cipher.type,
+        name: "Item",
+        partial: cipher.isPartial,
+      }),
+    );
+
+    vaultExportApiService = mock<VaultExportApiService>();
+    vaultExportApiService.getOrganizationExport.mockResolvedValue(
+      Object.assign(new OrganizationExportResponse({}), { ciphers: cipherResponses() }),
+    );
+
+    collectionService = mock<CollectionService>();
+    // Keykeeper: the export grid's check reads the person's collections; none limits this.
+    collectionService.decryptedCollections$.mockReturnValue(of([]));
+    collectionService.encryptedCollections$.mockReturnValue(
+      of([{ id: "col-1", organizationId, manage: true } as unknown as Collection]),
+    );
+
+    const keyService = mock<KeyService>();
+    keyService.orgKeys$.mockReturnValue(
+      of({ [organizationId]: new SymmetricCryptoKey(new Uint8Array(64)) } as never),
+    );
+
+    const encryptService = mock<EncryptService>();
+    encryptService.encryptString.mockResolvedValue(new EncString(ENC_NAME));
+
+    const restrictedItemTypesService = mock<RestrictedItemTypesService>();
+    Object.defineProperty(restrictedItemTypesService, "restricted$", { value: of([]) });
+    restrictedItemTypesService.isCipherRestricted.mockReturnValue(false);
+
+    service = new OrganizationVaultExportService(
+      cipherService,
+      vaultExportApiService,
+      mock<KeyGenerationService>(),
+      keyService,
+      encryptService,
+      collectionService,
+      mock<KdfConfigService>(),
+      restrictedItemTypesService,
+    );
+  });
+
+  describe("gated (partial) ciphers, which have no sensitive fields to export", () => {
+    it("are left out of an encrypted export from the export API", async () => {
+      const result = await service.getOrganizationExport(
+        userId,
+        organizationId,
+        "encrypted_json",
+        false,
+      );
+
+      expect(exportedIds(result.data as string)).toEqual(["visible"]);
+    });
+
+    it("are left out of an unencrypted export from the export API", async () => {
+      const result = await service.getOrganizationExport(userId, organizationId, "json", false);
+
+      expect(exportedIds(result.data as string)).toEqual(["visible"]);
+    });
+
+    it("are left out of an encrypted export of managed collections", async () => {
+      cipherService.getAll.mockResolvedValue(
+        cipherResponses().map((response) => new Cipher(new CipherData(response))),
+      );
+
+      const result = await service.getOrganizationExport(
+        userId,
+        organizationId,
+        "encrypted_json",
+        true,
+      );
+
+      expect(exportedIds(result.data as string)).toEqual(["visible"]);
+    });
+  });
+});
+
 // Keykeeper: export is one of the capabilities the apps enforce (DESIGN.md,
 // "Folders and permissions"): only items in shared folders the person can
 // export leave in an export.
-const userId = "user" as UserId;
+const kkUser = "user" as UserId;
 const org = "org" as OrganizationId;
 
 function folder(id: string, grid: FolderGrid): CollectionView {
@@ -83,7 +212,7 @@ describe("OrganizationVaultExportService and shared folder permissions", () => {
       login("Payroll portal", "payroll"),
     ]);
 
-    const exported = await service.getOrganizationExport(userId, org, "json", true);
+    const exported = await service.getOrganizationExport(kkUser, org, "json", true);
     const doc = JSON.parse(exported.data as string);
 
     expect(doc.collections.map((c: { name: string }) => c.name)).toEqual(["reports"]);
@@ -95,7 +224,7 @@ describe("OrganizationVaultExportService and shared folder permissions", () => {
       of([folder("everyone", GRID_ALL), folder("payroll", FOLDER_PRESETS.edit)]),
     );
 
-    await expect(service.getOrganizationExport(userId, org, "json", false)).rejects.toThrow(
+    await expect(service.getOrganizationExport(kkUser, org, "json", false)).rejects.toThrow(
       "You can't export some of this organization's shared folders.",
     );
   });

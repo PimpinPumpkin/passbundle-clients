@@ -8,8 +8,6 @@ import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
-import { KeyGenerationService } from "@bitwarden/common/key-management/crypto";
-import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
@@ -28,6 +26,8 @@ import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.servi
 import { FolderService } from "@bitwarden/common/vault/abstractions/folder/folder.service.abstraction";
 import { RestrictedItemTypesService } from "@bitwarden/common/vault/services/restricted-item-types.service";
 import { KeyService } from "@bitwarden/key-management";
+// eslint-disable-next-line no-restricted-imports
+import { EncryptService, KeyGenerationService } from "@bitwarden/legacy-crypto";
 import { StateProvider } from "@bitwarden/state";
 import { SafeInjectionToken } from "@bitwarden/ui-common";
 
@@ -90,6 +90,7 @@ export const ImporterProviders: SafeProvider[] = [
       KeyGenerationService,
       AccountService,
       RestrictedItemTypesService,
+      ConfigService,
       SdkService,
       SyncService,
       OrganizationService,

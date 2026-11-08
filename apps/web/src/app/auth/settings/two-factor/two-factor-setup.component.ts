@@ -1,6 +1,7 @@
 // FIXME: Update this file to be type safe and remove this and next line
 // @ts-strict-ignore
 import { Component, OnDestroy, OnInit } from "@angular/core";
+import { toSignal } from "@angular/core/rxjs-interop";
 import {
   first,
   lastValueFrom,
@@ -36,10 +37,17 @@ import { TwoFactorWebAuthnResponse } from "@bitwarden/common/auth/two-factor/res
 import { TwoFactorYubiKeyResponse } from "@bitwarden/common/auth/two-factor/response/two-factor-yubi-key.response";
 import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions/account/billing-account-profile-state.service";
 import { ProductTierType } from "@bitwarden/common/billing/enums";
+import { FeatureFlag } from "@bitwarden/common/enums/feature-flag.enum";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { MessagingService } from "@bitwarden/common/platform/abstractions/messaging.service";
-import { DialogRef, DialogService, ItemModule, ToastService } from "@bitwarden/components";
+import {
+  BreadcrumbsModule,
+  DialogRef,
+  DialogService,
+  ItemModule,
+  ToastService,
+} from "@bitwarden/components";
 
 import { KeykeeperTwoStepDetourComponent } from "../../../keykeeper/two-step-setup/two-step-detour";
 import { HeaderModule } from "../../../layouts/header/header.module";
@@ -61,6 +69,7 @@ import { TwoFactorVerifyComponent } from "./two-factor-verify.component";
   imports: [
     ItemModule,
     HeaderModule,
+    BreadcrumbsModule,
     PremiumBadgeComponent,
     TwoFactorIconComponent,
     SharedModule,
@@ -78,6 +87,11 @@ export class TwoFactorSetupComponent implements OnInit, OnDestroy {
   loading = true;
 
   tabbedHeader = true;
+
+  protected readonly showBreadcrumbs = toSignal(
+    this.configService.getFeatureFlag$(FeatureFlag.VFO1Foundation),
+    { initialValue: false },
+  );
 
   protected destroy$ = new Subject<void>();
   private twoFactorAuthPolicyAppliesToActiveUser: boolean;

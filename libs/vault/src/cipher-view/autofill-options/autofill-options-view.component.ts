@@ -6,7 +6,7 @@ import { firstValueFrom } from "rxjs";
 
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
-import { getUserId } from "@bitwarden/common/auth/services/account.service";
+import { getOptionalUserId } from "@bitwarden/common/auth/services/account.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { LoginUriView } from "@bitwarden/common/vault/models/view/login-uri.view";
@@ -43,6 +43,8 @@ export class AutofillOptionsViewComponent {
   // eslint-disable-next-line @angular-eslint/prefer-signals
   @Input() cipherId: string;
 
+  readonly activeUserId$ = getOptionalUserId(this.accountService.activeAccount$);
+
   /** Keykeeper: "Open and fill", where the app has it (the extension). */
   private openAndFillService = inject(KeykeeperOpenAndFillService, { optional: true });
 
@@ -53,8 +55,11 @@ export class AutofillOptionsViewComponent {
   ) {}
 
   async openWebsite(selectedUri: string) {
-    const activeUserId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
-    await this.cipherService.updateLastLaunchedDate(this.cipherId, activeUserId);
+    const activeUserId = await firstValueFrom(this.activeUserId$);
+    // This component may be displayed in an anonymous context where the user is not logged in
+    if (activeUserId) {
+      await this.cipherService.updateLastLaunchedDate(this.cipherId, activeUserId);
+    }
     this.platformUtilsService.launchUri(selectedUri);
   }
 
@@ -76,8 +81,10 @@ export class AutofillOptionsViewComponent {
     if (url == null || this.openAndFillService == null) {
       return;
     }
-    const activeUserId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
-    await this.cipherService.updateLastLaunchedDate(this.cipherId, activeUserId);
+    const activeUserId = await firstValueFrom(this.activeUserId$);
+    if (activeUserId) {
+      await this.cipherService.updateLastLaunchedDate(this.cipherId, activeUserId);
+    }
     await this.openAndFillService.open(this.cipherId, url);
   }
 }

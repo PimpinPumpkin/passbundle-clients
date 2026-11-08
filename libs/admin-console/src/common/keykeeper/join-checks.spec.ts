@@ -3,13 +3,12 @@ import { webcrypto } from "node:crypto";
 import { mock } from "jest-mock-extended";
 import { BehaviorSubject, firstValueFrom } from "rxjs";
 
-import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
-import { EncString } from "@bitwarden/common/key-management/crypto/models/enc-string";
-import { SymmetricCryptoKey } from "@bitwarden/common/platform/models/domain/symmetric-crypto-key";
 import { FakeStateProvider, mockAccountServiceWith } from "@bitwarden/common/spec";
 import { OrganizationId, UserId } from "@bitwarden/common/types/guid";
 import { OrgKey } from "@bitwarden/common/types/key";
 import { KeyService } from "@bitwarden/key-management";
+// eslint-disable-next-line no-restricted-imports
+import { EncryptService, EncString, SymmetricCryptoKey } from "@bitwarden/legacy-crypto";
 
 import { KEYKEEPER_USED_SEALS, KeykeeperJoinChecks, MAX_ON_ITS_OWN_PER_DAY } from "./join-checks";
 import { KeykeeperJoinSeals, parseExpiringSeal, parseJoiningSeal } from "./join-seals";

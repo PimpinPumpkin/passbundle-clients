@@ -19,7 +19,6 @@ import {
   DialogService,
   IconButtonModule,
   MenuModule,
-  NoItemsModule,
   TooltipDirective,
 } from "@bitwarden/components";
 import { AddEditFolderDialogComponent, KeykeeperCategoryTileComponent } from "@bitwarden/vault";
@@ -40,7 +39,6 @@ export interface NewItemInitialValues {
   selector: "app-new-item-dropdown",
   templateUrl: "new-item-dropdown.component.html",
   imports: [
-    NoItemsModule,
     JslibModule,
     CommonModule,
     ButtonModule,
@@ -68,7 +66,7 @@ export class NewItemDropdownComponent implements OnInit {
    */
   readonly canCreateCipher = input(true);
 
-  /** Keykeeper: a + with "New" as its name, instead of a button that says New. */
+  /** Keykeeper: a + with "Add" as its name, instead of a button that says Add. */
   readonly iconOnly = input(false, { transform: booleanAttribute });
 
   /** Keykeeper: the category whose tile a kind of item shows. */
@@ -97,11 +95,6 @@ export class NewItemDropdownComponent implements OnInit {
     { initialValue: false },
   );
 
-  protected readonly btnTextAddCreateFeatureFlag = toSignal(
-    this.configService.getFeatureFlag$(FeatureFlag.PM32380_BtnTextAddCreate),
-    { initialValue: false },
-  );
-
   constructor(
     private dialogService: DialogService,
     private restrictedItemTypeService: RestrictedItemTypesService,
@@ -126,7 +119,7 @@ export class NewItemDropdownComponent implements OnInit {
 
     return {
       type: type.toString(),
-      collectionId: this.initialValues?.collectionId,
+      collectionIds: this.initialValues?.collectionId,
       organizationId: this.initialValues?.organizationId,
       folderId: this.initialValues?.folderId,
       ...loginDetails,
@@ -136,7 +129,7 @@ export class NewItemDropdownComponent implements OnInit {
   /** Keykeeper: where the item from a template goes, as for any new item. */
   templateQueryParams(): AddEditQueryParams {
     return {
-      collectionId: this.initialValues?.collectionId,
+      collectionIds: this.initialValues?.collectionId,
       organizationId: this.initialValues?.organizationId,
       folderId: this.initialValues?.folderId,
     };
@@ -151,7 +144,7 @@ export class NewItemDropdownComponent implements OnInit {
       queryParams: {
         folderId: this.initialValues?.folderId,
         organizationId: this.initialValues?.organizationId,
-        collectionId: this.initialValues?.collectionId,
+        collectionIds: this.initialValues?.collectionId,
       },
     });
   }

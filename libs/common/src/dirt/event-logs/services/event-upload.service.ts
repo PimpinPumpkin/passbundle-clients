@@ -16,13 +16,6 @@ import { EventRequest } from "../models/request/event.request";
 
 import { EVENT_COLLECTION } from "./key-definitions";
 
-/**
- * Keykeeper: the most events one upload carries. The server refuses a
- * request with more (passbundle-server, src/api/core/events.rs), so a long
- * backlog goes in batches of this size.
- */
-export const MAX_EVENTS_PER_UPLOAD = 500;
-
 export class EventUploadService implements EventUploadServiceAbstraction {
   private inited = false;
   constructor(
@@ -77,32 +70,42 @@ export class EventUploadService implements EventUploadServiceAbstraction {
     if (eventCollection == null || eventCollection.length === 0) {
       return;
     }
-    const request = eventCollection.map((e) => {
-      const req = new EventRequest();
-      req.type = e.type;
-      req.cipherId = e.cipherId;
-      req.date = e.date;
-      req.organizationId = e.organizationId;
-      return req;
+    const eventRequests = eventCollection.map((e) => {
+      return this.eventDataToEventRequest(e);
     });
-    // Keykeeper: in batches the server takes. When one fails, it and the
-    // ones after it go back in state, ahead of anything collected meanwhile.
-    for (let start = 0; start < request.length; start += MAX_EVENTS_PER_UPLOAD) {
-      try {
-        await this.apiService.postEventsCollect(
-          request.slice(start, start + MAX_EVENTS_PER_UPLOAD),
-          userId,
-        );
-      } catch (e) {
-        this.logService.error(e);
-        // Add the events back to state if there was an error and they were not uploaded.
-        const notUploaded = eventCollection.slice(start);
-        await this.stateProvider
-          .getUser(userId, EVENT_COLLECTION)
-          .update((current) => [...notUploaded, ...(current ?? [])]);
-        return;
-      }
+
+    let failedEvents: EventRequest[];
+    try {
+      failedEvents = await this.apiService.postEventsCollect(eventRequests, userId);
+    } catch (e) {
+      this.logService.error(e);
+      failedEvents = eventRequests;
     }
+
+    // Add any events that failed to upload back to state. Keykeeper: ahead of
+    // anything collected meanwhile, which setting the state would drop.
+    if (failedEvents && failedEvents.length > 0) {
+      const failedEventData = failedEvents.map((e) => {
+        const eventData = new EventData();
+        eventData.type = e.type;
+        eventData.cipherId = e.cipherId;
+        eventData.date = e.date;
+        eventData.organizationId = e.organizationId;
+        return eventData;
+      });
+      await this.stateProvider
+        .getUser(userId, EVENT_COLLECTION)
+        .update((current) => [...failedEventData, ...(current ?? [])]);
+    }
+  }
+
+  eventDataToEventRequest(event: EventData): EventRequest {
+    const req = new EventRequest();
+    req.type = event.type;
+    req.cipherId = event.cipherId;
+    req.date = event.date;
+    req.organizationId = event.organizationId;
+    return req;
   }
 
   /** Return user's events and then clear them from state

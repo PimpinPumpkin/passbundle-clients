@@ -1,4 +1,4 @@
-// FIXME: Update this file to be type safe and remove this and next line
+// FIXME: TODO: PM-44095 Update this file to be type safe and remove this and next line
 // @ts-strict-ignore
 import { Utils } from "../../../platform/misc/utils";
 import { UserId } from "../../../types/guid";
@@ -27,6 +27,11 @@ export class AuthResult {
     masterPasswordHash: string | null;
   } | null;
   // The master-password used in the authentication process
+  // TODO: PM-44095 - Change to `masterPassword?: string` (prefer optional if truly optional). The
+  // `masterPassword` parameter of LoginSuccessHandlerService.run and of
+  // EncryptedMigrator.runMigrations (and each migration's runMigrations) must change to
+  // `masterPassword?: string` with it, and their callers that pass `null` must pass nothing instead.
+  // EncryptedMigrator belongs to key management.
   masterPassword: string | null;
 
   get requiresTwoFactor() {

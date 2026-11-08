@@ -57,7 +57,7 @@
     </a>
   }
 </bit-nav-item>
-<app-coachmark #reportsCoachmark stepId="monitorSecurity" />
+<vault-coachmark #reportsCoachmark stepId="monitorSecurity" />
 
 @if (m.categories.length > 0) {
   <div
@@ -140,7 +140,7 @@
     <ng-container *ngTemplateOutlet="entry; context: { $implicit: trash, rail: true }" />
   }
 </div>
-<app-coachmark #collectionsCoachmark stepId="shareWithCollections" />
+<vault-coachmark #collectionsCoachmark stepId="shareWithCollections" />
 
 <!-- One entry: its tile or icon and its name, then what it holds,
      right-aligned. With the menu closed to icons, only the entries marked for
