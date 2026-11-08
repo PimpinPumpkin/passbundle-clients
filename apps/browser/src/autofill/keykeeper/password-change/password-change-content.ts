@@ -49,6 +49,8 @@ export type PageServices = {
   collect: {
     getPageDetails(): Promise<{ fields: AutofillField[] }>;
     getAutofillFieldElementByOpid(opid: string): Element | null;
+    /** Forgets what it found, so the next read walks the page again. */
+    stopMonitoring?(): void;
   };
   insert: { fillForm(script: AutofillScript): Promise<void> };
 };
@@ -161,9 +163,10 @@ export class PasswordChangeContent {
     if (moved) {
       return moved;
     }
-    // A fresh collection each time: upstream's caches what it found until its
-    // own observer, which isn't running here, says the page changed.
-    this.services = this.makeServices();
+    // Upstream's collection keeps what it found until its own observer, which
+    // isn't running here, says the page changed: it forgets first.
+    this.services ??= this.makeServices();
+    this.services.collect.stopMonitoring?.();
     const details = await this.services.collect.getPageDetails();
     const fields = details.fields.map((field) => {
       const element = this.services!.collect.getAutofillFieldElementByOpid(field.opid);

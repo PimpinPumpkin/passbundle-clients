@@ -135,15 +135,17 @@ describe("Keykeeper assisted password change: the background", () => {
     log = [];
     generated = "Generated-password-20!";
     changePage = null;
-    read = jest.fn(() => formReading());
-    fill = jest.fn(() => ({
+    read = jest.fn((): PageReading | undefined => formReading());
+    fill = jest.fn((_message: object): FillAnswer | undefined => ({
       url: formPage,
       filled: true,
       invalid: false,
       restInvalid: false,
       submitted: true,
     }));
-    watch = jest.fn(() => formReading({ changedMessage: true, filledHere: true }));
+    watch = jest.fn((): PageReading | undefined =>
+      formReading({ changedMessage: true, filledHere: true }),
+    );
     // Saves as upstream's does: a changed password goes to history, with its revision date.
     save = jest.fn(async (draft: CipherView) => {
       log.push("save");

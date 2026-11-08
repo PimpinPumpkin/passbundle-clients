@@ -85,6 +85,8 @@ const NEXT_PAGE_MS = 3_000;
 const WATCH_CHUNK_MS = 20_000;
 /** How often a running change looks at its tab. */
 const TICK_MS = 1_000;
+/** How often a page without the form is read again, besides on a load or a return to the front. */
+const READ_AGAIN_MS = 2_000;
 
 /** Why a change stopped before its new password was saved. Nothing was changed. */
 type StopReason =
@@ -178,6 +180,8 @@ type Run = {
   shownNote: NoteKey | null;
   /** The new password is being saved: a stop now waits for the save to end. */
   saving: boolean;
+  /** A page without the form is read again on a load, a return to the front, or after this. */
+  nextReadAt: number;
   stopRequested: StopReason | null;
 };
 
@@ -286,12 +290,14 @@ export class KeykeeperPasswordChange {
         }
         if (changeInfo.status === "complete") {
           run.loadedAt = this.now();
+          run.nextReadAt = 0;
           this.trigger();
         }
       },
     );
     BrowserApi.addListener(chrome.tabs.onActivated, ({ tabId }: chrome.tabs.OnActivatedInfo) => {
       if (this.run?.tabId === tabId) {
+        this.run.nextReadAt = 0;
         this.trigger();
       }
     });
@@ -386,6 +392,7 @@ export class KeykeeperPasswordChange {
       shownNote: null,
       saving: false,
       stopRequested: null,
+      nextReadAt: 0,
     };
     this.setStatus(this.run, "finding", true);
     this.ticker ??= setInterval(() => this.trigger(), TICK_MS);
@@ -526,7 +533,7 @@ export class KeykeeperPasswordChange {
           return this.stop(run, "timeout");
         }
         // Only the tab in front, and only a page that finished loading.
-        if (!tab.active || tab.status !== "complete") {
+        if (!tab.active || tab.status !== "complete" || now < run.nextReadAt) {
           return;
         }
         return this.find(run, tab, cipher);
@@ -597,6 +604,8 @@ export class KeykeeperPasswordChange {
     if (reading == null) {
       return;
     }
+    // A page without the form is read again in a moment, sooner when it loads or comes to the front.
+    run.nextReadAt = this.now() + READ_AGAIN_MS;
     if (reading.form === "form") {
       return this.change(run, tab, cipher, reading);
     }

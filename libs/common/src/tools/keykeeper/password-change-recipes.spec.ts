@@ -1,7 +1,12 @@
-import { readRecipe, recipeForHost, recipeRules } from "./password-change-recipes";
+import {
+  PasswordChangeRecipe,
+  readRecipe,
+  recipeForHost,
+  recipeRules,
+} from "./password-change-recipes";
 import { SITE_PASSWORD_CHANGE_RECIPES } from "./site-password-change-recipes.data";
 
-const full = {
+const full: PasswordChangeRecipe = {
   start: "https://accounts.example.test/settings/password",
   steps: ["#security-tab", "button.change-password"],
   fields: { current: "#old", new: "#new", confirm: null },

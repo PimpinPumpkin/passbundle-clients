@@ -1,3 +1,5 @@
+import { PasswordChangeRecipe } from "@bitwarden/common/tools/keykeeper/password-change-recipes";
+
 import AutofillField from "../../models/autofill-field";
 import AutofillScript from "../../models/autofill-script";
 
@@ -286,7 +288,10 @@ describe("Keykeeper password change: the page's half", () => {
   it("finds a recipe's fields by selector, including a form without a current password", async () => {
     document.body.innerHTML = `<form id="f"><input type="password" id="a"><input type="password" id="b">
       <button>Go</button></form>`;
-    const recipe = { fields: { current: null, new: "#a", confirm: "#b" }, submit: "button" };
+    const recipe: PasswordChangeRecipe = {
+      fields: { current: null, new: "#a", confirm: "#b" },
+      submit: "button",
+    };
     const reading = (await content.handle({
       command: PAGE_READ,
       url: url(),
@@ -309,7 +314,7 @@ describe("Keykeeper password change: the page's half", () => {
 
   it("ignores a recipe's field that isn't a password field", async () => {
     document.body.innerHTML = `<form id="f"><input type="text" id="a"></form>`;
-    const recipe = { fields: { current: null, new: "#a" } };
+    const recipe: PasswordChangeRecipe = { fields: { current: null, new: "#a" } };
     const reading = (await content.handle({
       command: PAGE_READ,
       url: url(),
