@@ -25,7 +25,7 @@ import { AccountService } from "@bitwarden/common/auth/abstractions/account.serv
 import { AuthService } from "@bitwarden/common/auth/abstractions/auth.service";
 import { AuthenticationStatus } from "@bitwarden/common/auth/enums/authentication-status";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
-import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
@@ -56,9 +56,6 @@ export type ConfirmResult = { confirmed: number; failed: string[] };
 
 /** Someone an app let in on its own, for the notice on that device. */
 export type LetIn = { email: string; organizationName: string };
-
-const message = (e: unknown) =>
-  e instanceof ErrorResponse ? e.getSingleMessage() : e instanceof Error ? e.message : String(e);
 
 export class KeykeeperMspWork {
   private running: Promise<string[]> | null = null;
@@ -133,7 +130,7 @@ export class KeykeeperMspWork {
       return this.running;
     }
     this.running = this.runOnce()
-      .catch((e: unknown) => [message(e)])
+      .catch((e: unknown) => [plainErrorMessage(e)])
       .finally(() => {
         this.running = null;
         if (this.rerun) {
@@ -234,7 +231,7 @@ export class KeykeeperMspWork {
         await this.joinChecks.markLetIn(userId, p);
         this.letIn.next({ email: p.email, organizationName: organization.name });
       } catch (e) {
-        result.failed.push(`${p.email} in ${organization.name}: ${message(e)}`);
+        result.failed.push(`${p.email} in ${organization.name}: ${plainErrorMessage(e)}`);
       }
     }
     if (result.confirmed > 0) {

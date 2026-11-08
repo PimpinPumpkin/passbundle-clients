@@ -14,9 +14,9 @@ import {
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
-import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { SymmetricCryptoKey } from "@bitwarden/common/platform/models/domain/symmetric-crypto-key";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { OrganizationId } from "@bitwarden/common/types/guid";
@@ -28,7 +28,7 @@ import { KeyService } from "@bitwarden/key-management";
 
 import { SharedModule } from "../../shared";
 import { KeykeeperConfirmChangeService } from "../confirm-change/confirm-change.service";
-import { KeykeeperMspApiService } from "../msp/msp-api.service";
+import { KeykeeperMspApiService, NO_ORG_KEY_YET } from "../msp/msp-api.service";
 
 import { KeykeeperScriptTokenDialogComponent } from "./script-token-dialog.component";
 
@@ -288,9 +288,7 @@ export class KeykeeperScriptAccessComponent {
     await this.attempt(async () => {
       const orgKey = await this.orgKey(orgId);
       if (orgKey == null) {
-        throw new Error(
-          "This browser doesn't have the organization's key yet. Reload and try again.",
-        );
+        throw new Error(NO_ORG_KEY_YET);
       }
       const { id, seed } = this.keys.newToken();
       const tokenKey = new SymmetricCryptoKey(await this.keys.tokenKey(seed));
@@ -370,12 +368,7 @@ export class KeykeeperScriptAccessComponent {
     try {
       await action();
     } catch (e) {
-      const message =
-        e instanceof ErrorResponse
-          ? e.getSingleMessage()
-          : e instanceof Error
-            ? e.message
-            : String(e);
+      const message = plainErrorMessage(e);
       this.toastService.showToast({ variant: "error", message });
     }
   }

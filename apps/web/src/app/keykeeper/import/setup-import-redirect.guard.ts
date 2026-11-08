@@ -2,6 +2,8 @@ import { inject } from "@angular/core";
 import { CanActivateFn, Router } from "@angular/router";
 import { firstValueFrom } from "rxjs";
 
+import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
+import { PolicyType } from "@bitwarden/common/admin-console/enums";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
@@ -14,12 +16,14 @@ export const SETUP_IMPORT = "keykeeper.setupImport";
  * Keykeeper: someone who has just signed up in this tab gets the offer to
  * bring their passwords over (setup-import) before their vault opens, once,
  * and only while the vault is empty. Not on a phone's browser, where exports
- * are hard to come by.
+ * are hard to come by, and not where an organization's policy keeps items out
+ * of Personal, where the import puts them.
  */
 export const setupImportRedirectGuard: CanActivateFn = async () => {
   const router = inject(Router);
   const accountService = inject(AccountService);
   const cipherService = inject(CipherService);
+  const policyService = inject(PolicyService);
 
   let justSignedUp = false;
   try {
@@ -44,6 +48,13 @@ export const setupImportRedirectGuard: CanActivateFn = async () => {
   const userId = await firstValueFrom(accountService.activeAccount$.pipe(getUserId));
   const ciphers = await firstValueFrom(cipherService.ciphers$(userId)).catch((): null => null);
   if (ciphers == null || Object.keys(ciphers).length > 0) {
+    forget();
+    return true;
+  }
+  const personalBlocked = await firstValueFrom(
+    policyService.policyAppliesToUser$(PolicyType.OrganizationDataOwnership, userId),
+  ).catch(() => true);
+  if (personalBlocked) {
     forget();
     return true;
   }
