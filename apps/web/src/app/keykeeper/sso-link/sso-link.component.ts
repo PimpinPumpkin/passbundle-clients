@@ -4,7 +4,9 @@ import { firstValueFrom } from "rxjs";
 
 import { KEYKEEPER_SSO_LINK_SESSION, KeykeeperSsoLinkSession } from "@bitwarden/auth/angular";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
+import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
 import { ToastService } from "@bitwarden/components";
 
@@ -149,7 +151,7 @@ export class KeykeeperSsoLinkComponent implements OnInit {
           this.step.set("pending");
         }
       } catch (e) {
-        this.fail(errorMessage(e));
+        this.fail(plainErrorMessage(e));
       }
       return;
     }
@@ -187,7 +189,7 @@ export class KeykeeperSsoLinkComponent implements OnInit {
       window.location.assign(url);
     } catch (e) {
       this.busy.set(false);
-      this.fail(errorMessage(e));
+      this.fail(plainErrorMessage(e));
     }
   }
 
@@ -217,7 +219,7 @@ export class KeykeeperSsoLinkComponent implements OnInit {
       }
     } catch (e) {
       this.busy.set(false);
-      this.fail(errorMessage(e));
+      this.fail(plainErrorMessage(e));
     }
   }
 
@@ -257,7 +259,7 @@ export class KeykeeperSsoLinkComponent implements OnInit {
     });
     const json = await response.json().catch((): unknown => null);
     if (!response.ok) {
-      throw new Error(serverMessage(json) ?? "Something went wrong. Sign in again.");
+      throw new ErrorResponse(json, response.status);
     }
     return json;
   }
@@ -271,17 +273,4 @@ function readLinkingSession(): KeykeeperSsoLinkSession | null {
   } catch {
     return null;
   }
-}
-
-function serverMessage(json: unknown): string | null {
-  const body = json as { message?: string; ErrorModel?: { Message?: string } } | null;
-  return body?.message || body?.ErrorModel?.Message || null;
-}
-
-/** An Error's message, or an ErrorResponse's (what ApiService throws). */
-function errorMessage(e: unknown): string {
-  const message = (e as { message?: unknown } | null)?.message;
-  return typeof message === "string" && message !== ""
-    ? message
-    : "Something went wrong. Try again.";
 }

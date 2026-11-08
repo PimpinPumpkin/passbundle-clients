@@ -16,6 +16,7 @@ import { firstValueFrom } from "rxjs";
 
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { OrganizationId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
@@ -93,7 +94,7 @@ export class KeykeeperScriptRefresher {
         });
       } catch (e) {
         failures.push(
-          `A script token's copy of ${item.name} wasn't updated: ${e instanceof Error ? e.message : String(e)}`,
+          `A script token's copy of ${item.name} wasn't updated: ${plainErrorMessage(e)}`,
         );
       }
     }

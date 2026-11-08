@@ -17,7 +17,7 @@ import {
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
-import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { CollectionId, OrganizationId, UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
@@ -183,7 +183,7 @@ export class KeykeeperTemplateSender {
         copies.push({ organizationId: client.id, cipherId: saved.id, sourceRevision: revision });
         result.sent.push(client);
       } catch (e) {
-        result.failed.push({ ...client, error: errorMessage(e) });
+        result.failed.push({ ...client, error: plainErrorMessage(e) });
       }
     }
     if (copies.length > 0) {
@@ -248,12 +248,4 @@ export class KeykeeperTemplateSender {
     state.collections[orgId] = id;
     return id;
   }
-}
-
-function errorMessage(e: unknown): string {
-  return e instanceof ErrorResponse
-    ? e.getSingleMessage()
-    : e instanceof Error
-      ? e.message
-      : String(e);
 }

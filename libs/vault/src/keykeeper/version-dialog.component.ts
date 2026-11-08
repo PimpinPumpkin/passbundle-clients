@@ -8,6 +8,7 @@ import {
 } from "@angular/core";
 
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
@@ -197,7 +198,14 @@ export class KeykeeperVersionDialogComponent {
     if (!confirmed || !this.data.restore) {
       return;
     }
-    const saved = await this.data.restore();
+    let saved: CipherView;
+    try {
+      saved = await this.data.restore();
+    } catch (e) {
+      // The server's reason (an edit made since, say), in plain words.
+      this.toastService.showToast({ variant: "error", message: plainErrorMessage(e) });
+      return;
+    }
     this.toastService.showToast({
       variant: "success",
       message: this.i18nService.t("keykeeperVersionRestored"),
@@ -215,7 +223,13 @@ export class KeykeeperVersionDialogComponent {
     if (!confirmed || !this.data.delete) {
       return;
     }
-    await this.data.delete();
+    try {
+      await this.data.delete();
+    } catch (e) {
+      // The server's reason, such as who may delete an item's versions.
+      this.toastService.showToast({ variant: "error", message: plainErrorMessage(e) });
+      return;
+    }
     this.toastService.showToast({
       variant: "success",
       message: this.i18nService.t("keykeeperVersionDeleted"),

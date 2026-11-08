@@ -3,7 +3,7 @@ import { FormsModule } from "@angular/forms";
 import { ActivatedRoute } from "@angular/router";
 
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
-import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import {
   ButtonModule,
   CalloutModule,
@@ -136,9 +136,7 @@ export class KeykeeperSiteProblemPageComponent implements OnInit {
       );
       this.sent.set(true);
     } catch (e) {
-      this.error.set(
-        e instanceof ErrorResponse ? e.getSingleMessage() : "Couldn't send the report.",
-      );
+      this.error.set(plainErrorMessage(e));
     }
   }
 }

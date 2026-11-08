@@ -4,6 +4,7 @@ import { of } from "rxjs";
 
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
@@ -48,6 +49,7 @@ describe("KeykeeperItemVersionsComponent", () => {
   const apiService = mock<ApiService>();
   const cipherService = mock<CipherService>();
   const dialogService = mock<DialogService>();
+  const toastService = mock<ToastService>();
   let response: ItemHistoryResponse;
   let openDialog: jest.SpyInstance;
 
@@ -83,7 +85,7 @@ describe("KeykeeperItemVersionsComponent", () => {
         { provide: DialogService, useValue: dialogService },
         { provide: I18nService, useValue: { t: (key: string) => key } },
         { provide: LogService, useValue: mock<LogService>() },
-        { provide: ToastService, useValue: mock<ToastService>() },
+        { provide: ToastService, useValue: toastService },
         { provide: TaskService, useValue: mock<TaskService>() },
       ],
     }).compileComponents();
@@ -174,6 +176,24 @@ describe("KeykeeperItemVersionsComponent", () => {
 
     buttons(el, "view")[0].click();
     expect((openDialog.mock.calls[0][1] as VersionDialogData).delete).toEqual(expect.any(Function));
+  });
+
+  it("says why when the server refuses to clear the history", async () => {
+    response = history([version("v1", { name: "one" })]);
+    const el = await render(login("two"), { canDelete: true });
+    dialogService.openSimpleDialog.mockResolvedValue(true);
+    const reason = "You don't have permission to clear this item's history";
+    apiService.send.mockImplementation(async (method) => {
+      if (method === "GET") {
+        return response;
+      }
+      throw new ErrorResponse({ message: reason, validationErrors: { "": [reason] } }, 400);
+    });
+
+    buttons(el, "keykeeperClearHistory")[0].click();
+    await fixture.whenStable();
+
+    expect(toastService.showToast).toHaveBeenCalledWith({ variant: "error", message: reason });
   });
 
   it("shows nothing while the item has no earlier versions", async () => {

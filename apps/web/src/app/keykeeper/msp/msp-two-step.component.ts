@@ -12,7 +12,7 @@ import { firstValueFrom, map } from "rxjs";
 
 import { MspTwoStep } from "@bitwarden/admin-console/common";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
-import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { DialogService, ToastService } from "@bitwarden/components";
 
 import { SharedModule } from "../../shared";
@@ -180,7 +180,7 @@ export class KeykeeperMspTwoStepComponent {
       });
       this.changed.emit();
     } catch (e) {
-      const message = e instanceof ErrorResponse ? e.getSingleMessage() : String(e);
+      const message = plainErrorMessage(e);
       this.toastService.showToast({ variant: "error", message });
     }
   };

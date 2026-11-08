@@ -3,8 +3,8 @@ import { ActivatedRoute } from "@angular/router";
 import { firstValueFrom } from "rxjs";
 
 import { ProvisioningView } from "@bitwarden/admin-console/common";
-import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { DialogService, ToastService } from "@bitwarden/components";
 
 import { HeaderModule } from "../../layouts/header/header.module";
@@ -367,7 +367,7 @@ export class KeykeeperProvisioningComponent implements OnInit {
     try {
       await work();
     } catch (e) {
-      const message = e instanceof ErrorResponse ? e.getSingleMessage() : String(e);
+      const message = plainErrorMessage(e);
       this.toastService.showToast({ variant: "error", message });
     }
   }
