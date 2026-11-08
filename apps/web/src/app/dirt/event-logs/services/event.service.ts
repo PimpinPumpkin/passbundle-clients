@@ -640,6 +640,12 @@ export class EventService {
       case EventType.Keykeeper_EveryoneTwoStepOff:
         msg = humanReadableMsg = this.i18nService.t("keykeeperEveryoneTwoStepOff");
         break;
+      case EventType.Keykeeper_MemberHealthOn:
+        msg = humanReadableMsg = this.i18nService.t("keykeeperMemberHealthOn");
+        break;
+      case EventType.Keykeeper_MemberHealthOff:
+        msg = humanReadableMsg = this.i18nService.t("keykeeperMemberHealthOffEvent");
+        break;
       case EventType.Keykeeper_SsoSettingsChanged:
         msg = this.i18nService.t(
           "keykeeperSsoSettingsChanged",

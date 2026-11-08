@@ -126,6 +126,10 @@ export enum EventType {
   Organization_InviteLinkRefreshed = 1628,
   Organization_InviteLinkConfirmEnabled = 1629,
   Organization_InviteLinkConfirmDisabled = 1630,
+  // Keykeeper: the organization turned "Members' own passwords" on or off.
+  // See DESIGN.md, "Members' own passwords".
+  Keykeeper_MemberHealthOn = 1688,
+  Keykeeper_MemberHealthOff = 1689,
   // Keykeeper: a place the organization's events are sent was added,
   // changed, or removed (event streaming), or the server stopped sending
   // there.

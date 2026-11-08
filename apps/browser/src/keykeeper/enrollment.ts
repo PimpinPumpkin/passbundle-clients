@@ -201,6 +201,8 @@ type EnrollmentInfo = {
   organizationName: string;
   publicKey: string | null;
   accountRecovery: boolean;
+  /** Its admins see how many of members' own passwords are weak, reused, or exposed. */
+  memberHealth?: boolean;
 };
 
 export type EnrollmentOutcome =
@@ -388,6 +390,7 @@ export class KeykeeperEnrollment {
         {
           organizationName: info.organizationName,
           accountRecovery: info.accountRecovery,
+          memberHealth: info.memberHealth === true,
           fingerprint: info.publicKey
             ? await this.legacyCompatKeyService.getFingerprint(
                 info.organizationId,

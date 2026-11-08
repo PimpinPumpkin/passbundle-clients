@@ -63,6 +63,7 @@ import {
   StrengthScorer,
 } from "./client-health";
 import { KeykeeperDefaultPoliciesComponent } from "./default-policies.component";
+import { withMemberHealth } from "./member-health-policy";
 import { describeEvent, MspEvent } from "./msp-activity";
 import {
   ClientEnrollment,
@@ -1560,8 +1561,11 @@ export class KeykeeperMspComponent implements OnInit {
           definitions.push(definition);
         }
       }
-      // Keykeeper: and two-step login for each client's admins.
-      this.policyDefinitions.set(withAdminTwoStep(definitions, policies.types));
+      // Keykeeper: and two-step login for each client's admins, and
+      // Members' own passwords.
+      this.policyDefinitions.set(
+        withMemberHealth(withAdminTwoStep(definitions, policies.types), policies.types),
+      );
     }
     this.policies.set(policies);
   }

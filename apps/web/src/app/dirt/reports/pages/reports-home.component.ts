@@ -3,15 +3,15 @@
 // FIXME(https://bitwarden.atlassian.net/browse/CL-1062): `OnPush` components should not use mutable properties
 /* eslint-disable @bitwarden/components/enforce-readonly-angular-properties */
 import { ChangeDetectionStrategy, Component, OnInit, signal } from "@angular/core";
-import { toSignal } from "@angular/core/rxjs-interop";
-import { firstValueFrom, of, switchMap } from "rxjs";
+import { firstValueFrom } from "rxjs";
 
-import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
+import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions/account/billing-account-profile-state.service";
-import { confirmedMemberOfAny } from "@bitwarden/common/dirt/keykeeper/own-health";
+import { organizationNames, ownHealthSeenBy } from "@bitwarden/common/dirt/keykeeper/own-health";
 import { FeatureFlag } from "@bitwarden/common/enums/feature-flag.enum";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
+import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 
 import { reports, ReportType } from "../reports";
 import { ReportEntry, ReportVariant } from "../shared";
@@ -25,26 +25,23 @@ import { ReportEntry, ReportVariant } from "../shared";
 export class ReportsHomeComponent implements OnInit {
   readonly reports = signal<ReportEntry[]>([]);
   /**
-   * Keykeeper: whether their organizations' admins see their own passwords'
-   * numbers, following a sync that confirms them somewhere.
+   * Keykeeper: the organizations whose admins see how many of the person's
+   * own passwords are weak, reused, or exposed, by name, as the server says
+   * when the page opens: those they've joined that have "Members' own
+   * passwords" on. Empty when none does, and the line isn't shown.
    */
-  readonly keykeeperSeenByAdmins = toSignal(
-    this.accountService.activeAccount$.pipe(
-      switchMap((account) =>
-        account == null ? of(false) : confirmedMemberOfAny(this.organizationService, account.id),
-      ),
-    ),
-    { initialValue: false },
-  );
+  readonly keykeeperSeenBy = signal<string | null>(null);
 
   constructor(
     private billingAccountProfileStateService: BillingAccountProfileStateService,
     private accountService: AccountService,
     private configService: ConfigService,
-    private organizationService: OrganizationService,
+    private apiService: ApiService,
+    private logService: LogService,
   ) {}
 
   async ngOnInit(): Promise<void> {
+    void this.keykeeperLoadSeenBy();
     const account = await firstValueFrom(this.accountService.activeAccount$);
     const userHasPremium = await firstValueFrom(
       this.billingAccountProfileStateService.hasPremiumFromAnySource$(account.id),
@@ -97,5 +94,19 @@ export class ReportsHomeComponent implements OnInit {
     }
 
     this.reports.set(reportEntries);
+  }
+
+  /** Keykeeper: who sees the numbers; nothing shown if the server can't say. */
+  private async keykeeperLoadSeenBy() {
+    try {
+      const seenBy = await ownHealthSeenBy(this.apiService);
+      this.keykeeperSeenBy.set(
+        seenBy == null || seenBy.length === 0
+          ? null
+          : organizationNames(seenBy.map((organization) => organization.name)),
+      );
+    } catch (e) {
+      this.logService.warning(`Couldn't read who sees your own passwords' numbers: ${String(e)}`);
+    }
   }
 }
