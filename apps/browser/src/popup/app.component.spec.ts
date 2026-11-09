@@ -4,6 +4,7 @@ import { Router } from "@angular/router";
 import { mock, MockProxy } from "jest-mock-extended";
 import { EMPTY, of } from "rxjs";
 
+import { KeykeeperNewDeviceApprovalsService } from "@bitwarden/angular/auth/keykeeper/new-device-approval/new-device-approvals.service";
 import { DeviceTrustToastService } from "@bitwarden/angular/auth/services/device-trust-toast.service.abstraction";
 import { DocumentLangSetter } from "@bitwarden/angular/platform/i18n";
 import {
@@ -84,6 +85,11 @@ describe("AppComponent (browser popup)", () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: PopupCompactModeService, useValue: compactModeService },
+        // Keykeeper: prompts for sign-ins on new devices (not under test here).
+        {
+          provide: KeykeeperNewDeviceApprovalsService,
+          useValue: mock<KeykeeperNewDeviceApprovalsService>(),
+        },
         { provide: SdkService, useValue: sdkService },
       ],
     });
