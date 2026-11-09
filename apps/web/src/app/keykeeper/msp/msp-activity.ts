@@ -51,6 +51,12 @@ export function describeEvent(
       return detail === "off"
         ? `${actor} stopped requiring two-step login of ${org}'s admins`
         : `${actor} required two-step login of ${org}'s admins`;
+    case "client_browser_autofill_set":
+      return detail === "unchanged"
+        ? `${actor} left the browsers' card and address autofill as they are in ${org}`
+        : detail === "offAndImport"
+          ? `${actor} turned off the browsers' card and address autofill in ${org}, offering to bring them in`
+          : `${actor} turned off the browsers' card and address autofill in ${org}`;
     case "client_password_change_set":
       return detail === "off"
         ? `${actor} turned off assisted password change in ${org}`

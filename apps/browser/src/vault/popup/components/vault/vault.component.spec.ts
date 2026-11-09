@@ -48,6 +48,7 @@ import {
   Vfo1TourCalloutService,
 } from "@bitwarden/vault";
 
+import { KeykeeperBrowserAutofillNoticeComponent } from "../../../../keykeeper/popup/browser-autofill-notice.component";
 import { KeykeeperTwoStepNeededComponent } from "../../../../keykeeper/popup/two-step-needed.component";
 import { KeykeeperTwoStepNudgeComponent } from "../../../../keykeeper/popup/two-step-nudge.component";
 import { BrowserApi } from "../../../../platform/browser/browser-api";
@@ -176,6 +177,14 @@ class KeykeeperTwoStepNeededStubComponent {}
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 class KeykeeperTwoStepNudgeStubComponent {}
+
+@Component({
+  selector: "app-keykeeper-browser-autofill-notice",
+  standalone: true,
+  template: "",
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class KeykeeperBrowserAutofillNoticeStubComponent {}
 
 @Component({
   selector: "app-autofill-vault-list-items",
@@ -462,6 +471,7 @@ describe("VaultComponent", () => {
           // Keykeeper
           KeykeeperTwoStepNeededComponent,
           KeykeeperTwoStepNudgeComponent,
+          KeykeeperBrowserAutofillNoticeComponent,
           VaultPopupListTableComponent,
           VaultSwitcherComponent,
         ],
@@ -484,6 +494,7 @@ describe("VaultComponent", () => {
           VaultOrganizationUserNotificationsStubComponent,
           KeykeeperTwoStepNeededStubComponent,
           KeykeeperTwoStepNudgeStubComponent,
+          KeykeeperBrowserAutofillNoticeStubComponent,
           VaultPopupListTableStubComponent,
           VaultSwitcherStubComponent,
         ],

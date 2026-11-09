@@ -52,6 +52,7 @@ import { KeykeeperInstallCommandComponent } from "../organizations/install-comma
 import { KeykeeperTwoStepDetour } from "../two-step-setup/two-step-detour";
 
 import { withAdminTwoStep } from "./admin-two-step-policy";
+import { withBrowserAutofillOff } from "./browser-autofill-policy";
 import { clientConsoleWay, noConsoleHelp } from "./client-console";
 import {
   ClientHealth,
@@ -470,6 +471,7 @@ const CLIENT_FEATURES = {
                   [serverUrl]="serverUrl()"
                   [whose]="possessive(install.client.name)"
                   [joins]="install.client.name"
+                  [browserAutofill]="install.enrollment.browserAutofill"
                   testIdPrefix="msp-install"
                 />
                 <p bitTypography="helper">
@@ -1561,10 +1563,14 @@ export class KeykeeperMspComponent implements OnInit {
           definitions.push(definition);
         }
       }
-      // Keykeeper: and two-step login for each client's admins, and turning off
-      // assisted password change.
+      // Keykeeper: and two-step login for each client's admins, turning off
+      // assisted password change, and turning off the browsers' card and
+      // address autofill.
       this.policyDefinitions.set(
-        withPasswordChangeOff(withAdminTwoStep(definitions, policies.types), policies.types),
+        withBrowserAutofillOff(
+          withPasswordChangeOff(withAdminTwoStep(definitions, policies.types), policies.types),
+          policies.types,
+        ),
       );
     }
     this.policies.set(policies);

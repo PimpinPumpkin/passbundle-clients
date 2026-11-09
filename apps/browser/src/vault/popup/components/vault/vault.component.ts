@@ -79,6 +79,7 @@ import {
 } from "@bitwarden/vault";
 
 import { CurrentAccountComponent } from "../../../../auth/popup/account-switching/current-account.component";
+import { KeykeeperBrowserAutofillNoticeComponent } from "../../../../keykeeper/popup/browser-autofill-notice.component";
 import { KeykeeperTwoStepNeededComponent } from "../../../../keykeeper/popup/two-step-needed.component";
 import { KeykeeperTwoStepNudgeComponent } from "../../../../keykeeper/popup/two-step-nudge.component";
 import { PopOutComponent } from "../../../../platform/popup/components/pop-out.component";
@@ -130,6 +131,7 @@ const NEW_EXPERIENCE_DARK_IMG = "../../../../images/new-experience/new-experienc
   imports: [
     KeykeeperTwoStepNeededComponent,
     KeykeeperTwoStepNudgeComponent,
+    KeykeeperBrowserAutofillNoticeComponent,
     BlockedInjectionBanner,
     FillAssistActiveBannerComponent,
     PopupPageComponent,

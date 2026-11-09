@@ -35,6 +35,19 @@ export const MAC_PROFILE_SCRIPT = "make-profile.sh";
  */
 export type InstallCommandParts = { secret: string; fingerprint: string };
 
+/**
+ * What the command sets besides joining: the organization's choices for the
+ * browsers. With `browserAutofillOff`, the scripts turn off Chrome's, Edge's,
+ * and Firefox's own card and address autofill by policy (DESIGN.md,
+ * "Addresses and cards").
+ */
+export type InstallCommandOptions = { browserAutofillOff?: boolean };
+
+/** The organization's setting, as the install command's options. */
+export function installOptionsFor(browserAutofill: string | undefined): InstallCommandOptions {
+  return { browserAutofillOff: browserAutofill === "off" || browserAutofill === "offAndImport" };
+}
+
 /** The computers a command is for. */
 export type InstallPlatform = "windows" | "macos" | "linux";
 
@@ -70,15 +83,20 @@ export function installCommand(
   serverUrl: string,
   token: string,
   parts?: InstallCommandParts | null,
+  options?: InstallCommandOptions,
 ): string | null {
   const url = serverUrl.replace(/\/+$/, "");
   if (!SCRIPT.test(script) || !SERVER_URL.test(url) || !checkedToken(token, parts)) {
     return null;
   }
-  const command = `.\\${script} -ServerUrl ${quote(url)} -EnrollmentToken ${quote(token)}`;
-  return parts == null
-    ? command
-    : `${command} -JoinSecret ${quote(parts.secret)} -OrgKey ${quote(parts.fingerprint)}`;
+  const command = [
+    `.\\${script} -ServerUrl ${quote(url)} -EnrollmentToken ${quote(token)}`,
+    ...(parts == null
+      ? []
+      : [`-JoinSecret ${quote(parts.secret)} -OrgKey ${quote(parts.fingerprint)}`]),
+    ...(options?.browserAutofillOff ? ["-DisableCardAutofill -DisableAddressAutofill"] : []),
+  ];
+  return command.join(" ");
 }
 
 /**
@@ -93,9 +111,10 @@ export function installSteps(
   serverUrl: string,
   token: string,
   parts?: InstallCommandParts | null,
+  options?: InstallCommandOptions,
 ): InstallSteps | null {
   if (platform === "windows") {
-    const command = installCommand(scripts.windows, serverUrl, token, parts);
+    const command = installCommand(scripts.windows, serverUrl, token, parts, options);
     return command == null ? null : { command };
   }
   const url = serverUrl.replace(/\/+$/, "");
@@ -105,7 +124,7 @@ export function installSteps(
   if (!checkedToken(token, parts)) {
     return null;
   }
-  const options = [
+  const args = [
     `--server-url ${shellLiteral(url)}`,
     `--enrollment-token ${shellLiteral(token)}`,
     ...(parts == null
@@ -114,15 +133,16 @@ export function installSteps(
           `--join-secret ${shellLiteral(parts.secret)}`,
           `--org-key ${shellLiteral(parts.fingerprint)}`,
         ]),
+    ...(options?.browserAutofillOff ? ["--disable-card-autofill --disable-address-autofill"] : []),
   ].join(" ");
   if (platform === "linux") {
-    return { command: `./${scripts.unix} ${options}` };
+    return { command: `./${scripts.unix} ${args}` };
   }
   if (!MAC_PROFILE.test(scripts.macProfile)) {
     return null;
   }
   return {
-    command: `./${MAC_PROFILE_SCRIPT} ${options} > ${scripts.macProfile}`,
+    command: `./${MAC_PROFILE_SCRIPT} ${args} > ${scripts.macProfile}`,
     app: `./${scripts.unix}`,
   };
 }

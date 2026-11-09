@@ -228,6 +228,18 @@ describe("MSP activity sentences", () => {
       "ana@northwind.test turned on assisted password change in Acme Dental",
     ],
     [
+      { event: "client_browser_autofill_set", detail: "off" },
+      "ana@northwind.test turned off the browsers' card and address autofill in Acme Dental",
+    ],
+    [
+      { event: "client_browser_autofill_set", detail: "offAndImport" },
+      "ana@northwind.test turned off the browsers' card and address autofill in Acme Dental, offering to bring them in",
+    ],
+    [
+      { event: "client_browser_autofill_set", detail: "unchanged" },
+      "ana@northwind.test left the browsers' card and address autofill as they are in Acme Dental",
+    ],
+    [
       { event: "staff_invited", detail: "admin" },
       "ana@northwind.test invited ben@northwind.test to join as an admin",
     ],

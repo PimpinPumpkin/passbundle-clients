@@ -68,6 +68,7 @@ describe("ORGANIZATIONS state", () => {
         useDisableSMAdsForUsers: false,
         usePhishingBlocker: false,
         keykeeperPasswordChange: true,
+        keykeeperBrowserAutofill: "off",
         useMyItems: false,
         useInviteLinks: false,
       },

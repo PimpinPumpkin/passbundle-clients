@@ -103,6 +103,8 @@
     <app-keykeeper-two-step-needed class="tw-mb-3 tw-block" />
     <!-- Keykeeper: a nudge to set up two-step login, for someone with none whom no rule covers -->
     <app-keykeeper-two-step-nudge />
+    <!-- Keykeeper: what an organization did with the browser's own card and address autofill here -->
+    <app-keykeeper-browser-autofill-notice />
     @if (vaultState === VaultStateEnum.Empty && !vfo1Enabled()) {
       <vault-organization-user-notifications
         class="-tw-mx-5 -tw-mt-3 tw-flex tw-flex-col tw-px-2 tw-mb-3"

@@ -6,6 +6,7 @@ import { MemberDecryptionType } from "../../../auth/enums/sso";
 import { ProductTierType } from "../../../billing/enums";
 import { OrganizationId } from "../../../types/guid";
 import { OrganizationUserStatusType, OrganizationUserType, ProviderType } from "../../enums";
+import { BrowserAutofillMode, browserAutofillMode } from "../../keykeeper/browser-autofill";
 import { PermissionsApi } from "../api/permissions.api";
 import { OrganizationData } from "../data/organization.data";
 
@@ -103,6 +104,8 @@ export class Organization {
   usePhishingBlocker: boolean;
   /** Keykeeper: the browser extension may change its items' passwords on their sites. */
   keykeeperPasswordChange: boolean;
+  /** Keykeeper: what it does with the browsers' own card and address autofill. */
+  keykeeperBrowserAutofill: BrowserAutofillMode;
   useMyItems: boolean;
   useInviteLinks: boolean;
 
@@ -173,6 +176,7 @@ export class Organization {
     this.ssoMemberDecryptionType = obj.ssoMemberDecryptionType;
     this.usePhishingBlocker = obj.usePhishingBlocker;
     this.keykeeperPasswordChange = obj.keykeeperPasswordChange === true;
+    this.keykeeperBrowserAutofill = browserAutofillMode(obj.keykeeperBrowserAutofill);
     this.useMyItems = obj.useMyItems;
     this.useInviteLinks = obj.useInviteLinks;
   }

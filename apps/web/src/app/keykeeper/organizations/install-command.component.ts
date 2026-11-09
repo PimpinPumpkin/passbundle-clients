@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, input, signal } from "@an
 import {
   INSTALL_COMMAND_REFUSED,
   InstallCommandParts,
+  installOptionsFor,
   InstallPlatform,
   installSteps,
   MAC_PROFILE_SCRIPT,
@@ -71,6 +72,12 @@ export type ShownInstallParts = InstallCommandParts & { phrase?: string[] | null
         </p>
       }
     }
+    @if (autofillOff()) {
+      <p bitTypography="body2" [attr.data-testid]="testId('autofill-off')">
+        It also turns off the browsers' own card and address autofill, as this organization's
+        setting says, in every profile on the computer.
+      </p>
+    }
     @if (steps(); as s) {
       <pre
         class="tw-whitespace-pre-wrap tw-break-all tw-rounded tw-bg-background-alt tw-p-3 tw-text-sm"
@@ -128,6 +135,8 @@ export class KeykeeperInstallCommandComponent {
   readonly joins = input.required<string>();
   /** The start of each test id, such as "msp-install". */
   readonly testIdPrefix = input.required<string>();
+  /** The organization's browser autofill setting, from the server; off adds the scripts' options. */
+  readonly browserAutofill = input<string | undefined>(undefined);
 
   protected readonly platform = signal<InstallPlatform>("windows");
   protected readonly refused = INSTALL_COMMAND_REFUSED;
@@ -140,7 +149,18 @@ export class KeykeeperInstallCommandComponent {
   };
 
   protected readonly steps = computed(() =>
-    installSteps(this.platform(), this.scripts, this.serverUrl(), this.token(), this.parts()),
+    installSteps(
+      this.platform(),
+      this.scripts,
+      this.serverUrl(),
+      this.token(),
+      this.parts(),
+      installOptionsFor(this.browserAutofill()),
+    ),
+  );
+  /** Whether the command turns off the browsers' card and address autofill. */
+  protected readonly autofillOff = computed(
+    () => installOptionsFor(this.browserAutofill()).browserAutofillOff === true,
   );
 
   constructor(

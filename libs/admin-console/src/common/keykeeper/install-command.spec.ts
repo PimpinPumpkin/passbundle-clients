@@ -1,4 +1,10 @@
-import { INSTALL_PLATFORMS, installCommand, installSteps, shellLiteral } from "./install-command";
+import {
+  INSTALL_PLATFORMS,
+  installCommand,
+  installOptionsFor,
+  installSteps,
+  shellLiteral,
+} from "./install-command";
 
 const script = "Install-PassBundle.ps1";
 const token = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJ0123-_6";
@@ -171,5 +177,51 @@ describe("shellLiteral", () => {
     expect(shellLiteral("plain")).toBe("'plain'");
     expect(shellLiteral('$(whoami) `id` \\ " ;')).toBe("'$(whoami) `id` \\ \" ;'");
     expect(shellLiteral("it's")).toBe("'it'\\''s'");
+  });
+});
+
+describe("the organization's browser autofill setting in the command", () => {
+  const scripts = {
+    windows: "Install-PassBundle.ps1",
+    unix: "install-passbundle.sh",
+    macProfile: "PassBundle.mobileconfig",
+  };
+  const parts = { secret: token.replace("a", "s"), fingerprint: token.replace("a", "f") };
+
+  it("turns the browsers' card and address autofill off only while the setting is off", () => {
+    expect(installOptionsFor("off")).toEqual({ browserAutofillOff: true });
+    expect(installOptionsFor("offAndImport")).toEqual({ browserAutofillOff: true });
+    for (const left of ["unchanged", undefined, "", "OFF", "something else"]) {
+      expect(installOptionsFor(left)).toEqual({ browserAutofillOff: false });
+    }
+  });
+
+  it("adds each script's options at the end, after what it already carried", () => {
+    const off = { browserAutofillOff: true };
+    expect(installCommand(scripts.windows, "https://vault.example.com", token, parts, off)).toBe(
+      `.\\Install-PassBundle.ps1 -ServerUrl 'https://vault.example.com' -EnrollmentToken '${token}' -JoinSecret '${parts.secret}' -OrgKey '${parts.fingerprint}' -DisableCardAutofill -DisableAddressAutofill`,
+    );
+    expect(installCommand(scripts.windows, "https://vault.example.com", token, null, off)).toBe(
+      `.\\Install-PassBundle.ps1 -ServerUrl 'https://vault.example.com' -EnrollmentToken '${token}' -DisableCardAutofill -DisableAddressAutofill`,
+    );
+    for (const platform of ["macos", "linux"] as const) {
+      const steps = installSteps(platform, scripts, "https://vault.example.com", token, parts, off);
+      expect(steps?.command).toContain(
+        `--org-key '${parts.fingerprint}' --disable-card-autofill --disable-address-autofill`,
+      );
+    }
+    // The Mac's app command carries nothing but the script.
+    expect(
+      installSteps("macos", scripts, "https://vault.example.com", token, parts, off)?.app,
+    ).toBe("./install-passbundle.sh");
+  });
+
+  it("leaves them out when the setting leaves the browsers as they are", () => {
+    for (const platform of INSTALL_PLATFORMS) {
+      const steps = installSteps(platform, scripts, "https://vault.example.com", token, parts, {
+        browserAutofillOff: false,
+      });
+      expect(steps?.command).not.toMatch(/autofill/i);
+    }
   });
 });
