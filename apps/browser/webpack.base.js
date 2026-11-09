@@ -284,6 +284,11 @@ module.exports.buildConfig = function buildConfig(params) {
         __dirname,
         "src/autofill/content/auto-submit-login.ts",
       ),
+      // Keykeeper: assisted password change, injected only into the tab it opened.
+      "content/keykeeper-password-change": path.resolve(
+        __dirname,
+        "src/autofill/content/keykeeper-password-change.ts",
+      ),
       "content/contextMenuHandler": path.resolve(
         __dirname,
         "src/autofill/content/context-menu-handler.ts",

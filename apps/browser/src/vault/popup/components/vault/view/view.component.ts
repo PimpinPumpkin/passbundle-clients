@@ -58,6 +58,8 @@ import {
   CipherViewComponent,
   CopyCipherFieldService,
   historyAccess,
+  KeykeeperPasswordChangeCardComponent,
+  KeykeeperPasswordChangeService,
   PasswordRepromptService,
 } from "@bitwarden/vault";
 
@@ -122,6 +124,7 @@ type LoadAction =
     LinkModule,
     TypographyModule,
     ShareButtonComponent,
+    KeykeeperPasswordChangeCardComponent,
   ],
   providers: [
     { provide: ViewPasswordHistoryService, useClass: BrowserViewPasswordHistoryService },
@@ -130,6 +133,10 @@ type LoadAction =
 })
 export class ViewComponent {
   private readonly configService = inject(ConfigService);
+  /** Keykeeper: assisted password change, where the extension provides it. */
+  private readonly passwordChangeService = inject(KeykeeperPasswordChangeService, {
+    optional: true,
+  });
 
   private activeUserId: UserId;
 
@@ -266,6 +273,23 @@ export class ViewComponent {
       this.logService.error(e);
       return false;
     }
+  }
+
+  /**
+   * Keykeeper: Change password, for a login the person can edit and see the
+   * password of, with an https website (DESIGN.md, "Assisted password change").
+   */
+  canChangePassword(): boolean {
+    return (
+      this.cipher != null &&
+      !this.cipher.isArchived &&
+      this.passwordChangeService?.available(this.cipher) === true
+    );
+  }
+
+  /** Keykeeper: asks, then starts the change; the background opens the site's page. */
+  async changePassword() {
+    await this.passwordChangeService?.confirmAndStart(this.cipher);
   }
 
   /** Keykeeper: the item's version history, which asks for the master password first if the item does. */

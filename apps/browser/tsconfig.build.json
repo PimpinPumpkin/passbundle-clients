@@ -12,6 +12,7 @@
     "src/autofill/content/bootstrap-autofill-overlay-notifications.ts",
     "src/autofill/content/autofiller.ts",
     "src/autofill/content/auto-submit-login.ts",
+    "src/autofill/content/keykeeper-password-change.ts",
     "src/autofill/content/context-menu-handler.ts",
     "src/autofill/content/content-message-handler.ts",
     "src/autofill/fido2/content/fido2-content-script.ts",

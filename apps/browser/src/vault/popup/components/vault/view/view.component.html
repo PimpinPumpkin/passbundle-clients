@@ -33,6 +33,12 @@
   </popup-header>
 
   @if (cipher) {
+    <!-- Keykeeper: an unfinished password change, with the old password one click away -->
+    <vault-keykeeper-password-change-card
+      class="tw-block tw-mb-4"
+      [cipher]="cipher"
+      (saved)="cipher = $event"
+    />
     <app-cipher-view [cipher]="cipher" keykeeperHero>
       @if (showAutofillButton()) {
         <button
@@ -45,6 +51,22 @@
           (click)="doAutofill()"
         >
           {{ "keykeeperFillOnThisPage" | i18n }}
+        </button>
+      }
+      <!-- Keykeeper: change the password on the site, saving the new one first -->
+      @if (canChangePassword()) {
+        <button
+          type="button"
+          slot="button"
+          bitButton
+          buttonType="secondary"
+          block
+          class="tw-mt-2"
+          startIcon="bwi-key"
+          data-testid="keykeeper-change-password"
+          (click)="changePassword()"
+        >
+          {{ "changePassword" | i18n }}
         </button>
       }
       <!-- Keykeeper: its version history, for people whose shared folders let them see it -->

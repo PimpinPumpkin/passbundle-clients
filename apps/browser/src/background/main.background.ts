@@ -380,6 +380,8 @@ import {
 import { keykeeperFillPicker as fillPickerHooks } from "../autofill/keykeeper/fill-field-menu";
 import { keykeeperSiteFixes as siteFixHooks } from "../autofill/keykeeper/fill-rules";
 import { KeykeeperOpenAndFill } from "../autofill/keykeeper/open-and-fill";
+import { PASSWORD_CHANGE_SCRIPT } from "../autofill/keykeeper/password-change/password-change-messages";
+import { KeykeeperPasswordChange } from "../autofill/keykeeper/password-change/password-change.background";
 import { KeykeeperSiteFixes } from "../autofill/keykeeper/site-fixes";
 import { AutofillLifecycleService } from "../autofill/services/abstractions/autofill-lifecycle.service";
 import { AutofillService as AutofillServiceAbstraction } from "../autofill/services/abstractions/autofill.service";
@@ -630,6 +632,7 @@ export default class MainBackground {
   keykeeperMspWork: KeykeeperMspWork;
   keykeeperAgentBiometrics: KeykeeperAgentBiometrics;
   keykeeperOpenAndFill: KeykeeperOpenAndFill;
+  keykeeperPasswordChange: KeykeeperPasswordChange;
   private runtimeBackground: RuntimeBackground;
   private tabsBackground: TabsBackground;
   private webRequestBackground: WebRequestBackground;
@@ -1986,6 +1989,39 @@ export default class MainBackground {
       logError: (error) => this.logService.error(error),
     });
     this.keykeeperOpenAndFill.init();
+    // Keykeeper: assisted password change, on the site, in a tab it opens.
+    this.keykeeperPasswordChange = new KeykeeperPasswordChange({
+      cipherService: this.cipherService,
+      accountService: this.accountService,
+      authService: this.authService,
+      passwordRepromptRequired: async (cipher) =>
+        cipher.reprompt === CipherRepromptType.Password &&
+        (await this.userVerificationService.hasMasterPassword()),
+      itemMatches,
+      defaultMatch: () =>
+        firstValueFrom(this.domainSettingsService.resolvedDefaultUriMatchStrategy$),
+      isBlocked: async (url) => {
+        const blocked = await firstValueFrom(this.domainSettingsService.blockedInteractionsUris$);
+        return blocked != null && isUrlInList(url, blocked);
+      },
+      generatePassword: () => this.keykeeperGeneratePassword(),
+      inject: (tabId) =>
+        this.scriptInjectorService.inject({
+          tabId,
+          injectDetails: { file: PASSWORD_CHANGE_SCRIPT, frame: 0, runAt: "document_idle" },
+        }),
+      send: (tabId, message) =>
+        new Promise((resolve) =>
+          chrome.tabs.sendMessage(tabId, message, { frameId: 0 }, (response) => {
+            // Nothing there to answer, or the page went away: no answer.
+            void chrome.runtime.lastError;
+            resolve(response);
+          }),
+        ),
+      t: (key, ...substitutions) => this.i18nService.t(key, ...substitutions),
+      logError: (error) => this.logService.error(error),
+    });
+    this.keykeeperPasswordChange.init();
     // Keykeeper: join the client organization named by the MSP's install command.
     this.keykeeperEnrollment = new KeykeeperEnrollment(
       this.accountService,
@@ -2550,6 +2586,27 @@ export default class MainBackground {
     await this.autofillBadgeUpdaterService.init();
     await this.clipboardNotificationBadgeUpdaterService.init();
     await this.atRiskCipherUpdaterService.init();
+  }
+
+  /**
+   * Keykeeper: a new password for an assisted password change, from the
+   * generator with the person's settings and the organization's policy. The
+   * change remakes it to the site's rules itself.
+   */
+  private async keykeeperGeneratePassword(): Promise<string> {
+    if (!this.credentialGeneratorService) {
+      throw new Error("The generator isn't ready.");
+    }
+    const generated = await firstValueFrom(
+      this.credentialGeneratorService.generate$({
+        on$: concat(
+          of({ source: PasswordGenerateRequestSource.Clipboard, type: Type.password }),
+          NEVER,
+        ),
+        account$: this.accountService.activeAccount$,
+      }),
+    );
+    return generated.credential;
   }
 
   /** Keykeeper: with the tab it's for, the password follows that site's own rules. */

@@ -43,6 +43,10 @@ import {
   finishPickAfterReprompt,
 } from "../autofill/keykeeper/fill-field-menu";
 import { OPEN_AND_FILL } from "../autofill/keykeeper/open-and-fill-message";
+import {
+  PASSWORD_CHANGE_START,
+  PASSWORD_CHANGE_STATUS,
+} from "../autofill/keykeeper/password-change/password-change-messages";
 import { AutofillLifecycleService } from "../autofill/services/abstractions/autofill-lifecycle.service";
 import { AutofillService } from "../autofill/services/abstractions/autofill.service";
 import { FORCE_TARGETING_RULES_UPDATE_COMMAND } from "../autofill/services/targeting-rules-data.service";
@@ -123,6 +127,9 @@ export default class RuntimeBackground {
         REMOVE_BIOMETRICS,
         // Keykeeper: "Open and fill" answers whether it opened the tab.
         OPEN_AND_FILL,
+        // Keykeeper: assisted password change answers whether it started, and how it's going.
+        PASSWORD_CHANGE_START,
+        PASSWORD_CHANGE_STATUS,
         "getUserPremiumStatus",
         "getUrlAutofillTargetingRules",
         "collectPageDetailsForPopup",
@@ -286,6 +293,23 @@ export default class RuntimeBackground {
       // from the extension's own pages, which it checks itself.
       case OPEN_AND_FILL: {
         return (await this.main.keykeeperOpenAndFill?.open(msg, sender)) ?? false;
+      }
+      // Keykeeper: assisted password change (autofill/keykeeper/password-change/),
+      // only from the extension's own pages, which it checks itself.
+      case PASSWORD_CHANGE_START: {
+        return (
+          (await this.main.keykeeperPasswordChange?.start(msg, sender)) ?? {
+            started: false,
+            reason: "notAllowed",
+          }
+        );
+      }
+      case PASSWORD_CHANGE_STATUS: {
+        if (!fromExtensionPage(sender) || typeof msg.cipherId !== "string") {
+          return null;
+        }
+        const status = this.main.keykeeperPasswordChange?.status(msg.cipherId);
+        return status == null ? null : { running: status.running, text: status.text };
       }
       // Keykeeper: the master password prompt's answer for a fill picker
       // choice (autofill/keykeeper/fill-field-menu.ts), only from the prompt.

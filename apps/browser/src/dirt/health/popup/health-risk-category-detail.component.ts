@@ -39,7 +39,7 @@ import {
   CompactModeService,
 } from "@bitwarden/components";
 import { I18nPipe } from "@bitwarden/ui-common";
-import { PasswordRepromptService } from "@bitwarden/vault";
+import { KeykeeperPasswordChangeService, PasswordRepromptService } from "@bitwarden/vault";
 
 import { CurrentAccountComponent } from "../../../auth/popup/account-switching/current-account.component";
 import { PopOutComponent } from "../../../platform/popup/components/pop-out.component";
@@ -90,6 +90,10 @@ export class HealthRiskCategoryDetailComponent {
   readonly accountService = inject(AccountService);
   readonly cipherService = inject(CipherService);
   readonly changeLoginPasswordService = inject(ChangeLoginPasswordService);
+  /** Keykeeper: assisted password change, where the extension provides it. */
+  private readonly passwordChangeService = inject(KeykeeperPasswordChangeService, {
+    optional: true,
+  });
   readonly passwordRepromptService = inject(PasswordRepromptService);
   readonly platformUtilsService = inject(PlatformUtilsService);
   readonly vaultHealthReportService = inject(VaultHealthReportService);
@@ -210,6 +214,12 @@ export class HealthRiskCategoryDetailComponent {
   };
 
   readonly onChangePassword = async (item: CipherView) => {
+    // Keykeeper: changes it on the site for a login that allows it (DESIGN.md,
+    // "Assisted password change"); anything else opens the site's page, as before.
+    if (this.passwordChangeService?.available(item)) {
+      await this.passwordChangeService.confirmAndStart(item);
+      return;
+    }
     const changePasswordUrl = await this.changeLoginPasswordService.getChangePasswordUrl(item);
     if (changePasswordUrl != null) {
       this.platformUtilsService.launchUri(changePasswordUrl);
