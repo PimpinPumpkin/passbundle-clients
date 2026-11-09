@@ -396,9 +396,16 @@ export abstract class LoginStrategy<TData extends LoginStrategyData = LoginStrat
   ): Promise<AuthResult> {
     const result = new AuthResult();
     result.requiresDeviceVerification = true;
-    // Keykeeper: the new-device check, for the waiting page (in memory).
+    // Keykeeper: the new-device check, for the waiting page (in memory), and
+    // its token with the sign-in, so signing in again (the extension's popup
+    // opened again) continues the same check.
     result.keykeeperNewDeviceCheck = response.keykeeperNewDeviceCheck;
     keykeeperRememberNewDeviceCheck(response.keykeeperNewDeviceCheck);
+    const request = this.cache.value?.tokenRequest;
+    if (response.keykeeperNewDeviceCheck && request instanceof PasswordTokenRequest) {
+      request.keykeeperNewDeviceToken = response.keykeeperNewDeviceCheck.token;
+      this.cache.next(this.cache.value);
+    }
     return result;
   }
 

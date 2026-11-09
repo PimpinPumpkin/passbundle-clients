@@ -5,6 +5,14 @@ import { TokenTwoFactorRequest } from "./token-two-factor.request";
 import { TokenRequest } from "./token.request";
 
 export class PasswordTokenRequest extends TokenRequest {
+  /**
+   * Keykeeper: the token of the new-device check this sign-in waits for
+   * (DESIGN.md, "New-device check"). Never sent on its own: signing in again
+   * while the check waits sends it as `newDeviceOtp`, so the server continues
+   * the same check, which has one holder, instead of starting a new one.
+   */
+  keykeeperNewDeviceToken?: string;
+
   constructor(
     public email: string,
     public masterPasswordHash: string,
