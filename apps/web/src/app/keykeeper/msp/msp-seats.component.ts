@@ -10,20 +10,24 @@ import { ToastService } from "@bitwarden/components";
 import { SharedModule } from "../../shared";
 
 import {
-  averageText,
+  dayLabel,
   getMspSeats,
   getMspSeatsCsv,
+  howBilled,
   monthLabel,
   MspSeats,
+  proratedText,
   seatsCsvFile,
   WHAT_COUNTS,
 } from "./msp-seats";
 
 /**
  * Keykeeper: seats by client in the MSP console, for MSP admins who bill
- * each client for its own seats: a month's most seats on any day, average,
- * and today's for each client, with totals, and the same as a CSV file.
- * See DESIGN.md, "Seats by client".
+ * each client for its own seats. Seats are billed by the day, so each
+ * client's line is its seat-days and its prorated seats (seat-days over the
+ * days in the month), with its peak beside them and today's in this month,
+ * then the totals; and the same as a CSV file. See DESIGN.md, "Seats by
+ * client".
  */
 @Component({
   selector: "app-keykeeper-msp-seats",
@@ -34,6 +38,7 @@ import {
       <section class="tw-mt-8" aria-label="Seats" data-testid="msp-seats">
         <h2 bitTypography="h3">Seats</h2>
         <p bitTypography="body2" data-testid="msp-seats-what-counts">{{ whatCounts }}</p>
+        <p bitTypography="body2" data-testid="msp-seats-how-billed">{{ billed(s) }}</p>
         <div class="tw-flex tw-flex-wrap tw-items-end tw-gap-4">
           <bit-form-field disableMargin class="tw-w-72 tw-max-w-full">
             <bit-label>Month</bit-label>
@@ -58,12 +63,18 @@ import {
             No clients in {{ label(s.month) }}.
           </p>
         } @else {
+          @if (s.thisMonth) {
+            <p bitTypography="body2" class="tw-mt-4" data-testid="msp-seats-through">
+              So far, through {{ day(s.through) }}.
+            </p>
+          }
           <bit-table class="tw-mt-4">
             <ng-container header>
               <tr>
                 <th bitCell>Client</th>
-                <th bitCell>Most on any day</th>
-                <th bitCell>Average</th>
+                <th bitCell>Seat-days</th>
+                <th bitCell>Prorated seats</th>
+                <th bitCell>Peak</th>
                 @if (s.thisMonth) {
                   <th bitCell>Today</th>
                 }
@@ -78,8 +89,9 @@ import {
                       <span class="tw-text-muted"> (no longer a client)</span>
                     }
                   </td>
-                  <td bitCell data-testid="msp-seats-most">{{ c.most }}</td>
-                  <td bitCell data-testid="msp-seats-average">{{ average(c.average) }}</td>
+                  <td bitCell data-testid="msp-seats-seat-days">{{ c.seatDays }}</td>
+                  <td bitCell data-testid="msp-seats-prorated">{{ prorated(c.prorated) }}</td>
+                  <td bitCell data-testid="msp-seats-peak">{{ c.most }}</td>
                   @if (s.thisMonth) {
                     <td bitCell data-testid="msp-seats-today">{{ c.today ?? "-" }}</td>
                   }
@@ -87,8 +99,9 @@ import {
               }
               <tr bitRow class="tw-font-semibold" data-testid="msp-seats-total">
                 <td bitCell>Total</td>
-                <td bitCell data-testid="msp-seats-most">{{ s.totals.most }}</td>
-                <td bitCell data-testid="msp-seats-average">{{ average(s.totals.average) }}</td>
+                <td bitCell data-testid="msp-seats-seat-days">{{ s.totals.seatDays }}</td>
+                <td bitCell data-testid="msp-seats-prorated">{{ prorated(s.totals.prorated) }}</td>
+                <td bitCell data-testid="msp-seats-peak">{{ s.totals.most }}</td>
                 @if (s.thisMonth) {
                   <td bitCell data-testid="msp-seats-today">{{ s.totals.today ?? 0 }}</td>
                 }
@@ -109,7 +122,9 @@ export class KeykeeperMspSeatsComponent {
   protected readonly month = new FormControl("", { nonNullable: true });
   protected readonly whatCounts = WHAT_COUNTS;
   protected readonly label = monthLabel;
-  protected readonly average = averageText;
+  protected readonly day = dayLabel;
+  protected readonly billed = howBilled;
+  protected readonly prorated = proratedText;
 
   constructor(
     private readonly apiService: ApiService,

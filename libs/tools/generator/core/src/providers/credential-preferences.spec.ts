@@ -41,6 +41,47 @@ describe("PREFERENCES", () => {
       });
     });
 
+    // Keykeeper: the generator opens on the kind chosen last, so the kinds
+    // nobody chose can't look chosen, however the clock ticks meanwhile.
+    describe("with a clock that ticks between each kind", () => {
+      const RealDate = Date;
+      beforeEach(() => {
+        let now = 1_000;
+        global.Date = class extends RealDate {
+          constructor(...args: unknown[]) {
+            if (args.length === 0) {
+              super(now++);
+            } else {
+              super(...(args as [number]));
+            }
+          }
+        } as DateConstructor;
+      });
+      afterEach(() => {
+        global.Date = RealDate;
+      });
+
+      it("counts none of them as chosen", () => {
+        const result = PREFERENCES.deserializer(null!);
+
+        expect(result?.password.updated.getTime()).toBe(0);
+        expect(result?.username.updated.getTime()).toBe(0);
+        expect(result?.email.updated.getTime()).toBe(0);
+      });
+
+      it("counts a missing kind as chosen before the others", () => {
+        const input: any = structuredClone(SomeCredentialPreferences);
+        input.email.updated = 100;
+        input.password.updated = 200;
+        delete input.username;
+
+        const result = PREFERENCES.deserializer(input);
+
+        expect(result?.username.updated.getTime()).toBe(0);
+        expect(result?.password.updated.getTime()).toBe(200);
+      });
+    });
+
     it("fills missing password preferences", () => {
       const input: any = structuredClone(SomeCredentialPreferences);
       delete input.password;

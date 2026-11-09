@@ -3,10 +3,12 @@ import { mock } from "jest-mock-extended";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 
 import {
-  averageText,
+  dayLabel,
   getMspSeats,
   getMspSeatsCsv,
+  howBilled,
   monthLabel,
+  proratedText,
   seatsCsvFile,
   WHAT_COUNTS,
 } from "./msp-seats";
@@ -30,17 +32,29 @@ describe("MSP seats", () => {
     expect(seatsCsvFile("\uFEFFMonth,Client\r\n")).toBe("\uFEFFMonth,Client\r\n");
   });
 
-  it("names months and shows averages with one decimal", () => {
+  it("names months and days, and shows prorated seats with two decimals", () => {
     expect(monthLabel("2026-11")).toMatch(/November.*2026|2026.*November/);
     expect(monthLabel("2027-01")).toMatch(/January.*2027|2027.*January/);
+    expect(monthLabel("2026-11", "month")).toMatch(/November/);
+    expect(monthLabel("2026-11", "month")).not.toMatch(/2026/);
     expect(monthLabel("not a month")).toBe("not a month");
-    expect(averageText(4)).toBe("4.0");
-    expect(averageText(4.7)).toBe("4.7");
-    expect(averageText(0.3)).toBe("0.3");
+    expect(dayLabel("2026-11-08")).toMatch(/November.*8|8.*November/);
+    expect(dayLabel("2028-02-29")).toMatch(/February.*29|29.*February/);
+    expect(dayLabel("not a day")).toBe("not a day");
+    expect(proratedText(10.37)).toBe("10.37");
+    expect(proratedText(2)).toBe("2.00");
+    expect(proratedText(0.07)).toBe("0.07");
+    expect(proratedText(0.1)).toBe("0.10");
   });
 
-  it("says what counts in the site's words", () => {
+  it("says what counts in the site's words, and how a month is billed with its own days", () => {
     expect(WHAT_COUNTS).toContain("People who've been invited but haven't joined don't count");
     expect(WHAT_COUNTS).toContain("neither do your staff");
+    expect(WHAT_COUNTS).toContain("counted at the end of each day (UTC)");
+    const november = howBilled({ month: "2026-11", daysInMonth: 30 });
+    expect(november).toMatch(/divided by the 30 days in November,/);
+    expect(november).toContain("a seat added late in the month counts only for its days");
+    expect(november).toContain("Peak is the most seats on any day, for reference.");
+    expect(howBilled({ month: "2028-02", daysInMonth: 29 })).toMatch(/the 29 days in February,/);
   });
 });

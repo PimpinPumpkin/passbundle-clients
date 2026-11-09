@@ -109,6 +109,7 @@ import { DefaultBillingAccountProfileStateService } from "@bitwarden/common/bill
 import {
   EventUploadService as EventUploadServiceAbstraction,
   EventCollectionService as EventCollectionServiceAbstraction,
+  EventType,
 } from "@bitwarden/common/dirt/event-logs";
 import { EventCollectionService } from "@bitwarden/common/dirt/event-logs/services/event-collection.service";
 import { EventUploadService } from "@bitwarden/common/dirt/event-logs/services/event-upload.service";
@@ -245,6 +246,7 @@ import { SearchService as SearchServiceAbstraction } from "@bitwarden/common/vau
 import { TotpService as TotpServiceAbstraction } from "@bitwarden/common/vault/abstractions/totp.service";
 import { VaultSettingsService as VaultSettingsServiceAbstraction } from "@bitwarden/common/vault/abstractions/vault-settings/vault-settings.service";
 import { CipherRepromptType, ExtensionPageUrls } from "@bitwarden/common/vault/enums";
+import { allowedIn } from "@bitwarden/common/vault/keykeeper/password-change";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
   DefaultEndUserNotificationService,
@@ -2019,6 +2021,12 @@ export default class MainBackground {
           }),
         ),
       t: (key, ...substitutions) => this.i18nService.t(key, ...substitutions),
+      // Organizations allow it unless they turned it off, as the person's sync says.
+      organizationsAllowing: async (userId) =>
+        allowedIn(await firstValueFrom(this.organizationService.organizations$(userId))),
+      // Upstream's client events, sent at once: the organization's log says how it changed.
+      collectEvent: (type, cipherId, organizationId) =>
+        this.eventCollectionService.collect(type as EventType, cipherId, true, organizationId),
       logError: (error) => this.logService.error(error),
     });
     this.keykeeperPasswordChange.init();

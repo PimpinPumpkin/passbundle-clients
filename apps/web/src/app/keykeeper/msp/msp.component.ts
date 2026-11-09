@@ -85,6 +85,7 @@ import { KeykeeperMspSiteFixesComponent } from "./msp-site-fixes.component";
 import { KeykeeperMspTemplatesComponent } from "./msp-templates.component";
 import { KeykeeperMspTwoStepComponent } from "./msp-two-step.component";
 import { KeykeeperMspWorkService } from "./msp-work.service";
+import { withPasswordChangeOff } from "./password-change-policy";
 import { DEFAULT_ACCESS, describeAccess, reachesEveryClient } from "./technician-access";
 import { KeykeeperTechnicianAccessEditorComponent } from "./technician-access-editor.component";
 
@@ -1560,8 +1561,11 @@ export class KeykeeperMspComponent implements OnInit {
           definitions.push(definition);
         }
       }
-      // Keykeeper: and two-step login for each client's admins.
-      this.policyDefinitions.set(withAdminTwoStep(definitions, policies.types));
+      // Keykeeper: and two-step login for each client's admins, and turning off
+      // assisted password change.
+      this.policyDefinitions.set(
+        withPasswordChangeOff(withAdminTwoStep(definitions, policies.types), policies.types),
+      );
     }
     this.policies.set(policies);
   }
