@@ -1114,6 +1114,186 @@
   "keykeeperFolderLookHint": {
     "message": "Everyone who has this folder sees its icon. It's encrypted, like the folder's name."
   },
+  "keykeeperNewDeviceTitle": {
+    "message": "Approve this sign-in"
+  },
+  "keykeeperNewDeviceSubtitle": {
+    "message": "This device is new to your account."
+  },
+  "keykeeperNewDeviceTypeThis": {
+    "message": "On a device where you're already signed in, open your vault and type this number:"
+  },
+  "keykeeperNewDeviceNumberLabel": {
+    "message": "The number to type: $NUMBER$",
+    "placeholders": {
+      "number": {
+        "content": "$1",
+        "example": "47"
+      }
+    }
+  },
+  "keykeeperNewDeviceWaiting": {
+    "message": "Waiting for approval. This works for 10 minutes."
+  },
+  "keykeeperNewDeviceFinishing": {
+    "message": "Approved. Signing you in..."
+  },
+  "keykeeperNewDeviceNoApprovers": {
+    "message": "None of your devices can approve this sign-in right now, so we can email you a code instead."
+  },
+  "keykeeperNewDeviceEmailMe": {
+    "message": "Email me a code"
+  },
+  "keykeeperNewDeviceCodeSent": {
+    "message": "We sent a code to $EMAIL$.",
+    "placeholders": {
+      "email": {
+        "content": "$1",
+        "example": "a***@example.com"
+      }
+    }
+  },
+  "keykeeperNewDeviceCodeLabel": {
+    "message": "Code from the email"
+  },
+  "keykeeperNewDeviceSendAnother": {
+    "message": "Send another code"
+  },
+  "keykeeperNewDeviceEmailWeaker": {
+    "message": "A code by email is less safe than approving from your own device: anyone who can read your email could use it. Two-step login is safer than both."
+  },
+  "keykeeperNewDeviceCantReach": {
+    "message": "Can't use your other devices?"
+  },
+  "keykeeperNewDeviceLaterExplained": {
+    "message": "We can email you a code instead, but only after 24 hours. Your devices and your email are told now, so if this isn't you, it can be denied. Come back after that and sign in on this device again to get the code."
+  },
+  "keykeeperNewDeviceEmailLater": {
+    "message": "Email me a code in 24 hours"
+  },
+  "keykeeperNewDeviceLaterAsked": {
+    "message": "A code by email can be sent after $TIME$. Sign in again on this device then to get it.",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "Nov 9, 2026, 3:12 PM"
+      }
+    }
+  },
+  "keykeeperNewDeviceDenied": {
+    "message": "Sign-in denied"
+  },
+  "keykeeperNewDeviceDeniedNumber": {
+    "message": "The number typed on your other device didn't match, so this sign-in was denied. Start over to get a new number."
+  },
+  "keykeeperNewDeviceDeniedThere": {
+    "message": "This sign-in was denied from one of your devices."
+  },
+  "keykeeperNewDeviceEnded": {
+    "message": "This sign-in has ended. Start over to sign in again."
+  },
+  "keykeeperNewDeviceStartOver": {
+    "message": "Start over"
+  },
+  "keykeeperApproveSignInTitle": {
+    "message": "Approve this sign-in?"
+  },
+  "keykeeperApproveSignInIntro": {
+    "message": "Someone is signing in to $EMAIL$ on a new device. Approve only if it's you, on a device in front of you.",
+    "placeholders": {
+      "email": {
+        "content": "$1",
+        "example": "ana@example.com"
+      }
+    }
+  },
+  "keykeeperApproveSignInDevice": {
+    "message": "Device"
+  },
+  "keykeeperApproveSignInWhere": {
+    "message": "Where"
+  },
+  "keykeeperApproveSignInUnknownLocation": {
+    "message": "Unknown location"
+  },
+  "keykeeperApproveSignInWhen": {
+    "message": "When"
+  },
+  "keykeeperApproveSignInNumberLabel": {
+    "message": "Number shown on the new device"
+  },
+  "keykeeperApproveSignInNumberHint": {
+    "message": "Two digits. A wrong number denies the sign-in."
+  },
+  "keykeeperApproveSignInNumberNeeded": {
+    "message": "Type the two-digit number shown on the new device."
+  },
+  "keykeeperApproveSignInApprove": {
+    "message": "Approve"
+  },
+  "keykeeperApproveSignInDeny": {
+    "message": "Deny"
+  },
+  "keykeeperApproveSignInNotNow": {
+    "message": "Not now"
+  },
+  "keykeeperApproveSignInApproved": {
+    "message": "Sign-in approved"
+  },
+  "keykeeperApproveSignInWrongNumber": {
+    "message": "That number didn't match, so the sign-in was denied."
+  },
+  "keykeeperApproveSignInDenied": {
+    "message": "Sign-in denied"
+  },
+  "keykeeperApproveSignInGone": {
+    "message": "That sign-in has ended or was answered on another device."
+  },
+  "keykeeperApproveSignInEmailLater": {
+    "message": "They asked for a code by email instead, which can be sent after $TIME$. Deny it if this isn't you.",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "Nov 9, 2026, 3:12 PM"
+      }
+    }
+  },
+  "keykeeperNewDeviceCheckStartedEvent": {
+    "message": "Signed in on a new device, waiting for approval: $DEVICE$.",
+    "placeholders": {
+      "device": {
+        "content": "$1",
+        "example": "Web vault in Firefox"
+      }
+    }
+  },
+  "keykeeperNewDeviceApprovedEvent": {
+    "message": "Approved a sign-in on a new device: $DETAIL$.",
+    "placeholders": {
+      "detail": {
+        "content": "$1",
+        "example": "Web vault in Firefox, from 203.0.113.7"
+      }
+    }
+  },
+  "keykeeperNewDeviceDeniedEvent": {
+    "message": "Denied a sign-in on a new device: $DETAIL$.",
+    "placeholders": {
+      "detail": {
+        "content": "$1",
+        "example": "Web vault in Firefox, from 203.0.113.7: a wrong number"
+      }
+    }
+  },
+  "keykeeperNewDeviceEmailLaterEvent": {
+    "message": "Asked for a code by email to sign in on a new device: $DEVICE$.",
+    "placeholders": {
+      "device": {
+        "content": "$1",
+        "example": "Web vault in Firefox"
+      }
+    }
+  },
   "keykeeperPasswordChangeConfirmTitle": {
     "message": "Change the password on $SITE$?",
     "placeholders": {

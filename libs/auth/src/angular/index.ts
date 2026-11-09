@@ -58,6 +58,7 @@ export * from "./two-factor-auth";
 export * from "./new-device-verification/new-device-verification.component";
 export * from "./new-device-verification/new-device-verification-component.service";
 export * from "./new-device-verification/default-new-device-verification-component.service";
+export * from "./new-device-verification/keykeeper-new-device-check.component";
 
 // validators
 export * from "./validators/compare-inputs.validator";

@@ -3,6 +3,7 @@
 import { Utils } from "../../../platform/misc/utils";
 import { UserId } from "../../../types/guid";
 import { TwoFactorProviderType } from "../../enums/two-factor-provider-type";
+import { KeykeeperNewDeviceCheck } from "../../keykeeper/new-device-check";
 
 export class AuthResult {
   userId: UserId;
@@ -26,6 +27,11 @@ export class AuthResult {
     email: string | null;
     masterPasswordHash: string | null;
   } | null;
+  /**
+   * Keykeeper: the new-device check this sign-in waits for, when it's held
+   * because the device is new to an account without two-step login.
+   */
+  keykeeperNewDeviceCheck?: KeykeeperNewDeviceCheck | null;
   // The master-password used in the authentication process
   // TODO: PM-44095 - Change to `masterPassword?: string` (prefer optional if truly optional). The
   // `masterPassword` parameter of LoginSuccessHandlerService.run and of

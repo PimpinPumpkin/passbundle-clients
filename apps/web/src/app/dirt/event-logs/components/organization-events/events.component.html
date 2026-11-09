@@ -118,6 +118,15 @@
               </td>
               <td bitCell>
                 <span title="{{ e.appName }}, {{ e.ip }}">{{ e.appName }}</span>
+                @if (e.keykeeperLocation) {
+                  <div
+                    class="tw-text-xs tw-text-muted"
+                    title="{{ e.ip }}"
+                    data-testid="keykeeper-event-location"
+                  >
+                    {{ e.keykeeperLocation }}
+                  </div>
+                }
               </td>
               <td bitCell>
                 @if (isSendAccessMemberLink(e)) {
@@ -136,6 +145,15 @@
           }
         </ng-template>
       </bit-table>
+      @if (keykeeperLocationSource(); as source) {
+        <p class="tw-text-xs tw-text-muted tw-mt-2" data-testid="keykeeper-event-location-source">
+          @if (source.url) {
+            <a bitLink [href]="source.url" target="_blank" rel="noreferrer">{{ source.name }}</a>
+          } @else {
+            {{ source.name }}
+          }
+        </p>
+      }
     }
     @if (continuationToken) {
       <button type="button" bitButton buttonType="primary" [bitAction]="loadMoreEvents">
