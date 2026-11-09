@@ -67,6 +67,7 @@ describe("ORGANIZATIONS state", () => {
         ssoMemberDecryptionType: undefined,
         useDisableSMAdsForUsers: false,
         usePhishingBlocker: false,
+        keykeeperPasswordChange: true,
         useMyItems: false,
         useInviteLinks: false,
       },

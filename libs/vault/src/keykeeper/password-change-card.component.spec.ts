@@ -3,6 +3,7 @@ import { mock, MockProxy } from "jest-mock-extended";
 import { of } from "rxjs";
 
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import { EventCollectionService, EventType } from "@bitwarden/common/dirt/event-logs";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { UserId } from "@bitwarden/common/types/guid";
@@ -53,6 +54,7 @@ describe("KeykeeperPasswordChangeCardComponent", () => {
   let cipherService: MockProxy<CipherService>;
   let toastService: MockProxy<ToastService>;
   let changeService: MockProxy<KeykeeperPasswordChangeService>;
+  let events: MockProxy<EventCollectionService>;
   let saved: CipherView[];
 
   async function render(item: CipherView | null, withService = false) {
@@ -70,6 +72,7 @@ describe("KeykeeperPasswordChangeCardComponent", () => {
         },
         { provide: LogService, useValue: mock<LogService>() },
         { provide: ToastService, useValue: toastService },
+        { provide: EventCollectionService, useValue: events },
         ...(withService
           ? [{ provide: KeykeeperPasswordChangeService, useValue: changeService }]
           : []),
@@ -96,6 +99,8 @@ describe("KeykeeperPasswordChangeCardComponent", () => {
     toastService = mock<ToastService>();
     changeService = mock<KeykeeperPasswordChangeService>();
     changeService.status.mockResolvedValue(null);
+    events = mock<EventCollectionService>();
+    events.collect.mockResolvedValue(undefined);
     saved = [];
   });
 
@@ -124,6 +129,27 @@ describe("KeykeeperPasswordChangeCardComponent", () => {
     expect(saved).toHaveLength(1);
   });
 
+  it("tells an organization's event log when the old password comes back", async () => {
+    const shared = changedItem("refused");
+    shared.organizationId = "org-1";
+    await render(shared);
+    button("put-back")!.click();
+    await fixture.whenStable();
+    expect(events.collect).toHaveBeenCalledWith(
+      EventType.Keykeeper_CipherPasswordPutBack,
+      "item-1",
+      true,
+      "org-1",
+    );
+  });
+
+  it("sends no event for a personal item", async () => {
+    await render(changedItem("refused"));
+    button("put-back")!.click();
+    await fixture.whenStable();
+    expect(events.collect).not.toHaveBeenCalled();
+  });
+
   it("keeps the new password when it worked, taking the marker off", async () => {
     await render(changedItem());
     button("it-worked")!.click();
@@ -133,11 +159,14 @@ describe("KeykeeperPasswordChangeCardComponent", () => {
     expect(readPasswordChangeMarker(draft)).toBeNull();
   });
 
-  it("says so when the save fails, and keeps the card", async () => {
+  it("says so when the save fails, and keeps the card, sending no event", async () => {
     cipherService.updateWithServer.mockRejectedValue(new Error("stale"));
-    await render(changedItem());
+    const shared = changedItem();
+    shared.organizationId = "org-1";
+    await render(shared);
     button("put-back")!.click();
     await fixture.whenStable();
+    expect(events.collect).not.toHaveBeenCalled();
     expect(toastService.showToast).toHaveBeenCalledWith(
       expect.objectContaining({ variant: "error", message: "keykeeperPasswordChangeSaveFailed" }),
     );

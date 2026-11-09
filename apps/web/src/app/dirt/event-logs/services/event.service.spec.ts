@@ -522,3 +522,41 @@ describe("EventService ServiceAccount people events", () => {
     expect(info.message).toContain(grantedMemberId.substring(0, 8));
   });
 });
+
+// Keykeeper: assisted password change (DESIGN.md, "Assisted password change", "Activity").
+describe("EventService assisted password change events", () => {
+  let sut: EventService;
+  const i18n = mock<I18nService>();
+  i18n.t.mockImplementation((id: string, p1?: string) => `${id}:${p1 ?? ""}`);
+
+  beforeEach(() => {
+    const policyService = mock<PolicyService>();
+    policyService.policies$.mockReturnValue(of([]));
+    const accountService = mock<AccountService>();
+    (accountService as any).activeAccount$ = of({ id: "user-id" });
+    const configService = mock<ConfigService>();
+    configService.getFeatureFlag.mockResolvedValue(false);
+    sut = new EventService(i18n, policyService, accountService, configService);
+  });
+
+  const itemEvent = (type: EventType) =>
+    ({ type, cipherId: "cipher-1234-5678", organizationId: "org" }) as EventResponse;
+
+  it("says a password changed on its website, and an earlier one put back, by item", async () => {
+    const changed = await sut.getEventInfo(itemEvent(EventType.Keykeeper_CipherPasswordChanged));
+    expect(changed.humanReadableMessage).toBe("keykeeperPasswordChangedItemId:cipher-1");
+    const putBack = await sut.getEventInfo(itemEvent(EventType.Keykeeper_CipherPasswordPutBack));
+    expect(putBack.humanReadableMessage).toBe("keykeeperPasswordPutBackItemId:cipher-1");
+  });
+
+  it("says the organization turned it on or off", async () => {
+    const on = await sut.getEventInfo({
+      type: EventType.Keykeeper_PasswordChangeOn,
+    } as EventResponse);
+    expect(on.message).toBe("keykeeperPasswordChangeOnEvent:");
+    const off = await sut.getEventInfo({
+      type: EventType.Keykeeper_PasswordChangeOff,
+    } as EventResponse);
+    expect(off.message).toBe("keykeeperPasswordChangeOffEvent:");
+  });
+});

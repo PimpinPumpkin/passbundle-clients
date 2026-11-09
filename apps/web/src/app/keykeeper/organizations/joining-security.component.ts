@@ -10,19 +10,20 @@ import { KeykeeperOrgJoiningComponent } from "../joining/org-joining.component";
 import { KeykeeperAdminTwoStepComponent } from "./admin-two-step.component";
 import { KeykeeperMemberHealthSettingComponent } from "./member-health-setting.component";
 import { KeykeeperOrgInstallComponent } from "./org-install.component";
+import { KeykeeperPasswordChangeSettingComponent } from "./password-change-setting.component";
 import { KeykeeperScriptAccessComponent } from "./script-access.component";
 
 /**
  * Keykeeper: an organization's "Joining and security" page, under Settings,
  * for its owners and admins: two-step login for admins, how people join, the
- * install command, script access, and Members' own passwords. Organization
- * info, where these were, is upstream's owners-only page, and it loads an
- * owners-only endpoint, so a company's own IT admin couldn't reach them
- * there. Each card asks the server for its own part and stays hidden when the
- * server says "not found", so this page shows a person exactly what the
- * server lets them have: for an MSP's technician who is an admin in a client,
- * Joining and which IT provider manages the install command, not the rest.
- * See DESIGN.md, "A company's own IT".
+ * install command, script access, assisted password change, and Members' own
+ * passwords. Organization info, where these were, is upstream's owners-only
+ * page, and it loads an owners-only endpoint, so a company's own IT admin
+ * couldn't reach them there. Each card asks the server for its own part and
+ * stays hidden when the server says "not found", so this page shows a person
+ * exactly what the server lets them have: for an MSP's technician who is an
+ * admin in a client, Joining and which IT provider manages the install
+ * command, not the rest. See DESIGN.md, "A company's own IT".
  */
 @Component({
   selector: "app-keykeeper-joining-security",
@@ -34,6 +35,7 @@ import { KeykeeperScriptAccessComponent } from "./script-access.component";
     KeykeeperMemberHealthSettingComponent,
     KeykeeperOrgJoiningComponent,
     KeykeeperOrgInstallComponent,
+    KeykeeperPasswordChangeSettingComponent,
     KeykeeperScriptAccessComponent,
   ],
   template: `
@@ -46,6 +48,7 @@ import { KeykeeperScriptAccessComponent } from "./script-access.component";
           <app-keykeeper-org-joining [organizationId]="id" />
           <app-keykeeper-org-install [organizationId]="id" />
           <app-keykeeper-script-access [organizationId]="id" />
+          <app-keykeeper-password-change-setting [organizationId]="id" />
           <app-keykeeper-member-health-setting [organizationId]="id" />
         </div>
       }

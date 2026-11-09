@@ -31,6 +31,7 @@ import {
   MspTwoStep,
   OrgAdminTwoStep,
   OrgMemberHealthSetting,
+  OrgPasswordChange,
   MspRole,
   MspSiteFixes,
   MspSummary,
@@ -576,6 +577,31 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
       "GET",
       `/keykeeper/organizations/${orgId}/admin-two-step`,
       null,
+      true,
+      true,
+    );
+  }
+
+  /**
+   * Whether the organization allows assisted password change on its items.
+   * Owners and admins (and the MSP's admins) only; anyone else gets "not found".
+   */
+  async getOrgPasswordChange(orgId: string): Promise<OrgPasswordChange> {
+    return this.apiService.send(
+      "GET",
+      `/keykeeper/organizations/${orgId}/password-change`,
+      null,
+      true,
+      true,
+    );
+  }
+
+  /** Allows it, or turns it off. It needs no proof: it lets nobody in. */
+  async setOrgPasswordChange(orgId: string, allowed: boolean): Promise<OrgPasswordChange> {
+    return this.apiService.send(
+      "PUT",
+      `/keykeeper/organizations/${orgId}/password-change`,
+      { allowed },
       true,
       true,
     );

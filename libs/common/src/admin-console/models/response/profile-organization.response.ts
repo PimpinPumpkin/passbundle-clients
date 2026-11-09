@@ -65,6 +65,8 @@ export class ProfileOrganizationResponse extends BaseResponse {
   ssoEnabled: boolean;
   ssoMemberDecryptionType?: MemberDecryptionType;
   usePhishingBlocker: boolean;
+  /** Keykeeper: whether the browser extension may change its items' passwords on their sites. */
+  keykeeperPasswordChange: boolean;
   useMyItems: boolean;
   useInviteLinks: boolean;
 
@@ -143,6 +145,8 @@ export class ProfileOrganizationResponse extends BaseResponse {
     this.ssoEnabled = this.getResponseProperty("SsoEnabled") ?? false;
     this.ssoMemberDecryptionType = this.getResponseProperty("SsoMemberDecryptionType");
     this.usePhishingBlocker = this.getResponseProperty("UsePhishingBlocker") ?? false;
+    // Keykeeper: a server that doesn't say doesn't allow it (DESIGN.md, "Assisted password change").
+    this.keykeeperPasswordChange = this.getResponseProperty("KeykeeperPasswordChange") === true;
     this.useMyItems = this.getResponseProperty("UseMyItems") ?? false;
     this.useInviteLinks = this.getResponseProperty("UseInviteLinks") ?? false;
   }

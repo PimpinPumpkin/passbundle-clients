@@ -16,8 +16,12 @@ export const PREFERENCES = new UserKeyDefinition<CredentialPreference>(
         if (result[type]) {
           result[type].updated = new Date(result[type].updated);
         } else {
+          // Keykeeper: a kind never chosen counts as chosen before any other.
+          // The generator opens on the kind chosen last, so a time per kind,
+          // taken one after another, opened it on Username whenever the clock
+          // ticked between them.
           const [algorithm] = AlgorithmsByType[type];
-          result[type] = { algorithm, updated: new Date() };
+          result[type] = { algorithm, updated: new Date(0) };
         }
       }
 
