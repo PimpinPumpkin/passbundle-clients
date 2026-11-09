@@ -1,0 +1,81 @@
+<bit-dialog dialogSize="small" data-testid="keykeeper-new-device-approval">
+  <span bitDialogTitle>{{ "keykeeperApproveSignInTitle" | i18n }}</span>
+
+  <ng-container bitDialogContent>
+    <p>{{ "keykeeperApproveSignInIntro" | i18n: data.email }}</p>
+    <dl class="tw-mb-3">
+      <dt class="tw-font-medium">{{ "keykeeperApproveSignInDevice" | i18n }}</dt>
+      <dd class="tw-mb-2" data-testid="keykeeper-new-device-approval-device">
+        {{ data.request.device }}
+      </dd>
+      <dt class="tw-font-medium">{{ "keykeeperApproveSignInWhere" | i18n }}</dt>
+      <dd class="tw-mb-2" data-testid="keykeeper-new-device-approval-where">
+        {{ data.request.location ?? ("keykeeperApproveSignInUnknownLocation" | i18n) }}
+        <span class="tw-text-muted">({{ data.request.ipAddress }})</span>
+      </dd>
+      <dt class="tw-font-medium">{{ "keykeeperApproveSignInWhen" | i18n }}</dt>
+      <dd class="tw-mb-2">{{ when(data.request.creationDate) }}</dd>
+    </dl>
+
+    @if (data.request.emailAfter) {
+      <p class="tw-text-sm" data-testid="keykeeper-new-device-approval-email-later">
+        {{ "keykeeperApproveSignInEmailLater" | i18n: when(data.request.emailAfter) }}
+      </p>
+    }
+
+    <form [formGroup]="form" [bitSubmit]="approve">
+      <bit-form-field>
+        <bit-label>{{ "keykeeperApproveSignInNumberLabel" | i18n }}</bit-label>
+        <input
+          bitInput
+          type="text"
+          inputmode="numeric"
+          maxlength="2"
+          autocomplete="off"
+          formControlName="number"
+          appInputVerbatim
+          data-testid="keykeeper-new-device-approval-number"
+        />
+        <bit-hint>{{ "keykeeperApproveSignInNumberHint" | i18n }}</bit-hint>
+      </bit-form-field>
+    </form>
+
+    @if (error) {
+      <p class="tw-text-danger tw-text-sm" role="alert">{{ error }}</p>
+    }
+
+    @if (data.source && data.request.location) {
+      <p class="tw-text-xs tw-text-muted tw-mb-0">
+        @if (data.source.url) {
+          <a bitLink [href]="data.source.url" target="_blank" rel="noreferrer">{{ data.source.name }}</a>
+        } @else {
+          {{ data.source.name }}
+        }
+      </p>
+    }
+  </ng-container>
+
+  <ng-container bitDialogFooter>
+    <button
+      bitButton
+      type="button"
+      buttonType="primary"
+      [bitAction]="approve"
+      data-testid="keykeeper-new-device-approval-approve"
+    >
+      {{ "keykeeperApproveSignInApprove" | i18n }}
+    </button>
+    <button
+      bitButton
+      type="button"
+      buttonType="danger"
+      [bitAction]="deny"
+      data-testid="keykeeper-new-device-approval-deny"
+    >
+      {{ "keykeeperApproveSignInDeny" | i18n }}
+    </button>
+    <button bitButton type="button" buttonType="secondary" (click)="later()">
+      {{ "keykeeperApproveSignInNotNow" | i18n }}
+    </button>
+  </ng-container>
+</bit-dialog>

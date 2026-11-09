@@ -332,6 +332,8 @@ export class EntityEventsComponent implements OnInit, OnDestroy {
           installationId: r.installationId,
           systemUser: r.systemUser,
           serviceAccountId: r.serviceAccountId,
+          keykeeperLocation: r.keykeeperLocation,
+          keykeeperLocationSource: r.keykeeperLocationSource,
         });
       }),
     );

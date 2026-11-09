@@ -21,7 +21,6 @@ import { canAccessFeature } from "@bitwarden/angular/platform/guard/feature-flag
 import {
   DevicesIcon,
   ExpiredIcon,
-  EmailCodeSentIcon,
   UserLockIcon,
   VaultIcon,
   LockIcon,
@@ -31,7 +30,7 @@ import {
   LoginComponent,
   LoginDecryptionOptionsComponent,
   LoginViaAuthRequestComponent,
-  NewDeviceVerificationComponent,
+  KeykeeperNewDeviceCheckComponent,
   PasswordHintComponent,
   RegistrationFinishComponent,
   RegistrationStartComponent,
@@ -207,14 +206,16 @@ const routes: Routes = [
     path: AuthRoute.NewDeviceVerification,
     component: ExtensionAnonLayoutWrapperComponent,
     canActivate: [unauthGuardFn(), activeAuthGuard()],
-    children: [{ path: "", component: NewDeviceVerificationComponent }],
+    // Keykeeper: the new-device check's waiting page, in place of upstream's
+    // emailed code (DESIGN.md, "New-device check").
+    children: [{ path: "", component: KeykeeperNewDeviceCheckComponent }],
     data: {
-      pageIcon: EmailCodeSentIcon,
+      pageIcon: DevicesIcon,
       pageTitle: {
-        key: "verifyYourIdentity",
+        key: "keykeeperNewDeviceTitle",
       },
       pageSubtitle: {
-        key: "weDontRecognizeThisDevice",
+        key: "keykeeperNewDeviceSubtitle",
       },
       showBackButton: true,
       elevation: 1,

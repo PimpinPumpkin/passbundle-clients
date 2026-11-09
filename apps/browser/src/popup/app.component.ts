@@ -23,6 +23,7 @@ import {
   tap,
 } from "rxjs";
 
+import { KeykeeperNewDeviceApprovalsService } from "@bitwarden/angular/auth/keykeeper/new-device-approval/new-device-approvals.service";
 import { LoginApprovalDialogComponent } from "@bitwarden/angular/auth/login-approval/login-approval-dialog.component";
 import { DeviceTrustToastService } from "@bitwarden/angular/auth/services/device-trust-toast.service.abstraction";
 import { DocumentLangSetter } from "@bitwarden/angular/platform/i18n";
@@ -75,6 +76,7 @@ import { routerTransition } from "./app-routing.animations";
 export class AppComponent implements OnInit, OnDestroy {
   private compactModeService = inject(PopupCompactModeService);
   private sdkService = inject(SdkService);
+  private keykeeperNewDeviceApprovals = inject(KeykeeperNewDeviceApprovalsService);
 
   private lastActivity: Date;
   private activeUserId: UserId;
@@ -139,6 +141,9 @@ export class AppComponent implements OnInit, OnDestroy {
     window.addEventListener("focus", this.onWindowFocus);
 
     this.authRequestAnsweringService.setupUnlockListenersForProcessingAuthRequests(this.destroy$);
+    // Keykeeper: prompts for the account's sign-ins on new devices, while
+    // the popup is open and unlocked (DESIGN.md, "New-device check").
+    this.keykeeperNewDeviceApprovals.start();
 
     this.authService.activeAccountStatus$
       .pipe(

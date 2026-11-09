@@ -21,7 +21,6 @@ import {
   DevicesIcon,
   RegistrationUserAddIcon,
   ExpiredIcon,
-  EmailCodeSentIcon,
   SecurityKeyIcon,
   UserLockIcon,
   VaultIcon,
@@ -48,7 +47,7 @@ import {
   LoginDecryptionOptionsComponent,
   TwoFactorAuthComponent,
   TwoFactorAuthGuard,
-  NewDeviceVerificationComponent,
+  KeykeeperNewDeviceCheckComponent,
 } from "@bitwarden/auth/angular";
 import { canAccessEmergencyAccess } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { PolicyType } from "@bitwarden/common/admin-console/enums";
@@ -551,16 +550,18 @@ const routes: Routes = [
         children: [
           {
             path: "",
-            component: NewDeviceVerificationComponent,
+            // Keykeeper: the new-device check's waiting page, in place of
+            // upstream's emailed code (DESIGN.md, "New-device check").
+            component: KeykeeperNewDeviceCheckComponent,
           },
         ],
         data: {
-          pageIcon: EmailCodeSentIcon,
+          pageIcon: DevicesIcon,
           pageTitle: {
-            key: "verifyYourIdentity",
+            key: "keykeeperNewDeviceTitle",
           },
           pageSubtitle: {
-            key: "weDontRecognizeThisDevice",
+            key: "keykeeperNewDeviceSubtitle",
           },
         } satisfies RouteDataProperties & AnonLayoutWrapperData,
       },

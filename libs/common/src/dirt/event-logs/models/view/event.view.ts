@@ -18,6 +18,9 @@ export class EventView {
   installationId: string;
   systemUser: EventSystemUser;
   serviceAccountId: string;
+  /** Keykeeper: roughly where the address is ("Berlin, Germany"), or null. */
+  keykeeperLocation: string | null;
+  keykeeperLocationSource: { name: string; url: string | null } | null;
 
   constructor(data: Required<EventView>) {
     this.message = data.message;
@@ -34,5 +37,7 @@ export class EventView {
     this.installationId = data.installationId;
     this.systemUser = data.systemUser;
     this.serviceAccountId = data.serviceAccountId;
+    this.keykeeperLocation = data.keykeeperLocation;
+    this.keykeeperLocationSource = data.keykeeperLocationSource;
   }
 }

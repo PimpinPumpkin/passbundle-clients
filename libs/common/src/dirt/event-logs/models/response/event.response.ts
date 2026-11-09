@@ -29,6 +29,14 @@ export class EventResponse extends BaseResponse {
   sendId: string;
   /** Keykeeper: the event's subject in words, such as why a single sign-on was refused. */
   keykeeperDetail: string;
+  /**
+   * Keykeeper: roughly where the address is, which the server works out from
+   * its own database file when it answers, or null (DESIGN.md, "New-device
+   * check").
+   */
+  keykeeperLocation: string | null;
+  /** Keykeeper: who to credit for that location, as its database's license asks. */
+  keykeeperLocationSource: { name: string; url: string | null } | null;
 
   constructor(response: any) {
     super(response);
@@ -56,5 +64,9 @@ export class EventResponse extends BaseResponse {
     this.grantedServiceAccountId = this.getResponseProperty("GrantedServiceAccountId");
     this.sendId = this.getResponseProperty("SendId");
     this.keykeeperDetail = this.getResponseProperty("KeykeeperDetail");
+    this.keykeeperLocation = this.getResponseProperty("KeykeeperLocation") ?? null;
+    const source = this.getResponseProperty("KeykeeperLocationSource");
+    this.keykeeperLocationSource =
+      typeof source?.name === "string" ? { name: source.name, url: source.url ?? null } : null;
   }
 }

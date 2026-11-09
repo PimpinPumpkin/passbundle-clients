@@ -121,6 +121,47 @@ export class EventService {
       case EventType.User_TdeOffboardingPasswordSet:
         msg = humanReadableMsg = this.i18nService.t("tdeOffboardingPasswordSet");
         break;
+      // Keykeeper: the new-device check (DESIGN.md, "New-device check").
+      case EventType.Keykeeper_NewDeviceCheckStarted:
+        msg = this.i18nService.t(
+          "keykeeperNewDeviceCheckStartedEvent",
+          this.escapeHtml(ev.keykeeperDetail ?? ""),
+        );
+        humanReadableMsg = this.i18nService.t(
+          "keykeeperNewDeviceCheckStartedEvent",
+          ev.keykeeperDetail ?? "",
+        );
+        break;
+      case EventType.Keykeeper_NewDeviceApproved:
+        msg = this.i18nService.t(
+          "keykeeperNewDeviceApprovedEvent",
+          this.escapeHtml(ev.keykeeperDetail ?? ""),
+        );
+        humanReadableMsg = this.i18nService.t(
+          "keykeeperNewDeviceApprovedEvent",
+          ev.keykeeperDetail ?? "",
+        );
+        break;
+      case EventType.Keykeeper_NewDeviceDenied:
+        msg = this.i18nService.t(
+          "keykeeperNewDeviceDeniedEvent",
+          this.escapeHtml(ev.keykeeperDetail ?? ""),
+        );
+        humanReadableMsg = this.i18nService.t(
+          "keykeeperNewDeviceDeniedEvent",
+          ev.keykeeperDetail ?? "",
+        );
+        break;
+      case EventType.Keykeeper_NewDeviceEmailLater:
+        msg = this.i18nService.t(
+          "keykeeperNewDeviceEmailLaterEvent",
+          this.escapeHtml(ev.keykeeperDetail ?? ""),
+        );
+        humanReadableMsg = this.i18nService.t(
+          "keykeeperNewDeviceEmailLaterEvent",
+          ev.keykeeperDetail ?? "",
+        );
+        break;
       // Cipher
       case EventType.Cipher_Created:
         msg = this.i18nService.t("createdItemId", this.formatCipherId(ev, options));

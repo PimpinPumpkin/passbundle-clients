@@ -4,6 +4,7 @@ import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { TokenService } from "@bitwarden/common/auth/abstractions/token.service";
 import { TwoFactorProviderType } from "@bitwarden/common/auth/enums/two-factor-provider-type";
+import { keykeeperRememberNewDeviceCheck } from "@bitwarden/common/auth/keykeeper/new-device-check";
 import { AuthResult } from "@bitwarden/common/auth/models/domain/auth-result";
 import { ForceSetPasswordReason } from "@bitwarden/common/auth/models/domain/force-set-password-reason";
 import { DeviceRequest } from "@bitwarden/common/auth/models/request/identity-token/device.request";
@@ -395,6 +396,9 @@ export abstract class LoginStrategy<TData extends LoginStrategyData = LoginStrat
   ): Promise<AuthResult> {
     const result = new AuthResult();
     result.requiresDeviceVerification = true;
+    // Keykeeper: the new-device check, for the waiting page (in memory).
+    result.keykeeperNewDeviceCheck = response.keykeeperNewDeviceCheck;
+    keykeeperRememberNewDeviceCheck(response.keykeeperNewDeviceCheck);
     return result;
   }
 

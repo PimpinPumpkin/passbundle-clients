@@ -1,6 +1,7 @@
 import { Inject, Injectable, DOCUMENT, inject } from "@angular/core";
 import { firstValueFrom } from "rxjs";
 
+import { KeykeeperNewDeviceApprovalsService } from "@bitwarden/angular/auth/keykeeper/new-device-approval/new-device-approvals.service";
 import { AbstractThemingService } from "@bitwarden/angular/platform/services/theming/theming.service.abstraction";
 import { WINDOW } from "@bitwarden/angular/services/injection-tokens";
 import { AutomationDriver } from "@bitwarden/automation-driver";
@@ -42,6 +43,8 @@ export class InitService {
   private readonly keykeeperMspWork = inject(KeykeeperMspWorkService);
   // Keykeeper: a tab stays unlocked across a reload, within its timeout.
   private readonly keykeeperReloadKey = inject(KeykeeperReloadKeyService);
+  // Keykeeper: prompts for the account's sign-ins on new devices.
+  private readonly keykeeperNewDeviceApprovals = inject(KeykeeperNewDeviceApprovalsService);
   // Keykeeper: the generator's settings, and the breach check's switch,
   // follow someone to each device.
   private readonly keykeeperGeneratorSettings = new KeykeeperGeneratorSettingsSync(
@@ -122,6 +125,7 @@ export class InitService {
       this.taskService.listenForTaskNotifications();
       // Keykeeper: see KeykeeperMspWork.
       this.keykeeperMspWork.start();
+      this.keykeeperNewDeviceApprovals.start();
       this.keykeeperGeneratorSettings.start();
 
       // Opportunistic sweep of any sealed open-org-invite secrets whose TTL has expired
