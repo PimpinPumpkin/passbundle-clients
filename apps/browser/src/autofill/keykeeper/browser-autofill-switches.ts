@@ -163,7 +163,11 @@ export class KeykeeperBrowserAutofillSwitches {
       )
       .subscribe((wanted) => {
         // One change at a time, in order.
-        this.queue = this.queue.then(() => this.apply(wanted)).catch(() => {});
+        this.queue = this.queue
+          .then(async () => {
+            await this.apply(wanted);
+          })
+          .catch(() => {});
       });
   }
 
