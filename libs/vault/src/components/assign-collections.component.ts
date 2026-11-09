@@ -101,6 +101,13 @@ export interface CollectionAssignmentParams {
    * The bulk method already handles admin actions internally.
    */
   isSingleCipherAdmin?: boolean;
+
+  /**
+   * Keykeeper: a sentence shown at the top of the dialog, for when the list
+   * that opened it left some of the selected items out of `ciphers` (how many
+   * are skipped, and why).
+   */
+  notice?: string;
 }
 
 export const CollectionAssignmentResult = {

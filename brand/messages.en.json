@@ -1526,5 +1526,188 @@
   },
   "keykeeperBrowserAutofillOffPolicyDesc": {
     "message": "Chrome, Edge, and Firefox stop saving and filling cards and addresses in people's work profiles, and on computers the install command set up. What they saved stays in the browser."
+  },
+  "keykeeperSelectItem": {
+    "message": "Select $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "Company email"
+      }
+    }
+  },
+  "keykeeperSelectLimit": {
+    "message": "The first $COUNT$ are selected. That's the most you can change at once.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "500"
+      }
+    }
+  },
+  "keykeeperBulkProgress": {
+    "message": "$DONE$ of $TOTAL$ done",
+    "placeholders": {
+      "done": {
+        "content": "$1",
+        "example": "3"
+      },
+      "total": {
+        "content": "$2",
+        "example": "12"
+      }
+    }
+  },
+  "keykeeperBulkNothingAllowed": {
+    "message": "Your organization doesn't let you change the items you selected."
+  },
+  "keykeeperBulkSkipDelete": {
+    "message": "$SKIPPED$ of the $TOTAL$ items you selected will be skipped. Your organization doesn't let you delete them.",
+    "placeholders": {
+      "skipped": {
+        "content": "$1",
+        "example": "2"
+      },
+      "total": {
+        "content": "$2",
+        "example": "12"
+      }
+    }
+  },
+  "keykeeperBulkSkipDeleteOne": {
+    "message": "1 of the $TOTAL$ items you selected will be skipped. Your organization doesn't let you delete it.",
+    "placeholders": {
+      "total": {
+        "content": "$1",
+        "example": "12"
+      }
+    }
+  },
+  "keykeeperBulkSkipRestore": {
+    "message": "$SKIPPED$ of the $TOTAL$ items you selected will be skipped. Your organization doesn't let you restore them.",
+    "placeholders": {
+      "skipped": {
+        "content": "$1",
+        "example": "2"
+      },
+      "total": {
+        "content": "$2",
+        "example": "12"
+      }
+    }
+  },
+  "keykeeperBulkSkipRestoreOne": {
+    "message": "1 of the $TOTAL$ items you selected will be skipped. Your organization doesn't let you restore it.",
+    "placeholders": {
+      "total": {
+        "content": "$1",
+        "example": "12"
+      }
+    }
+  },
+  "keykeeperBulkSkipMove": {
+    "message": "$SKIPPED$ of the $TOTAL$ items you selected will be skipped. Your organization doesn't let you move them to another shared folder.",
+    "placeholders": {
+      "skipped": {
+        "content": "$1",
+        "example": "2"
+      },
+      "total": {
+        "content": "$2",
+        "example": "12"
+      }
+    }
+  },
+  "keykeeperBulkSkipMoveOne": {
+    "message": "1 of the $TOTAL$ items you selected will be skipped. Your organization doesn't let you move it to another shared folder.",
+    "placeholders": {
+      "total": {
+        "content": "$1",
+        "example": "12"
+      }
+    }
+  },
+  "keykeeperBulkSkipFolders": {
+    "message": "$SKIPPED$ of the $TOTAL$ shared folders you selected will be skipped. Your organization doesn't let you delete them.",
+    "placeholders": {
+      "skipped": {
+        "content": "$1",
+        "example": "2"
+      },
+      "total": {
+        "content": "$2",
+        "example": "4"
+      }
+    }
+  },
+  "keykeeperBulkSkipFoldersOne": {
+    "message": "1 of the $TOTAL$ shared folders you selected will be skipped. Your organization doesn't let you delete it.",
+    "placeholders": {
+      "total": {
+        "content": "$1",
+        "example": "4"
+      }
+    }
+  },
+  "keykeeperBulkSkipped": {
+    "message": "$COUNT$ items were skipped.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "keykeeperBulkSkippedOne": {
+    "message": "1 item was skipped."
+  },
+  "keykeeperBulkSkippedFolders": {
+    "message": "$COUNT$ shared folders were skipped.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "2"
+      }
+    }
+  },
+  "keykeeperBulkSkippedFoldersOne": {
+    "message": "1 shared folder was skipped."
+  },
+  "keykeeperBulkSeveralOrganizations": {
+    "message": "The items you selected belong to more than one organization. A shared folder belongs to one organization, so select items from one organization at a time."
+  },
+  "keykeeperBulkPartlyFailed": {
+    "message": "Something went wrong. Some of the items you selected may not have changed, so check the list."
+  },
+  "keykeeperBulkSomeFailed": {
+    "message": "$FAILED$ of $TOTAL$ items couldn't be changed.",
+    "placeholders": {
+      "failed": {
+        "content": "$1",
+        "example": "2"
+      },
+      "total": {
+        "content": "$2",
+        "example": "12"
+      }
+    }
+  },
+  "keykeeperBulkFavorited": {
+    "message": "$COUNT$ items added to favorites",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "12"
+      }
+    }
+  },
+  "keykeeperBulkUnfavorited": {
+    "message": "$COUNT$ items removed from favorites",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "12"
+      }
+    }
   }
 }

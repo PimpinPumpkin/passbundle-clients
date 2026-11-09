@@ -35,6 +35,9 @@ describe("VaultBatchActionComponent", () => {
 
   const canAddToFolder = signal(false);
   const canAssignToCollections = signal(false);
+  const canFavorite = signal(false);
+  const favoriteAdds = signal(true);
+  const progress = signal<{ done: number; total: number } | null>(null);
   const canEditCollectionAccess = signal(false);
   const canArchive = signal(false);
   const canUnarchive = signal(false);
@@ -47,6 +50,7 @@ describe("VaultBatchActionComponent", () => {
   const clearSpy = jest.fn();
   const bulkMoveToFolderSpy = jest.fn();
   const bulkAssignToCollectionsSpy = jest.fn();
+  const bulkFavoriteSpy = jest.fn();
   const bulkEditCollectionAccessSpy = jest.fn();
   const bulkArchiveSpy = jest.fn();
   const bulkUnarchiveSpy = jest.fn();
@@ -56,6 +60,9 @@ describe("VaultBatchActionComponent", () => {
   beforeEach(async () => {
     canAddToFolder.set(false);
     canAssignToCollections.set(false);
+    canFavorite.set(false);
+    favoriteAdds.set(true);
+    progress.set(null);
     canEditCollectionAccess.set(false);
     canArchive.set(false);
     canUnarchive.set(false);
@@ -75,6 +82,9 @@ describe("VaultBatchActionComponent", () => {
             selectedCount,
             canAddToFolder,
             canAssignToCollections,
+            canFavorite,
+            favoriteAdds,
+            progress,
             canEditCollectionAccess,
             canArchive,
             canUnarchive,
@@ -84,6 +94,7 @@ describe("VaultBatchActionComponent", () => {
             clearSelection: clearSpy,
             bulkMoveToFolder: bulkMoveToFolderSpy,
             bulkAssignToCollections: bulkAssignToCollectionsSpy,
+            bulkFavorite: bulkFavoriteSpy,
             bulkEditCollectionAccess: bulkEditCollectionAccessSpy,
             bulkArchive: bulkArchiveSpy,
             bulkUnarchive: bulkUnarchiveSpy,
@@ -91,7 +102,13 @@ describe("VaultBatchActionComponent", () => {
             bulkDelete: bulkDeleteSpy,
           },
         },
-        { provide: I18nService, useValue: { t: (key: string) => `translated-${key}` } },
+        {
+          provide: I18nService,
+          useValue: {
+            t: (key: string, ...placeholders: Array<string | number>) =>
+              [`translated-${key}`, ...placeholders].join(" "),
+          },
+        },
         {
           provide: Vfo1TerminologyService,
           useValue: { iconClass: (icon: string) => icon, enabled: vfo1Enabled },
@@ -109,22 +126,28 @@ describe("VaultBatchActionComponent", () => {
       expect(component["primaryActions"]()).toHaveLength(0);
     });
 
-    it("includes all actions when total equals threshold (3)", () => {
+    // Keykeeper: five actions stay buttons (upstream: three), so Delete is
+    // not put away in the menu for everyone who belongs to an organization.
+    it("includes all actions when total equals threshold (5)", () => {
       canAddToFolder.set(true);
+      canAssignToCollections.set(true);
+      canFavorite.set(true);
       canArchive.set(true);
       canDelete.set(true);
 
-      expect(component["primaryActions"]()).toHaveLength(3);
+      expect(component["primaryActions"]()).toHaveLength(5);
       expect(component["overflowActions"]()).toHaveLength(0);
     });
 
-    it("caps at 2 when total exceeds threshold (3)", () => {
+    it("caps at 4 when total exceeds threshold (5)", () => {
       canAddToFolder.set(true);
       canAssignToCollections.set(true);
+      canFavorite.set(true);
+      canEditCollectionAccess.set(true);
       canArchive.set(true);
       canDelete.set(true);
 
-      expect(component["primaryActions"]()).toHaveLength(2);
+      expect(component["primaryActions"]()).toHaveLength(4);
     });
 
     it("contains all actions when exactly 1 is enabled", () => {
@@ -144,32 +167,51 @@ describe("VaultBatchActionComponent", () => {
   });
 
   describe("overflowActions", () => {
-    it("is empty when total is at or below the threshold (3)", () => {
+    it("is empty when total is at or below the threshold (5)", () => {
       canAddToFolder.set(true);
       canDelete.set(true);
 
       expect(component["overflowActions"]()).toHaveLength(0);
     });
 
-    it("contains remaining actions when total is 4", () => {
+    it("contains remaining actions when total is 6", () => {
       canAddToFolder.set(true);
       canAssignToCollections.set(true);
+      canFavorite.set(true);
+      canEditCollectionAccess.set(true);
       canArchive.set(true);
       canDelete.set(true);
 
       expect(component["overflowActions"]()).toHaveLength(2);
     });
 
-    it("contains remaining actions when all 6 actions are enabled", () => {
+    it("contains remaining actions when all 8 actions are enabled", () => {
       canAddToFolder.set(true);
       canAssignToCollections.set(true);
+      canFavorite.set(true);
+      canEditCollectionAccess.set(true);
       canArchive.set(true);
       canUnarchive.set(true);
       canRestore.set(true);
       canDelete.set(true);
 
-      expect(component["primaryActions"]()).toHaveLength(2);
+      expect(component["primaryActions"]()).toHaveLength(4);
       expect(component["overflowActions"]()).toHaveLength(4);
+    });
+
+    it("keeps Delete last, whatever else is offered", () => {
+      canAddToFolder.set(true);
+      canAssignToCollections.set(true);
+      canFavorite.set(true);
+      canDelete.set(true);
+
+      const labels = component["primaryActions"]().map((action) => action.label);
+      expect(labels).toEqual([
+        "translated-addToFolder",
+        "translated-assignToCollections",
+        "translated-favorite",
+        "translated-delete",
+      ]);
     });
   });
 
@@ -188,6 +230,32 @@ describe("VaultBatchActionComponent", () => {
       const [action] = component["primaryActions"]();
       expect(action.icon).toBe("bwi-collection");
       expect(action.label).toBe("translated-assignToCollections");
+    });
+
+    it("offers Favorite with an empty star when it will add favorites", () => {
+      canFavorite.set(true);
+      favoriteAdds.set(true);
+
+      const [action] = component["primaryActions"]();
+      expect(action.icon).toBe("bwi-star");
+      expect(action.label).toBe("translated-favorite");
+    });
+
+    it("offers Unfavorite with a full star when every selected item is a favorite", () => {
+      canFavorite.set(true);
+      favoriteAdds.set(false);
+
+      const [action] = component["primaryActions"]();
+      expect(action.icon).toBe("bwi-star-f");
+      expect(action.label).toBe("translated-unfavorite");
+    });
+
+    it("says permanently delete in the trash", () => {
+      canDelete.set(true);
+      inTrash.set(true);
+
+      const [action] = component["primaryActions"]();
+      expect(action.label).toBe("translated-permanentlyDelete");
     });
 
     it("assigns the correct icon and translated label for edit-access", () => {
@@ -266,6 +334,14 @@ describe("VaultBatchActionComponent", () => {
       expect(bulkAssignToCollectionsSpy).toHaveBeenCalledTimes(1);
     });
 
+    it("calls service.bulkFavorite when the favorite action is invoked", () => {
+      canFavorite.set(true);
+
+      component["primaryActions"]()[0].action();
+
+      expect(bulkFavoriteSpy).toHaveBeenCalledTimes(1);
+    });
+
     it("calls service.bulkEditCollectionAccess when edit-access action is invoked", () => {
       canEditCollectionAccess.set(true);
 
@@ -304,6 +380,65 @@ describe("VaultBatchActionComponent", () => {
       component["primaryActions"]()[0].action();
 
       expect(bulkDeleteSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("the line above the bar", () => {
+    it("says nothing when the selection has actions", () => {
+      selectedCount.set(2);
+      canDelete.set(true);
+
+      expect(component["note"]()).toBe("");
+    });
+
+    it("says nothing when nothing is selected", () => {
+      expect(component["note"]()).toBe("");
+    });
+
+    it("says why the bar is empty when no selected item may be changed", () => {
+      selectedCount.set(2);
+
+      expect(component["note"]()).toBe("translated-keykeeperBulkNothingAllowed");
+    });
+
+    it("says how far an action has got while it runs", () => {
+      selectedCount.set(12);
+      canFavorite.set(true);
+      progress.set({ done: 3, total: 12 });
+
+      expect(component["busy"]()).toBe(true);
+      expect(component["note"]()).toBe("translated-keykeeperBulkProgress 3 12");
+    });
+
+    it("is not busy when no action is running", () => {
+      expect(component["busy"]()).toBe(false);
+    });
+
+    it("turns the buttons off while an action runs", () => {
+      selectedCount.set(2);
+      canFavorite.set(true);
+      canDelete.set(true);
+
+      const outlet = TestBed.createComponent(FooterOutletComponent);
+      fixture.detectChanges();
+      outlet.detectChanges();
+
+      const buttons = () =>
+        Array.from(
+          (outlet.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+            '[role="toolbar"] button[bitBulkActionButton]:not([icon="bwi-clear"]):not([icon="bwi-ellipsis-v"])',
+          ),
+        );
+      expect(buttons().length).toBe(2);
+      expect(buttons().every((button) => !button.disabled)).toBe(true);
+
+      progress.set({ done: 0, total: 2 });
+      fixture.detectChanges();
+      outlet.detectChanges();
+
+      expect(buttons().every((button) => button.disabled || button.ariaDisabled === "true")).toBe(
+        true,
+      );
     });
   });
 });

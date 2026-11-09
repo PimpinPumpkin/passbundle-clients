@@ -957,6 +957,66 @@ app-vault-onboarding [data-accordion-content] > div {
 .pb-web app-vault-items tbody [biticonbutton] {
   color: var(--pb-muted);
 }
+/* Selecting several items (DESIGN.md, "Selecting several items"). A row's
+   checkbox shows when the pointer is over the row, when the keyboard reaches
+   it, when it is checked, and on every row once anything is selected. It is
+   only faded out, so the keyboard and a screen reader find it all the time.
+   Where there is no pointer to hover with, it always shows. The same goes for
+   any other list that takes a selection (the MSP console's templates), which
+   marks itself with data-keykeeper="select-list". */
+.pb-web
+  :is(app-vault-items, [data-keykeeper="select-list"])
+  tbody
+  td:first-child
+  input[type="checkbox"] {
+  opacity: 0;
+  transition: opacity 80ms ease-out;
+}
+.pb-web
+  :is(app-vault-items, [data-keykeeper="select-list"])
+  tbody
+  tr:hover
+  td:first-child
+  input[type="checkbox"],
+.pb-web
+  :is(app-vault-items, [data-keykeeper="select-list"])
+  tbody
+  td:first-child
+  input[type="checkbox"]:focus-visible,
+.pb-web
+  :is(app-vault-items, [data-keykeeper="select-list"])
+  tbody
+  td:first-child
+  input[type="checkbox"]:checked,
+.pb-web
+  :is(app-vault-items, [data-keykeeper="select-list"])[data-keykeeper-selecting]
+  tbody
+  td:first-child
+  input[type="checkbox"] {
+  opacity: 1;
+}
+@media (hover: none) {
+  .pb-web
+    :is(app-vault-items, [data-keykeeper="select-list"])
+    tbody
+    td:first-child
+    input[type="checkbox"] {
+    opacity: 1;
+  }
+}
+/* The list takes the focus on a click so Cmd/Ctrl+A works in it; it is not a
+   Tab stop, so it shows no ring of its own. */
+.pb-web :is(app-vault-items, [data-keykeeper="select-list"]):focus {
+  outline: none;
+}
+/* A selected row keeps the selection's tint. */
+.pb-web
+  :is(app-vault-items, [data-keykeeper="select-list"])
+  tbody
+  tr:has(td:first-child input[type="checkbox"]:checked)
+  td {
+  background: var(--pb-selected) !important;
+}
 
 /* ----- The item's panel (a drawer: vault-item-dialog in the web vault). */
 .pb-web bit-layout bit-dialog > section {

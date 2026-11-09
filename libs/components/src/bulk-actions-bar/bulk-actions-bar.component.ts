@@ -94,6 +94,16 @@ export class BulkActionsBarComponent {
     () => this.selectedCount() ?? this.table?.selectionModel()?.count() ?? 0,
   );
 
+  /**
+   * Keykeeper: a line shown just above the bar, for what the buttons can't
+   * say: how far a long action has got, or why the selection has no actions.
+   * It sits outside the measured bar, so it never moves the buttons.
+   */
+  readonly note = input<string>("");
+
+  /** Keykeeper: true while an action is running, for assistive technology. */
+  readonly busy = input<boolean>(false);
+
   private readonly clear$ = new Subject<void>();
   readonly clear = outputFromObservable(this.clear$);
 
@@ -168,11 +178,15 @@ export class BulkActionsBarComponent {
     if (this.effectiveCount() === 0) {
       return this.i18nService.t("selectionCleared");
     }
-    return this.i18nService.t(
+    const announcement = this.i18nService.t(
       "bulkActionsBarAnnouncement",
       this.effectiveCount(),
       `${this.modifierKey()}+B`,
     );
+    // Keykeeper: the note is read out with the count, except while an action
+    // runs, when it changes with every item and its result is announced after.
+    const note = this.note();
+    return note !== "" && !this.busy() ? `${announcement} ${note}` : announcement;
   });
 
   protected readonly barStateClasses = computed(() =>
@@ -318,6 +332,12 @@ export class BulkActionsBarComponent {
   }
 
   protected onToolbarKeydown(event: KeyboardEvent): void {
+    // Keykeeper: Escape lets go of the selection, as it does in the list.
+    if (event.key === "Escape") {
+      event.preventDefault();
+      this.onClear();
+      return;
+    }
     this.keyManager()?.onKeydown(event);
   }
 

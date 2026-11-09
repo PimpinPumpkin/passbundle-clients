@@ -545,4 +545,30 @@ describe("AssignCollectionsComponent", () => {
       expect(await editableWith({ seePasswords: true, share: true, viewHistory: true })).toBe(1);
     });
   });
+
+  // Keykeeper: the list that opened the dialog says how many of the selected
+  // items it left out, and why (DESIGN.md, "Selecting several items").
+  describe("Keykeeper: the notice about skipped items", () => {
+    const notice = () => fixture.debugElement.query(By.css('[data-testid="assign-notice"]'));
+
+    it("is not there when nothing was left out", () => {
+      expect(notice()).toBeNull();
+    });
+
+    it("is shown at the top of the dialog when the list passes one", async () => {
+      TestBed.resetTestingModule();
+      await setup(false);
+      component.params = {
+        ...params,
+        notice: "2 of the 5 items you selected will be skipped.",
+      };
+      fixture.detectChanges();
+
+      expect(notice().nativeElement.textContent.trim()).toBe(
+        "2 of the 5 items you selected will be skipped.",
+      );
+      const form = fixture.debugElement.query(By.css("form")).nativeElement as HTMLElement;
+      expect(form.firstElementChild).toBe(notice().nativeElement);
+    });
+  });
 });

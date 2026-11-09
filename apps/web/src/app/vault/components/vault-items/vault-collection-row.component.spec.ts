@@ -47,6 +47,8 @@ import { VaultCollectionRowComponent } from "./vault-collection-row.component";
         [groups]="groups"
         [showGroups]="true"
         [organizations]="[]"
+        [canEditCollection]="canEdit"
+        (checkedToggled)="held.push($event)"
       ></tr>
     </tbody>
   </table>`,
@@ -55,6 +57,8 @@ import { VaultCollectionRowComponent } from "./vault-collection-row.component";
 class HostComponent {
   collection!: CollectionView;
   groups: GroupView[] = [];
+  canEdit = false;
+  held: boolean[] = [];
 }
 
 describe("VaultCollectionRowComponent group badges", () => {
@@ -62,7 +66,7 @@ describe("VaultCollectionRowComponent group badges", () => {
 
   const group = (id: string, name: string) => new GroupView({ id, organizationId: "org-id", name });
 
-  async function setup(collectionGroupIds: string[], groups: GroupView[]) {
+  async function setup(collectionGroupIds: string[], groups: GroupView[], canEdit = false) {
     const i18nService = mock<I18nService>();
     i18nService.collator = new Intl.Collator("en");
     i18nService.t.mockImplementation((key) => key);
@@ -110,6 +114,7 @@ describe("VaultCollectionRowComponent group badges", () => {
     fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.collection = collection;
     fixture.componentInstance.groups = groups;
+    fixture.componentInstance.canEdit = canEdit;
     fixture.detectChanges();
   }
 
@@ -136,5 +141,39 @@ describe("VaultCollectionRowComponent group badges", () => {
     await setup([], [group("group-1", "Engineering")]);
 
     expect(renderedBadges()).toEqual([]);
+  });
+
+  // Keykeeper: selecting several items (DESIGN.md, "Selecting several items").
+  describe("the row's checkbox", () => {
+    const checkbox = () =>
+      fixture.nativeElement.querySelector('input[type="checkbox"]') as HTMLInputElement;
+
+    it("names the shared folder it selects", async () => {
+      await setup([], [], true);
+      const t = TestBed.inject(I18nService).t as jest.Mock;
+
+      expect(checkbox().getAttribute("aria-label")).toBe("keykeeperSelectItem");
+      expect(t.mock.calls.find(([key]) => key === "keykeeperSelectItem")?.[1]).toBe(
+        "Shared Collection",
+      );
+    });
+
+    it("says whether Shift was held when it is clicked, and lets the click through", async () => {
+      await setup([], [], true);
+      const withShift = new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        shiftKey: true,
+      });
+      const plain = new MouseEvent("click", { bubbles: true, cancelable: true });
+
+      checkbox().dispatchEvent(withShift);
+      checkbox().dispatchEvent(plain);
+
+      expect(fixture.componentInstance.held).toEqual([true, false]);
+      // Neither click is canceled: a canceled one leaves the checkbox as it was.
+      expect(withShift.defaultPrevented).toBe(false);
+      expect(plain.defaultPrevented).toBe(false);
+    });
   });
 });
