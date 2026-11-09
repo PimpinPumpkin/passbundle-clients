@@ -240,6 +240,14 @@ describe("MSP activity sentences", () => {
       "ana@northwind.test left the browsers' card and address autofill as they are in Acme Dental",
     ],
     [
+      { event: "client_member_health_set", detail: "off" },
+      "ana@northwind.test turned off Members' own passwords in Acme Dental",
+    ],
+    [
+      { event: "client_member_health_set", detail: "on" },
+      "ana@northwind.test turned on Members' own passwords in Acme Dental",
+    ],
+    [
       { event: "staff_invited", detail: "admin" },
       "ana@northwind.test invited ben@northwind.test to join as an admin",
     ],

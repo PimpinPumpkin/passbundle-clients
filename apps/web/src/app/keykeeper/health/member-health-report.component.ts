@@ -29,7 +29,8 @@ import {
  * owners and admins: how many of each confirmed member's own logins (their
  * Personal items) have weak, reused, or exposed passwords, as their apps
  * reported them. Numbers only: neither the admin nor the server sees which
- * items. See DESIGN.md, "Members' own passwords".
+ * items. While the organization has it off, the page says so and where to
+ * turn it on, and lists nobody. See DESIGN.md, "Members' own passwords".
  */
 @Component({
   selector: "app-keykeeper-member-health-report",
@@ -50,6 +51,11 @@ import {
       } @else if (failed()) {
         <bit-callout type="danger" [title]="'errorOccurred' | i18n">
           {{ "keykeeperMemberHealthCouldntLoad" | i18n }}
+        </bit-callout>
+      } @else if (off()) {
+        <bit-callout type="info" [title]="null" data-testid="member-health-off">
+          {{ "keykeeperMemberHealthOff" | i18n }}
+          <a bitLink [routerLink]="settingsLink()">{{ "keykeeperMemberHealthTurnOn" | i18n }}</a>
         </bit-callout>
       } @else {
         @let total = totals();
@@ -124,6 +130,9 @@ export class KeykeeperMemberHealthReportComponent implements OnInit {
 
   protected readonly loading = signal(true);
   protected readonly failed = signal(false);
+  /** The organization has "Members' own passwords" off. */
+  protected readonly off = signal(false);
+  protected readonly settingsLink = signal<string[]>([]);
   protected readonly rows = signal<MemberHealthRow[]>([]);
   protected readonly totals = computed(() => memberHealthTotals(this.rows()));
 
@@ -147,6 +156,8 @@ export class KeykeeperMemberHealthReportComponent implements OnInit {
   async load(organizationId: string) {
     this.loading.set(true);
     this.failed.set(false);
+    this.off.set(false);
+    this.settingsLink.set(["/organizations", organizationId, "settings", "joining"]);
     try {
       const [response, members] = await Promise.all([
         this.apiService.send(
@@ -155,9 +166,10 @@ export class KeykeeperMemberHealthReportComponent implements OnInit {
           null,
           true,
           true,
-        ) as Promise<{ data?: MemberHealthReport[] }>,
+        ) as Promise<{ data?: MemberHealthReport[]; on?: boolean }>,
         this.organizationUserApiService.getAllMiniUserDetails(organizationId),
       ]);
+      this.off.set(response?.on === false);
       this.rows.set(memberHealthRows(response?.data ?? [], members.data));
     } catch (e) {
       this.logService.error(e);

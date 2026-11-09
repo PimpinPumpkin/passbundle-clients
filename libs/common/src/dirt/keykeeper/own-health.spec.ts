@@ -15,7 +15,13 @@ import { CipherType } from "../../vault/enums";
 import { CipherView } from "../../vault/models/view/cipher.view";
 import { LoginView } from "../../vault/models/view/login.view";
 
-import { KeykeeperOwnHealthReporter, KeykeeperOwnHealthWatch, ownHealthCounts } from "./own-health";
+import {
+  KeykeeperOwnHealthReporter,
+  KeykeeperOwnHealthWatch,
+  organizationNames,
+  ownHealthCounts,
+  ownHealthSeenBy,
+} from "./own-health";
 
 const USER = "user-1" as UserId;
 let nextId = 0;
@@ -34,6 +40,29 @@ function login(password: string, more: Partial<CipherView> = {}): CipherView {
 
 /** Weak by length, so the tests don't depend on the strength library. */
 const weakByLength = (cipher: CipherView) => cipher.login.password.length < 12;
+
+const CONTOSO = { id: "org-1", name: "Contoso" };
+
+/**
+ * A server that answers which organizations see the numbers (`seen`, or a
+ * refusal with that status) and keeps reports while one does.
+ */
+function serverWith(api: ReturnType<typeof mock<ApiService>>, seen: () => unknown[] | number) {
+  api.send.mockImplementation(async (method: string, path: string) => {
+    if (method === "GET" && path === "/keykeeper/own-health/seen-by") {
+      const answer = seen();
+      if (typeof answer === "number") {
+        throw { statusCode: answer };
+      }
+      return { object: "list", data: answer };
+    }
+    return { object: "keykeeperOwnHealth", kept: (seen() as unknown[]).length > 0 };
+  });
+}
+
+/** The reports the app sent. */
+const puts = (api: ReturnType<typeof mock<ApiService>>) =>
+  api.send.mock.calls.filter(([method]) => method === "PUT");
 
 describe("Members' own passwords, in numbers", () => {
   const vault = () => [
@@ -80,6 +109,7 @@ describe("Members' own passwords, in numbers", () => {
 
     beforeEach(() => {
       api = mock<ApiService>();
+      serverWith(api, () => [CONTOSO]);
       organizations = new BehaviorSubject([member(OrganizationUserStatusType.Confirmed)]);
       const organizationService = mock<OrganizationService>();
       organizationService.organizations$.mockReturnValue(organizations);
@@ -95,7 +125,7 @@ describe("Members' own passwords, in numbers", () => {
       expect(await reporter.report(USER, { ...counts, weak: 0 })).toBe(true);
       reporter.forget(USER);
       expect(await reporter.report(USER, { ...counts, weak: 0 })).toBe(true);
-      expect(api.send).toHaveBeenCalledTimes(3);
+      expect(puts(api)).toHaveLength(3);
     });
 
     it("sends nothing for someone who isn't a confirmed member of an organization", async () => {
@@ -106,18 +136,62 @@ describe("Members' own passwords, in numbers", () => {
       expect(api.send).not.toHaveBeenCalled();
     });
 
+    it("sends nothing while no organization they've joined has it on, and sends once one does", async () => {
+      let seen: unknown[] = [];
+      serverWith(api, () => seen);
+      const counts = { logins: 4, weak: 1, reused: 2 };
+      expect(await reporter.report(USER, counts)).toBe(false);
+      expect(await reporter.report(USER, counts)).toBe(false);
+      expect(puts(api)).toHaveLength(0);
+
+      seen = [CONTOSO];
+      expect(await reporter.report(USER, counts)).toBe(true);
+      expect(puts(api)).toHaveLength(1);
+    });
+
+    it("sends again a report the server didn't keep, as when it was turned off meanwhile", async () => {
+      api.send.mockImplementation(async (method: string) =>
+        method === "GET" ? { data: [CONTOSO] } : { kept: false },
+      );
+      const counts = { logins: 4, weak: 1, reused: 2 };
+      expect(await reporter.report(USER, counts)).toBe(false);
+      expect(await reporter.report(USER, counts)).toBe(false);
+      expect(puts(api)).toHaveLength(2);
+    });
+
     it("stops asking a server that doesn't have it, and never fails", async () => {
-      api.send.mockRejectedValueOnce({ statusCode: 500 });
+      serverWith(api, () => 500);
       expect(await reporter.report(USER, { logins: 1, weak: 0, reused: 0 })).toBe(false);
-      api.send.mockRejectedValueOnce({ statusCode: 404 });
+      serverWith(api, () => 404);
       expect(await reporter.report(USER, { logins: 1, weak: 0, reused: 0 })).toBe(false);
       expect(await reporter.report(USER, { logins: 2, weak: 0, reused: 0 })).toBe(false);
       expect(api.send).toHaveBeenCalledTimes(2);
+      expect(puts(api)).toHaveLength(0);
     });
+  });
+
+  it("asks the server which organizations see them, by name", async () => {
+    const api = mock<ApiService>();
+    serverWith(api, () => [{ ...CONTOSO, more: "ignored" }]);
+    expect(await ownHealthSeenBy(api)).toEqual([CONTOSO]);
+    expect(api.send).toHaveBeenCalledWith("GET", "/keykeeper/own-health/seen-by", null, true, true);
+    serverWith(api, () => 404);
+    expect(await ownHealthSeenBy(api)).toBeNull();
+    serverWith(api, () => 500);
+    await expect(ownHealthSeenBy(api)).rejects.toEqual({ statusCode: 500 });
+  });
+
+  it("names the organizations in a sentence", () => {
+    expect(organizationNames(["Contoso"])).toBe("Contoso");
+    expect(organizationNames(["Contoso", "Fabrikam"])).toBe("Contoso and Fabrikam");
+    expect(organizationNames(["Contoso", "Fabrikam", "Litware"])).toBe(
+      "Contoso, Fabrikam, and Litware",
+    );
   });
 
   it("in the extension, counts weak and reused after unlocking and reports them", async () => {
     const api = mock<ApiService>();
+    serverWith(api, () => [CONTOSO]);
     const organizationService = mock<OrganizationService>();
     organizationService.organizations$.mockReturnValue(
       of([Object.assign(new Organization(), { status: OrganizationUserStatusType.Confirmed })]),
@@ -140,7 +214,7 @@ describe("Members' own passwords, in numbers", () => {
     await awaitAsync(40);
     running.unsubscribe();
 
-    expect(api.send).toHaveBeenCalledTimes(1);
+    expect(puts(api)).toHaveLength(1);
     expect(api.send).toHaveBeenCalledWith(
       "PUT",
       "/keykeeper/own-health",

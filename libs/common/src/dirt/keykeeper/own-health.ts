@@ -3,6 +3,8 @@
 // passwords"). The logins in the person's Personal items are counted by
 // Health's own rules (password-health.ts), and only four numbers go to the
 // server: how many, how many weak, reused, and exposed. Never which items.
+// Only while an organization they've joined has "Members' own passwords" on:
+// the server says which do (`seen-by`), and the person is told by name.
 
 import {
   debounceTime,
@@ -48,6 +50,42 @@ export type OwnHealthCounts = {
 };
 
 const PATH = "/keykeeper/own-health";
+const SEEN_BY_PATH = "/keykeeper/own-health/seen-by";
+
+/** An organization whose owners and admins see someone's numbers. */
+export type OwnHealthSeenBy = { id: string; name: string };
+
+/**
+ * The organizations whose owners and admins see someone's numbers: those
+ * they've joined that have "Members' own passwords" on, by name. Null from a
+ * server that doesn't have it.
+ */
+export async function ownHealthSeenBy(apiService: ApiService): Promise<OwnHealthSeenBy[] | null> {
+  try {
+    const response: { data?: OwnHealthSeenBy[] } = await apiService.send(
+      "GET",
+      SEEN_BY_PATH,
+      null,
+      true,
+      true,
+    );
+    return (response?.data ?? []).map(({ id, name }) => ({ id, name }));
+  } catch (e) {
+    const status = (e as { statusCode?: number })?.statusCode;
+    if (status === 404 || status === 405) {
+      return null;
+    }
+    throw e;
+  }
+}
+
+/** Names in a sentence: "A", "A and B", or "A, B, and C". */
+export function organizationNames(names: string[]): string {
+  if (names.length <= 2) {
+    return names.join(" and ");
+  }
+  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+}
 
 /**
  * The numbers for the logins in someone's Personal items (no organization)
@@ -91,9 +129,11 @@ export function confirmedMemberOfAny(
 
 /**
  * Sends someone's numbers to the server: once per unlock and again when they
- * change, only for a confirmed member of an organization, and never again in
- * this session after the server says it doesn't have the endpoint. It never
- * fails: the numbers are worth less than any error.
+ * change, only while an organization they've joined sees them (it asks the
+ * server first, and not at all for someone who isn't a confirmed member of
+ * any), and never again in this session after the server says it doesn't
+ * have the endpoint. It never fails: the numbers are worth less than any
+ * error.
  */
 export class KeykeeperOwnHealthReporter {
   /** What was last sent, by account, so the same numbers aren't sent again. */
@@ -115,7 +155,25 @@ export class KeykeeperOwnHealthReporter {
       if (!(await firstValueFrom(confirmedMemberOfAny(this.organizationService, userId)))) {
         return false;
       }
-      await this.apiService.send("PUT", PATH, counts, true, true);
+      const seenBy = await ownHealthSeenBy(this.apiService);
+      if (seenBy == null) {
+        this.unheard = true;
+        return false;
+      }
+      if (seenBy.length === 0) {
+        return false;
+      }
+      const answer: { kept?: boolean } | null = await this.apiService.send(
+        "PUT",
+        PATH,
+        counts,
+        true,
+        true,
+      );
+      // An organization turned it off in the meantime: the server didn't keep them.
+      if (answer?.kept === false) {
+        return false;
+      }
       this.sent.set(userId, text);
       return true;
     } catch (e) {

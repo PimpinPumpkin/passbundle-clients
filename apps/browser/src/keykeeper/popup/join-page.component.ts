@@ -10,8 +10,10 @@ import { JOIN_ANSWER_KEY, JOIN_REQUEST_KEY, JoinAnswer, StoredJoinRequest } from
 /**
  * Keykeeper: asks the person once whether to join the organization the
  * install command named, before the extension joins it. Says what joining
- * means, and what account recovery lets the organization's admins do. See
- * enrollment.ts and DESIGN.md, "Onboarding through the RMM".
+ * means, what account recovery lets the organization's admins do, and
+ * whether they'll see how many of the person's own passwords are weak,
+ * reused, or exposed. See enrollment.ts and DESIGN.md, "Onboarding through
+ * the RMM" and "Members' own passwords".
  */
 @Component({
   selector: "app-keykeeper-join-page",
@@ -55,6 +57,12 @@ import { JOIN_ANSWER_KEY, JOIN_REQUEST_KEY, JoinAnswer, StoredJoinRequest } from
                 and tell them.
               </p>
             }
+          }
+          @if (r.memberHealth) {
+            <p bitTypography="body2" data-testid="keykeeper-join-member-health">
+              Admins at {{ r.organizationName }} will see how many of your own passwords are weak,
+              reused, or exposed. Never which ones.
+            </p>
           }
           <p bitTypography="helper" data-testid="keykeeper-join-later">
             Not now asks again in 7 days.

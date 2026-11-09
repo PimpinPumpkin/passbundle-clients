@@ -543,6 +543,23 @@ export const KEYKEEPER_ADMIN_TWO_STEP_POLICY = 1000;
 export const KEYKEEPER_PASSWORD_CHANGE_OFF_POLICY = 1001;
 
 /**
+ * The type number of the MSP default "Members' own passwords": whether each
+ * client's owners and admins see how many of its members' own passwords are
+ * weak, reused, or exposed. Not an upstream policy either. See DESIGN.md,
+ * "Members' own passwords".
+ */
+export const KEYKEEPER_MEMBER_HEALTH_POLICY = 1002;
+
+/** An organization's "Members' own passwords", as its Settings page shows it. */
+export type OrgMemberHealthSetting = {
+  enabled: boolean;
+  /** The MSP that manages the organization, if one does. */
+  msp: { id: string; name: string } | null;
+  /** The MSP requires it for every client, so it can't be changed here. */
+  requiredByMsp: boolean;
+};
+
+/**
  * The type number of the MSP default "Turn off the browsers' card and
  * address autofill", which isn't an upstream policy either: on, a client
  * turns off Chrome's, Edge's, and Firefox's own card and address autofill,
