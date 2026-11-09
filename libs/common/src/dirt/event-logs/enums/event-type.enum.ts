@@ -163,6 +163,12 @@ export enum EventType {
   // again, or turned it off.
   Keykeeper_PasswordChangeOn = 1680,
   Keykeeper_PasswordChangeOff = 1681,
+  // Keykeeper: the organization left the browsers' own card and address
+  // autofill as they are, turned them off, or turned them off and offered its
+  // people to bring theirs in. See DESIGN.md, "Addresses and cards".
+  Keykeeper_BrowserAutofillUnchanged = 1682,
+  Keykeeper_BrowserAutofillOff = 1683,
+  Keykeeper_BrowserAutofillOffAndImport = 1684,
 
   Policy_Updated = 1700,
 

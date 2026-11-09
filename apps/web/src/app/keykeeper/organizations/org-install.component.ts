@@ -44,6 +44,7 @@ type InstallState =
               [serverUrl]="serverUrl()"
               whose="your organization's"
               joins="the organization"
+              [browserAutofill]="s.enrollment.browserAutofill"
               testIdPrefix="org-install"
             />
             <p bitTypography="helper" data-testid="org-install-joins">

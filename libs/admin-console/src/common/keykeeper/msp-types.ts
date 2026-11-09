@@ -137,6 +137,12 @@ export type ClientEnrollment = {
    * may still have the command. Older servers leave it out.
    */
   removedSinceToken?: number;
+  /**
+   * What the organization does with the browsers' own card and address
+   * autofill; while it's off, the command turns them off too. Older servers
+   * leave it out. See DESIGN.md, "Addresses and cards".
+   */
+  browserAutofill?: "unchanged" | "off" | "offAndImport";
 };
 
 /**
@@ -553,6 +559,15 @@ export type OrgMemberHealthSetting = {
   requiredByMsp: boolean;
 };
 
+/**
+ * The type number of the MSP default "Turn off the browsers' card and
+ * address autofill", which isn't an upstream policy either: on, a client
+ * turns off Chrome's, Edge's, and Firefox's own card and address autofill,
+ * with one option, `{ offer: true }`, to offer bringing them into PassBundle.
+ * 1002 is "Members' own passwords". See DESIGN.md, "Addresses and cards".
+ */
+export const KEYKEEPER_BROWSER_AUTOFILL_OFF_POLICY = 1003;
+
 /** Someone two-step login for admins covers who hasn't set up a method that counts. */
 export type TwoStepNotSetUp = {
   /** Their membership, in an organization's list. */
@@ -579,6 +594,18 @@ export type TwoStepNotSetUp = {
  */
 export type OrgPasswordChange = {
   allowed: boolean;
+  /** The MSP that manages the organization, if one does. */
+  msp: { id: string; name: string } | null;
+  /** The MSP requires its setting for every client, so it can't be changed here. */
+  requiredByMsp: boolean;
+};
+
+/**
+ * Keykeeper: what an organization does with the browsers' own card and
+ * address autofill (DESIGN.md, "Addresses and cards").
+ */
+export type OrgBrowserAutofill = {
+  mode: "unchanged" | "off" | "offAndImport";
   /** The MSP that manages the organization, if one does. */
   msp: { id: string; name: string } | null;
   /** The MSP requires its setting for every client, so it can't be changed here. */

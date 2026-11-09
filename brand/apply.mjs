@@ -441,21 +441,34 @@ function apply() {
   // 5. Browser extension manifests and icons. Native messaging, which talks
   //    to the desktop agent, is a required permission rather than upstream's
   //    optional one, so biometric unlock needs no extra prompt or reload
-  //    (DESIGN.md, "Biometric unlock"). The extension's IDs are ours: the
+  //    (DESIGN.md, "Biometric unlock"). So is the privacy API, so an
+  //    organization's setting for the browser's own card and address
+  //    autofill holds without anyone clicking (DESIGN.md, "Addresses and
+  //    cards"). The extension's IDs are ours: the
   //    Chromium key fixes its ID on Chrome and Edge, and Firefox gets our
   //    add-on ID instead of upstream's.
   const extension = extensionIdentity();
+  const REQUIRED_PERMISSIONS = ["nativeMessaging", "privacy"];
   for (const rel of ["apps/browser/src/manifest.json", "apps/browser/src/manifest.v3.json"]) {
     const manifest = JSON.parse(read(rel));
     if (manifest.author !== "Bitwarden Inc.") fail(`unexpected author in ${rel}`);
     manifest.author = BRAND.company;
     for (const [key, list] of Object.entries(manifest)) {
       if (/^(__\w+__)?optional_permissions$/.test(key) && Array.isArray(list)) {
-        manifest[key] = list.filter((p) => p !== "nativeMessaging");
+        // Firefox's privacy API has no card or address switches, so it stays
+        // optional there, as upstream has it.
+        const moved = key.startsWith("__firefox__")
+          ? REQUIRED_PERMISSIONS.filter((p) => p !== "privacy")
+          : REQUIRED_PERMISSIONS;
+        manifest[key] = list.filter((p) => !moved.includes(p));
         const required = key.replace("optional_", "");
         // Firefox's own list, where there is one; otherwise the shared list.
         const target = Array.isArray(manifest[required]) ? required : "permissions";
-        if (!manifest[target].includes("nativeMessaging")) manifest[target].push("nativeMessaging");
+        for (const permission of moved) {
+          if (list.includes(permission) && !manifest[target].includes(permission)) {
+            manifest[target].push(permission);
+          }
+        }
       }
     }
     const branded = JSON.parse(brandText(JSON.stringify(manifest, null, 2)));

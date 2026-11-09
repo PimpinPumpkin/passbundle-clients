@@ -1,7 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from "@angular/core";
 import { firstValueFrom } from "rxjs";
 
-import { KEYKEEPER_ADMIN_TWO_STEP_POLICY } from "@bitwarden/admin-console/common";
+import {
+  KEYKEEPER_ADMIN_TWO_STEP_POLICY,
+  KEYKEEPER_BROWSER_AUTOFILL_OFF_POLICY,
+} from "@bitwarden/admin-console/common";
 import { PolicyType } from "@bitwarden/common/admin-console/enums";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
@@ -11,6 +14,7 @@ import { BasePolicyEditDefinition } from "../../admin-console/organizations/poli
 import { SharedModule } from "../../shared";
 
 import { requiresEveryone } from "./admin-two-step-policy";
+import { offersImport } from "./browser-autofill-policy";
 import { KeykeeperDefaultPolicyDialogComponent } from "./default-policy-dialog.component";
 import { KeykeeperMspApiService, MspPolicies } from "./msp-api.service";
 import {
@@ -84,6 +88,16 @@ const REVOKING: Partial<Record<PolicyType, string>> = {
                       data-testid="msp-policy-everyone"
                       title="Everyone else too"
                       >Everyone</span
+                    >
+                  }
+                  @if (offerOf(row)) {
+                    <span
+                      bitBadge
+                      variant="success"
+                      class="tw-ml-1"
+                      data-testid="msp-policy-offer"
+                      title="Offer to bring them in"
+                      >Offer</span
                     >
                   }
                 } @else {
@@ -197,6 +211,11 @@ export class KeykeeperDefaultPoliciesComponent {
   /** Two-step login for admins, required of everyone else too. */
   protected everyoneOf(row: DefaultPolicyRow): boolean {
     return row.type === KEYKEEPER_ADMIN_TWO_STEP_POLICY && requiresEveryone(row.default.data);
+  }
+
+  /** The browsers' card and address autofill turned off, with the offer to bring them in. */
+  protected offerOf(row: DefaultPolicyRow): boolean {
+    return row.type === KEYKEEPER_BROWSER_AUTOFILL_OFF_POLICY && offersImport(row.default.data);
   }
 
   protected nameOf(type: number): string {

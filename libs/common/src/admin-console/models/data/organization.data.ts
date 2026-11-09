@@ -3,6 +3,7 @@ import { Jsonify } from "type-fest";
 import { MemberDecryptionType } from "../../../auth/enums/sso";
 import { ProductTierType } from "../../../billing/enums";
 import { OrganizationUserStatusType, OrganizationUserType, ProviderType } from "../../enums";
+import { BrowserAutofillMode, browserAutofillMode } from "../../keykeeper/browser-autofill";
 import { PermissionsApi } from "../api/permissions.api";
 import { ProfileOrganizationResponse } from "../response/profile-organization.response";
 
@@ -69,6 +70,7 @@ export class OrganizationData {
   ssoMemberDecryptionType?: MemberDecryptionType;
   usePhishingBlocker: boolean;
   keykeeperPasswordChange: boolean;
+  keykeeperBrowserAutofill: BrowserAutofillMode;
   useMyItems: boolean;
   useInviteLinks: boolean;
 
@@ -139,6 +141,7 @@ export class OrganizationData {
     this.ssoMemberDecryptionType = response.ssoMemberDecryptionType;
     this.usePhishingBlocker = response.usePhishingBlocker;
     this.keykeeperPasswordChange = response.keykeeperPasswordChange === true;
+    this.keykeeperBrowserAutofill = browserAutofillMode(response.keykeeperBrowserAutofill);
     this.useMyItems = response.useMyItems;
     this.useInviteLinks = response.useInviteLinks;
 

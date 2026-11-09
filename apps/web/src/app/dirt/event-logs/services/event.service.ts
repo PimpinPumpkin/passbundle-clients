@@ -708,6 +708,15 @@ export class EventService {
       case EventType.Keykeeper_PasswordChangeOff:
         msg = humanReadableMsg = this.i18nService.t("keykeeperPasswordChangeOffEvent");
         break;
+      case EventType.Keykeeper_BrowserAutofillUnchanged:
+        msg = humanReadableMsg = this.i18nService.t("keykeeperBrowserAutofillUnchangedEvent");
+        break;
+      case EventType.Keykeeper_BrowserAutofillOff:
+        msg = humanReadableMsg = this.i18nService.t("keykeeperBrowserAutofillOffEvent");
+        break;
+      case EventType.Keykeeper_BrowserAutofillOffAndImport:
+        msg = humanReadableMsg = this.i18nService.t("keykeeperBrowserAutofillOffAndImportEvent");
+        break;
       case EventType.Keykeeper_MemberHealthOn:
         msg = humanReadableMsg = this.i18nService.t("keykeeperMemberHealthOn");
         break;

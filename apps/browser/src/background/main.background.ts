@@ -6,8 +6,10 @@ import {
   EMPTY,
   NEVER,
   Observable,
+  combineLatest,
   concatMap,
   concat,
+  distinctUntilChanged,
   filter,
   firstValueFrom,
   from,
@@ -59,6 +61,7 @@ import { InternalNewPolicyService } from "@bitwarden/common/admin-console/abstra
 import { PolicyApiServiceAbstraction } from "@bitwarden/common/admin-console/abstractions/policy/policy-api.service.abstraction";
 import { InternalPolicyService as InternalPolicyServiceAbstraction } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import { ProviderService as ProviderServiceAbstraction } from "@bitwarden/common/admin-console/abstractions/provider.service";
+import { OrganizationUserStatusType } from "@bitwarden/common/admin-console/enums";
 import { DefaultOrganizationService } from "@bitwarden/common/admin-console/services/organization/default-organization.service";
 import { DefaultNewPolicyService } from "@bitwarden/common/admin-console/services/policy/default-new-policy.service";
 import { DefaultPolicyService } from "@bitwarden/common/admin-console/services/policy/default-policy.service";
@@ -379,6 +382,12 @@ import {
   BrowserFido2ParentWindowReference,
   BrowserFido2UserInterfaceService,
 } from "../autofill/fido2/services/browser-fido2-user-interface.service";
+import {
+  accountOrgs$,
+  chromePrivacySwitches,
+  KeykeeperBrowserAutofillSwitches,
+  localStateStore,
+} from "../autofill/keykeeper/browser-autofill-switches";
 import { keykeeperFillPicker as fillPickerHooks } from "../autofill/keykeeper/fill-field-menu";
 import { keykeeperSiteFixes as siteFixHooks } from "../autofill/keykeeper/fill-rules";
 import { KeykeeperOpenAndFill } from "../autofill/keykeeper/open-and-fill";
@@ -2096,6 +2105,43 @@ export default class MainBackground {
       this.encryptService,
       this.stateProvider,
       this.logService,
+    ).start();
+    // Keykeeper: the browser's own card and address autofill, off in a work
+    // profile when an organization of an account signed in here turns them
+    // off (DESIGN.md, "Addresses and cards").
+    new KeykeeperBrowserAutofillSwitches(
+      chromePrivacySwitches(),
+      localStateStore(),
+      accountOrgs$(
+        this.accountService.accounts$.pipe(
+          switchMap((accounts) => {
+            const ids = Object.keys(accounts ?? {}) as UserId[];
+            return ids.length === 0
+              ? of([] as string[])
+              : combineLatest(
+                  ids.map((id) =>
+                    this.authService
+                      .authStatusFor$(id)
+                      .pipe(
+                        map((status) => (status === AuthenticationStatus.LoggedOut ? null : id)),
+                      ),
+                  ),
+                ).pipe(map((signedIn) => signedIn.filter((id): id is UserId => id != null)));
+          }),
+          distinctUntilChanged((a, b) => a.join() === b.join()),
+        ),
+        (userId) =>
+          this.organizationService.organizations$(userId as UserId).pipe(
+            map((orgs) =>
+              (orgs ?? []).map((o) => ({
+                id: o.id,
+                name: o.name,
+                member: o.status === OrganizationUserStatusType.Confirmed && o.enabled,
+                keykeeperBrowserAutofill: o.keykeeperBrowserAutofill,
+              })),
+            ),
+          ),
+      ),
     ).start();
     // Keykeeper: how many of someone's own passwords are weak or reused, in
     // numbers only, for their organizations' admins (DESIGN.md, "Members' own

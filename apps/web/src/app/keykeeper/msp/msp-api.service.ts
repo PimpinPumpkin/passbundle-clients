@@ -32,6 +32,7 @@ import {
   OrgAdminTwoStep,
   OrgMemberHealthSetting,
   OrgPasswordChange,
+  OrgBrowserAutofill,
   MspRole,
   MspSiteFixes,
   MspSummary,
@@ -602,6 +603,35 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
       "PUT",
       `/keykeeper/organizations/${orgId}/password-change`,
       { allowed },
+      true,
+      true,
+    );
+  }
+
+  /**
+   * What the organization does with the browsers' own card and address
+   * autofill. Owners and admins (and the MSP's admins) only; anyone else gets
+   * "not found".
+   */
+  async getOrgBrowserAutofill(orgId: string): Promise<OrgBrowserAutofill> {
+    return this.apiService.send(
+      "GET",
+      `/keykeeper/organizations/${orgId}/browser-autofill`,
+      null,
+      true,
+      true,
+    );
+  }
+
+  /** Changes it. It needs no proof: it changes a browser feature, not who gets in. */
+  async setOrgBrowserAutofill(
+    orgId: string,
+    mode: OrgBrowserAutofill["mode"],
+  ): Promise<OrgBrowserAutofill> {
+    return this.apiService.send(
+      "PUT",
+      `/keykeeper/organizations/${orgId}/browser-autofill`,
+      { mode },
       true,
       true,
     );

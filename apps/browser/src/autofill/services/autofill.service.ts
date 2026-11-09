@@ -56,6 +56,14 @@ import { AutofillMessageCommand, AutofillMessageSender } from "../enums/autofill
 import { AutofillOutcome } from "../enums/autofill-outcome.enum";
 import { InlineMenuFillTypes, type InlineMenuFillType } from "../enums/autofill-overlay.enum";
 import {
+  cardFieldsByHint,
+  hasOptionValue,
+  looksAlike,
+  monthOption,
+  nameParts,
+  yearOption,
+} from "../keykeeper/card-fields";
+import {
   applyFillRules,
   FillSource,
   mayFillValue,
@@ -63,6 +71,7 @@ import {
   visibleCustomFields,
 } from "../keykeeper/fill-rules";
 import { noteFill } from "../keykeeper/hidden-fills";
+import { phonePartFor } from "../keykeeper/identity-fields";
 import AutofillField from "../models/autofill-field";
 import AutofillPageDetails from "../models/autofill-page-details";
 import AutofillScript from "../models/autofill-script";
@@ -1408,9 +1417,17 @@ export default class AutofillService implements AutofillServiceInterface {
     }
 
     const fillFields: { [id: string]: AutofillField } = {};
+    // Keykeeper: the card's own autocomplete hints decide first, and a field
+    // hinted as something else is never guessed into a card (card-fields.ts).
+    const keykeeperHinted = cardFieldsByHint(pageDetails.fields);
+    Object.assign(fillFields, keykeeperHinted.slots);
 
     pageDetails.fields.forEach((f) => {
       if (AutofillService.isExcludedFieldType(f, AutoFillConstants.ExcludedAutofillTypes)) {
+        return;
+      }
+      // Keykeeper: see above.
+      if (f.opid != null && keykeeperHinted.leave.has(f.opid)) {
         return;
       }
 
@@ -1455,7 +1472,12 @@ export default class AutofillService implements AutofillServiceInterface {
           break;
         } else if (
           !fillFields.expMonth &&
-          AutofillService.isFieldMatch(f[attr], CreditCardAutoFillConstants.ExpiryMonthFieldNames)
+          AutofillService.isFieldMatch(
+            f[attr],
+            CreditCardAutoFillConstants.ExpiryMonthFieldNames,
+          ) &&
+          // Keykeeper: "card-m" only as a word, never in "Cardmember name".
+          !looksAlike(f[attr], "expMonth")
         ) {
           fillFields.expMonth = f;
           break;
@@ -1467,7 +1489,9 @@ export default class AutofillService implements AutofillServiceInterface {
           break;
         } else if (
           !fillFields.code &&
-          AutofillService.isFieldMatch(f[attr], CreditCardAutoFillConstants.CVVFieldNames)
+          AutofillService.isFieldMatch(f[attr], CreditCardAutoFillConstants.CVVFieldNames) &&
+          // Keykeeper: "cid" only as a word, never in "cidade" (a city).
+          !looksAlike(f[attr], "code")
         ) {
           fillFields.code = f;
           break;
@@ -1482,6 +1506,25 @@ export default class AutofillService implements AutofillServiceInterface {
     });
 
     const card = options.cipher.card;
+    // Keykeeper: the name on the card in parts, where the page asks for them.
+    const keykeeperName = nameParts(card.cardholderName);
+    for (const [slot, value] of [
+      ["cardholderGivenName", keykeeperName.given],
+      ["cardholderFamilyName", keykeeperName.family],
+    ] as const) {
+      if (fillFields[slot] && value) {
+        this.makeScriptActionWithValue(fillScript, value, fillFields[slot], filledFields);
+      }
+    }
+    // Keykeeper: for someone who can't see the item's secrets, the number and
+    // the security code go only into fields the page masks.
+    if (!maySeeSecrets(options.cipher)) {
+      for (const slot of ["number", "code"]) {
+        if (fillFields[slot] && fillFields[slot].type !== "password") {
+          delete fillFields[slot];
+        }
+      }
+    }
     this.makeScriptAction(fillScript, card, fillFields, filledFields, "cardholderName");
     this.makeScriptAction(fillScript, card, fillFields, filledFields, "number");
     this.makeScriptAction(fillScript, card, fillFields, filledFields, "code");
@@ -1490,8 +1533,14 @@ export default class AutofillService implements AutofillServiceInterface {
     // There is an expiration month field and the cipher has an expiration month value
     if (fillFields.expMonth && card.expMonth != null && AutofillService.hasValue(card.expMonth)) {
       let expMonth: string = card.expMonth;
+      // Keykeeper: a month list by its options' names and values first.
+      const keykeeperMonth = fillFields.expMonth.selectInfo?.options
+        ? monthOption(fillFields.expMonth.selectInfo.options, card.expMonth)
+        : null;
 
-      if (fillFields.expMonth.selectInfo && fillFields.expMonth.selectInfo.options) {
+      if (keykeeperMonth != null) {
+        expMonth = keykeeperMonth;
+      } else if (fillFields.expMonth.selectInfo && fillFields.expMonth.selectInfo.options) {
         let index: number | null = null;
         const siOptions = fillFields.expMonth.selectInfo.options;
         if (siOptions.length === 12) {
@@ -1522,7 +1571,12 @@ export default class AutofillService implements AutofillServiceInterface {
         expMonth = "0" + expMonth;
       }
 
-      if (fillFields.expMonth.opid != null) {
+      // Keykeeper: a list with no option for it is left alone, rather than
+      // given a value that chooses nothing.
+      const keykeeperNoMonth =
+        fillFields.expMonth.selectInfo?.options != null &&
+        !hasOptionValue(fillFields.expMonth.selectInfo.options, expMonth);
+      if (fillFields.expMonth.opid != null && !keykeeperNoMonth) {
         filledFields[fillFields.expMonth.opid] = fillFields.expMonth;
         AutofillService.fillByOpid(fillScript, fillFields.expMonth, expMonth);
       }
@@ -1531,7 +1585,13 @@ export default class AutofillService implements AutofillServiceInterface {
     // There is an expiration year field and the cipher has an expiration year value
     if (fillFields.expYear && card.expYear != null && AutofillService.hasValue(card.expYear)) {
       let expYear: string = card.expYear;
-      if (fillFields.expYear.selectInfo && fillFields.expYear.selectInfo.options) {
+      // Keykeeper: "2027" or "27", whichever the list has.
+      const keykeeperYear = fillFields.expYear.selectInfo?.options
+        ? yearOption(fillFields.expYear.selectInfo.options, card.expYear)
+        : null;
+      if (keykeeperYear != null) {
+        expYear = keykeeperYear;
+      } else if (fillFields.expYear.selectInfo && fillFields.expYear.selectInfo.options) {
         for (let i = 0; i < fillFields.expYear.selectInfo.options.length; i++) {
           const o: [string, string] = fillFields.expYear.selectInfo.options[i];
           if (o[0] === card.expYear || o[1] === card.expYear) {
@@ -1574,7 +1634,11 @@ export default class AutofillService implements AutofillServiceInterface {
         }
       }
 
-      if (fillFields.expYear.opid != null) {
+      // Keykeeper: a list with no option for it is left alone.
+      const keykeeperNoYear =
+        fillFields.expYear.selectInfo?.options != null &&
+        !hasOptionValue(fillFields.expYear.selectInfo.options, expYear);
+      if (fillFields.expYear.opid != null && !keykeeperNoYear) {
         filledFields[fillFields.expYear.opid] = fillFields.expYear;
         AutofillService.fillByOpid(fillScript, fillFields.expYear, expYear);
       }
@@ -1872,6 +1936,16 @@ export default class AutofillService implements AutofillServiceInterface {
     for (let fieldsIndex = 0; fieldsIndex < pageDetails.fields.length; fieldsIndex++) {
       const field = pageDetails.fields[fieldsIndex];
       if (this.excludeFieldFromIdentityFill(field)) {
+        continue;
+      }
+
+      // Keykeeper: a phone number asked for in parts gets each part, or
+      // nothing where the part isn't clear (identity-fields.ts).
+      const keykeeperPhonePart = phonePartFor(field, identity.phone);
+      if (keykeeperPhonePart !== undefined) {
+        if (keykeeperPhonePart) {
+          this.makeScriptActionWithValue(fillScript, keykeeperPhonePart, field, filledFields);
+        }
         continue;
       }
 

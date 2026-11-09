@@ -2,6 +2,7 @@ import { MemberDecryptionType } from "../../../auth/enums/sso";
 import { ProductTierType } from "../../../billing/enums";
 import { BaseResponse } from "../../../models/response/base.response";
 import { OrganizationUserStatusType, OrganizationUserType, ProviderType } from "../../enums";
+import { BrowserAutofillMode, browserAutofillMode } from "../../keykeeper/browser-autofill";
 import { PermissionsApi } from "../api/permissions.api";
 
 export class ProfileOrganizationResponse extends BaseResponse {
@@ -67,6 +68,8 @@ export class ProfileOrganizationResponse extends BaseResponse {
   usePhishingBlocker: boolean;
   /** Keykeeper: whether the browser extension may change its items' passwords on their sites. */
   keykeeperPasswordChange: boolean;
+  /** Keykeeper: what it does with the browsers' own card and address autofill. */
+  keykeeperBrowserAutofill: BrowserAutofillMode;
   useMyItems: boolean;
   useInviteLinks: boolean;
 
@@ -147,6 +150,10 @@ export class ProfileOrganizationResponse extends BaseResponse {
     this.usePhishingBlocker = this.getResponseProperty("UsePhishingBlocker") ?? false;
     // Keykeeper: a server that doesn't say doesn't allow it (DESIGN.md, "Assisted password change").
     this.keykeeperPasswordChange = this.getResponseProperty("KeykeeperPasswordChange") === true;
+    // Keykeeper: a server that doesn't say leaves them as they are (DESIGN.md, "Addresses and cards").
+    this.keykeeperBrowserAutofill = browserAutofillMode(
+      this.getResponseProperty("KeykeeperBrowserAutofill"),
+    );
     this.useMyItems = this.getResponseProperty("UseMyItems") ?? false;
     this.useInviteLinks = this.getResponseProperty("UseInviteLinks") ?? false;
   }

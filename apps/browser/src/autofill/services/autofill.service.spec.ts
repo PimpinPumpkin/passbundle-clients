@@ -6329,4 +6329,166 @@ describe("AutofillService", () => {
       expect(autofillService["currentlyOpeningPasswordRepromptPopout"]).toBe(false);
     });
   });
+
+  // Keykeeper: cards and identities on a checkout (DESIGN.md, "Addresses and
+  // cards"; card-fields.ts, identity-fields.ts).
+  describe("Keykeeper: a checkout's card and address fields", () => {
+    const field = (opid: string, custom: Record<string, unknown> = {}) =>
+      createAutofillFieldMock({
+        opid,
+        htmlID: opid,
+        htmlName: opid,
+        title: "",
+        "label-left": "",
+        "label-right": "",
+        "label-top": "",
+        "label-tag": "",
+        "label-aria": "",
+        placeholder: "",
+        autoCompleteType: "",
+        selectInfo: null,
+        ...custom,
+      });
+    const select = (opid: string, options: [string, string][], custom = {}) =>
+      field(opid, { tagName: "select", type: "select-one", selectInfo: { options }, ...custom });
+    const fills = (script: AutofillScript) =>
+      Object.fromEntries(
+        script.script
+          .filter(([action]) => action === "fill_by_opid")
+          .map(([, opid, v]) => [opid, v]),
+      );
+    const card = (custom: Partial<CardView> = {}) =>
+      ({
+        cardholderName: "Alice B Example",
+        number: "4111111111111111",
+        expMonth: "3",
+        expYear: "2027",
+        code: "123",
+        brand: "Visa",
+        ...custom,
+      }) as CardView;
+    const cardFill = async (fields: AutofillField[], c = card(), viewPassword = true) => {
+      const options = createGenerateFillScriptOptionsMock({
+        cipher: mock<CipherView>({ viewPassword, card: c }),
+      });
+      const script = await autofillService["generateCardFillScript"](
+        createAutofillScriptMock({ script: [] }),
+        createAutofillPageDetailsMock({ fields }),
+        {},
+        options,
+      );
+      return fills(script);
+    };
+    const months: [string, string][] = [
+      ["", ""],
+      ["month", "month"],
+      ...Array.from({ length: 12 }, (_, i): [string, string] => [
+        String(i + 1).padStart(2, "0"),
+        String(i + 1).padStart(2, "0"),
+      ]),
+    ];
+
+    it("puts the name on the card only in the card's own field, after a shipping name", async () => {
+      const filled = await cardFill([
+        field("name", { autoCompleteType: "shipping name" }),
+        field("city", { autoCompleteType: "shipping address-level2", htmlName: "cidade" }),
+        field("ccname", { autoCompleteType: "cc-name" }),
+        field("ccnumber", { autoCompleteType: "cc-number" }),
+        field("cvc", { autoCompleteType: "cc-csc" }),
+      ]);
+      expect(filled).toEqual({
+        ccname: "Alice B Example",
+        ccnumber: "4111111111111111",
+        cvc: "123",
+      });
+    });
+
+    it("never takes look-alike words for the security code or the month", async () => {
+      const filled = await cardFill([
+        field("cidade", { "label-tag": "Cidade" }),
+        field("member", { htmlName: "cardmembername", "label-tag": "Cardmember name" }),
+        field("number", { htmlName: "card-number" }),
+        field("cid", { htmlName: "cid" }),
+      ]);
+      expect(filled.cidade).toBeUndefined();
+      expect(filled.member).toBeUndefined();
+      expect(filled.number).toBe("4111111111111111");
+      expect(filled.cid).toBe("123");
+    });
+
+    it("splits the name on the card where the page asks for it in parts", async () => {
+      const filled = await cardFill([
+        field("first", { autoCompleteType: "cc-given-name" }),
+        field("last", { autoCompleteType: "cc-family-name" }),
+      ]);
+      expect(filled).toEqual({ first: "Alice B", last: "Example" });
+    });
+
+    it("chooses month and year options by their values, and leaves a list with no match alone", async () => {
+      const years: [string, string][] = [
+        ["year", ""],
+        ...Array.from({ length: 10 }, (_, i): [string, string] => [
+          String(2026 + i),
+          String(2026 + i),
+        ]),
+      ];
+      const lists = [
+        select("month", months, { autoCompleteType: "cc-exp-month" }),
+        select("year", years, { autoCompleteType: "cc-exp-year" }),
+      ];
+      expect(await cardFill(lists, card({ expYear: "27" }))).toEqual({ month: "03", year: "2027" });
+      // A list numbered from 0, by its options' names.
+      const named = select(
+        "month",
+        [
+          ["january", "0"],
+          ["february", "1"],
+          ["march", "2"],
+        ],
+        { autoCompleteType: "cc-exp-month" },
+      );
+      expect((await cardFill([named]))["month"]).toBe("2");
+      // No option for 2040: the list is left as it is.
+      expect((await cardFill(lists, card({ expYear: "2040" })))["year"]).toBeUndefined();
+    });
+
+    it("types the number and the code only into masked fields for someone who can't see them", async () => {
+      const filled = await cardFill(
+        [
+          field("number", { autoCompleteType: "cc-number" }),
+          field("cvc", { autoCompleteType: "cc-csc", type: "password" }),
+          field("ccname", { autoCompleteType: "cc-name" }),
+        ],
+        card(),
+        false,
+      );
+      expect(filled).toEqual({ cvc: "123", ccname: "Alice B Example" });
+    });
+
+    it("gives a phone number in parts each part, and the country code field no country", async () => {
+      const identity = {
+        firstName: "Alice",
+        lastName: "Example",
+        phone: "+1 555-123-4567",
+        country: "US",
+      } as IdentityView;
+      const options = createGenerateFillScriptOptionsMock({
+        cipher: mock<CipherView>({ viewPassword: true, identity }),
+      });
+      const script = await autofillService["generateIdentityFillScript"](
+        createAutofillScriptMock({ script: [] }),
+        createAutofillPageDetailsMock({
+          fields: [
+            field("cc", { autoCompleteType: "tel-country-code" }),
+            field("area", { autoCompleteType: "tel-area-code" }),
+            field("local", { autoCompleteType: "tel-local" }),
+            field("ext", { autoCompleteType: "tel-extension" }),
+          ],
+        }),
+        {},
+        options,
+      );
+      expect(fills(script)).toEqual({ cc: "+1", area: "555", local: "1234567" });
+    });
+  });
 });

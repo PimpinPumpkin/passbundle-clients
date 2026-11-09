@@ -559,4 +559,18 @@ describe("EventService assisted password change events", () => {
     } as EventResponse);
     expect(off.message).toBe("keykeeperPasswordChangeOffEvent:");
   });
+
+  it("says what the organization did with the browsers' card and address autofill", async () => {
+    const said = async (type: EventType) =>
+      (await sut.getEventInfo({ type } as EventResponse)).humanReadableMessage;
+    expect(await said(EventType.Keykeeper_BrowserAutofillUnchanged)).toBe(
+      "keykeeperBrowserAutofillUnchangedEvent:",
+    );
+    expect(await said(EventType.Keykeeper_BrowserAutofillOff)).toBe(
+      "keykeeperBrowserAutofillOffEvent:",
+    );
+    expect(await said(EventType.Keykeeper_BrowserAutofillOffAndImport)).toBe(
+      "keykeeperBrowserAutofillOffAndImportEvent:",
+    );
+  });
 });

@@ -1511,5 +1511,20 @@
   },
   "keykeeperPasswordChangeOffPolicyDesc": {
     "message": "Change password in the browser extension won't change the passwords of this organization's items on their sites. It only opens the site's change-password page, and people change it themselves."
+  },
+  "keykeeperBrowserAutofillUnchangedEvent": {
+    "message": "Left the browsers' card and address autofill as they are."
+  },
+  "keykeeperBrowserAutofillOffEvent": {
+    "message": "Turned off the browsers' card and address autofill."
+  },
+  "keykeeperBrowserAutofillOffAndImportEvent": {
+    "message": "Turned off the browsers' card and address autofill, offering to bring them in."
+  },
+  "keykeeperBrowserAutofillOffPolicy": {
+    "message": "Turn off the browsers' card and address autofill"
+  },
+  "keykeeperBrowserAutofillOffPolicyDesc": {
+    "message": "Chrome, Edge, and Firefox stop saving and filling cards and addresses in people's work profiles, and on computers the install command set up. What they saved stays in the browser."
   }
 }
