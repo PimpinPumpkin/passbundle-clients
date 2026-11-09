@@ -94,6 +94,8 @@ describe("Keykeeper assisted password change: the background", () => {
   let send: jest.Mock;
   let generated: string;
   let changePage: string | null;
+  let allowed: Record<string, boolean>;
+  let collectEvent: jest.Mock;
   let service: KeykeeperPasswordChange;
 
   const listener = (event: { addListener: unknown }) =>
@@ -135,6 +137,10 @@ describe("Keykeeper assisted password change: the background", () => {
     log = [];
     generated = "Generated-password-20!";
     changePage = null;
+    allowed = {};
+    collectEvent = jest.fn(async () => {
+      log.push("event");
+    });
     read = jest.fn((): PageReading | undefined => formReading());
     fill = jest.fn((_message: object): FillAnswer | undefined => ({
       url: formPage,
@@ -213,6 +219,8 @@ describe("Keykeeper assisted password change: the background", () => {
       send,
       t: (key, ...subs) => [key, ...subs].join(" "),
       changePageFor: () => changePage,
+      organizationsAllowing: async () => (orgId) => allowed[orgId] === true,
+      collectEvent,
       recipeFor: () => null,
       logError: jest.fn(),
     });
@@ -249,6 +257,13 @@ describe("Keykeeper assisted password change: the background", () => {
       item.organizationId = "org-1";
       expect(await start()).toEqual({ started: false, reason: "notAllowed" });
       expect(BrowserApi.createNewTab).not.toHaveBeenCalled();
+    });
+
+    it("starts for an organization's item only where the organization allows it", async () => {
+      item.organizationId = "org-1";
+      expect(await start()).toEqual({ started: false, reason: "notAllowed" });
+      allowed["org-1"] = true;
+      expect(await start()).toEqual({ started: true });
     });
 
     it("needs the master password asked for an item that asks for it", async () => {
@@ -319,6 +334,37 @@ describe("Keykeeper assisted password change: the background", () => {
       await load(formPage);
       await wait(1_000);
       expect(fill).toHaveBeenCalled();
+    });
+
+    it("tells an organization's event log the password changed this way, right after the save", async () => {
+      item.organizationId = "org-1";
+      allowed["org-1"] = true;
+      await start();
+      await load(formPage);
+      await wait(1_000);
+      expect(collectEvent).toHaveBeenCalledWith(1192, cipherId, "org-1");
+      expect(log.indexOf("save")).toBeLessThan(log.indexOf("event"));
+      expect(log.indexOf("event")).toBeLessThan(log.indexOf(PAGE_FILL));
+      expect(collectEvent).toHaveBeenCalledTimes(1);
+    });
+
+    it("sends no event for a personal item", async () => {
+      await start();
+      await load(formPage);
+      await wait(1_000);
+      expect(collectEvent).not.toHaveBeenCalled();
+    });
+
+    it("stops before saving when the organization turned it off meanwhile", async () => {
+      item.organizationId = "org-1";
+      allowed["org-1"] = true;
+      await start();
+      allowed["org-1"] = false;
+      await load(formPage);
+      await wait(1_000);
+      expect(save).not.toHaveBeenCalled();
+      expect(collectEvent).not.toHaveBeenCalled();
+      expect(service.status(cipherId)?.note).toBe("stopped.changedMeanwhile");
     });
 
     it("fills nothing when the save fails, and says nothing changed", async () => {

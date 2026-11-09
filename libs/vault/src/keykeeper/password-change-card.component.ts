@@ -12,6 +12,7 @@ import { firstValueFrom } from "rxjs";
 
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
+import { EventCollectionService, EventType } from "@bitwarden/common/dirt/event-logs";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
@@ -88,6 +89,7 @@ import { KeykeeperPasswordChangeService } from "./password-change.service";
 export class KeykeeperPasswordChangeCardComponent {
   private readonly accountService = inject(AccountService);
   private readonly cipherService = inject(CipherService);
+  private readonly eventCollectionService = inject(EventCollectionService);
   private readonly i18nService = inject(I18nService);
   private readonly logService = inject(LogService);
   private readonly toastService = inject(ToastService);
@@ -160,7 +162,20 @@ export class KeykeeperPasswordChangeCardComponent {
     if (cipher == null || draft == null) {
       return;
     }
-    await this.save(cipher, draft, "keykeeperPasswordChangePutBackDone");
+    if (await this.save(cipher, draft, "keykeeperPasswordChangePutBackDone")) {
+      // An organization's item: its event log says the old password came back
+      // after a password change (DESIGN.md, "Assisted password change", "Activity").
+      if (cipher.organizationId != null) {
+        await this.eventCollectionService
+          .collect(
+            EventType.Keykeeper_CipherPasswordPutBack,
+            cipher.id,
+            true,
+            cipher.organizationId,
+          )
+          .catch((e: unknown) => this.logService.error(e));
+      }
+    }
   };
 
   protected readonly itWorked = async () => {
@@ -171,18 +186,21 @@ export class KeykeeperPasswordChangeCardComponent {
     await this.save(cipher, withChangeConfirmed(cipher), "keykeeperPasswordChangeItWorkedDone");
   };
 
-  private async save(current: CipherView, draft: CipherView, doneKey: string) {
+  /** Saves the item, and answers whether it did. */
+  private async save(current: CipherView, draft: CipherView, doneKey: string): Promise<boolean> {
     try {
       const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
       const saved = await this.cipherService.updateWithServer(draft, userId, current);
       this.toastService.showToast({ variant: "success", message: this.i18nService.t(doneKey) });
       this.saved.emit(saved);
+      return true;
     } catch (e) {
       this.logService.error(e);
       this.toastService.showToast({
         variant: "error",
         message: this.i18nService.t("keykeeperPasswordChangeSaveFailed"),
       });
+      return false;
     }
   }
 }

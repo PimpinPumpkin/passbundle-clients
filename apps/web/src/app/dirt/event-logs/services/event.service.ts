@@ -145,6 +145,27 @@ export class EventService {
           this.getShortId(ev.cipherId),
         );
         break;
+      // Keykeeper: assisted password change, as the extension and web vault report it.
+      case EventType.Keykeeper_CipherPasswordChanged:
+        msg = this.i18nService.t(
+          "keykeeperPasswordChangedItemId",
+          this.formatCipherId(ev, options),
+        );
+        humanReadableMsg = this.i18nService.t(
+          "keykeeperPasswordChangedItemId",
+          this.getShortId(ev.cipherId),
+        );
+        break;
+      case EventType.Keykeeper_CipherPasswordPutBack:
+        msg = this.i18nService.t(
+          "keykeeperPasswordPutBackItemId",
+          this.formatCipherId(ev, options),
+        );
+        humanReadableMsg = this.i18nService.t(
+          "keykeeperPasswordPutBackItemId",
+          this.getShortId(ev.cipherId),
+        );
+        break;
       case EventType.Cipher_Deleted:
         msg = this.i18nService.t("permanentlyDeletedItemId", this.formatCipherId(ev, options));
         humanReadableMsg = this.i18nService.t(
@@ -639,6 +660,12 @@ export class EventService {
         break;
       case EventType.Keykeeper_EveryoneTwoStepOff:
         msg = humanReadableMsg = this.i18nService.t("keykeeperEveryoneTwoStepOff");
+        break;
+      case EventType.Keykeeper_PasswordChangeOn:
+        msg = humanReadableMsg = this.i18nService.t("keykeeperPasswordChangeOnEvent");
+        break;
+      case EventType.Keykeeper_PasswordChangeOff:
+        msg = humanReadableMsg = this.i18nService.t("keykeeperPasswordChangeOffEvent");
         break;
       case EventType.Keykeeper_SsoSettingsChanged:
         msg = this.i18nService.t(

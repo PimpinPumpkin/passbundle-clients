@@ -529,6 +529,13 @@ export type SsoSettings = {
  */
 export const KEYKEEPER_ADMIN_TWO_STEP_POLICY = 1000;
 
+/**
+ * The type number of the MSP default "Turn off assisted password change",
+ * which isn't an upstream policy either: on, a client turns it off for its
+ * items. See DESIGN.md, "Assisted password change", "Organizations".
+ */
+export const KEYKEEPER_PASSWORD_CHANGE_OFF_POLICY = 1001;
+
 /** Someone two-step login for admins covers who hasn't set up a method that counts. */
 export type TwoStepNotSetUp = {
   /** Their membership, in an organization's list. */
@@ -549,6 +556,18 @@ export type TwoStepNotSetUp = {
 };
 
 /** An organization's two-step login for admins, as its Settings page shows it. */
+/**
+ * Keykeeper: whether an organization allows assisted password change on its
+ * items (DESIGN.md, "Assisted password change", "Organizations").
+ */
+export type OrgPasswordChange = {
+  allowed: boolean;
+  /** The MSP that manages the organization, if one does. */
+  msp: { id: string; name: string } | null;
+  /** The MSP requires its setting for every client, so it can't be changed here. */
+  requiredByMsp: boolean;
+};
+
 export type OrgAdminTwoStep = {
   required: boolean;
   /**

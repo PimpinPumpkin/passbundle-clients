@@ -256,8 +256,8 @@ export type PasswordChangeItem = ItemLike & {
  * login they can edit and see the password of (for an organization's item,
  * its folder permissions decide both), with a password saved, a website it
  * can start from over https, and not in the trash. An organization's item
- * also needs the organization to allow it (`organizationAllows`), which none
- * does yet: see DESIGN.md, "Organizations".
+ * also needs the organization to allow it (`organizationAllows`, from the
+ * person's sync: `allowedIn`); see DESIGN.md, "Organizations".
  */
 export function mayChangePassword(
   item: PasswordChangeItem | null | undefined,
@@ -278,9 +278,26 @@ export function mayChangePassword(
   return item.organizationId == null || organizationAllows(item.organizationId);
 }
 
+/** What the person's sync says about an organization. */
+export type PasswordChangeOrganization = { id: string; keykeeperPasswordChange?: boolean | null };
+
 /**
- * Organizations that allow assisted password change on their items. None yet:
- * the switch is a setting of PassBundle's own that isn't built (DESIGN.md,
- * "Organizations"), and organization items wait for it.
+ * Whether an organization allows assisted password change on its items, as
+ * the person's sync says: on unless it turned it off (DESIGN.md,
+ * "Organizations"). One the person isn't in, or one that doesn't say (an
+ * older server), doesn't.
  */
-export const organizationAllowsPasswordChange = (_organizationId: string): boolean => false;
+export function organizationAllowsPasswordChange(
+  organizations: readonly PasswordChangeOrganization[] | null | undefined,
+  organizationId: string,
+): boolean {
+  return (organizations ?? []).some(
+    (o) => o.id === organizationId && o.keykeeperPasswordChange === true,
+  );
+}
+
+/** `organizationAllowsPasswordChange` for one person's organizations, as `mayChangePassword` takes it. */
+export const allowedIn =
+  (organizations: readonly PasswordChangeOrganization[] | null | undefined) =>
+  (organizationId: string): boolean =>
+    organizationAllowsPasswordChange(organizations, organizationId);

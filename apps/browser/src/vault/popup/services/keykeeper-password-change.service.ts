@@ -5,11 +5,15 @@
 // background to start.
 
 import { inject, Injectable } from "@angular/core";
+import { toSignal } from "@angular/core/rxjs-interop";
+import { of, switchMap } from "rxjs";
 
+import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
+import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import {
   mayChangePassword,
-  organizationAllowsPasswordChange,
+  allowedIn,
   passwordChangeWebsite,
 } from "@bitwarden/common/vault/keykeeper/password-change";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
@@ -37,12 +41,22 @@ const REFUSALS: Record<StartRefusal, string> = {
 @Injectable()
 export class BrowserPasswordChangeService extends KeykeeperPasswordChangeService {
   private readonly dialogService = inject(DialogService);
+  private readonly organizationService = inject(OrganizationService);
   private readonly i18nService = inject(I18nService);
   private readonly passwordRepromptService = inject(PasswordRepromptService);
   private readonly toastService = inject(ToastService);
+  /** The person's organizations, as their sync says, for whether each allows it on its items. */
+  private readonly organizations = toSignal(
+    inject(AccountService).activeAccount$.pipe(
+      switchMap((account) =>
+        account == null ? of([]) : this.organizationService.organizations$(account.id),
+      ),
+    ),
+    { initialValue: [] },
+  );
 
   available(cipher: CipherView): boolean {
-    return mayChangePassword(cipher, organizationAllowsPasswordChange);
+    return mayChangePassword(cipher, allowedIn(this.organizations()));
   }
 
   async confirmAndStart(cipher: CipherView): Promise<boolean> {

@@ -1,6 +1,10 @@
 import { TestBed } from "@angular/core/testing";
 import { mock, MockProxy } from "jest-mock-extended";
+import { BehaviorSubject, of } from "rxjs";
 
+import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
+import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
+import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
@@ -35,6 +39,7 @@ describe("BrowserPasswordChangeService", () => {
   let reprompt: MockProxy<PasswordRepromptService>;
   let toastService: MockProxy<ToastService>;
   let send: jest.SpyInstance;
+  let organizations$: BehaviorSubject<Organization[]>;
 
   beforeEach(() => {
     dialogService = mock<DialogService>();
@@ -46,6 +51,7 @@ describe("BrowserPasswordChangeService", () => {
       .spyOn(BrowserApi, "sendMessageWithResponse")
       .mockResolvedValue({ result: { started: true } });
     jest.spyOn(BrowserPopupUtils, "inPopup").mockReturnValue(false);
+    organizations$ = new BehaviorSubject<Organization[]>([]);
     TestBed.configureTestingModule({
       providers: [
         BrowserPasswordChangeService,
@@ -53,6 +59,8 @@ describe("BrowserPasswordChangeService", () => {
         { provide: PasswordRepromptService, useValue: reprompt },
         { provide: ToastService, useValue: toastService },
         { provide: I18nService, useValue: { t: (key: string) => key } },
+        { provide: AccountService, useValue: { activeAccount$: of({ id: "user-1" }) } },
+        { provide: OrganizationService, useValue: { organizations$: () => organizations$ } },
       ],
     });
     service = TestBed.inject(BrowserPasswordChangeService);
@@ -60,10 +68,14 @@ describe("BrowserPasswordChangeService", () => {
 
   afterEach(() => jest.restoreAllMocks());
 
-  it("is available for a personal login the person can edit and see, not for an organization's yet", () => {
+  it("is available for a login the person can edit and see, an organization's where it allows it", () => {
     expect(service.available(login())).toBe(true);
     const shared = login();
     shared.organizationId = "org-1";
+    expect(service.available(shared)).toBe(false);
+    organizations$.next([{ id: "org-1", keykeeperPasswordChange: true } as Organization]);
+    expect(service.available(shared)).toBe(true);
+    organizations$.next([{ id: "org-1", keykeeperPasswordChange: false } as Organization]);
     expect(service.available(shared)).toBe(false);
     const hidden = login();
     hidden.viewPassword = false;
