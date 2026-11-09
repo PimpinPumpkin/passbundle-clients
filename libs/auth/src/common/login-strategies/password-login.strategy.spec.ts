@@ -8,6 +8,7 @@ import { DefaultPolicyService } from "@bitwarden/common/admin-console/services/p
 import { TokenService } from "@bitwarden/common/auth/abstractions/token.service";
 import { TwoFactorProviderType } from "@bitwarden/common/auth/enums/two-factor-provider-type";
 import { ForceSetPasswordReason } from "@bitwarden/common/auth/models/domain/force-set-password-reason";
+import { IdentityDeviceVerificationResponse } from "@bitwarden/common/auth/models/response/identity-device-verification.response";
 import { IdentityKeykeeperTwoStepSetupResponse } from "@bitwarden/common/auth/models/response/identity-keykeeper-two-step-setup.response";
 import { IdentitySsoRequiredResponse } from "@bitwarden/common/auth/models/response/identity-sso-required.response";
 import { IdentityTokenResponse } from "@bitwarden/common/auth/models/response/identity-token.response";
@@ -682,6 +683,43 @@ describe("PasswordLoginStrategy", () => {
         }),
       );
       expect(result.userId).toBe(userId);
+    });
+
+    it("Keykeeper: with no code, sends the new-device check's own token, so the server continues that check", async () => {
+      const token = "t".repeat(43);
+      const held = new IdentityDeviceVerificationResponse({
+        ErrorModel: { Message: "new device verification required" },
+        KeykeeperNewDeviceCheck: {
+          id: "c1",
+          token,
+          number: "47",
+          status: "waiting",
+          expiresAt: "2026-11-09T12:10:00Z",
+          approvers: true,
+          email: "later",
+        },
+      });
+      apiService.postIdentityToken.mockResolvedValueOnce(held);
+      const first = await passwordLoginStrategy.logIn(credentials);
+      expect(first.requiresDeviceVerification).toBe(true);
+      expect(first.keykeeperNewDeviceCheck?.number).toBe("47");
+
+      apiService.postIdentityToken.mockResolvedValueOnce(held);
+      await passwordLoginStrategy.logInNewDeviceVerification("");
+      expect(apiService.postIdentityToken).toHaveBeenLastCalledWith(
+        expect.objectContaining({ newDeviceOtp: token }),
+      );
+      // A code given is sent instead, and the token is kept for the next time.
+      apiService.postIdentityToken.mockResolvedValueOnce(held);
+      await passwordLoginStrategy.logInNewDeviceVerification("12345678");
+      expect(apiService.postIdentityToken).toHaveBeenLastCalledWith(
+        expect.objectContaining({ newDeviceOtp: "12345678" }),
+      );
+      apiService.postIdentityToken.mockResolvedValueOnce(held);
+      await passwordLoginStrategy.logInNewDeviceVerification("");
+      expect(apiService.postIdentityToken).toHaveBeenLastCalledWith(
+        expect.objectContaining({ newDeviceOtp: token }),
+      );
     });
 
     it("sets authResult.masterPassword from cache", async () => {

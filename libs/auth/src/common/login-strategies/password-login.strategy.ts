@@ -303,7 +303,10 @@ export class PasswordLoginStrategy extends LoginStrategy<PasswordLoginStrategyDa
 
   async logInNewDeviceVerification(deviceVerificationOtp: string): Promise<AuthResult> {
     const data = this.getLoginStrategyDataOrThrow();
-    data.tokenRequest.newDeviceOtp = deviceVerificationOtp;
+    // Keykeeper: with no code, the new-device check's own token, so the
+    // server continues that check (DESIGN.md, "New-device check").
+    data.tokenRequest.newDeviceOtp =
+      deviceVerificationOtp || data.tokenRequest.keykeeperNewDeviceToken;
     this.cache.next(data);
 
     const [authResult] = await this.startLogIn();

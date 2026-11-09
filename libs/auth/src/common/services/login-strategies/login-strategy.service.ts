@@ -259,6 +259,10 @@ export class LoginStrategyService implements LoginStrategyServiceAbstraction {
       // Only clear cache if device verification succeeds
       if (result !== null && !result.requiresDeviceVerification) {
         await this.clearCache();
+      } else if (result?.requiresDeviceVerification) {
+        // Keykeeper: still waiting, keep what changed (the new-device check's
+        // token) for a popup opened again.
+        await this.loginStrategyCacheService.setCacheData(strategy.exportCache());
       }
       return result;
     } catch (e) {
