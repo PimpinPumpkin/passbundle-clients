@@ -1,10 +1,14 @@
-import { KEYKEEPER_ADMIN_TWO_STEP_POLICY } from "@bitwarden/admin-console/common";
+import {
+  KEYKEEPER_ADMIN_TWO_STEP_POLICY,
+  KEYKEEPER_MEMBER_HEALTH_POLICY,
+} from "@bitwarden/admin-console/common";
 import { PolicyType } from "@bitwarden/common/admin-console/enums";
 
 import { BasePolicyEditDefinition } from "../../admin-console/organizations/policies";
 import { membersPhrase, twoStepRoleLabel } from "../organizations/admin-two-step.component";
 
 import { everyoneData, requiresEveryone, withAdminTwoStep } from "./admin-two-step-policy";
+import { KeykeeperMemberHealthPolicy, withMemberHealth } from "./member-health-policy";
 
 describe("two-step login for admins as an MSP default", () => {
   it("keeps its one option, everyone else too, and null without it", () => {
@@ -38,6 +42,28 @@ describe("two-step login for admins as an MSP default", () => {
       KEYKEEPER_ADMIN_TWO_STEP_POLICY,
       PolicyType.SingleOrg,
     ]);
+  });
+});
+
+describe("Members' own passwords as an MSP default", () => {
+  it("comes last when the server offers it", () => {
+    const definition = (type: number) => ({ type }) as BasePolicyEditDefinition;
+    const upstream = [
+      definition(PolicyType.TwoFactorAuthentication),
+      definition(PolicyType.SingleOrg),
+    ];
+    expect(withMemberHealth(upstream, []).map((d) => d.type)).toEqual([
+      PolicyType.TwoFactorAuthentication,
+      PolicyType.SingleOrg,
+    ]);
+    const offered = withMemberHealth(upstream, [KEYKEEPER_MEMBER_HEALTH_POLICY]);
+    expect(offered.map((d) => d.type)).toEqual([
+      PolicyType.TwoFactorAuthentication,
+      PolicyType.SingleOrg,
+      KEYKEEPER_MEMBER_HEALTH_POLICY,
+    ]);
+    expect(offered.at(-1)).toBeInstanceOf(KeykeeperMemberHealthPolicy);
+    expect(offered.at(-1)!.name).toBe("keykeeperMemberHealthPolicy");
   });
 });
 

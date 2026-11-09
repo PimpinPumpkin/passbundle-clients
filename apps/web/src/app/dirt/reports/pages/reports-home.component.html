@@ -2,10 +2,10 @@
 
 <bit-container>
   <p>{{ "reportsDesc" | i18n }}</p>
-  <!-- Keykeeper: who sees the numbers for the person's own passwords (DESIGN.md, "Members' own passwords"). -->
-  @if (keykeeperSeenByAdmins()) {
+  <!-- Keykeeper: who sees the numbers for the person's own passwords, by name (DESIGN.md, "Members' own passwords"). -->
+  @if (keykeeperSeenBy(); as organizations) {
     <p class="tw-text-sm tw-text-muted" data-testid="keykeeper-own-health-seen-by">
-      {{ "keykeeperOwnHealthSeenBy" | i18n }}
+      {{ "keykeeperOwnHealthSeenBy" | i18n: organizations }}
     </p>
   }
 

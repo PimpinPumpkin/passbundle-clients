@@ -536,6 +536,23 @@ export const KEYKEEPER_ADMIN_TWO_STEP_POLICY = 1000;
  */
 export const KEYKEEPER_PASSWORD_CHANGE_OFF_POLICY = 1001;
 
+/**
+ * The type number of the MSP default "Members' own passwords": whether each
+ * client's owners and admins see how many of its members' own passwords are
+ * weak, reused, or exposed. Not an upstream policy either. See DESIGN.md,
+ * "Members' own passwords".
+ */
+export const KEYKEEPER_MEMBER_HEALTH_POLICY = 1002;
+
+/** An organization's "Members' own passwords", as its Settings page shows it. */
+export type OrgMemberHealthSetting = {
+  enabled: boolean;
+  /** The MSP that manages the organization, if one does. */
+  msp: { id: string; name: string } | null;
+  /** The MSP requires it for every client, so it can't be changed here. */
+  requiredByMsp: boolean;
+};
+
 /** Someone two-step login for admins covers who hasn't set up a method that counts. */
 export type TwoStepNotSetUp = {
   /** Their membership, in an organization's list. */

@@ -223,6 +223,13 @@ describe("Keykeeper enrollment through the install command", () => {
     }
   });
 
+  it("says in its question when the organization's admins will see how many of their own passwords are weak, reused, or exposed", async () => {
+    const t = setUp();
+    t.respond({ ...t.info(false), memberHealth: true });
+    expect(await t.enrollment.run(userId)).toBe("joined");
+    expect(t.asked).toEqual([expect.objectContaining({ memberHealth: true })]);
+  });
+
   it("joins once the person signs in to the right server, after saying they weren't", async () => {
     const elsewhere = setUp({ accountServer: "https://vault.other.test" });
     await elsewhere.enrollment.run(userId);
@@ -243,6 +250,7 @@ describe("Keykeeper enrollment through the install command", () => {
       {
         organizationName: "Acme Dental",
         accountRecovery: true,
+        memberHealth: false,
         fingerprint: ["alpha", "bravo", "charlie"],
         adminElsewhere: [],
       },

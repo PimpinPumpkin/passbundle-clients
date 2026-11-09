@@ -103,6 +103,12 @@
   "keykeeperMemberHealthPrivacy": {
     "message": "Each member's apps count their own logins and send only these numbers. Neither you nor the server sees which logins, their names, or their passwords. This organization's items are in the other reports."
   },
+  "keykeeperMemberHealthOff": {
+    "message": "Members' own passwords is off for this organization, so members' apps don't send these numbers and there's nothing to show."
+  },
+  "keykeeperMemberHealthTurnOn": {
+    "message": "Turn it on in Joining and security"
+  },
   "keykeeperMemberHealthCouldntLoad": {
     "message": "The numbers couldn't be loaded. Try again later."
   },
@@ -153,7 +159,13 @@
     }
   },
   "keykeeperOwnHealthSeenBy": {
-    "message": "Owners and admins of the organizations you're a member of see how many of your own passwords are weak, reused, or exposed. Never which ones."
+    "message": "Admins at $ORGANIZATIONS$ see how many of your own passwords are weak, reused, or exposed. Never which ones.",
+    "placeholders": {
+      "organizations": {
+        "content": "$1",
+        "example": "Harbor Dental"
+      }
+    }
   },
   "keykeeperExpires": {
     "message": "Expires"
@@ -1020,6 +1032,18 @@
   },
   "keykeeperAdminTwoStepPolicyDesc": {
     "message": "Owners, admins, and custom roles that manage members, policies, or account recovery must use an authenticator app, a security key or passkey, or Duo. Email codes don't count. Admins who sign in with the organization's own single sign-on are covered by it there."
+  },
+  "keykeeperMemberHealthPolicy": {
+    "message": "Members' own passwords"
+  },
+  "keykeeperMemberHealthPolicyDesc": {
+    "message": "Owners and admins see how many of each member's own passwords are weak, reused, or exposed, never which ones, and members are told on their Health page."
+  },
+  "keykeeperMemberHealthOn": {
+    "message": "Turned on Members' own passwords."
+  },
+  "keykeeperMemberHealthOffEvent": {
+    "message": "Turned off Members' own passwords."
   },
   "keykeeperReservedFieldName": {
     "message": "Names starting with \"keykeeper.\" are reserved."
