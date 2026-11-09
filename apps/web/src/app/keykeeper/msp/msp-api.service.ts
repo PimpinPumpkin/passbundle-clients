@@ -30,6 +30,7 @@ import {
   MspRemoval,
   MspTwoStep,
   OrgAdminTwoStep,
+  OrgMemberHealthSetting,
   OrgPasswordChange,
   MspRole,
   MspSiteFixes,
@@ -621,6 +622,32 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
       "PUT",
       `/keykeeper/organizations/${orgId}/admin-two-step`,
       { required, ...(everyone == null ? {} : { everyone }), ...verificationFields(verification) },
+      true,
+      true,
+    );
+  }
+
+  /**
+   * An organization's "Members' own passwords", for its owners and admins (and
+   * its MSP's admins); "not found" for anyone else. See DESIGN.md, "Members'
+   * own passwords".
+   */
+  async getOrgMemberHealth(orgId: string): Promise<OrgMemberHealthSetting> {
+    return this.apiService.send(
+      "GET",
+      `/keykeeper/organizations/${orgId}/member-health-setting`,
+      null,
+      true,
+      true,
+    );
+  }
+
+  /** Turns it on or off; off deletes the numbers no other organization sees. */
+  async setOrgMemberHealth(orgId: string, enabled: boolean): Promise<OrgMemberHealthSetting> {
+    return this.apiService.send(
+      "PUT",
+      `/keykeeper/organizations/${orgId}/member-health-setting`,
+      { enabled },
       true,
       true,
     );

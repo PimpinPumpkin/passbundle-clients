@@ -9,6 +9,12 @@ export const JOIN_ANSWER_KEY = "keykeeper.joinAnswer";
 export type JoinRequest = {
   organizationName: string;
   accountRecovery: boolean;
+  /**
+   * The organization has "Members' own passwords" on: its admins will see how
+   * many of the person's own passwords are weak, reused, or exposed. Older
+   * servers leave it out.
+   */
+  memberHealth?: boolean;
   /** The organization's fingerprint phrase, when it has a public key. */
   fingerprint: string[] | null;
   /** Organizations where the person is an owner or admin, which account recovery would reach too. */

@@ -59,6 +59,11 @@ export function describeEvent(
       return detail === "off"
         ? `${actor} stopped requiring two-step login of everyone in ${org}`
         : `${actor} required two-step login of everyone in ${org}`;
+    // Members' own passwords, changed in the client's own settings.
+    case "client_member_health_set":
+      return detail === "off"
+        ? `${actor} turned off Members' own passwords in ${org}`
+        : `${actor} turned on Members' own passwords in ${org}`;
     case "template_added":
       return `${actor} added ${theTemplate} for ${clients || "clients"}`;
     case "template_changed":
