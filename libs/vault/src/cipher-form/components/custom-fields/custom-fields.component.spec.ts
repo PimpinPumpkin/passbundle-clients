@@ -581,6 +581,24 @@ describe("CustomFieldsComponent", () => {
     expect(toggleItems).toHaveLength(4);
   });
 
+  // Keykeeper: a custom field is as wide as every other field of the form, so
+  // its edit and reorder buttons are the field's own last buttons. A checkbox
+  // has no field around it, so its two buttons end its row instead.
+  it("Keykeeper: keeps each field's edit and reorder buttons inside the field", () => {
+    originalCipherView.fields = mockFieldViews;
+    originalCipherView.viewPassword = true;
+    config.mode = "edit";
+
+    component.ngOnInit();
+    fixture.detectChanges();
+
+    const count = (selector: string) => fixture.debugElement.queryAll(By.css(selector)).length;
+    expect(count('bit-form-field button[data-testid="reorder-toggle-button"]')).toBe(3);
+    expect(count('bit-form-field button[data-testid="edit-custom-field-button"]')).toBe(3);
+    expect(count('button[data-testid="reorder-toggle-button"]')).toBe(4);
+    expect(count('button[data-testid="edit-custom-field-button"]')).toBe(4);
+  });
+
   it("shows all reorder buttons except for hidden fields when in edit mode and viewPassword is false", () => {
     originalCipherView.fields = mockFieldViews;
     originalCipherView.viewPassword = false;

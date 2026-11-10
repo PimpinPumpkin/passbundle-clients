@@ -10,7 +10,9 @@
       @for (uri of uriControls; track uri; let i = $index) {
         <vault-autofill-uri-option
           cdkDrag
-          [cdkDragDisabled]="uriControls.length <= 1 || autofillOptionsForm.disabled || websitesLocked"
+          [cdkDragDisabled]="
+            uriControls.length <= 1 || autofillOptionsForm.disabled || websitesLocked
+          "
           [formControlName]="i"
           (remove)="removeUri(i)"
           (onKeydown)="onUriItemKeydown($event, i)"
@@ -30,11 +32,14 @@
       </p>
     }
     @if (autofillOptionsForm.enabled && !websitesLocked) {
+      <!-- Keykeeper: the link is a block of its own, 16px under the last
+           website, with no line of text's slack under it. -->
       @if (showAddAppDropdown()) {
         <button
           type="button"
           bitLink
           linkType="primary"
+          class="tw-flex tw-w-fit tw-mt-2"
           [class.tw-mb-6]="autofillOnPageLoadEnabled$ | async"
           startIcon="bwi-plus"
           [bitMenuTriggerFor]="addUriMenu"
@@ -62,6 +67,7 @@
           type="button"
           bitLink
           linkType="primary"
+          class="tw-flex tw-w-fit tw-mt-2"
           [class.tw-mb-6]="autofillOnPageLoadEnabled$ | async"
           (click)="addUri({ uri: null, matchDetection: null }, true)"
           startIcon="bwi-plus"

@@ -387,6 +387,26 @@ html.pb-web {
 :is(.pb-web, .pb-popup) bit-form-field label {
   color: var(--pb-label);
 }
+/* A dropdown is the color of the field it sits in, so it matches the text
+   fields beside it in dark mode too. */
+:is(.pb-web, .pb-popup)
+  [bitfieldcontainer]
+  .ng-select:not(.ng-select-disabled)
+  > .ng-select-container {
+  background-color: transparent;
+}
+
+/* ----- The item form (add and edit), here and in the extension. */
+/* A field that can't be typed in (an SSH key's parts) is plain text under
+   its label, not an empty-looking box. */
+:is(.pb-web, .pb-popup) vault-cipher-form [bitfieldcontainer]:has(:is(input, textarea)[readonly]) {
+  background-color: transparent !important;
+  box-shadow: none;
+}
+/* "Add website" and "Add field" are the size of the labels above them. */
+:is(.pb-web, .pb-popup) vault-cipher-form bit-card button[bitlink] {
+  font-size: 14px;
+}
 :is(.pb-web, .pb-popup) bit-form-field :is(input, textarea)::placeholder,
 :is(.pb-web, .pb-popup) bit-search input::placeholder {
   color: var(--pb-placeholder) !important;
@@ -1087,6 +1107,13 @@ app-vault-onboarding [data-accordion-content] > div {
   box-shadow: inset 0 0 0 1px var(--pb-inset-line) !important;
   border-radius: 12px !important;
 }
+/* The Attachments row under the form is one of those cards. */
+.pb-web [data-keykeeper="item-panel"] bit-item[slot="attachment-button"] {
+  background: var(--pb-inset) !important;
+  border: 0 !important;
+  box-shadow: inset 0 0 0 1px var(--pb-inset-line) !important;
+  border-radius: 12px !important;
+}
 .pb-web
   [data-keykeeper="item-panel"]
   :is(read-only-cipher-card, app-autofill-options-view)
@@ -1126,6 +1153,13 @@ app-vault-onboarding [data-accordion-content] > div {
   border-color: var(--pb-divider) !important;
 }
 .pb-web .cdk-overlay-pane bit-dialog :is(bit-card, bit-item-group) {
+  background: var(--pb-surface) !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  box-shadow: var(--pb-shadow-resting) !important;
+}
+/* The Attachments row under the form is one of those cards here too. */
+.pb-web .cdk-overlay-pane bit-dialog bit-item[slot="attachment-button"] {
   background: var(--pb-surface) !important;
   border: 0 !important;
   border-radius: 12px !important;
