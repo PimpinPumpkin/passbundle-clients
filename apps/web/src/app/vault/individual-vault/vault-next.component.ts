@@ -9,10 +9,11 @@ import {
   untracked,
 } from "@angular/core";
 import { takeUntilDestroyed, toObservable, toSignal } from "@angular/core/rxjs-interop";
-import { ActivatedRoute, Router, RouterLink } from "@angular/router";
+import { ActivatedRoute, Router } from "@angular/router";
 import { combineLatest, filter, firstValueFrom, map, shareReplay, switchMap, take } from "rxjs";
 
 import { CollectionService } from "@bitwarden/admin-console/common";
+import { KeykeeperPricingLinkComponent } from "@bitwarden/angular/billing/keykeeper";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import {
@@ -127,7 +128,7 @@ import { VaultOnboardingComponent } from "./vault-onboarding/vault-onboarding.co
     I18nPipe,
     HeaderModule,
     LinkModule,
-    RouterLink,
+    KeykeeperPricingLinkComponent,
     NewCipherMenuComponent,
     PopoverModule,
     VaultBannersComponent,

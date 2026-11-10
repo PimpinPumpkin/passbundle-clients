@@ -78,7 +78,6 @@ import { SecurityRoutingModule } from "./auth/settings/security/security-routing
 import { SsoLoginFailedComponent } from "./auth/sso/sso-login-failed.component";
 import { VerifyEmailTokenComponent } from "./auth/verify-email-token.component";
 import { VerifyRecoverDeleteComponent } from "./auth/verify-recover-delete.component";
-import { PremiumCheckoutSuccessComponent } from "./billing/individual/premium-checkout/premium-checkout-success.component";
 import { SponsoredFamiliesComponent } from "./billing/settings/sponsored-families.component";
 import { CompleteTrialInitiationComponent } from "./billing/trial-initiation/complete-trial-initiation/complete-trial-initiation.component";
 import { freeTrialTextResolver } from "./billing/trial-initiation/complete-trial-initiation/resolver/free-trial-text.resolver";
@@ -690,16 +689,9 @@ const routes: Routes = [
           },
         ],
       },
-      {
-        path: "premium/checkout/success",
-        data: {
-          titleId: "paymentSuccessful",
-          pageIcon: null,
-          doNotSaveUrl: true,
-          maxWidth: "lg",
-        } satisfies RouteDataProperties & AnonLayoutWrapperData,
-        children: [{ path: "", component: PremiumCheckoutSuccessComponent }],
-      },
+      // Keykeeper: upstream's checkout page is gone with its purchase pages
+      // (DESIGN.md, "Plans and billing"). An old link lands on the vault.
+      { path: "premium/checkout/success", redirectTo: "/" },
       {
         path: AuthRoute.ChangePassword,
         component: ChangePasswordComponent,
@@ -838,13 +830,11 @@ const routes: Routes = [
             component: KeykeeperCreateOrganizationComponent,
             data: { titleId: "addPlan" } satisfies RouteDataProperties,
           },
-          {
-            path: "subscription",
-            loadChildren: () =>
-              import("./billing/individual/individual-billing.module").then(
-                (m) => m.IndividualBillingModule,
-              ),
-          },
+          // Keykeeper: upstream's Subscription, Premium, payment method and
+          // billing history pages are gone. They called a billing API this
+          // server never had (DESIGN.md, "Plans and billing"). An old link to
+          // any of them lands on the vault.
+          { path: "subscription", redirectTo: "/" },
           {
             path: AuthWebRouteSegment.EmergencyAccess,
             children: [

@@ -78,8 +78,12 @@ export class OpenAttachmentsComponent implements OnInit {
     }
 
     const userId = await firstValueFrom(getUserId(this.accountService.activeAccount$));
-    const cipher = await firstValueFrom(this.cipherService.cipherView$(userId, this.cipherId));
-
+    // Keykeeper: the stored item, not its decrypted view, says whether it has
+    // files: a view the popup decrypted earlier can lack them.
+    const cipher = await this.cipherService.get(this.cipherId, userId);
+    if (cipher == null) {
+      return;
+    }
     this.hasFiles = (cipher.attachments?.length ?? 0) > 0;
 
     if (!cipher.organizationId) {

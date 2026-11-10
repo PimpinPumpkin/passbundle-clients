@@ -841,11 +841,6 @@ describe("VaultComponent", () => {
     }));
   });
 
-  it("showPremiumDialog opens PremiumUpgradeDialogComponent", () => {
-    component["showPremiumDialog"]();
-    expect(PremiumUpgradeDialogComponent.open).toHaveBeenCalledTimes(1);
-  });
-
   it("navigateToImport navigates to import route", fakeAsync(async () => {
     configSvc.getFeatureFlag.mockResolvedValue(false);
     const ngRouter = TestBed.inject(Router);
@@ -902,7 +897,7 @@ describe("VaultComponent", () => {
     expect(spy).toHaveBeenCalledWith(NudgeType.HasVaultItems, "user-xyz");
   }));
 
-  it("renders Premium spotlight when eligible and opens dialog on click", fakeAsync(() => {
+  it("renders Premium spotlight when eligible and links to the Pricing page", fakeAsync(() => {
     activeAccount$.next({
       id: "user-1",
       creationDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
@@ -937,12 +932,14 @@ describe("VaultComponent", () => {
     const spotDe = fixture.debugElement.query(By.css("bit-callout"));
     expect(spotDe).toBeTruthy();
 
-    const button = spotDe.query(By.css("[slot='end']"));
-    button.nativeElement.click();
+    // Keykeeper: the website's Pricing page in place of upstream's upgrade window.
+    const end = spotDe.query(By.css("[slot='end']"));
+    expect(end.nativeElement.tagName.toLowerCase()).toBe("billing-keykeeper-pricing-link");
+    end.nativeElement.click();
 
     fixture.detectChanges();
 
-    expect(PremiumUpgradeDialogComponent.open).toHaveBeenCalledTimes(1);
+    expect(PremiumUpgradeDialogComponent.open).not.toHaveBeenCalled();
   }));
 
   it("renders Empty-Vault spotlight when vaultState is Empty and nudge is on", fakeAsync(() => {

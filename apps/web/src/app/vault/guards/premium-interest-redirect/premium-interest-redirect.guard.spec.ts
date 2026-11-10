@@ -19,10 +19,12 @@ describe("premiumInterestRedirectGuard", () => {
   const activeAccount$ = new BehaviorSubject<Account | null>(account);
   const createUrlTree = jest.fn();
   const getPremiumInterest = jest.fn().mockResolvedValue(false);
+  const clearPremiumInterest = jest.fn().mockResolvedValue(undefined);
   const logError = jest.fn();
 
   beforeEach(() => {
     getPremiumInterest.mockClear();
+    clearPremiumInterest.mockClear();
     createUrlTree.mockClear();
     logError.mockClear();
     activeAccount$.next(account);
@@ -33,7 +35,7 @@ describe("premiumInterestRedirectGuard", () => {
         { provide: AccountService, useValue: { activeAccount$ } },
         {
           provide: PremiumInterestStateService,
-          useValue: { getPremiumInterest },
+          useValue: { getPremiumInterest, clearPremiumInterest },
         },
         { provide: LogService, useValue: { error: logError } },
       ],
@@ -54,17 +56,16 @@ describe("premiumInterestRedirectGuard", () => {
     expect(await runPremiumInterestGuard()).toBe(true);
   });
 
-  it("redirects to premium subscription page when user intends to setup premium", async () => {
-    const urlTree = { toString: () => "/settings/subscription/premium" };
-    createUrlTree.mockReturnValueOnce(urlTree);
+  // Keykeeper: upstream's Premium purchase page is gone, so the vault opens
+  // and the wish to buy Premium is forgotten.
+  it("opens the vault and forgets the interest when user intends to setup premium", async () => {
     getPremiumInterest.mockResolvedValueOnce(true);
 
     const result = await runPremiumInterestGuard();
 
-    expect(createUrlTree).toHaveBeenCalledWith(["/settings/subscription/premium"], {
-      queryParams: { callToAction: "upgradeToPremium" },
-    });
-    expect(result).toBe(urlTree);
+    expect(result).toBe(true);
+    expect(createUrlTree).not.toHaveBeenCalled();
+    expect(clearPremiumInterest).toHaveBeenCalledWith(account.id);
   });
 
   it("redirects to login when active account is missing", async () => {

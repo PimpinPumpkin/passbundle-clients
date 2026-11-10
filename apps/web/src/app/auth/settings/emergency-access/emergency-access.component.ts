@@ -2,7 +2,7 @@
 // @ts-strict-ignore
 import { Component, OnInit } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
-import { lastValueFrom, firstValueFrom } from "rxjs";
+import { lastValueFrom, firstValueFrom, map } from "rxjs";
 
 import { UserNamePipe } from "@bitwarden/angular/pipes/user-name.pipe";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";

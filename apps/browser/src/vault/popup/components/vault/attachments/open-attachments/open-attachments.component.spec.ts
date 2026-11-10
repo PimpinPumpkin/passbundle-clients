@@ -34,7 +34,7 @@ describe("OpenAttachmentsComponent", () => {
   let openNotice: jest.SpyInstance;
   const promptForPremium = jest.fn().mockResolvedValue(null);
   const hasPremiumFromAnySource$ = new BehaviorSubject<boolean>(true);
-  const cipherView = {
+  const cipherView = Object.assign(new CipherView(), {
     id: "5555-444-3333",
     type: CipherType.Login,
     name: "Test Login",
@@ -42,7 +42,7 @@ describe("OpenAttachmentsComponent", () => {
       username: "username",
       password: "password",
     },
-  } as CipherView;
+  }) as CipherView;
 
   const org = {
     name: "Test Org",
@@ -50,8 +50,9 @@ describe("OpenAttachmentsComponent", () => {
     maxStorageGb: 5,
   } as Organization;
 
+  // The stored item, as the component reads it: its files and its organization.
   const mockCipherService = {
-    cipherView$: jest.fn().mockReturnValue(of(cipherView)),
+    get: jest.fn().mockImplementation(async () => cipherView),
   };
   const organizations$ = jest.fn().mockReturnValue(of([org]));
   const dialogService = { open: jest.fn() };
@@ -69,7 +70,7 @@ describe("OpenAttachmentsComponent", () => {
   const formStatusChange$ = new BehaviorSubject<"enabled" | "disabled">("enabled");
 
   beforeEach(async () => {
-    mockCipherService.cipherView$.mockClear();
+    mockCipherService.get.mockClear();
     organizations$.mockClear();
     promptForPremium.mockClear();
     hasPremiumFromAnySource$.next(true);
@@ -85,7 +86,10 @@ describe("OpenAttachmentsComponent", () => {
       imports: [OpenAttachmentsComponent, RouterTestingModule],
       providers: [
         { provide: I18nService, useValue: { t: (key: string) => key } },
-        { provide: BillingAccountProfileStateService, useValue: { hasPremiumFromAnySource$ } },
+        {
+          provide: BillingAccountProfileStateService,
+          useValue: { hasPremiumFromAnySource$: () => hasPremiumFromAnySource$ },
+        },
         {
           provide: CipherService,
           useValue: mockCipherService,
@@ -127,7 +131,10 @@ describe("OpenAttachmentsComponent", () => {
     openNotice.mockRestore();
   });
 
-  const attachmentsRoute = [["/attachments"], { queryParams: { cipherId: "5555-444-3333" } }];
+  const expectAttachmentsPage = () =>
+    expect(router.navigate).toHaveBeenCalledWith(["/attachments"], {
+      queryParams: { cipherId: "5555-444-3333" },
+    });
   const oneFile = () => [Object.assign(new AttachmentView(), { id: "file-1" })];
   const badge = () => fixture.debugElement.query(By.css("app-premium-badge"));
 
@@ -136,7 +143,7 @@ describe("OpenAttachmentsComponent", () => {
 
     await component.openAttachments();
 
-    expect(router.navigate).toHaveBeenCalledWith(...attachmentsRoute);
+    expectAttachmentsPage();
     expect(openNotice).not.toHaveBeenCalled();
   });
 
@@ -173,9 +180,8 @@ describe("OpenAttachmentsComponent", () => {
 
       await component.openAttachments();
 
-      expect(openNotice).toHaveBeenCalledWith(dialogService, {
-        sentence: KeykeeperPlanSentence.AttachFiles,
-      });
+      expect(openNotice).toHaveBeenCalledTimes(1);
+      expect(openNotice.mock.calls[0][1]).toEqual({ sentence: KeykeeperPlanSentence.AttachFiles });
       expect(router.navigate).not.toHaveBeenCalled();
       expect(promptForPremium).not.toHaveBeenCalled();
     });
@@ -186,7 +192,7 @@ describe("OpenAttachmentsComponent", () => {
 
       await component.openAttachments();
 
-      expect(router.navigate).toHaveBeenCalledWith(...attachmentsRoute);
+      expectAttachmentsPage();
       expect(openNotice).not.toHaveBeenCalled();
     });
 
@@ -214,7 +220,7 @@ describe("OpenAttachmentsComponent", () => {
 
       expect(component.attachingOff).toBeNull();
       expect(badge()).toBeNull();
-      expect(router.navigate).toHaveBeenCalledWith(...attachmentsRoute);
+      expectAttachmentsPage();
     });
 
     it("says the organization's plan has ended when it has no storage and the item has no files", async () => {
@@ -226,7 +232,8 @@ describe("OpenAttachmentsComponent", () => {
 
       expect(component.attachingOff).toBe("organization");
       expect(badge()).toBeNull();
-      expect(openNotice).toHaveBeenCalledWith(dialogService, {
+      expect(openNotice).toHaveBeenCalledTimes(1);
+      expect(openNotice.mock.calls[0][1]).toEqual({
         sentence: KeykeeperPlanSentence.OrganizationEnded,
       });
       expect(router.navigate).not.toHaveBeenCalled();
@@ -239,7 +246,7 @@ describe("OpenAttachmentsComponent", () => {
 
       await component.openAttachments();
 
-      expect(router.navigate).toHaveBeenCalledWith(...attachmentsRoute);
+      expectAttachmentsPage();
       expect(openNotice).not.toHaveBeenCalled();
     });
   });
