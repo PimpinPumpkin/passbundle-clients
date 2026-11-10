@@ -2,7 +2,7 @@ import { mock, MockProxy } from "jest-mock-extended";
 import { firstValueFrom, of } from "rxjs";
 
 import { newGuid } from "@bitwarden/guid";
-import { Policy as SdkPolicy } from "@bitwarden/sdk-internal";
+import { OrganizationUserPolicyContext, Policy as SdkPolicy } from "@bitwarden/sdk-internal";
 
 import { FakeStateProvider, mockAccountServiceWith } from "../../../../spec";
 import { FakeSingleUserState } from "../../../../spec/fake-state";
@@ -312,6 +312,187 @@ describe("PolicyService", () => {
       expect(() => policyService.policiesByType$(PolicyType.DisableSend, undefined as any)).toThrow(
         "No userId provided",
       );
+    });
+
+    // Keykeeper: the server leaves a membership that came from an MSP out of a client's member
+    // policies, whatever its role there, and says which memberships those are (keykeeperFromMsp).
+    describe("a membership that came from an MSP", () => {
+      const otherOrgId = newGuid();
+      let sdkFilter: jest.Mock;
+
+      beforeEach(() => {
+        // Stands in for the SDK with upstream's rule: a policy that is on applies to everyone in
+        // its organization but the owners and admins.
+        sdkFilter = jest.fn(
+          (policies: SdkPolicy[], organizations: OrganizationUserPolicyContext[], type: number) =>
+            policies.filter(
+              (p) =>
+                p.type === type &&
+                p.enabled &&
+                organizations.some(
+                  (o) =>
+                    o.id === p.organizationId &&
+                    o.role !== OrganizationUserType.Owner &&
+                    o.role !== OrganizationUserType.Admin,
+                ),
+            ),
+        );
+        sdkService.client.policies.mockReturnValue({ filter_by_type: sdkFilter } as any);
+      });
+
+      function membership(id: string, type: OrganizationUserType, fromMsp: boolean) {
+        const data = organizationData(
+          id,
+          true,
+          true,
+          OrganizationUserStatusType.Confirmed,
+          false,
+          type,
+        );
+        data.keykeeperFromMsp = fromMsp;
+        return new Organization(data);
+      }
+
+      function signedInWith(memberships: Organization[], ...policyTypes: PolicyType[]) {
+        organizationService.organizations$.calledWith(userId).mockReturnValue(of(memberships));
+        newPolicyService.policies$
+          .calledWith(userId)
+          .mockReturnValue(
+            of(
+              memberships.flatMap((m) =>
+                policyTypes.map((type) => new Policy(policyData(newGuid(), m.id, type, true))),
+              ),
+            ),
+          );
+      }
+
+      const applies = (type: PolicyType) =>
+        firstValueFrom(policyService.policyAppliesToUser$(type, userId));
+
+      /** The role the SDK was given for each organization, in the order they were passed. */
+      const rolesSent = () =>
+        (sdkFilter.mock.lastCall[1] as OrganizationUserPolicyContext[]).map((o) => o.role);
+
+      it("leaves a technician with a custom role out of the client's member policies", async () => {
+        signedInWith(
+          [membership(orgId1, OrganizationUserType.Custom, true)],
+          PolicyType.OrganizationDataOwnership,
+          PolicyType.SingleOrg,
+          PolicyType.DisableSend,
+        );
+
+        expect(await applies(PolicyType.OrganizationDataOwnership)).toBe(false);
+        expect(rolesSent()).toEqual([OrganizationUserType.Admin]);
+        expect(await applies(PolicyType.SingleOrg)).toBe(false);
+        expect(await applies(PolicyType.DisableSend)).toBe(false);
+      });
+
+      it("still applies them to the client's own member with a custom role", async () => {
+        signedInWith(
+          [membership(orgId1, OrganizationUserType.Custom, false)],
+          PolicyType.OrganizationDataOwnership,
+          PolicyType.SingleOrg,
+          PolicyType.DisableSend,
+        );
+
+        expect(await applies(PolicyType.OrganizationDataOwnership)).toBe(true);
+        expect(rolesSent()).toEqual([OrganizationUserType.Custom]);
+        expect(await applies(PolicyType.SingleOrg)).toBe(true);
+        expect(await applies(PolicyType.DisableSend)).toBe(true);
+      });
+
+      it("still applies them to the client's ordinary member", async () => {
+        signedInWith(
+          [membership(orgId1, OrganizationUserType.User, false)],
+          PolicyType.OrganizationDataOwnership,
+          PolicyType.SingleOrg,
+          PolicyType.DisableSend,
+        );
+
+        expect(await applies(PolicyType.OrganizationDataOwnership)).toBe(true);
+        expect(rolesSent()).toEqual([OrganizationUserType.User]);
+        expect(await applies(PolicyType.SingleOrg)).toBe(true);
+        expect(await applies(PolicyType.DisableSend)).toBe(true);
+      });
+
+      it("leaves a technician who is a regular member there out of them too", async () => {
+        signedInWith(
+          [membership(orgId1, OrganizationUserType.User, true)],
+          PolicyType.OrganizationDataOwnership,
+        );
+
+        expect(await applies(PolicyType.OrganizationDataOwnership)).toBe(false);
+        expect(rolesSent()).toEqual([OrganizationUserType.Admin]);
+      });
+
+      it("goes by each organization, so a technician's own organization still binds them", async () => {
+        signedInWith(
+          [
+            membership(orgId1, OrganizationUserType.Custom, true),
+            membership(otherOrgId, OrganizationUserType.Custom, false),
+          ],
+          PolicyType.OrganizationDataOwnership,
+        );
+
+        const policies = await firstValueFrom(
+          policyService.policiesByType$(PolicyType.OrganizationDataOwnership, userId),
+        );
+
+        expect(policies.map((p) => p.organizationId)).toEqual([otherOrgId]);
+        expect(rolesSent()).toEqual([OrganizationUserType.Admin, OrganizationUserType.Custom]);
+      });
+
+      it("never lets a technician off two-step login", async () => {
+        signedInWith(
+          [membership(orgId1, OrganizationUserType.Custom, true)],
+          PolicyType.TwoFactorAuthentication,
+        );
+
+        expect(await applies(PolicyType.TwoFactorAuthentication)).toBe(true);
+        expect(rolesSent()).toEqual([OrganizationUserType.Custom]);
+      });
+
+      it("leaves a technician out of required single sign-on the way it leaves an owner out", async () => {
+        signedInWith(
+          [membership(orgId1, OrganizationUserType.Custom, true)],
+          PolicyType.RequireSso,
+        );
+
+        expect(await applies(PolicyType.RequireSso)).toBe(false);
+        expect(rolesSent()).toEqual([OrganizationUserType.Owner]);
+      });
+
+      it("still requires single sign-on of the client's own member with a custom role", async () => {
+        signedInWith(
+          [membership(orgId1, OrganizationUserType.Custom, false)],
+          PolicyType.RequireSso,
+        );
+
+        expect(await applies(PolicyType.RequireSso)).toBe(true);
+        expect(rolesSent()).toEqual([OrganizationUserType.Custom]);
+      });
+
+      it("keeps an owner an owner, so a policy that binds admins doesn't start binding them", async () => {
+        signedInWith(
+          [membership(orgId1, OrganizationUserType.Owner, true)],
+          PolicyType.MaximumVaultTimeout,
+        );
+
+        await applies(PolicyType.MaximumVaultTimeout);
+
+        expect(rolesSent()).toEqual([OrganizationUserType.Owner]);
+      });
+
+      it("gives a technician no more than an admin, so a policy that binds admins binds them", async () => {
+        signedInWith(
+          [membership(orgId1, OrganizationUserType.Custom, true)],
+          PolicyType.MaximumVaultTimeout,
+        );
+
+        await applies(PolicyType.MaximumVaultTimeout);
+
+        expect(rolesSent()).toEqual([OrganizationUserType.Admin]);
+      });
     });
   });
 
