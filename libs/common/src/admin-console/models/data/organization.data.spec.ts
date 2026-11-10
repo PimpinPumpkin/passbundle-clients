@@ -1,6 +1,8 @@
 import { ProductTierType } from "../../../billing/enums/product-tier-type.enum";
 import { OrganizationUserStatusType, OrganizationUserType } from "../../enums";
 import { ORGANIZATIONS } from "../../services/organization/organization.state";
+import { Organization } from "../domain/organization";
+import { ProfileOrganizationResponse } from "../response/profile-organization.response";
 
 import { OrganizationData } from "./organization.data";
 
@@ -69,11 +71,39 @@ describe("ORGANIZATIONS state", () => {
         usePhishingBlocker: false,
         keykeeperPasswordChange: true,
         keykeeperBrowserAutofill: "off",
+        keykeeperFromMsp: true,
         useMyItems: false,
         useInviteLinks: false,
       },
     };
     const result = sut.deserializer(JSON.parse(JSON.stringify(expectedResult)));
     expect(result).toEqual(expectedResult);
+  });
+});
+
+// Keykeeper: the server says which memberships came from an MSP (DESIGN.md, "MSP console").
+describe("a membership that came from an MSP", () => {
+  function fromProfile(answer: Record<string, unknown>) {
+    const data = new OrganizationData(new ProfileOrganizationResponse({ id: "org", ...answer }), {
+      isMember: true,
+      isProviderUser: false,
+    });
+    // The way it comes back out of the stored state.
+    return new Organization(OrganizationData.fromJSON(JSON.parse(JSON.stringify(data))));
+  }
+
+  it("is known from the server's answer", () => {
+    expect(fromProfile({ keykeeperFromMsp: true }).keykeeperFromMsp).toBe(true);
+    expect(fromProfile({ keykeeperFromMsp: false }).keykeeperFromMsp).toBe(false);
+  });
+
+  it("is nobody on a server that doesn't say", () => {
+    expect(fromProfile({}).keykeeperFromMsp).toBe(false);
+  });
+
+  it("takes nothing but a plain yes for one", () => {
+    expect(fromProfile({ keykeeperFromMsp: "true" }).keykeeperFromMsp).toBe(false);
+    expect(fromProfile({ keykeeperFromMsp: 1 }).keykeeperFromMsp).toBe(false);
+    expect(fromProfile({ keykeeperFromMsp: null }).keykeeperFromMsp).toBe(false);
   });
 });

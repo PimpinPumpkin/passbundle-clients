@@ -10,7 +10,7 @@ import { UserId } from "../../../types/guid";
 import { OrganizationService } from "../../abstractions/organization/organization.service.abstraction";
 import { InternalNewPolicyService } from "../../abstractions/policy/new-policy.service";
 import { PolicyService } from "../../abstractions/policy/policy.service.abstraction";
-import { PolicyType } from "../../enums";
+import { OrganizationUserType, PolicyType } from "../../enums";
 import { PolicyData } from "../../models/data/policy.data";
 import { MasterPasswordPolicyOptions } from "../../models/domain/master-password-policy-options";
 import { Organization } from "../../models/domain/organization";
@@ -74,7 +74,7 @@ export class DefaultPolicyService implements PolicyService {
         const sdkPolicies = policies.map((p) => p.toSdkPolicy());
         const sdkOrganizationContext = confirmedOrganizations
           .concat(acceptedOrganizations)
-          .map((o) => DefaultPolicyService.toSdkOrganizationUserPolicyContext(o));
+          .map((o) => DefaultPolicyService.toSdkOrganizationUserPolicyContext(o, policyType));
         const filteredViews = sdkClient
           .policies()
           .filter_by_type(sdkPolicies, sdkOrganizationContext, policyType);
@@ -278,15 +278,42 @@ export class DefaultPolicyService implements PolicyService {
    */
   private static toSdkOrganizationUserPolicyContext(
     organization: Organization,
+    policyType: PolicyType,
   ): OrganizationUserPolicyContext {
     return {
       id: asUuid(organization.id),
       status: organization.status,
-      role: organization.type,
+      role: DefaultPolicyService.roleForPolicy(organization, policyType),
       enabled: organization.enabled,
       usePolicies: organization.usePolicies,
       isProviderUser: organization.isProviderUser,
     };
+  }
+
+  /**
+   * Keykeeper: the role a policy is worked out from. A membership that came from an MSP is left
+   * out of the organization's member policies wherever the server leaves it out, whatever its role
+   * there: a technician with a custom role is a regular member in each client and still has to
+   * work in all of them (DESIGN.md, "MSP console"). It goes by what the server says about the
+   * membership, never by the role, and it follows the server policy by policy:
+   *
+   * - Member policies treat it as an admin (the server's exempt_from_member_policies), so a policy
+   *   that binds admins binds the technician too.
+   * - "Require single sign-on" treats it as an owner (the server's exempt_from_requirement).
+   * - Two-step login keeps the real role: an MSP's staff are never let off it (DESIGN.md, "MSP
+   *   staff and two-step login").
+   */
+  private static roleForPolicy(
+    organization: Organization,
+    policyType: PolicyType,
+  ): OrganizationUserType {
+    if (!organization.keykeeperFromMsp || policyType === PolicyType.TwoFactorAuthentication) {
+      return organization.type;
+    }
+    if (policyType === PolicyType.RequireSso || organization.type === OrganizationUserType.Owner) {
+      return OrganizationUserType.Owner;
+    }
+    return OrganizationUserType.Admin;
   }
 
   private mergeMasterPasswordPolicyOptions(
