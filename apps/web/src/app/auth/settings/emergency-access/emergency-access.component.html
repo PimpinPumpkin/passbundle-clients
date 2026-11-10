@@ -32,14 +32,14 @@
       <h2 bitTypography="h2" noMargin class="tw-mb-0">
         {{ "trustedEmergencyContacts" | i18n }}
       </h2>
-      <app-premium-badge></app-premium-badge>
+      <!-- Keykeeper: legacy contacts are free (DESIGN.md, "Plans and billing"): no Premium badge, and anyone can add one. -->
       <div class="tw-ml-auto tw-flex">
         <button
           type="button"
           bitButton
           buttonType="primary"
           [bitAction]="invite"
-          [disabled]="!(canAccessPremium$ | async)"
+          data-testid="keykeeper-add-legacy-contact"
         >
           <bit-icon name="bwi-plus" class="bwi-fw"></bit-icon>
           {{ "addEmergencyContact" | i18n }}

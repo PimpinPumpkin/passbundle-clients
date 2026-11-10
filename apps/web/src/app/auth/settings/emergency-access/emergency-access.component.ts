@@ -2,16 +2,14 @@
 // @ts-strict-ignore
 import { Component, OnInit } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
-import { lastValueFrom, Observable, firstValueFrom, switchMap, map } from "rxjs";
+import { lastValueFrom, firstValueFrom } from "rxjs";
 
-import { PremiumBadgeComponent } from "@bitwarden/angular/billing/components/premium-badge";
 import { UserNamePipe } from "@bitwarden/angular/pipes/user-name.pipe";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { OrganizationManagementPreferencesService } from "@bitwarden/common/admin-console/abstractions/organization-management-preferences/organization-management-preferences.service";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
-import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions/account/billing-account-profile-state.service";
 import { FeatureFlag } from "@bitwarden/common/enums/feature-flag.enum";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
@@ -49,7 +47,7 @@ import {
 // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
 @Component({
   templateUrl: "emergency-access.component.html",
-  imports: [SharedModule, HeaderModule, BreadcrumbsModule, PremiumBadgeComponent],
+  imports: [SharedModule, HeaderModule, BreadcrumbsModule],
 })
 export class EmergencyAccessComponent implements OnInit {
   loaded = false;
@@ -58,7 +56,6 @@ export class EmergencyAccessComponent implements OnInit {
     this.configService.getFeatureFlag$(FeatureFlag.VFO1Foundation),
     { initialValue: false },
   );
-  canAccessPremium$: Observable<boolean>;
   trustedContacts: GranteeEmergencyAccess[];
   grantedContacts: GrantorEmergencyAccess[];
   emergencyAccessType = EmergencyAccessType;
@@ -76,19 +73,12 @@ export class EmergencyAccessComponent implements OnInit {
     private stateService: StateService,
     private organizationService: OrganizationService,
     protected dialogService: DialogService,
-    billingAccountProfileStateService: BillingAccountProfileStateService,
     protected organizationManagementPreferencesService: OrganizationManagementPreferencesService,
     private toastService: ToastService,
     private apiService: ApiService,
     private accountService: AccountService,
     private configService: ConfigService,
-  ) {
-    this.canAccessPremium$ = this.accountService.activeAccount$.pipe(
-      switchMap((account) =>
-        billingAccountProfileStateService.hasPremiumFromAnySource$(account.id),
-      ),
-    );
-  }
+  ) {}
 
   async ngOnInit() {
     const userId = await firstValueFrom(getUserId(this.accountService.activeAccount$));
@@ -106,12 +96,13 @@ export class EmergencyAccessComponent implements OnInit {
   }
 
   edit = async (details: GranteeEmergencyAccess) => {
-    const canAccessPremium = await firstValueFrom(this.canAccessPremium$);
+    // Keykeeper: legacy contacts are free (DESIGN.md, "Plans and billing"), so
+    // the window is never read-only for want of Premium.
     const dialogRef = EmergencyAccessAddEditComponent.open(this.dialogService, {
       data: {
         name: this.userNamePipe.transform(details),
         emergencyAccessId: details?.id,
-        readOnly: !canAccessPremium,
+        readOnly: false,
       },
     });
 
