@@ -310,8 +310,9 @@ describe("NavigationProductSwitcherComponent", () => {
     expect(links[0].getAttribute("href")).toBe("/vault");
   });
 
+  // Keykeeper: no upgrade nav button; it opened upstream's purchase pages, which are gone.
   describe("upgrade nav button", () => {
-    it("shows upgrade nav button when shouldShowPremiumUpgradeButton$ is true", () => {
+    it("never shows the upgrade nav button, even when shouldShowPremiumUpgradeButton$ is true", () => {
       mockShouldShowPremiumUpgradeButton$.next(true);
       mockProducts$.next({
         bento: [],
@@ -328,7 +329,7 @@ describe("NavigationProductSwitcherComponent", () => {
 
       const upgradeButton = fixture.nativeElement.querySelector("app-upgrade-nav-button");
 
-      expect(upgradeButton).toBeTruthy();
+      expect(upgradeButton).toBeNull();
     });
   });
 

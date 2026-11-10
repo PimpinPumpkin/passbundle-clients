@@ -149,19 +149,21 @@ describe("SettingsV2Component", () => {
     expect(el.querySelector("bit-callout")).toBeFalsy();
   });
 
-  it("openUpgradeDialog calls PremiumUpgradeDialogComponent.open with the DialogService", async () => {
+  // Keykeeper: the callout links to the website's Pricing page in place of
+  // upstream's upgrade window, which sent people to a purchase page.
+  it("links the premium callout to the Pricing page, with no upgrade window", async () => {
     openSpy = jest.spyOn(PremiumUpgradeDialogComponent, "open").mockImplementation();
     mockBillingState.hasPremiumFromAnySource$.mockReturnValue(of(false));
     pushActiveAccount();
 
     const fixture = TestBed.createComponent(SettingsV2Component);
-    const component = fixture.componentInstance;
     fixture.detectChanges();
     await fixture.whenStable();
 
-    component["openUpgradeDialog"]();
-    expect(openSpy).toHaveBeenCalledTimes(1);
-    expect(openSpy).toHaveBeenCalledWith(dialogService);
+    const callout: HTMLElement = fixture.nativeElement.querySelector("bit-callout");
+    expect(callout.querySelector("billing-keykeeper-pricing-link")).toBeTruthy();
+    expect(callout.querySelector("button")).toBeFalsy();
+    expect(openSpy).not.toHaveBeenCalled();
   });
 
   it("showAutofillBadge$ emits true when showNudgeBadge is true", async () => {

@@ -1,6 +1,5 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectionStrategy, Component, computed, input, output, inject } from "@angular/core";
-import { Router } from "@angular/router";
 import { firstValueFrom, switchMap } from "rxjs";
 
 import { CollectionAdminService } from "@bitwarden/admin-console/common";
@@ -59,7 +58,6 @@ export class VaultHeaderComponent {
   private readonly i18nService = inject(I18nService);
   private readonly dialogService = inject(DialogService);
   private readonly collectionAdminService = inject(CollectionAdminService);
-  private readonly router = inject(Router);
   private readonly accountService = inject(AccountService);
   private readonly vfo1TerminologyService = inject(Vfo1TerminologyService);
 
@@ -172,27 +170,18 @@ export class VaultHeaderComponent {
       : vfo1Enabled
         ? "freeOrgMaxSharedFolderReachedNoManageBilling"
         : "freeOrgMaxCollectionReachedNoManageBilling";
+    // Keykeeper: the organization's Billing pages are gone (DESIGN.md, "Plans
+    // and billing"), so the dialog only closes.
     const orgUpgradeSimpleDialogOpts: SimpleDialogOptions = {
       title: this.i18nService.t("upgradeOrganization"),
       content: this.i18nService.t(contentKey, org.maxCollections),
       type: "primary",
+      acceptButtonText: this.i18nService.t("ok"),
+      cancelButtonText: null, // hide secondary btn
     };
 
-    if (org.canEditSubscription) {
-      orgUpgradeSimpleDialogOpts.acceptButtonText = this.i18nService.t("upgrade");
-    } else {
-      orgUpgradeSimpleDialogOpts.acceptButtonText = this.i18nService.t("ok");
-      orgUpgradeSimpleDialogOpts.cancelButtonText = null; // hide secondary btn
-    }
-
     const simpleDialog = this.dialogService.openSimpleDialogRef(orgUpgradeSimpleDialogOpts);
-    const result = await firstValueFrom(simpleDialog.closed);
-
-    if (result && org.canEditSubscription) {
-      await this.router.navigate(["/organizations", org.id, "billing", "subscription"], {
-        queryParams: { upgrade: true },
-      });
-    }
+    await firstValueFrom(simpleDialog.closed);
   }
 
   protected readonly canEditCollection = computed(() => {

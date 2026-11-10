@@ -70,15 +70,8 @@
         (dismiss)="dismissVaultNudgeSpotlight(NudgeType.PremiumUpgrade)"
       >
         {{ "unlockAdvancedSecurityDesc" | i18n }}
-        <button
-          slot="end"
-          bitButton
-          type="button"
-          buttonType="primary"
-          (click)="showPremiumDialog()"
-        >
-          {{ "explorePremium" | i18n }}
-        </button>
+        <!-- Keykeeper: upstream's upgrade window is gone; the website's Pricing page in its place. -->
+        <billing-keykeeper-pricing-link slot="end" />
       </bit-callout>
     }
     @if (vaultState === VaultStateEnum.Empty && showEmptyVaultSpotlight$ | async) {

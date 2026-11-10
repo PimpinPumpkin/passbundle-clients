@@ -8,7 +8,10 @@
   >
     <div class="tw-flex tw-items-center tw-gap-2">
       {{ "attachments" | i18n }}
-      <app-premium-badge></app-premium-badge>
+      <!-- Keykeeper: the badge says what Premium adds here, and only shows when that's the reason a file can't be added. -->
+      @if (attachingOff === "premium") {
+        <app-premium-badge [sentence]="attachFilesSentence"></app-premium-badge>
+      }
     </div>
     <ng-container slot="end">
       <span class="tw-sr-only">{{ "popOutNewWindow" | i18n }}</span>

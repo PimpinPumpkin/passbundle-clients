@@ -282,6 +282,12 @@ function apply() {
   }
   ownMessages.keykeeperInstallScriptMacLinux = { message: BRAND.installScriptMacLinux };
   ownMessages.keykeeperMacProfile = { message: BRAND.macProfile };
+  // The website's Pricing page, where a plan's sentence ("Attaching files is
+  // part of Premium.") sends a person to see what each plan has.
+  if (typeof BRAND.urls?.website !== "string" || !/^https:\/\/[^\s/]+$/.test(BRAND.urls.website)) {
+    fail('brand.json needs "urls.website", the website\'s address, such as "https://example.com".');
+  }
+  ownMessages.keykeeperPricingPage = { message: `${BRAND.urls.website}/pricing/` };
   // The product's name, for our own pages, which never type it themselves.
   ownMessages.keykeeperProductName = { message: BRAND.name };
   for (const rel of trackedFiles(

@@ -16,7 +16,6 @@ import {
 import { I18nPipe } from "@bitwarden/ui-common";
 import { CoachmarkComponent, CoachmarkService } from "@bitwarden/vault";
 
-import { UpgradeNavButtonComponent } from "../../../billing/individual/upgrade/upgrade-nav-button/upgrade-nav-button/upgrade-nav-button.component";
 import { ProductSwitcherItem, ProductSwitcherService } from "../shared/product-switcher.service";
 
 @Component({
@@ -29,7 +28,6 @@ import { ProductSwitcherItem, ProductSwitcherService } from "../shared/product-s
     MenuModule,
     NavigationModule,
     I18nPipe,
-    UpgradeNavButtonComponent,
     IconComponent,
     IconTileComponent,
     PopoverModule,
@@ -54,9 +52,6 @@ export class NavigationProductSwitcherComponent {
   protected readonly tileVariant = computed<IconTileVariant>(() =>
     this.variant() === "secondary" ? "gray" : "primary",
   );
-
-  protected readonly shouldShowPremiumUpgradeButton$: Observable<boolean> =
-    this.productSwitcherService.shouldShowPremiumUpgradeButton$;
 
   protected readonly accessibleProducts$: Observable<ProductSwitcherItem[]> =
     this.productSwitcherService.products$.pipe(map((products) => products.bento ?? []));

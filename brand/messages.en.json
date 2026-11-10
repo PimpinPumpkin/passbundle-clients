@@ -1526,5 +1526,32 @@
   },
   "keykeeperBrowserAutofillOffPolicyDesc": {
     "message": "Chrome, Edge, and Firefox stop saving and filling cards and addresses in people's work profiles, and on computers the install command set up. What they saved stays in the browser."
+  },
+  "keykeeperPlanPremium": {
+    "message": "That's part of Premium."
+  },
+  "keykeeperPlanAttachFiles": {
+    "message": "Attaching files is part of Premium."
+  },
+  "keykeeperPlanSendFiles": {
+    "message": "Sending files is part of Premium. Sending text is free."
+  },
+  "keykeeperPlanBreachReport": {
+    "message": "The data breach report is part of Premium."
+  },
+  "keykeeperPlanOrganization": {
+    "message": "Your organization's plan doesn't include that."
+  },
+  "keykeeperPlanOrganizationEnded": {
+    "message": "This organization's plan has ended, so nothing new can be added. Everything in it can still be opened, changed, exported, and deleted."
+  },
+  "keykeeperPlanSeePricing": {
+    "message": "See pricing"
+  },
+  "keykeeperPlanPremiumTitle": {
+    "message": "Premium"
+  },
+  "keykeeperPlanEndedTitle": {
+    "message": "Plan ended"
   }
 }

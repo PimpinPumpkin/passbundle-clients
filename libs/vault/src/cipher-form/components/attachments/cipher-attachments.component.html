@@ -78,7 +78,12 @@
 }
 
 <form [id]="attachmentFormId" [formGroup]="attachmentForm" [bitSubmit]="submit">
-  @if (cipher()?.edit) {
+  <!-- Keykeeper: on a plan that can't add files, the sentence stands where the file picker would be. -->
+  @if (addingOffSentence(); as sentence) {
+    <bit-card data-testid="keykeeper-attaching-off">
+      <billing-keykeeper-plan-notice [sentence]="sentence" />
+    </bit-card>
+  } @else if (cipher()?.edit) {
     <bit-card>
       <bit-file-upload formControlName="file">
         <bit-label>{{ "addAttachment" | i18n }}</bit-label>

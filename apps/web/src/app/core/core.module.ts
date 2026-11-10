@@ -568,14 +568,7 @@ const safeProviders: SafeProvider[] = [
   safeProvider({
     provide: PremiumUpgradePromptService,
     useClass: WebVaultPremiumUpgradePromptService,
-    deps: [
-      DialogService,
-      AccountService,
-      SyncService,
-      BillingAccountProfileStateService,
-      PlatformUtilsService,
-      Router,
-    ],
+    deps: [DialogService, AccountService, BillingAccountProfileStateService],
   }),
   safeProvider({
     provide: PremiumInterestStateService,

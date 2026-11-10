@@ -136,9 +136,7 @@
   }
 }
 
-@if (version() !== "vfo1" && (shouldShowPremiumUpgradeButton$ | async)) {
-  <app-upgrade-nav-button></app-upgrade-nav-button>
-}
+<!-- Keykeeper: no upgrade button. It opened upstream's purchase pages, which are gone (DESIGN.md, "Plans and billing"). -->
 
 @if (version() !== "vfo1" && moreProducts && moreProducts.length > 0) {
   <section class="tw-mt-2 tw-flex tw-w-full tw-flex-col tw-gap-2 tw-border-0">

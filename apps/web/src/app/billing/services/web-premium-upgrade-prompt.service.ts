@@ -1,39 +1,34 @@
-import { Injectable, Optional } from "@angular/core";
-import { Router } from "@angular/router";
-import { firstValueFrom, lastValueFrom, Subject } from "rxjs";
+import { Injectable } from "@angular/core";
+import { EMPTY, firstValueFrom, Observable } from "rxjs";
 
-import { Account, AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import {
+  KeykeeperPlanNoticeDialogComponent,
+  KeykeeperPlanSentence,
+} from "@bitwarden/angular/billing/keykeeper";
+import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions";
-import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
-import { SyncService } from "@bitwarden/common/platform/sync";
 import { OrganizationId } from "@bitwarden/common/types/guid";
 import { PremiumUpgradePromptService } from "@bitwarden/common/vault/abstractions/premium-upgrade-prompt.service";
-import { DialogRef, DialogService } from "@bitwarden/components";
-import { VaultItemDialogResult } from "@bitwarden/vault";
-import {
-  UnifiedUpgradeDialogComponent,
-  UnifiedUpgradeDialogStatus,
-} from "@bitwarden/web-vault/app/billing/individual/upgrade/unified-upgrade-dialog/unified-upgrade-dialog.component";
+import { DialogService } from "@bitwarden/components";
 
+/**
+ * Keykeeper: upstream's prompt sent people to its purchase pages and its
+ * organization Billing pages, which call a billing API this server never had.
+ * Those pages are gone (DESIGN.md, "Plans and billing"). Until our own Plan
+ * page exists, the prompt says one plain sentence with a link to the Pricing
+ * page on the website, and never navigates or closes the window it's in.
+ */
 @Injectable()
 export class WebVaultPremiumUpgradePromptService implements PremiumUpgradePromptService {
-  private readonly _upgradeConfirmed$ = new Subject<boolean>();
-  readonly upgradeConfirmed$ = this._upgradeConfirmed$.asObservable();
+  /** Nothing is ever bought here, so no upgrade is ever confirmed. */
+  readonly upgradeConfirmed$: Observable<boolean> = EMPTY;
 
   constructor(
     private dialogService: DialogService,
     private accountService: AccountService,
-    private syncService: SyncService,
     private billingAccountProfileStateService: BillingAccountProfileStateService,
-    private platformUtilsService: PlatformUtilsService,
-    private router: Router,
-    @Optional() private dialog?: DialogRef<VaultItemDialogResult>,
   ) {}
-  private readonly subscriptionPageRoute = "settings/subscription/premium";
 
-  /**
-   * Prompts the user for a premium upgrade.
-   */
   async promptForPremium(organizationId?: OrganizationId) {
     const account = await firstValueFrom(this.accountService.activeAccount$);
     if (!account) {
@@ -47,75 +42,10 @@ export class WebVaultPremiumUpgradePromptService implements PremiumUpgradePrompt
       return;
     }
 
-    // Per conversation in PM-23713, retain the existing upgrade org flow for now, will be addressed
-    //  as a part of https://bitwarden.atlassian.net/browse/PM-25507
-    if (!organizationId) {
-      await this.promptForPremiumVNext(account);
-      return;
-    }
-
-    let confirmed = false;
-    let route: string[] | null = null;
-
-    if (organizationId) {
-      confirmed = await this.dialogService.openSimpleDialog({
-        title: { key: "upgradeOrganization" },
-        content: { key: "upgradeOrganizationDesc" },
-        acceptButtonText: { key: "upgradeOrganization" },
-        type: "info",
-      });
-      if (confirmed) {
-        route = ["organizations", organizationId, "billing", "subscription"];
-      }
-    } else {
-      confirmed = await this.dialogService.openSimpleDialog({
-        title: { key: "premiumRequired" },
-        content: { key: "premiumRequiredDesc" },
-        acceptButtonText: { key: "upgrade" },
-        type: "success",
-      });
-      if (confirmed) {
-        route = [this.subscriptionPageRoute];
-      }
-    }
-
-    this._upgradeConfirmed$.next(confirmed);
-
-    if (route) {
-      await this.router.navigate(route);
-    }
-    if (confirmed && this.dialog) {
-      await this.dialog.close(VaultItemDialogResult.PremiumUpgrade);
-    }
-  }
-
-  private async promptForPremiumVNext(account: Account) {
-    await (this.platformUtilsService.isSelfHost()
-      ? this.redirectToSubscriptionPage()
-      : this.openUpgradeDialog(account));
-  }
-
-  private async redirectToSubscriptionPage() {
-    await this.router.navigate([this.subscriptionPageRoute]);
-    if (this.dialog) {
-      await this.dialog.close(VaultItemDialogResult.PremiumUpgrade);
-    }
-  }
-
-  private async openUpgradeDialog(account: Account) {
-    const dialogRef = UnifiedUpgradeDialogComponent.open(this.dialogService, {
-      data: {
-        account,
-        planSelectionStepTitleOverride: "upgradeYourPlan",
-        hideContinueWithoutUpgradingButton: true,
-      },
+    KeykeeperPlanNoticeDialogComponent.open(this.dialogService, {
+      sentence: organizationId
+        ? KeykeeperPlanSentence.OrganizationPlan
+        : KeykeeperPlanSentence.Premium,
     });
-    const result = await lastValueFrom(dialogRef.closed);
-    if (
-      result?.status === UnifiedUpgradeDialogStatus.UpgradedToPremium ||
-      result?.status === UnifiedUpgradeDialogStatus.UpgradedToFamilies
-    ) {
-      await this.syncService.fullSync(true);
-    }
   }
 }

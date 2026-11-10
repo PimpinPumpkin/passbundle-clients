@@ -110,16 +110,21 @@ describe("Is Paid Org Guard", () => {
     ).not.toBe("This component can only be accessed by a paid organization!");
   });
 
-  it("redirects users with billing access to the billing screen to upgrade", async () => {
+  // Keykeeper: the organization's Billing pages are gone, so an owner gets
+  // the same closing dialog and stays where they were.
+  it("never takes users with billing access to the billing screen", async () => {
     // `useTotp` is the current indicator of a free org, it is the baseline
     // feature offered above the free organization level.
     const org = orgFactory({ type: OrganizationUserType.Owner, useTotp: false });
     organizationService.organizations$.calledWith(userId).mockReturnValue(of([org]));
     dialogService.openSimpleDialog.calledWith(any()).mockResolvedValue(true);
     await routerHarness.navigateByUrl(`organizations/${org.id}/paidOrganizationsOnly`);
-    expect(routerHarness.routeNativeElement?.querySelector("h1")?.textContent?.trim() ?? "").toBe(
-      "This is the organization upgrade screen!",
+    expect(dialogService.openSimpleDialog).toHaveBeenCalledWith(
+      expect.objectContaining({ acceptButtonText: { key: "ok" }, cancelButtonText: null }),
     );
+    const heading = routerHarness.routeNativeElement?.querySelector("h1")?.textContent?.trim();
+    expect(heading ?? "").not.toBe("This is the organization upgrade screen!");
+    expect(heading ?? "").not.toBe("This component can only be accessed by a paid organization!");
   });
 
   it("proceeds with navigation if the organization in question is a paid organization", async () => {

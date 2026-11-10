@@ -56,6 +56,8 @@ export class AttachmentsV2Component {
   canEditCipher: boolean;
   attachmentFormId = CipherAttachmentsComponent.attachmentFormID;
   buttonText: string;
+  /** Keykeeper: "Add attachment" until the plan turns adding off; then the window only lists files. */
+  titleKey = "addAttachment";
   private isUploading = false;
 
   /**
@@ -153,5 +155,14 @@ export class AttachmentsV2Component {
     void this.dialogRef.close({
       action: AttachmentDialogResult.Closed,
     });
+  }
+
+  /**
+   * Keykeeper: the plan doesn't let files be added to this item. The files
+   * here can still be downloaded and removed, and the button closes.
+   */
+  addingOff() {
+    this.buttonText = this.i18nService.t("close");
+    this.titleKey = "attachments";
   }
 }

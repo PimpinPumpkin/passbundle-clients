@@ -126,7 +126,9 @@ describe("Is Enterprise Org Guard", () => {
     },
   );
 
-  it("redirects users with billing access to the billing screen to upgrade", async () => {
+  // Keykeeper: the organization's Billing pages are gone, so an owner gets
+  // the same closing dialog and stays where they were.
+  it("never takes users with billing access to the billing screen", async () => {
     const org = orgFactory({
       type: OrganizationUserType.Owner,
       productTierType: ProductTierType.Teams,
@@ -134,8 +136,13 @@ describe("Is Enterprise Org Guard", () => {
     organizationService.organizations$.calledWith(userId).mockReturnValue(of([org]));
     dialogService.openSimpleDialog.calledWith(any()).mockResolvedValue(true);
     await routerHarness.navigateByUrl(`organizations/${org.id}/enterpriseOrgsOnly`);
-    expect(routerHarness.routeNativeElement?.querySelector("h1")?.textContent?.trim() ?? "").toBe(
-      "This is the organization upgrade screen!",
+    expect(dialogService.openSimpleDialog).toHaveBeenCalledWith(
+      expect.objectContaining({ acceptButtonText: { key: "ok" }, cancelButtonText: null }),
+    );
+    const heading = routerHarness.routeNativeElement?.querySelector("h1")?.textContent?.trim();
+    expect(heading ?? "").not.toBe("This is the organization upgrade screen!");
+    expect(heading ?? "").not.toBe(
+      "This component can only be accessed by a enterprise organization!",
     );
   });
 

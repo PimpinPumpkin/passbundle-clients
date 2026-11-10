@@ -31,7 +31,7 @@ import {
 } from "rxjs";
 
 import { CollectionService } from "@bitwarden/admin-console/common";
-import { PremiumUpgradeDialogComponent } from "@bitwarden/angular/billing/components";
+import { KeykeeperPricingLinkComponent } from "@bitwarden/angular/billing/keykeeper";
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { NudgesService, NudgeType, PremiumUpsellService } from "@bitwarden/angular/vault";
 import { DeactivatedOrg, NoResults, VaultOpen } from "@bitwarden/assets/svg";
@@ -129,6 +129,7 @@ const NEW_EXPERIENCE_DARK_IMG = "../../../../images/new-experience/new-experienc
   selector: "app-vault",
   templateUrl: "vault.component.html",
   imports: [
+    KeykeeperPricingLinkComponent,
     KeykeeperTwoStepNeededComponent,
     KeykeeperTwoStepNudgeComponent,
     KeykeeperBrowserAutofillNoticeComponent,
@@ -243,10 +244,6 @@ export class VaultComponent implements OnInit, OnDestroy {
     }),
     shareReplay({ bufferSize: 1, refCount: true }),
   );
-
-  showPremiumDialog() {
-    PremiumUpgradeDialogComponent.open(this.dialogService);
-  }
 
   /** When true, show skeleton loading state with debouncing to prevent flicker */
   protected showSkeletonsLoaders$ = combineLatest([

@@ -4,6 +4,7 @@ import { CommonModule } from "@angular/common";
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   DestroyRef,
   effect,
   inject,
@@ -22,16 +23,22 @@ import {
 } from "@angular/forms";
 import { firstValueFrom } from "rxjs";
 
+import {
+  attachingOffSentence,
+  KeykeeperPlanNoticeComponent,
+} from "@bitwarden/angular/billing/keykeeper";
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
+import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions/account/billing-account-profile-state.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { CipherId, OrganizationId, UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
+import { attachingOff, AttachingOff } from "@bitwarden/common/vault/keykeeper/attachments-plan";
 import { CipherData } from "@bitwarden/common/vault/models/data/cipher.data";
 import { Cipher } from "@bitwarden/common/vault/models/domain/cipher";
 import { AttachmentView } from "@bitwarden/common/vault/models/view/attachment.view";
@@ -73,6 +80,7 @@ type CipherAttachmentForm = FormGroup<{
     FormFieldModule,
     ItemModule,
     JslibModule,
+    KeykeeperPlanNoticeComponent,
     ProgressBarComponent,
     ReactiveFormsModule,
     TruncatedFilenameComponent,
@@ -111,9 +119,30 @@ export class CipherAttachmentsComponent {
 
   readonly onCloseButtonPress = output<void>();
 
+  /**
+   * Keykeeper: emits once when the plan doesn't let files be added to this
+   * item, so the window around this list can turn its Upload button into
+   * Close. The files already here can still be downloaded and removed.
+   */
+  readonly onAddingOff = output<AttachingOff>();
+
   protected readonly organization = signal<Organization | null>(null);
   protected readonly cipher = signal<CipherView | null>(null);
   protected readonly uploadProgress = signal<number | null>(null);
+
+  /**
+   * Keykeeper: why files can't be added to this item, or null when they can
+   * (DESIGN.md, "Plans and billing"): a personal item needs Premium, and an
+   * organization's item needs the organization's storage, which is 0 once its
+   * plan has ended.
+   */
+  protected readonly addingOff = signal<AttachingOff | null>(null);
+
+  /** Keykeeper: the plain sentence shown where the file picker would be. */
+  protected readonly addingOffSentence = computed(() => {
+    const off = this.addingOff();
+    return off == null ? null : attachingOffSentence(off);
+  });
 
   attachmentForm: CipherAttachmentForm = this.formBuilder.group({
     file: new FormControl<File | null>(null, {
@@ -125,6 +154,7 @@ export class CipherAttachmentsComponent {
   private cipherDomain: Cipher | null = null;
   private activeUserId: UserId | null = null;
   private readonly destroyRef = inject(DestroyRef);
+  private readonly billingAccountProfileStateService = inject(BillingAccountProfileStateService);
 
   constructor(
     private cipherService: CipherService,
@@ -161,10 +191,19 @@ export class CipherAttachmentsComponent {
         this.cipher.set(await this.cipherService.decrypt(this.cipherDomain, this.activeUserId));
       }
 
+      // Keykeeper: adding is the plan's to allow; downloading and removing aren't.
+      const off = await this.planTurnsAddingOff();
+      this.addingOff.set(off);
+      if (off != null) {
+        this.onAddingOff.emit(off);
+      }
+
       // Update the initial state of the submit button
       const btn = this.submitBtn();
       if (btn) {
-        btn.disabled.set(!this.attachmentForm.valid && (this.cipher()?.edit ?? true));
+        btn.disabled.set(
+          !this.attachmentForm.valid && (this.cipher()?.edit ?? true) && off == null,
+        );
       }
     });
 
@@ -195,6 +234,12 @@ export class CipherAttachmentsComponent {
   submit = async () => {
     //user can't edit cipher and will close the bit-dialog
     if (!(this.cipher()?.edit ?? false)) {
+      this.onCloseButtonPress.emit();
+      return;
+    }
+
+    // Keykeeper: nothing can be added on this plan, so the button only closes.
+    if (this.addingOff() != null) {
       this.onCloseButtonPress.emit();
       return;
     }
@@ -337,7 +382,10 @@ export class CipherAttachmentsComponent {
    * Gets the organization for the given organization ID
    */
   private async getOrganization(): Promise<Organization | null> {
-    const orgId = this.organizationId();
+    return this.findOrganization(this.organizationId());
+  }
+
+  private async findOrganization(orgId: string | null | undefined): Promise<Organization | null> {
     if (!orgId || !this.activeUserId) {
       return null;
     }
@@ -347,6 +395,27 @@ export class CipherAttachmentsComponent {
     );
 
     return organizations.find((o) => o.id === orgId) || null;
+  }
+
+  /**
+   * Keykeeper: whether the plan turns adding off for this item. The item's own
+   * organization decides, since the extension's page passes no organization.
+   */
+  private async planTurnsAddingOff(): Promise<AttachingOff | null> {
+    const cipher = this.cipher();
+    if (cipher == null || !cipher.edit || !this.activeUserId) {
+      return null;
+    }
+
+    const organizationId = cipher.organizationId ?? this.organizationId();
+    const organization = this.organization() ?? (await this.findOrganization(organizationId));
+    const hasPremium = organizationId
+      ? false
+      : await firstValueFrom(
+          this.billingAccountProfileStateService.hasPremiumFromAnySource$(this.activeUserId),
+        );
+
+    return attachingOff(organizationId, organization, hasPremium);
   }
 
   protected fixOldAttachment = (attachment: AttachmentView) => {

@@ -27,6 +27,11 @@ import {
 } from "rxjs/operators";
 
 import { CollectionService } from "@bitwarden/admin-console/common";
+import {
+  attachingOffSentence,
+  KeykeeperPlanNoticeDialogComponent,
+  KeykeeperPricingLinkComponent,
+} from "@bitwarden/angular/billing/keykeeper";
 import { SearchPipe } from "@bitwarden/angular/pipes/search.pipe";
 import {
   NoResults,
@@ -75,6 +80,10 @@ import { SearchService } from "@bitwarden/common/vault/abstractions/search.servi
 import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherRepromptType } from "@bitwarden/common/vault/enums/cipher-reprompt-type";
+import {
+  attachingOff,
+  attachmentsWindowOpens,
+} from "@bitwarden/common/vault/keykeeper/attachments-plan";
 import { CipherData } from "@bitwarden/common/vault/models/data/cipher.data";
 import { TreeNode } from "@bitwarden/common/vault/models/domain/tree-node";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
@@ -189,6 +198,7 @@ type EmptyStateMap = Record<EmptyStateType, EmptyStateItem>;
     VaultItemsModule,
     SharedModule,
     VaultBatchActionComponent,
+    KeykeeperPricingLinkComponent,
   ],
   providers: [
     RoutedVaultFilterService,
@@ -703,10 +713,6 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
     this.vaultFilterService.clearOrganizationFilter();
   }
 
-  async navigateToGetPremium() {
-    await this.router.navigate(["/settings/subscription/premium"]);
-  }
-
   async onVaultItemsEvent(event: VaultItemEvent<C>) {
     this.processingEvent = true;
     try {
@@ -955,19 +961,22 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
       return;
     }
 
-    if (cipher.organizationId == null && !this.canAccessPremium) {
-      await this.premiumUpgradePromptService.promptForPremium();
+    // Keykeeper: the window opens for any item that has files, on any plan, so
+    // a file can be downloaded and removed, and turns adding off itself. An
+    // item with no files and no right to add gets the plain sentence instead
+    // (DESIGN.md, "Plans and billing").
+    const organizationId =
+      cipher.organizationId != null ? uuidAsString(cipher.organizationId) : null;
+    const org =
+      organizationId != null
+        ? await firstValueFrom(this.organizations$.pipe(getOrganizationById(organizationId)))
+        : null;
+    const off = attachingOff(organizationId, org, this.canAccessPremium);
+    if (off != null && !attachmentsWindowOpens(CipherViewLikeUtils.hasAttachments(cipher), off)) {
+      KeykeeperPlanNoticeDialogComponent.open(this.dialogService, {
+        sentence: attachingOffSentence(off),
+      });
       return;
-    } else if (cipher.organizationId != null) {
-      const org = await firstValueFrom(
-        this.organizations$.pipe(getOrganizationById(uuidAsString(cipher.organizationId))),
-      );
-      if (org != null && (org.maxStorageGb == null || org.maxStorageGb === 0)) {
-        this.messagingService.send("upgradeOrganization", {
-          organizationId: cipher.organizationId,
-        });
-        return;
-      }
     }
 
     const dialogRef = AttachmentsV2Component.open(this.dialogService, {

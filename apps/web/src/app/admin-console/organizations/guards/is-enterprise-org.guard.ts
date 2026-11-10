@@ -41,30 +41,17 @@ export function isEnterpriseOrgGuard(showError: boolean = true): CanActivateFn {
     }
 
     if (org.productTierType != ProductTierType.Enterprise && showError) {
-      // Users without billing permission can't access billing
-      if (!org.canEditSubscription) {
-        await dialogService.openSimpleDialog({
-          title: { key: "upgradeOrganizationEnterprise" },
-          content: { key: "onlyAvailableForEnterpriseOrganization" },
-          acceptButtonText: { key: "ok" },
-          cancelButtonText: null,
-          type: "info",
-        });
-        return false;
-      } else {
-        const upgradeConfirmed = await dialogService.openSimpleDialog({
-          title: { key: "upgradeOrganizationEnterprise" },
-          content: { key: "onlyAvailableForEnterpriseOrganization" },
-          acceptButtonText: { key: "upgradeOrganization" },
-          type: "info",
-          icon: "bwi-plus-circle",
-        });
-        if (upgradeConfirmed) {
-          await router.navigate(["organizations", org.id, "billing", "subscription"], {
-            queryParams: { upgrade: true, productTierType: ProductTierType.Enterprise },
-          });
-        }
-      }
+      // Keykeeper: the organization's Billing pages are gone (DESIGN.md,
+      // "Plans and billing"), so everyone gets the version without the
+      // upgrade button.
+      await dialogService.openSimpleDialog({
+        title: { key: "upgradeOrganizationEnterprise" },
+        content: { key: "onlyAvailableForEnterpriseOrganization" },
+        acceptButtonText: { key: "ok" },
+        cancelButtonText: null,
+        type: "info",
+      });
+      return false;
     }
 
     return org.productTierType == ProductTierType.Enterprise;

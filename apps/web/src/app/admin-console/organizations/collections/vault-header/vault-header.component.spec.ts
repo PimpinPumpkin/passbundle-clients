@@ -516,7 +516,8 @@ describe("VaultHeaderComponent", () => {
       );
     });
 
-    it("navigates to billing when free org owner accepts upgrade dialog", async () => {
+    // Keykeeper: the organization's Billing pages are gone, so the dialog only closes.
+    it("stays put when free org owner accepts upgrade dialog", async () => {
       const col1 = makeCollection("Col1", { id: "c1" as any });
       const col2 = makeCollection("Col2", { id: "c2" as any });
       mockCollectionAdminService.collectionAdminViews$.mockReturnValue(of([col1, col2]));
@@ -545,10 +546,10 @@ describe("VaultHeaderComponent", () => {
       closedSubject.next(true as any);
       await promise;
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        ["/organizations", orgId, "billing", "subscription"],
-        { queryParams: { upgrade: true } },
+      expect(mockDialogService.openSimpleDialogRef).toHaveBeenCalledWith(
+        expect.objectContaining({ cancelButtonText: null }),
       );
+      expect(navigateSpy).not.toHaveBeenCalled();
     });
   });
 });

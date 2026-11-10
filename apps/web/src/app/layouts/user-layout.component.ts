@@ -30,7 +30,6 @@ import { PopoverModule, SideNavService, SvgModule } from "@bitwarden/components"
 import { SendPolicyService } from "@bitwarden/send-ui";
 import { I18nPipe } from "@bitwarden/ui-common";
 import { CoachmarkComponent, CoachmarkService } from "@bitwarden/vault";
-import { PremiumSubscriptionRoutingService } from "@bitwarden/web-vault/app/billing/individual/services/premium-subscription-routing.service";
 
 import { BillingFreeFamiliesNavItemComponent } from "../billing/shared/billing-free-families-nav-item.component";
 import { KeykeeperMspApiService } from "../keykeeper/msp/msp-api.service";
@@ -64,7 +63,6 @@ export class UserLayoutComponent implements OnInit {
   protected readonly sendEnabled$: Observable<boolean> = this.sendPolicyService.disableSend$.pipe(
     map((disableSend) => !disableSend),
   );
-  protected subscriptionRoute$: Observable<string | null>;
 
   protected readonly coachmarkService = inject(CoachmarkService);
   protected readonly sideNavService = inject(SideNavService);
@@ -111,7 +109,6 @@ export class UserLayoutComponent implements OnInit {
     private accountService: AccountService,
     private policyService: PolicyService,
     private sendPolicyService: SendPolicyService,
-    private premiumSubscriptionRoutingService: PremiumSubscriptionRoutingService,
   ) {
     this.showEmergencyAccess = toSignal(
       this.accountService.activeAccount$.pipe(
@@ -119,8 +116,6 @@ export class UserLayoutComponent implements OnInit {
         switchMap((userId) => canAccessEmergencyAccess(userId, this.policyService)),
       ),
     );
-
-    this.subscriptionRoute$ = this.premiumSubscriptionRoutingService.getSubscriptionRoute$();
 
     // Keykeeper: where the menu covers the page (a phone), going to another
     // page closes it. Picking a filter closes it too (the menu does that);

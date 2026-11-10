@@ -4,9 +4,14 @@ import { CommonModule } from "@angular/common";
 import { Component, Input, OnInit } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { Router } from "@angular/router";
-import { firstValueFrom, map, switchMap } from "rxjs";
+import { firstValueFrom } from "rxjs";
 
 import { PremiumBadgeComponent } from "@bitwarden/angular/billing/components/premium-badge";
+import {
+  attachingOffSentence,
+  KeykeeperPlanNoticeDialogComponent,
+  KeykeeperPlanSentence,
+} from "@bitwarden/angular/billing/keykeeper";
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import {
   getOrganizationById,
@@ -15,12 +20,14 @@ import {
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions";
-import { ProductTierType } from "@bitwarden/common/billing/enums";
-import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { CipherId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
-import { PremiumUpgradePromptService } from "@bitwarden/common/vault/abstractions/premium-upgrade-prompt.service";
-import { ItemModule, ToastService, TypographyModule } from "@bitwarden/components";
+import {
+  attachingOff,
+  AttachingOff,
+  attachmentsWindowOpens,
+} from "@bitwarden/common/vault/keykeeper/attachments-plan";
+import { DialogService, ItemModule, TypographyModule } from "@bitwarden/components";
 import { CipherFormContainer } from "@bitwarden/vault";
 
 // FIXME(https://bitwarden.atlassian.net/browse/CL-764): Migrate to OnPush
@@ -36,37 +43,30 @@ export class OpenAttachmentsComponent implements OnInit {
   // eslint-disable-next-line @angular-eslint/prefer-signals
   @Input({ required: true }) cipherId: CipherId;
 
-  /** True when the user has access to premium or h  */
-  canAccessAttachments: boolean;
+  /**
+   * Keykeeper: why a file can't be added to this item, or null when one can
+   * (DESIGN.md, "Plans and billing"). A personal item needs Premium; an
+   * organization's item needs the organization to have storage.
+   */
+  attachingOff: AttachingOff | null = null;
 
-  /** True when the cipher is a part of a free organization */
-  cipherIsAPartOfFreeOrg: boolean;
+  /** Keykeeper: files already on the item can be downloaded and removed on any plan. */
+  hasFiles = false;
 
   /** Tracks the disabled status of the edit cipher form */
   parentFormDisabled: boolean;
+
+  protected readonly attachFilesSentence = KeykeeperPlanSentence.AttachFiles;
 
   constructor(
     private router: Router,
     private billingAccountProfileStateService: BillingAccountProfileStateService,
     private cipherService: CipherService,
     private organizationService: OrganizationService,
-    private toastService: ToastService,
-    private i18nService: I18nService,
+    private dialogService: DialogService,
     private accountService: AccountService,
     private cipherFormContainer: CipherFormContainer,
-    private premiumUpgradeService: PremiumUpgradePromptService,
   ) {
-    this.accountService.activeAccount$
-      .pipe(
-        switchMap((account) =>
-          this.billingAccountProfileStateService.hasPremiumFromAnySource$(account.id),
-        ),
-        takeUntilDestroyed(),
-      )
-      .subscribe((canAccessPremium) => {
-        this.canAccessAttachments = canAccessPremium;
-      });
-
     this.cipherFormContainer.formStatusChange$.pipe(takeUntilDestroyed()).subscribe((status) => {
       this.parentFormDisabled = status === "disabled";
     });
@@ -77,40 +77,41 @@ export class OpenAttachmentsComponent implements OnInit {
       return;
     }
 
-    const activeUserId = await firstValueFrom(
-      this.accountService.activeAccount$.pipe(map((a) => a?.id)),
-    );
-    const cipher = await firstValueFrom(
-      this.cipherService.cipherView$(activeUserId, this.cipherId),
-    );
+    const userId = await firstValueFrom(getUserId(this.accountService.activeAccount$));
+    // Keykeeper: the stored item, not its decrypted view, says whether it has
+    // files: a view the popup decrypted earlier can lack them.
+    const cipher = await this.cipherService.get(this.cipherId, userId);
+    if (cipher == null) {
+      return;
+    }
+    this.hasFiles = (cipher.attachments?.length ?? 0) > 0;
 
     if (!cipher.organizationId) {
-      this.cipherIsAPartOfFreeOrg = false;
+      const hasPremium = await firstValueFrom(
+        this.billingAccountProfileStateService.hasPremiumFromAnySource$(userId),
+      );
+      this.attachingOff = attachingOff(null, null, hasPremium);
       return;
     }
 
-    const userId = await firstValueFrom(getUserId(this.accountService.activeAccount$));
     const org = await firstValueFrom(
       this.organizationService
         .organizations$(userId)
         .pipe(getOrganizationById(cipher.organizationId)),
     );
 
-    this.cipherIsAPartOfFreeOrg = org.productTierType === ProductTierType.Free;
+    this.attachingOff = attachingOff(cipher.organizationId, org, false);
   }
 
-  /** Routes the user to the attachments screen, if available */
+  /**
+   * Routes the user to the attachments screen. Keykeeper: it opens for any
+   * item that has files, and turns adding off itself. An item with no files
+   * and no right to add gets the plain sentence instead.
+   */
   async openAttachments() {
-    if (!this.canAccessAttachments) {
-      await this.premiumUpgradeService.promptForPremium();
-      return;
-    }
-
-    if (this.cipherIsAPartOfFreeOrg) {
-      this.toastService.showToast({
-        variant: "error",
-        title: null,
-        message: this.i18nService.t("freeOrgsCannotUseAttachments"),
+    if (this.attachingOff != null && !attachmentsWindowOpens(this.hasFiles, this.attachingOff)) {
+      KeykeeperPlanNoticeDialogComponent.open(this.dialogService, {
+        sentence: attachingOffSentence(this.attachingOff),
       });
       return;
     }
