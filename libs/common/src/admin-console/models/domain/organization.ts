@@ -106,6 +106,11 @@ export class Organization {
   keykeeperPasswordChange: boolean;
   /** Keykeeper: what it does with the browsers' own card and address autofill. */
   keykeeperBrowserAutofill: BrowserAutofillMode;
+  /**
+   * Keykeeper: this membership came from an MSP, so the organization's member policies leave it
+   * alone wherever they leave an admin alone (DESIGN.md, "MSP console").
+   */
+  keykeeperFromMsp: boolean;
   useMyItems: boolean;
   useInviteLinks: boolean;
 
@@ -177,6 +182,7 @@ export class Organization {
     this.usePhishingBlocker = obj.usePhishingBlocker;
     this.keykeeperPasswordChange = obj.keykeeperPasswordChange === true;
     this.keykeeperBrowserAutofill = browserAutofillMode(obj.keykeeperBrowserAutofill);
+    this.keykeeperFromMsp = obj.keykeeperFromMsp === true;
     this.useMyItems = obj.useMyItems;
     this.useInviteLinks = obj.useInviteLinks;
   }

@@ -71,6 +71,7 @@ export class OrganizationData {
   usePhishingBlocker: boolean;
   keykeeperPasswordChange: boolean;
   keykeeperBrowserAutofill: BrowserAutofillMode;
+  keykeeperFromMsp: boolean;
   useMyItems: boolean;
   useInviteLinks: boolean;
 
@@ -142,6 +143,7 @@ export class OrganizationData {
     this.usePhishingBlocker = response.usePhishingBlocker;
     this.keykeeperPasswordChange = response.keykeeperPasswordChange === true;
     this.keykeeperBrowserAutofill = browserAutofillMode(response.keykeeperBrowserAutofill);
+    this.keykeeperFromMsp = response.keykeeperFromMsp === true;
     this.useMyItems = response.useMyItems;
     this.useInviteLinks = response.useInviteLinks;
 

@@ -414,6 +414,27 @@ describe("FidoAuthenticatorService", () => {
         expect(credentialIdLength).toEqual(new Uint8Array([0, 16])); // 16 bytes because we're using GUIDs
         expect(credentialId).toEqual(credentialIdBytes);
       });
+
+      // Keykeeper: a site names a passkey's maker by these 16 bytes, so they are spelled out here
+      // rather than read from the constant under test.
+      it("labels a new passkey with PassBundle's AAGUID", async () => {
+        const result = await authenticator.makeCredential(params, windowReference);
+
+        const attestationObject = CBOR.decode(
+          Fido2Utils.bufferSourceToUint8Array(result.attestationObject).buffer,
+        );
+        // Attested credential data comes after the RP ID hash (32 bytes), the flags (1) and the
+        // counter (4), and starts with the AAGUID (16).
+        const authData: Uint8Array = attestationObject.authData;
+        const aaguid = Array.from(authData.slice(37, 53));
+
+        // 09c5ee5f-0845-48e6-aef4-c7c443317de5
+        expect(aaguid).toEqual([
+          0x09, 0xc5, 0xee, 0x5f, 0x08, 0x45, 0x48, 0xe6, 0xae, 0xf4, 0xc7, 0xc4, 0x43, 0x31, 0x7d,
+          0xe5,
+        ]);
+        expect(Array.from(result.authData.slice(37, 53))).toEqual(aaguid);
+      });
     });
 
     async function createParams(

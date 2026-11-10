@@ -36,9 +36,12 @@ import { p1363ToDer } from "./ecdsa-utils";
 import { Fido2Utils } from "./fido2-utils";
 import { guidToStandardFormat } from "./guid-utils";
 
-// AAGUID: d548826e-79b4-db40-a3d8-11116f7e8349
+// Keykeeper: PassBundle's AAGUID, 09c5ee5f-0845-48e6-aef4-c7c443317de5, the same one its own apps
+// use: what a site sees as the maker of a passkey made here. It only goes into the attested
+// credential data of a new passkey, so passkeys made before it changed keep working as they are
+// (docs/core.md, "Passkeys").
 export const AAGUID = new Uint8Array([
-  0xd5, 0x48, 0x82, 0x6e, 0x79, 0xb4, 0xdb, 0x40, 0xa3, 0xd8, 0x11, 0x11, 0x6f, 0x7e, 0x83, 0x49,
+  0x09, 0xc5, 0xee, 0x5f, 0x08, 0x45, 0x48, 0xe6, 0xae, 0xf4, 0xc7, 0xc4, 0x43, 0x31, 0x7d, 0xe5,
 ]);
 
 const KeyUsages: KeyUsage[] = ["sign"];
