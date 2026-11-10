@@ -75,7 +75,6 @@ import { SearchService } from "@bitwarden/common/vault/abstractions/search.servi
 import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherRepromptType } from "@bitwarden/common/vault/enums/cipher-reprompt-type";
-import { CipherData } from "@bitwarden/common/vault/models/data/cipher.data";
 import { TreeNode } from "@bitwarden/common/vault/models/domain/tree-node";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
@@ -118,6 +117,7 @@ import {
   RoutedVaultFilterBridgeService,
   RoutedVaultFilterModel,
   RoutedVaultFilterService,
+  saveFavorite,
   templateCipherType,
   templateFields,
   VaultBatchActionComponent,
@@ -416,7 +416,14 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
         switch (message.command) {
           case "syncCompleted":
             if (message.successfully) {
-              this.refresh();
+              // Keykeeper: a sync reads the list again but no longer throws
+              // the selection away. The server tells this browser about every
+              // change, its own bulk actions included, so a selection made
+              // right after one vanished a moment later, and so did one made
+              // while a colleague was working. The list keeps the rows that
+              // are still in it and lets go of the rest
+              // (VaultItemsComponent.keepSelectedRows).
+              this.refresh$.next(undefined);
               this.changeDetectorRef.detectChanges();
             }
             break;
@@ -1828,16 +1835,14 @@ export class VaultComponent<C extends CipherViewLike> implements OnInit, OnDestr
     // Keykeeper: only the favorite changes, through the partial update, so
     // the item isn't encrypted and saved again, and its history keeps no copy
     // of it (DESIGN.md, "Item history").
-    const favorite = !cipherFullView.favorite;
-    const response = await this.apiService.putPartialCipher(cipherFullView.id, {
-      folderId: cipherFullView.folderId,
-      favorite,
-    });
-    await this.cipherService.upsert(
-      new CipherData(response, cipherFullView.collectionIds),
+    // Several selected items go the same way (saveFavorite).
+    await saveFavorite(
+      this.apiService,
+      this.cipherService,
+      cipherFullView,
+      !cipherFullView.favorite,
       activeUserId,
     );
-    cipherFullView.favorite = favorite;
 
     this.toastService.showToast({
       variant: "success",

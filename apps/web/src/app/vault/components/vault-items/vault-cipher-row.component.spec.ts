@@ -207,6 +207,62 @@ describe("VaultCipherRowComponent", () => {
     });
   });
 
+  // Keykeeper: DESIGN.md, "Selecting several items".
+  describe("the selection checkbox", () => {
+    let cipher: CipherView;
+    const checkbox = () =>
+      fixture.nativeElement.querySelector('input[type="checkbox"]') as HTMLInputElement;
+
+    beforeEach(() => {
+      cipher = new CipherView();
+      cipher.id = "cipher-1";
+      cipher.name = "Contoso Mail";
+      cipher.type = CipherType.Login;
+      cipher.login = new LoginView();
+      component.cipher = cipher;
+      component.disabled = false;
+    });
+
+    it("names the item it selects", () => {
+      const t = jest.spyOn(TestBed.inject(I18nService), "t");
+
+      fixture.detectChanges();
+
+      expect(checkbox().getAttribute("aria-label")).toBe("keykeeperSelectItem");
+      expect(t.mock.calls.find(([key]) => key === "keykeeperSelectItem")?.[1]).toBe("Contoso Mail");
+    });
+
+    it("is there in an organization's vault for an item the person can only look at", () => {
+      cipher.organizationId = "org-1";
+      cipher.edit = false;
+      cipher.viewPassword = false;
+      component.organizations = [{ id: "org-1", canEditAllCiphers: false } as any];
+      component.viewingOrgVault = true;
+
+      expect(component["showCheckbox"]).toBe(true);
+    });
+
+    it("says whether Shift was held when it is clicked", () => {
+      fixture.detectChanges();
+      const held: boolean[] = [];
+      component.checkedToggled.subscribe((shift) => held.push(shift));
+
+      const withShift = new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        shiftKey: true,
+      });
+      const plain = new MouseEvent("click", { bubbles: true, cancelable: true });
+      checkbox().dispatchEvent(withShift);
+      checkbox().dispatchEvent(plain);
+
+      expect(held).toEqual([true, false]);
+      // Neither click is canceled: a canceled one leaves the checkbox as it was.
+      expect(withShift.defaultPrevented).toBe(false);
+      expect(plain.defaultPrevented).toBe(false);
+    });
+  });
+
   describe("showAssignToCollections", () => {
     let archivedCipher: CipherView;
 

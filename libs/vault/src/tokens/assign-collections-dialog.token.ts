@@ -9,6 +9,8 @@ export interface AssignCollectionsParams {
   availableCollections: CollectionView[];
   activeCollection?: CollectionView;
   isSingleCipherAdmin?: boolean;
+  /** Keykeeper: shown at the top of the dialog when selected items were left out of `ciphers`. */
+  notice?: string;
 }
 
 export const AssignCollectionsResult = {

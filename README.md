@@ -1,6 +1,6 @@
 # PassBundle apps
 
-The web vault, browser extension, desktop app, and command line for [PassBundle](https://github.com/PimpinPumpkin/Passbundle), a password manager for individuals, families, and managed service providers (MSPs).
+The web vault, browser extension, and command line for [PassBundle](https://github.com/PimpinPumpkin/Passbundle), a password manager for individuals, families, and managed service providers (MSPs). The desktop and phone apps are in [passbundle-apps](https://github.com/PimpinPumpkin/passbundle-apps).
 
 They're based on the open-source [Bitwarden clients](https://github.com/bitwarden/clients), which we follow by release and build in their open-source configuration only. PassBundle adds an MSP console (every client at a glance, staff and technician access, default policies, templates every client gets, onboarding through an RMM install command, and an audit log), custom roles for a client's point of contact, item templates, expiration dates, and autofill fixes. Vaults stay end-to-end encrypted: keys are made and used only in the apps.
 

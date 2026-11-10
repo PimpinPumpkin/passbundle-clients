@@ -5,10 +5,13 @@
       <button type="button" bit-chip-action [label]="'archived' | i18n"></button>
     }
     @if (!config.hideIndividualVaultFields) {
+      <!-- Keykeeper: the star is centered on the heading's line, and the
+           heading row is no taller than the form's other headings. -->
       <button
         slot="end"
         type="button"
         size="small"
+        class="-tw-mt-2 -tw-mb-1"
         [bitIconButton]="favoriteIcon"
         role="checkbox"
         [attr.aria-checked]="itemDetailsForm.value.favorite"

@@ -187,6 +187,38 @@ describe("UriOptionComponent", () => {
     });
   });
 
+  // Keykeeper: the reorder handle is one of the field's own buttons, so a
+  // website's field is as wide as every other field of the form.
+  describe("reorder handle (Keykeeper)", () => {
+    const getHandle = () =>
+      fixture.nativeElement.querySelector(
+        "bit-form-field button[data-testid='reorder-toggle-button']",
+      ) as HTMLButtonElement;
+
+    it("is inside the field when the website can be reordered", () => {
+      component.canReorder = true;
+      fixture.detectChanges();
+      expect(getHandle()).toBeTruthy();
+      expect(
+        fixture.nativeElement.querySelectorAll("button[data-testid='reorder-toggle-button']"),
+      ).toHaveLength(1);
+    });
+
+    it("is not there when the website can't be reordered", () => {
+      component.canReorder = false;
+      fixture.detectChanges();
+      expect(getHandle()).toBeFalsy();
+    });
+
+    it("passes its key presses on, so the arrow keys still move the website", () => {
+      jest.spyOn(component.onKeydown, "emit");
+      component.canReorder = true;
+      fixture.detectChanges();
+      getHandle().dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown" }));
+      expect(component.onKeydown.emit).toHaveBeenCalled();
+    });
+  });
+
   // Autotype App Tests
   describe("uriLabel", () => {
     it("returns 'websiteUri' for a normal URL at index 0", () => {

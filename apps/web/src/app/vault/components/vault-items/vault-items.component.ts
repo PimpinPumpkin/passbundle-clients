@@ -18,6 +18,7 @@ import {
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { FeatureFlag } from "@bitwarden/common/enums/feature-flag.enum";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
+import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { CipherAuthorizationService } from "@bitwarden/common/vault/services/cipher-authorization.service";
 import {
   RestrictedCipherType,
@@ -27,9 +28,17 @@ import {
   CipherViewLike,
   CipherViewLikeUtils,
 } from "@bitwarden/common/vault/utils/cipher-view-like-utils";
-import { SortDirection, TableDataSource } from "@bitwarden/components";
+import { SortDirection, TableDataSource, ToastService } from "@bitwarden/components";
 import { OrganizationId } from "@bitwarden/sdk-internal";
-import { VaultBatchBarService, VaultCopyButtonsService, VaultItem } from "@bitwarden/vault";
+import {
+  compareVaultItems,
+  MAX_SELECTION,
+  rangeBetween,
+  stillListed,
+  VaultBatchBarService,
+  VaultCopyButtonsService,
+  VaultItem,
+} from "@bitwarden/vault";
 
 import { GroupView } from "../../../admin-console/organizations/core";
 
@@ -46,7 +55,8 @@ import { VAULT_ROW_LEASE_BADGE } from "./vault-row-lease-badge.token";
 export const RowHeight = 64;
 export const RowHeightClass = `tw-h-[64px]`;
 
-const MaxSelectionCount = 500;
+// Keykeeper: the limit lives with the rest of selecting several items.
+const MaxSelectionCount = MAX_SELECTION;
 
 type ItemPermission = CollectionPermission | "NoAccess";
 
@@ -56,6 +66,15 @@ type ItemPermission = CollectionPermission | "NoAccess";
   selector: "app-vault-items",
   templateUrl: "vault-items.component.html",
   standalone: false,
+  // Keykeeper: the stylesheet shows every row's checkbox while anything is
+  // selected, and the list takes Cmd/Ctrl+A and Escape while the focus is in
+  // it (DESIGN.md, "Selecting several items"). The tabindex makes a click
+  // anywhere in the list put the focus there, without adding a Tab stop.
+  host: {
+    tabindex: "-1",
+    "[attr.data-keykeeper-selecting]": "selection.hasValue() ? '' : null",
+    "(keydown)": "onKeydown($event)",
+  },
 })
 export class VaultItemsComponent<C extends CipherViewLike> {
   protected RowHeight = RowHeight;
@@ -154,6 +173,11 @@ export class VaultItemsComponent<C extends CipherViewLike> {
 
   private readonly vaultCopyButtonsService = inject(VaultCopyButtonsService);
   private readonly configService = inject(ConfigService);
+  private readonly toastService = inject(ToastService);
+  private readonly i18nService = inject(I18nService);
+
+  /** Keykeeper: the row a Shift+click measures its range from: the last one clicked. */
+  private rangeAnchor: VaultItem<C> | undefined;
 
   constructor(
     protected cipherAuthorizationService: CipherAuthorizationService,
@@ -266,9 +290,95 @@ export class VaultItemsComponent<C extends CipherViewLike> {
     if (this.isAllSelected) {
       this.selection.clear();
     } else {
-      const sortedItems = this.getSortedEditableItems();
-      this.selection.select(...sortedItems.slice(0, MaxSelectionCount));
+      this.selectAllShown();
     }
+  }
+
+  /**
+   * Keykeeper: selects every row the list is showing, in the order it shows
+   * them, up to the limit, and says so when the limit cut it short.
+   */
+  private selectAllShown() {
+    const sortedItems = this.getSortedEditableItems();
+    this.selection.select(...sortedItems.slice(0, MaxSelectionCount));
+    if (sortedItems.length > MaxSelectionCount) {
+      this.sayLimit();
+    }
+  }
+
+  /**
+   * Keykeeper: a row's checkbox was clicked. With Shift held, every row from
+   * the one clicked before to this one takes this row's new state.
+   */
+  protected toggleItem(item: VaultItem<C>, shiftKey: boolean) {
+    const select = !this.selection.isSelected(item);
+    const anchor = this.rangeAnchor;
+    this.rangeAnchor = item;
+
+    if (!shiftKey || anchor == null) {
+      this.selection.toggle(item);
+      return;
+    }
+
+    const range = rangeBetween(this.getSortedEditableItems(), anchor, item, compareVaultItems);
+    if (!select) {
+      this.selection.deselect(item, ...range);
+      return;
+    }
+
+    // The clicked row first, so it is in even when the limit cuts the range.
+    const fresh = [item, ...range.filter((row) => !compareVaultItems(row, item))].filter(
+      (row) => !this.selection.isSelected(row),
+    );
+    const room = Math.max(0, MaxSelectionCount - this.selection.selected.length);
+    this.selection.select(...fresh.slice(0, room));
+    if (fresh.length > room) {
+      this.sayLimit();
+    }
+  }
+
+  /** Keykeeper: Cmd/Ctrl+A selects every row shown, and Escape lets go of the selection. */
+  protected onKeydown(event: KeyboardEvent) {
+    if (this.disabled) {
+      return;
+    }
+
+    // Typing in a field keeps its own meaning for both keys.
+    const target = event.target as HTMLElement | null;
+    const tag = target?.tagName;
+    if (
+      target?.isContentEditable ||
+      tag === "TEXTAREA" ||
+      tag === "SELECT" ||
+      (tag === "INPUT" && (target as HTMLInputElement).type !== "checkbox")
+    ) {
+      return;
+    }
+
+    // Exactly one of Cmd and Ctrl, as for the bar's own shortcut.
+    if (
+      event.key.toLowerCase() === "a" &&
+      event.metaKey !== event.ctrlKey &&
+      !event.altKey &&
+      !event.shiftKey
+    ) {
+      event.preventDefault();
+      this.selectAllShown();
+      return;
+    }
+
+    if (event.key === "Escape" && this.selection.hasValue()) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.selection.clear();
+    }
+  }
+
+  private sayLimit() {
+    this.toastService.showToast({
+      variant: "info",
+      message: this.i18nService.t("keykeeperSelectLimit", MaxSelectionCount),
+    });
   }
 
   /**
@@ -374,18 +484,53 @@ export class VaultItemsComponent<C extends CipherViewLike> {
       .map((cipher) => ({ cipher }));
     const items: VaultItem<C>[] = [].concat(collections).concat(ciphers);
 
-    // Ciphers are selectable only if the user can edit them; collections only if they can be edited or deleted
+    // Collections are selectable only if they can be edited or deleted
     // Gated ("partial") ciphers are read-only, so they are never selectable
+    // Keykeeper: every other item is selectable, whether or not the person can
+    // edit it, as long as its row's checkbox works (it is off for an item that
+    // couldn't be decrypted). What may be done to it is asked when an action
+    // runs (VaultBatchBarService). "Select all" used to pass over the items
+    // someone could only look at, so the header checkbox never matched the rows.
     this.editableItems = items.filter(
       (item) =>
         (item.cipher !== undefined &&
-          this.canEditCipher(item.cipher) &&
+          !CipherViewLikeUtils.decryptionFailure(item.cipher) &&
           !CipherViewLikeUtils.isPartial(item.cipher)) ||
         (item.collection !== undefined &&
           (this.canEditCollection(item.collection) || this.canDeleteCollection(item.collection))),
     );
 
     this.dataSource.data = items;
+    this.keepSelectedRows();
+  }
+
+  /**
+   * Keykeeper: what is selected is always in the list. When the list is read
+   * again (a sync came in, or a search narrowed it), the rows that are still
+   * there stay selected and are swapped for the list's current copy, so the
+   * next action goes by what each item allows now. Rows that left the list
+   * are let go of, so nothing is ever done to an item the list doesn't show.
+   */
+  private keepSelectedRows() {
+    const before = this.selection.selected;
+    if (before.length === 0) {
+      return;
+    }
+
+    const key = (row: VaultItem<C>) =>
+      row.cipher ? `item:${row.cipher.id}` : `folder:${row.collection?.id}`;
+    const after = stillListed(before, this.editableItems, key);
+    if (after.length === before.length && after.every((row, i) => row === before[i])) {
+      return;
+    }
+
+    if (after.length === 0) {
+      this.selection.clear();
+      return;
+    }
+    // One change for the two steps, so the bar never sees an empty selection.
+    this.selection.clear(false);
+    this.selection.select(...after);
   }
 
   /**

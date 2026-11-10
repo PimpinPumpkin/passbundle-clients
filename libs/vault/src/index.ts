@@ -198,6 +198,15 @@ export * from "./keykeeper/password-change.service";
 export * from "./keykeeper/password-change-card.component";
 export { CANT_COPY_ITEM_KEY, mayCloneItem } from "./keykeeper/may-clone";
 export {
+  MAX_SELECTION,
+  rangeBetween,
+  runEach,
+  splitByAllowed,
+  stillListed,
+} from "./keykeeper/bulk-selection";
+export type { BulkPlan, BulkRun } from "./keykeeper/bulk-selection";
+export { saveFavorite } from "./keykeeper/favorite";
+export {
   distinctVersions,
   droppedPasskeys,
   historyAccess,

@@ -44,8 +44,11 @@ import { AdvancedUriOptionDialogComponent } from "./advanced-uri-option-dialog.c
   selector: "vault-autofill-uri-option",
   templateUrl: "./uri-option.component.html",
   host: {
+    // Keykeeper: 8px above and below each row, so two websites are as far
+    // apart (16px) as any two fields of the form, and none of it under the
+    // card's last line.
     class:
-      "tw-flex tw-flex-col tw-p-3 -tw-mx-3 tw-gap-4 tw-bg-background tw-text-main tw-rounded-lg first:-tw-mt-3 last-of-type:tw-mb-0",
+      "tw-flex tw-flex-col tw-px-3 tw-py-2 -tw-mx-3 tw-gap-4 tw-bg-background tw-text-main tw-rounded-lg first:-tw-mt-2 last:-tw-mb-2",
   },
   providers: [
     {

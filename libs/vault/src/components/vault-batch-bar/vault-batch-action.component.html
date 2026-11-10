@@ -6,10 +6,17 @@
 <ng-template #barPortal>
   <bit-bulk-actions-bar
     [selectedCount]="service.selectedCount()"
+    [note]="note()"
+    [busy]="busy()"
     (clear)="service.clearSelection()"
   >
     @for (action of primaryActions(); track action.label) {
-      <bit-bulk-action [action]="action.action" [icon]="action.icon" [label]="action.label" />
+      <bit-bulk-action
+        [action]="action.action"
+        [icon]="action.icon"
+        [label]="action.label"
+        [disabled]="busy()"
+      />
     }
 
     @for (action of overflowActions(); track action.label) {
@@ -17,6 +24,7 @@
         [action]="action.action"
         [icon]="action.icon"
         [label]="action.label"
+        [disabled]="busy()"
       />
     }
   </bit-bulk-actions-bar>
