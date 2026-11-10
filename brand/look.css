@@ -1444,6 +1444,12 @@ html.pb-popup,
 .pb-popup bit-landing-footer {
   color: var(--pb-muted);
 }
+/* A form taller than the popup pushes the line under it further down, to
+   be scrolled to. Held at the popup's height, as upstream has it, the form
+   runs over that line and hides its first row. */
+.pb-popup bit-landing-layout > div > main {
+  height: auto !important;
+}
 .pb-popup auth-anon-layout bit-form-field label sup {
   display: none;
 }
