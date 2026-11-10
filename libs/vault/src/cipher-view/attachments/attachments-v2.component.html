@@ -1,6 +1,6 @@
 <bit-dialog dialogSize="default" background="alt">
   <span bitDialogTitle>
-    {{ "addAttachment" | i18n }}
+    {{ titleKey | i18n }}
   </span>
   <ng-container bitDialogContent>
     @if (cipherId) {
@@ -14,6 +14,7 @@
         (onUploadFailed)="uploadFailed()"
         (onRemoveSuccess)="removalSuccessful()"
         (onCloseButtonPress)="closeButtonPressed()"
+        (onAddingOff)="addingOff()"
       ></app-cipher-attachments>
     }
   </ng-container>

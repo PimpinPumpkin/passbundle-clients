@@ -16,6 +16,7 @@ import { OrganizationService } from "@bitwarden/common/admin-console/abstraction
 import { OrganizationUserType } from "@bitwarden/common/admin-console/enums";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions/account/billing-account-profile-state.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
@@ -66,6 +67,8 @@ describe("CipherAttachmentsComponent", () => {
   organization.id = "org-123" as OrganizationId;
   organization.type = OrganizationUserType.Admin;
   organization.allowAdminAccessToAllCollectionItems = true;
+  // Keykeeper: an organization with storage; 0 means its plan has ended.
+  organization.maxStorageGb = 1;
 
   const cipherServiceGet = jest.fn().mockResolvedValue(cipherDomain);
   const cipherServiceDecrypt = jest.fn().mockResolvedValue(cipherView);
@@ -74,8 +77,11 @@ describe("CipherAttachmentsComponent", () => {
   const mockUserId = Utils.newGuid() as UserId;
   const accountService: FakeAccountService = mockAccountServiceWith(mockUserId);
   const organizations$ = new BehaviorSubject<Organization[]>([organization]);
+  const hasPremium$ = new BehaviorSubject<boolean>(true);
 
   beforeEach(async () => {
+    hasPremium$.next(true);
+    organization.maxStorageGb = 1;
     cipherServiceGet.mockClear();
     cipherServiceDecrypt.mockClear().mockResolvedValue(cipherView);
     showToast.mockClear();
@@ -115,6 +121,10 @@ describe("CipherAttachmentsComponent", () => {
           useValue: {
             organizations$: () => organizations$.asObservable(),
           },
+        },
+        {
+          provide: BillingAccountProfileStateService,
+          useValue: { hasPremiumFromAnySource$: () => hasPremium$.asObservable() },
         },
       ],
     })
@@ -493,6 +503,107 @@ describe("CipherAttachmentsComponent", () => {
 
         expect(emitSpy).toHaveBeenCalled();
       });
+    });
+  });
+
+  // Keykeeper: adding files is the plan's to allow; the files already on the
+  // item can be downloaded and removed on any plan (DESIGN.md, "Plans and billing").
+  describe("when the plan turns adding off", () => {
+    const attachment = {
+      id: "1234-5678",
+      fileName: "test.txt",
+      // A file with its own key can be downloaded.
+      key: {},
+    } as unknown as AttachmentView;
+
+    async function setup(cipher: CipherView, organizationId?: OrganizationId): Promise<void> {
+      cipherServiceDecrypt.mockResolvedValue(cipher);
+      fixture = TestBed.createComponent(CipherAttachmentsComponent);
+      component = fixture.componentInstance;
+      submitBtnFixture = TestBed.createComponent(ButtonComponent);
+      if (organizationId) {
+        fixture.componentRef.setInput("organizationId", organizationId);
+      }
+      fixture.componentRef.setInput("submitBtn", submitBtnFixture.componentInstance);
+      fixture.componentRef.setInput("cipherId", "5555-444-3333" as CipherId);
+      fixture.detectChanges();
+      await waitForInitialization();
+    }
+
+    const notice = () =>
+      fixture.debugElement.query(By.css('[data-testid="keykeeper-plan-notice"]'));
+    const filePicker = () => fixture.debugElement.query(By.css("bit-file-upload"));
+
+    it("says attaching files is part of Premium for a personal item without Premium", async () => {
+      hasPremium$.next(false);
+      const emitted = jest.fn();
+
+      cipherServiceDecrypt.mockResolvedValue({ ...cipherView, attachments: [attachment] });
+      fixture = TestBed.createComponent(CipherAttachmentsComponent);
+      component = fixture.componentInstance;
+      component.onAddingOff.subscribe(emitted);
+      fixture.componentRef.setInput("cipherId", "5555-444-3333" as CipherId);
+      fixture.detectChanges();
+      await waitForInitialization();
+
+      expect(notice().nativeElement.getAttribute("data-sentence")).toBe("keykeeperPlanAttachFiles");
+      expect(filePicker()).toBeNull();
+      expect(emitted).toHaveBeenCalledWith("premium");
+    });
+
+    it("still lists the item's files to download and remove", async () => {
+      hasPremium$.next(false);
+      await setup({ ...cipherView, attachments: [attachment] } as CipherView);
+
+      expect(fixture.debugElement.queryAll(By.css('[data-testid="file-name"]')).length).toBe(1);
+      expect(fixture.debugElement.query(By.directive(DeleteAttachmentComponent))).not.toBeNull();
+      expect(
+        fixture.debugElement.query(By.directive(MockDownloadAttachmentComponent)),
+      ).not.toBeNull();
+    });
+
+    it("says the organization's plan has ended when it has no storage", async () => {
+      organization.maxStorageGb = 0;
+      await setup(
+        { ...cipherView, organizationId: organization.id, attachments: [attachment] } as CipherView,
+        organization.id,
+      );
+
+      expect(notice().nativeElement.getAttribute("data-sentence")).toBe(
+        "keykeeperPlanOrganizationEnded",
+      );
+      expect(filePicker()).toBeNull();
+    });
+
+    it("leaves an organization's item alone when the person has no Premium", async () => {
+      hasPremium$.next(false);
+      await setup(
+        { ...cipherView, organizationId: organization.id } as CipherView,
+        organization.id,
+      );
+
+      expect(notice()).toBeNull();
+      expect(filePicker()).not.toBeNull();
+    });
+
+    it("keeps the button on and makes it close the window", async () => {
+      hasPremium$.next(false);
+      await setup({ ...cipherView, attachments: [attachment] } as CipherView);
+      const closeSpy = jest.spyOn(component.onCloseButtonPress, "emit");
+
+      expect(submitBtnFixture.componentInstance.disabled()).toBe(false);
+      await component.submit();
+
+      expect(closeSpy).toHaveBeenCalled();
+      expect(saveAttachmentWithServer).not.toHaveBeenCalled();
+      expect(showToast).not.toHaveBeenCalled();
+    });
+
+    it("shows the file picker to someone with Premium", async () => {
+      await setup({ ...cipherView } as CipherView);
+
+      expect(notice()).toBeNull();
+      expect(filePicker()).not.toBeNull();
     });
   });
 
