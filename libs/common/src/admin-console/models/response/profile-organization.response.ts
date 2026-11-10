@@ -70,6 +70,8 @@ export class ProfileOrganizationResponse extends BaseResponse {
   keykeeperPasswordChange: boolean;
   /** Keykeeper: what it does with the browsers' own card and address autofill. */
   keykeeperBrowserAutofill: BrowserAutofillMode;
+  /** Keykeeper: whether this membership came from an MSP. */
+  keykeeperFromMsp: boolean;
   useMyItems: boolean;
   useInviteLinks: boolean;
 
@@ -154,6 +156,9 @@ export class ProfileOrganizationResponse extends BaseResponse {
     this.keykeeperBrowserAutofill = browserAutofillMode(
       this.getResponseProperty("KeykeeperBrowserAutofill"),
     );
+    // Keykeeper: a server that doesn't say leaves the member under the organization's policies
+    // (DESIGN.md, "MSP console").
+    this.keykeeperFromMsp = this.getResponseProperty("KeykeeperFromMsp") === true;
     this.useMyItems = this.getResponseProperty("UseMyItems") ?? false;
     this.useInviteLinks = this.getResponseProperty("UseInviteLinks") ?? false;
   }
