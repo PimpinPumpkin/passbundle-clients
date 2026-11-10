@@ -37,19 +37,30 @@
   </vault-carousel-slide>
 </vault-carousel>
 
+<!-- Keykeeper: Create account is offered once the server has said it takes new
+     accounts. Until then its place is kept empty, and a server that doesn't take
+     them says so there, with signing in as the way on. -->
+@if (keykeeperNewAccounts() === "closed") {
+  <p class="tw-mt-4 tw-mb-2 tw-text-center tw-text-sm tw-text-muted">
+    <auth-keykeeper-new-accounts-closed reason="closed"></auth-keykeeper-new-accounts-closed>
+  </p>
+} @else {
+  <button
+    type="button"
+    bitButton
+    buttonType="primary"
+    (click)="navigateToSignup()"
+    class="tw-w-full tw-mt-4"
+    [class.tw-invisible]="keykeeperNewAccounts() !== 'open'"
+    data-testid="intro-create-account"
+  >
+    {{ "createAccount" | i18n }}
+  </button>
+}
 <button
   type="button"
   bitButton
-  buttonType="primary"
-  (click)="navigateToSignup()"
-  class="tw-w-full tw-mt-4"
->
-  {{ "createAccount" | i18n }}
-</button>
-<button
-  type="button"
-  bitButton
-  buttonType="secondary"
+  [buttonType]="keykeeperNewAccounts() === 'closed' ? 'primary' : 'secondary'"
   (click)="navigateToLogin()"
   class="tw-w-full tw-mt-2"
 >

@@ -284,6 +284,12 @@ function apply() {
   ownMessages.keykeeperMacProfile = { message: BRAND.macProfile };
   // The product's name, for our own pages, which never type it themselves.
   ownMessages.keykeeperProductName = { message: BRAND.name };
+  // The website's Contact page, where a person asks for an account while the
+  // service isn't taking new ones ("Ask for one").
+  if (typeof BRAND.urls?.website !== "string" || !/^https:\/\/[^\s/]+$/.test(BRAND.urls.website)) {
+    fail('brand.json needs "urls.website", the website\'s address, such as "https://example.com".');
+  }
+  ownMessages.keykeeperContactPage = { message: `${BRAND.urls.website}/contact/` };
   for (const rel of trackedFiles(
     "apps/browser/src/_locales/en/messages.json",
     "apps/web/src/locales/en/messages.json",

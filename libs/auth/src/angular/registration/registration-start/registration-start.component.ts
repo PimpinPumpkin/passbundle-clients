@@ -1,11 +1,16 @@
 // FIXME: Update this file to be type safe and remove this and next line
 // @ts-strict-ignore
 import { CommonModule } from "@angular/common";
-import { Component, EventEmitter, OnDestroy, OnInit, Output } from "@angular/core";
+import { Component, EventEmitter, inject, OnDestroy, OnInit, Output } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { Subject, takeUntil } from "rxjs";
 
+// Keykeeper: what a server that isn't taking new accounts says in place of the form.
+import {
+  KeykeeperNewAccountsClosedComponent,
+  KeykeeperNewAccountsReason,
+} from "@bitwarden/angular/auth/keykeeper/new-accounts-closed.component";
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { RegistrationCheckEmailIcon } from "@bitwarden/assets/svg";
 import { AccountApiService } from "@bitwarden/common/auth/abstractions/account-api.service";
@@ -16,6 +21,7 @@ import { RegionConfig, Region } from "@bitwarden/common/platform/abstractions/en
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { ValidationService } from "@bitwarden/common/platform/abstractions/validation.service";
+import { DefaultServerSettingsService } from "@bitwarden/common/platform/services/default-server-settings.service";
 // This import has been flagged as unallowed for this class. It may be involved in a circular dependency loop.
 // eslint-disable-next-line no-restricted-imports
 import {
@@ -62,6 +68,7 @@ const DEFAULT_MARKETING_EMAILS_PREF_BY_REGION: Record<Region, boolean> = {
     LinkModule,
     SvgModule,
     RegistrationEnvSelectorComponent,
+    KeykeeperNewAccountsClosedComponent,
   ],
 })
 export class RegistrationStartComponent implements OnInit, OnDestroy {
@@ -96,6 +103,21 @@ export class RegistrationStartComponent implements OnInit, OnDestroy {
 
   showErrorSummary = false;
 
+  /**
+   * Keykeeper: whether this server takes no new accounts, once its settings
+   * have said (null until then). When it takes none, the page says so in
+   * place of the form (DESIGN.md, "New accounts on a closed server").
+   */
+  protected keykeeperClosed: boolean | null = null;
+
+  /**
+   * Keykeeper: the server's reason for turning down the address just tried,
+   * when it gave one. It shows in the form until the address changes.
+   */
+  protected keykeeperRefusal: KeykeeperNewAccountsReason | null = null;
+
+  private keykeeperServerSettings = inject(DefaultServerSettingsService);
+
   private destroy$ = new Subject<void>();
 
   constructor(
@@ -118,6 +140,17 @@ export class RegistrationStartComponent implements OnInit, OnDestroy {
     this.registrationStartStateChange.emit(this.state);
 
     this.listenForQueryParamChanges();
+
+    // Keykeeper: a server that isn't taking new accounts gets the plain
+    // sentence, not a form that fails at the end.
+    this.keykeeperServerSettings.isUserRegistrationDisabled$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((disabled) => {
+        this.keykeeperClosed = disabled === true;
+      });
+    this.email.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => {
+      this.keykeeperRefusal = null;
+    });
 
     /**
      * If the user has a login email, set the email field to the login email.
@@ -191,7 +224,21 @@ export class RegistrationStartComponent implements OnInit, OnDestroy {
       openOrgInviteRequest,
     );
 
-    const result = await this.accountApiService.registerSendVerificationEmail(request);
+    // Keykeeper: a server that turns the address down and says why gets the
+    // plain sentence in the form, not an error toast. Any other error goes on
+    // as before.
+    this.keykeeperRefusal = null;
+    let result: string | null;
+    try {
+      result = await this.accountApiService.registerSendVerificationEmail(request);
+    } catch (error: unknown) {
+      const refusal = keykeeperRefusalOf(error);
+      if (refusal == null) {
+        throw error;
+      }
+      this.keykeeperRefusal = refusal;
+      return;
+    }
 
     if (typeof result === "string") {
       // we received a token, so the env doesn't support email verification
@@ -327,4 +374,10 @@ export class RegistrationStartComponent implements OnInit, OnDestroy {
     this.destroy$.next();
     this.destroy$.complete();
   }
+}
+
+/** Keykeeper: the reason on a refused first sign-up step, when the server gave one. */
+function keykeeperRefusalOf(error: unknown): KeykeeperNewAccountsReason | null {
+  const reason = (error as { keykeeperNewAccounts?: unknown } | null)?.keykeeperNewAccounts;
+  return reason === "closed" || reason === "address" ? reason : null;
 }

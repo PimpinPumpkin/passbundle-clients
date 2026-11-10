@@ -19,6 +19,7 @@ import {
 } from "@bitwarden/common/platform/abstractions/environment.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { ValidationService } from "@bitwarden/common/platform/abstractions/validation.service";
+import { DefaultServerSettingsService } from "@bitwarden/common/platform/services/default-server-settings.service";
 // This import has been flagged as unallowed for this class. It may be involved in a circular dependency loop.
 // eslint-disable-next-line no-restricted-imports
 import {
@@ -157,6 +158,13 @@ const decorators = (options: {
           useValue: {
             showError: () => [],
           } as Partial<ValidationService>,
+        },
+        // Keykeeper: the stories' server takes new accounts, so they show the form.
+        {
+          provide: DefaultServerSettingsService,
+          useValue: {
+            isUserRegistrationDisabled$: of(false),
+          } as Partial<DefaultServerSettingsService>,
         },
       ],
     }),

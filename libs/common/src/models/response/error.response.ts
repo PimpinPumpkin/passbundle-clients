@@ -6,6 +6,12 @@ export class ErrorResponse extends BaseResponse {
   message: string;
   validationErrors: { [key: string]: string[] };
   statusCode: number;
+  /**
+   * Keykeeper: why the server turned down a new account at the first sign-up
+   * step, when it says: "closed" (it isn't taking new accounts) or "address"
+   * (not for that email address). Not set by a server that doesn't say.
+   */
+  keykeeperNewAccounts?: "closed" | "address";
 
   constructor(response: any, status: number, identityResponse?: boolean) {
     super(response);
@@ -26,6 +32,11 @@ export class ErrorResponse extends BaseResponse {
       this.validationErrors = this.getResponseProperty("ValidationErrors", errorModel);
     }
     this.statusCode = status;
+    // Keykeeper: the reason a new account was turned down, when the server gives one.
+    const newAccounts = this.getResponseProperty("keykeeperNewAccounts");
+    if (newAccounts === "closed" || newAccounts === "address") {
+      this.keykeeperNewAccounts = newAccounts;
+    }
   }
 
   getSingleMessage(): string {
