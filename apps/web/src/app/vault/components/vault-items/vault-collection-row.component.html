@@ -6,8 +6,9 @@
       appStopProp
       [disabled]="disabled"
       [checked]="checked"
-      (change)="$event ? this.checkedToggled.next() : null"
-      [attr.aria-label]="'collectionItemSelect' | vfo1I18n: 'sharedFolderItemSelect'"
+      (click)="noteShift($event)"
+      (change)="$event ? this.checkedToggled.next(shiftHeld) : null"
+      [attr.aria-label]="'keykeeperSelectItem' | i18n: collection.name"
     />
   }
 </td>

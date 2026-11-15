@@ -12,6 +12,8 @@ export type TemplateClientsDialogData = {
   allClients: boolean;
   /** The clients it goes to now, when not every client. */
   chosen: string[];
+  /** Said first, when this is for several templates and some of them are left out. */
+  notice?: string;
 };
 
 export type TemplateClientsDialogResult = { allClients: boolean; clients: string[] };
@@ -35,6 +37,9 @@ export type TemplateClientsDialogResult = { allClients: boolean; clients: string
       [subtitle]="data.name"
     >
       <ng-container bitDialogContent>
+        @if (data.notice) {
+          <p bitTypography="body1" data-testid="template-clients-notice">{{ data.notice }}</p>
+        }
         <bit-radio-group formControlName="scope" [block]="true">
           <bit-label>Applies to</bit-label>
           <bit-radio-button value="all">

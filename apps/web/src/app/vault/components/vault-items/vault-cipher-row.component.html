@@ -1,13 +1,16 @@
 <td bitCell [ngClass]="RowHeightClass" class="tw-min-w-fit">
   @if (showCheckbox) {
+    <!-- Keykeeper: the label names the item, and the click says whether Shift
+         was held, for selecting a range (DESIGN.md, "Selecting several items"). -->
     <input
       type="checkbox"
       bitCheckbox
       appStopProp
       [disabled]="disabled || decryptionFailure || isPartial"
       [checked]="checked"
-      (change)="$event ? this.checkedToggled.next() : null"
-      [attr.aria-label]="'vaultItemSelect' | i18n"
+      (click)="noteShift($event)"
+      (change)="$event ? this.checkedToggled.next(shiftHeld) : null"
+      [attr.aria-label]="'keykeeperSelectItem' | i18n: cipher.name"
     />
   }
 </td>

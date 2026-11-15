@@ -31,10 +31,14 @@ type ActionDescriptor = {
   color?: string;
 };
 
+// Keykeeper: upstream split at more than 3 actions and kept 2 as buttons,
+// which put Delete, always the last, in the menu as soon as someone belonged
+// to an organization. Five fit as buttons; when the window is too narrow for
+// them the bar packs the last ones into the menu by itself.
 /** When the total number of available actions exceeds this, split into primary + overflow. */
-const PRIMARY_ACTION_THRESHOLD = 3;
+const PRIMARY_ACTION_THRESHOLD = 5;
 /** Number of actions shown as primary buttons before the rest move to the overflow menu. */
-const PRIMARY_ACTION_COUNT = 2;
+const PRIMARY_ACTION_COUNT = 4;
 
 @Component({
   selector: "bit-vault-batch-action",
@@ -94,6 +98,15 @@ export class VaultBatchActionComponent implements OnDestroy {
           : this.i18nService.t("assignToCollections"),
       });
     }
+    // Keykeeper: the star in a single item's menu, for all the selected ones.
+    if (this.service.canFavorite()) {
+      const adds = this.service.favoriteAdds();
+      actions.push({
+        action: this.service.bulkFavorite.bind(this.service),
+        icon: adds ? "bwi-star" : "bwi-star-f",
+        label: this.i18nService.t(adds ? "favorite" : "unfavorite"),
+      });
+    }
     if (this.service.canEditCollectionAccess()) {
       actions.push({
         action: this.service.bulkEditCollectionAccess.bind(this.service),
@@ -131,6 +144,24 @@ export class VaultBatchActionComponent implements OnDestroy {
     }
 
     return actions;
+  });
+
+  /** Keykeeper: true while an action that goes one item at a time is running. */
+  protected readonly busy = computed(() => this.service.progress() != null);
+
+  /**
+   * Keykeeper: the line above the bar. While an action runs, how far it has
+   * got. Otherwise, when the selection has no action at all (every selected
+   * item is one the person may only look at), why the bar is empty.
+   */
+  protected readonly note = computed(() => {
+    const progress = this.service.progress();
+    if (progress != null) {
+      return this.i18nService.t("keykeeperBulkProgress", progress.done, progress.total);
+    }
+    return this.service.selectedCount() > 0 && this.visibleActions().length === 0
+      ? this.i18nService.t("keykeeperBulkNothingAllowed")
+      : "";
   });
 
   /** Actions rendered as top-level buttons. Capped at PRIMARY_ACTION_COUNT when there are more than PRIMARY_ACTION_THRESHOLD total actions. */

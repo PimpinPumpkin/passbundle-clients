@@ -10,11 +10,19 @@ export interface BulkDeleteDialogParams {
   organizations?: Organization[];
   collections?: CollectionView[];
   unassignedCiphers?: string[];
+  /**
+   * Keykeeper: a sentence to show above the confirmation's own text, for when
+   * some of what was selected is left out (how many are skipped, and why).
+   */
+  notice?: string;
 }
 
 export const BulkDeleteDialogResult = {
   Deleted: "deleted",
   Canceled: "canceled",
+  // Keykeeper: the server refused partway. Some of it may be deleted, so the
+  // list is read again, and the dialog has already said so.
+  Failed: "failed",
 } as const;
 
 export type BulkDeleteDialogResult = UnionOfValues<typeof BulkDeleteDialogResult>;

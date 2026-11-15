@@ -9,6 +9,21 @@
     {{ announcement() }}
   </div>
 
+  <!-- Keykeeper: the note, above the bar and out of its measured width. -->
+  @if (visible() && note() !== "") {
+    <div
+      class="tw-absolute tw-bottom-full tw-inset-x-0 tw-flex tw-justify-center tw-px-4 tw-pb-2"
+      aria-hidden="true"
+    >
+      <span
+        data-keykeeper="bulk-note"
+        class="tw-rounded-lg tw-bg-bg-brand-stronger tw-px-3 tw-py-1 tw-text-sm tw-text-fg-contrast tw-text-center"
+      >
+        {{ note() }}
+      </span>
+    </div>
+  }
+
   <!-- 17px gap need to visually align clear button divider element spacing -->
   <div
     #bar
@@ -19,6 +34,7 @@
     role="toolbar"
     aria-orientation="horizontal"
     [attr.aria-label]="'bulkActionsBar' | i18n"
+    [attr.aria-busy]="busy() ? 'true' : null"
     (keydown)="onToolbarKeydown($event)"
   >
     <span class="tw-flex tw-gap-1.5 tw-px-2 tw-text-sm" [class]="elementWithDividerClasses">

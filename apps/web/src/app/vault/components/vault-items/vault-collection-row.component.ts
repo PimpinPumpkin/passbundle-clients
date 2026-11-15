@@ -98,9 +98,21 @@ export class VaultCollectionRowComponent<C extends CipherViewLike> {
   // FIXME(https://bitwarden.atlassian.net/browse/CL-903): Migrate to Signals
   // eslint-disable-next-line @angular-eslint/prefer-signals
   @Input() checked: boolean;
+  // Keykeeper: says whether Shift was held, as the item rows do.
   // FIXME(https://bitwarden.atlassian.net/browse/CL-903): Migrate to Signals
   // eslint-disable-next-line @angular-eslint/prefer-output-emitter-ref
-  @Output() checkedToggled = new EventEmitter<void>();
+  @Output() checkedToggled = new EventEmitter<boolean>();
+  /** Keykeeper: whether Shift was down at the click that is toggling the checkbox. */
+  protected shiftHeld = false;
+
+  /**
+   * Keykeeper: a method, not an assignment in the template. A template
+   * statement that comes out false cancels its event, and a canceled click
+   * leaves the checkbox as it was.
+   */
+  protected noteShift(event: MouseEvent) {
+    this.shiftHeld = event.shiftKey;
+  }
 
   constructor(private i18nService: I18nService) {}
 

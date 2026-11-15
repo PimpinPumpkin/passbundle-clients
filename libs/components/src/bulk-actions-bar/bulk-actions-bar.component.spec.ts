@@ -47,7 +47,12 @@ function emitResize(el: Element, width: number): void {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <button id="outside" type="button">Outside</button>
-    <bit-bulk-actions-bar [selectedCount]="count()" (clear)="onClear()">
+    <bit-bulk-actions-bar
+      [selectedCount]="count()"
+      [note]="note()"
+      [busy]="busy()"
+      (clear)="onClear()"
+    >
       <bit-bulk-action [action]="first" icon="bwi-folder" label="First" />
       <bit-bulk-action [action]="second" icon="bwi-trash" label="Second" />
     </bit-bulk-actions-bar>
@@ -55,6 +60,9 @@ function emitResize(el: Element, width: number): void {
 })
 class HostComponent {
   readonly count = signal(0);
+  // Keykeeper: the line above the bar, and whether an action is running.
+  readonly note = signal("");
+  readonly busy = signal(false);
   readonly cleared = signal(0);
   readonly firstClicks = signal(0);
   readonly secondClicks = signal(0);
@@ -324,6 +332,98 @@ describe("BulkActionsBarComponent", () => {
       expect(document.activeElement).toBe(before);
       expect(host.cleared()).toBe(0);
     }));
+  });
+
+  // Keykeeper: Escape lets go of the selection from inside the bar, as it does
+  // from inside the list. Outside both it is left alone (the test above).
+  describe("Escape in the toolbar", () => {
+    beforeEach(() => {
+      host.count.set(2);
+      fixture.detectChanges();
+    });
+
+    it("clears the selection", () => {
+      closeBtn().focus();
+      const event = new KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+        cancelable: true,
+      });
+      primaryButtons()[0].dispatchEvent(event);
+      fixture.detectChanges();
+
+      expect(host.cleared()).toBe(1);
+      expect(event.defaultPrevented).toBe(true);
+    });
+
+    it("leaves the arrow keys to the toolbar", () => {
+      closeBtn().focus();
+      closeBtn().dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowRight", keyCode: 39, bubbles: true }),
+      );
+      fixture.detectChanges();
+
+      expect(host.cleared()).toBe(0);
+      expect(document.activeElement).toBe(firstAction());
+    });
+  });
+
+  describe("the note above the bar", () => {
+    const note = () =>
+      fixture.nativeElement.querySelector('[data-keykeeper="bulk-note"]') as HTMLElement | null;
+
+    it("is not there without a note", () => {
+      host.count.set(2);
+      fixture.detectChanges();
+
+      expect(note()).toBeNull();
+    });
+
+    it("is not there while nothing is selected", () => {
+      host.note.set("Nothing here can be changed.");
+      fixture.detectChanges();
+
+      expect(note()).toBeNull();
+    });
+
+    it("shows the note and reads it out with the count", () => {
+      host.count.set(2);
+      host.note.set("Nothing here can be changed.");
+      fixture.detectChanges();
+
+      expect(note()?.textContent?.trim()).toBe("Nothing here can be changed.");
+      // The visible copy is hidden from assistive technology: the live region says it.
+      expect(note()?.parentElement?.getAttribute("aria-hidden")).toBe("true");
+      expect(liveRegion().textContent?.trim()).toBe(
+        "2 items selected. The bulk actions bar is now available at the bottom of the screen. Press Ctrl+B to toggle focus to the bulk action bar. Nothing here can be changed.",
+      );
+    });
+
+    it("sits outside the toolbar, so it never changes the bar's width", () => {
+      host.count.set(2);
+      host.note.set("3 of 12 done");
+      fixture.detectChanges();
+
+      expect(innerBar().contains(note())).toBe(false);
+    });
+
+    it("shows progress while an action runs without reading out every step", () => {
+      host.count.set(12);
+      host.busy.set(true);
+      host.note.set("3 of 12 done");
+      fixture.detectChanges();
+
+      expect(note()?.textContent?.trim()).toBe("3 of 12 done");
+      expect(liveRegion().textContent?.trim()).not.toContain("3 of 12 done");
+      expect(innerBar().getAttribute("aria-busy")).toBe("true");
+    });
+
+    it("is not marked busy otherwise", () => {
+      host.count.set(2);
+      fixture.detectChanges();
+
+      expect(innerBar().getAttribute("aria-busy")).toBeNull();
+    });
   });
 
   describe("modifier label", () => {

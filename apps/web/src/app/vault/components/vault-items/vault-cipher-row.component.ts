@@ -158,9 +158,22 @@ export class VaultCipherRowComponent<C extends CipherViewLike> implements OnInit
   // FIXME(https://bitwarden.atlassian.net/browse/CL-903): Migrate to Signals
   // eslint-disable-next-line @angular-eslint/prefer-signals
   @Input() checked: boolean;
+  // Keykeeper: says whether Shift was held, which selects the range from the
+  // row clicked before this one.
   // FIXME(https://bitwarden.atlassian.net/browse/CL-903): Migrate to Signals
   // eslint-disable-next-line @angular-eslint/prefer-output-emitter-ref
-  @Output() checkedToggled = new EventEmitter<void>();
+  @Output() checkedToggled = new EventEmitter<boolean>();
+  /** Keykeeper: whether Shift was down at the click that is toggling the checkbox. */
+  protected shiftHeld = false;
+
+  /**
+   * Keykeeper: a method, not an assignment in the template. A template
+   * statement that comes out false cancels its event, and a canceled click
+   * leaves the checkbox as it was.
+   */
+  protected noteShift(event: MouseEvent) {
+    this.shiftHeld = event.shiftKey;
+  }
 
   private permissionList = getPermissionList();
   // Ordered highest to lowest priority; compared against `CollectionPermission` values (not
@@ -415,11 +428,13 @@ export class VaultCipherRowComponent<C extends CipherViewLike> implements OnInit
   }
 
   protected get showCheckbox() {
-    if (!this.viewingOrgVault || !this.organization) {
-      return true; // Always show checkbox in individual vault or for non-org items
-    }
-
-    return this.organization.canEditAllCiphers || (this.cipher.edit && this.cipher.viewPassword);
+    // Keykeeper: every row can be selected. Upstream left the checkbox off an
+    // organization's item the person can't edit or can't see the password of,
+    // and then took for granted that whatever was selected could be changed.
+    // Now each action asks, item by item, the rule the single item's menu goes
+    // by, and says how many it leaves out (VaultBatchBarService; DESIGN.md,
+    // "Selecting several items").
+    return true;
   }
 
   protected get showFavorite() {

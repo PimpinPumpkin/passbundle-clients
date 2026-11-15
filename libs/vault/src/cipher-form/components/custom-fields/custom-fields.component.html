@@ -10,10 +10,17 @@
         (cdkDropListDropped)="drop($event)"
         data-testid="custom-fields"
       >
+        <!-- Keykeeper: a field's edit and reorder buttons are the last
+             buttons in the field itself, as a website's are, so every field
+             is as wide as the form's others and its buttons are level with
+             it. A field takes only the buttons written inside it, which is
+             why each kind of field has its own copy. Rows are 16px apart,
+             as the form's other fields are, with nothing extra under the
+             card's last line. -->
         @for (field of fields.controls; track field; let i = $index) {
           <div
             [formGroupName]="i"
-            class="tw-flex tw-p-3 -tw-mx-3 tw-gap-4 tw-bg-background tw-rounded-lg first:-tw-mt-3 last-of-type:tw-mb-0"
+            class="tw-flex tw-px-3 tw-py-2 -tw-mx-3 tw-gap-4 tw-bg-background tw-rounded-lg first:-tw-mt-2 last:-tw-mb-2"
             [ngClass]="{
               'tw-items-center': field.value.type === FieldType.Boolean,
             }"
@@ -27,6 +34,30 @@
               <bit-form-field class="tw-flex-1" disableMargin>
                 <bit-label>{{ field.value.name }}</bit-label>
                 <input bitInput formControlName="value" data-testid="custom-text-field" />
+                @if (canEdit(field.value.type)) {
+                  <button
+                    type="button"
+                    (click)="openAddEditCustomFieldDialog({ index: i, label: field.value.name })"
+                    [label]="'editFieldLabel' | i18n: field.value.name"
+                    bitIconButton="bwi-pencil-square"
+                    bitSuffix
+                    data-testid="edit-custom-field-button"
+                    [disabled]="parentFormDisabled"
+                  ></button>
+                }
+                @if (canEdit(field.value.type) && fields.controls.length > 1) {
+                  <button
+                    role="application"
+                    type="button"
+                    bitIconButton="bwi-drag-and-drop"
+                    bitSuffix
+                    cdkDragHandle
+                    [label]="'reorderToggleButton' | i18n: field.value.name"
+                    (keydown)="handleKeyDown($event, field.value.name, i)"
+                    data-testid="reorder-toggle-button"
+                    [disabled]="parentFormDisabled"
+                  ></button>
+                }
               </bit-form-field>
             }
 
@@ -51,12 +82,39 @@
                     (toggledChange)="logHiddenEvent($event)"
                   ></button>
                 }
+                @if (canEdit(field.value.type)) {
+                  <button
+                    type="button"
+                    (click)="openAddEditCustomFieldDialog({ index: i, label: field.value.name })"
+                    [label]="'editFieldLabel' | i18n: field.value.name"
+                    bitIconButton="bwi-pencil-square"
+                    bitSuffix
+                    data-testid="edit-custom-field-button"
+                    [disabled]="parentFormDisabled"
+                  ></button>
+                }
+                @if (canEdit(field.value.type) && fields.controls.length > 1) {
+                  <button
+                    role="application"
+                    type="button"
+                    bitIconButton="bwi-drag-and-drop"
+                    bitSuffix
+                    cdkDragHandle
+                    [label]="'reorderToggleButton' | i18n: field.value.name"
+                    (keydown)="handleKeyDown($event, field.value.name, i)"
+                    data-testid="reorder-toggle-button"
+                    [disabled]="parentFormDisabled"
+                  ></button>
+                }
               </bit-form-field>
             }
 
             <!-- Boolean Field -->
             @if (field.value.type === FieldType.Boolean) {
-              <bit-form-control class="tw-flex-1" disableMargin>
+              <!-- Keykeeper: a checkbox has no field to hold its buttons, so
+                   they sit at the row's end, the size and place of the ones
+                   in the fields above and below. -->
+              <bit-form-control class="tw-flex-1 !tw-flex tw-flex-col tw-items-start" disableMargin>
                 <input
                   bitCheckbox
                   formControlName="value"
@@ -65,6 +123,32 @@
                 />
                 <bit-label>{{ field.value.name }}</bit-label>
               </bit-form-control>
+              <div class="tw-flex tw-items-center tw-pe-[5px]">
+                @if (canEdit(field.value.type)) {
+                  <button
+                    type="button"
+                    (click)="openAddEditCustomFieldDialog({ index: i, label: field.value.name })"
+                    [label]="'editFieldLabel' | i18n: field.value.name"
+                    bitIconButton="bwi-pencil-square"
+                    size="small"
+                    data-testid="edit-custom-field-button"
+                    [disabled]="parentFormDisabled"
+                  ></button>
+                }
+                @if (canEdit(field.value.type) && fields.controls.length > 1) {
+                  <button
+                    role="application"
+                    type="button"
+                    bitIconButton="bwi-drag-and-drop"
+                    size="small"
+                    cdkDragHandle
+                    [label]="'reorderToggleButton' | i18n: field.value.name"
+                    (keydown)="handleKeyDown($event, field.value.name, i)"
+                    data-testid="reorder-toggle-button"
+                    [disabled]="parentFormDisabled"
+                  ></button>
+                }
+              </div>
             }
 
             <!-- Linked Field -->
@@ -80,33 +164,31 @@
                     ></bit-option>
                   }
                 </bit-select>
+                @if (canEdit(field.value.type)) {
+                  <button
+                    type="button"
+                    (click)="openAddEditCustomFieldDialog({ index: i, label: field.value.name })"
+                    [label]="'editFieldLabel' | i18n: field.value.name"
+                    bitIconButton="bwi-pencil-square"
+                    bitSuffix
+                    data-testid="edit-custom-field-button"
+                    [disabled]="parentFormDisabled"
+                  ></button>
+                }
+                @if (canEdit(field.value.type) && fields.controls.length > 1) {
+                  <button
+                    role="application"
+                    type="button"
+                    bitIconButton="bwi-drag-and-drop"
+                    bitSuffix
+                    cdkDragHandle
+                    [label]="'reorderToggleButton' | i18n: field.value.name"
+                    (keydown)="handleKeyDown($event, field.value.name, i)"
+                    data-testid="reorder-toggle-button"
+                    [disabled]="parentFormDisabled"
+                  ></button>
+                }
               </bit-form-field>
-            }
-
-            @if (canEdit(field.value.type)) {
-              <button
-                type="button"
-                (click)="openAddEditCustomFieldDialog({ index: i, label: field.value.name })"
-                [label]="'editFieldLabel' | i18n: field.value.name"
-                bitIconButton="bwi-pencil-square"
-                class="tw-self-center tw-mt-2"
-                data-testid="edit-custom-field-button"
-                [disabled]="parentFormDisabled"
-              ></button>
-            }
-
-            @if (canEdit(field.value.type) && fields.controls.length > 1) {
-              <button
-                role="application"
-                type="button"
-                bitIconButton="bwi-drag-and-drop"
-                class="tw-self-center tw-mt-2"
-                cdkDragHandle
-                [label]="'reorderToggleButton' | i18n: field.value.name"
-                (keydown)="handleKeyDown($event, field.value.name, i)"
-                data-testid="reorder-toggle-button"
-                [disabled]="parentFormDisabled"
-              ></button>
             }
           </div>
         }
@@ -117,6 +199,7 @@
             type="button"
             bitLink
             linkType="primary"
+            class="tw-flex tw-w-fit tw-mt-2"
             (click)="openAddEditCustomFieldDialog()"
             data-testid="add-field-button"
           >

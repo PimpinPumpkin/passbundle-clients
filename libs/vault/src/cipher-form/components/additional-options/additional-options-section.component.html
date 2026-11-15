@@ -15,7 +15,12 @@
     <!-- Keykeeper: expiration date -->
     <vault-keykeeper-expiration-field></vault-keykeeper-expiration-field>
     @if (passwordRepromptEnabled$ | async) {
-      <bit-form-control [disableMargin]="hasCustomFields || isPartialEdit">
+      <!-- Keykeeper: the checkbox and the link below are blocks of their
+           own, so the card ends 24px under them as it does under a field. -->
+      <bit-form-control
+        class="!tw-flex tw-flex-col tw-items-start"
+        [disableMargin]="hasCustomFields || isPartialEdit"
+      >
         <input type="checkbox" bitCheckbox formControlName="reprompt" />
         <bit-label>{{ "passwordPrompt" | i18n }}</bit-label>
       </bit-form-control>
@@ -27,6 +32,7 @@
         startIcon="bwi-plus"
         type="button"
         linkType="primary"
+        class="tw-flex tw-w-fit"
         (click)="addCustomField()"
       >
         {{ "addField" | i18n }}

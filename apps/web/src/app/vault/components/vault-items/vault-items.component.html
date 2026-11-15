@@ -99,7 +99,7 @@
             [canEditCollection]="canEditCollection(item.collection)"
             [canViewCollectionInfo]="canViewCollectionInfo(item.collection)"
             [checked]="selection.isSelected(item)"
-            (checkedToggled)="selection.toggle(item)"
+            (checkedToggled)="toggleItem(item, $event)"
             (onEvent)="event($event)"
           ></tr>
         }
@@ -133,7 +133,7 @@
             [canRestoreCipher]="
               cipherAuthorizationService.canRestoreCipher$(item.cipher, showAdminActions) | async
             "
-            (checkedToggled)="selection.toggle(item)"
+            (checkedToggled)="toggleItem(item, $event)"
             (onEvent)="event($event)"
             [userCanArchive]="userCanArchive"
             [enforceOrgDataOwnershipPolicy]="enforceOrgDataOwnershipPolicy"

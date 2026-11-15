@@ -1,4 +1,13 @@
-<ng-container *ngIf="state === RegistrationStartState.USER_DATA_ENTRY">
+<!-- Keykeeper: a server that isn't taking new accounts says so here, in place of a
+     form that would fail at the end; nothing shows until the server's settings are in. -->
+<p
+  *ngIf="state === RegistrationStartState.USER_DATA_ENTRY && keykeeperClosed === true"
+  class="tw-mb-0 tw-text-base tw-text-main"
+>
+  <auth-keykeeper-new-accounts-closed reason="closed"></auth-keykeeper-new-accounts-closed>
+</p>
+
+<ng-container *ngIf="state === RegistrationStartState.USER_DATA_ENTRY && keykeeperClosed === false">
   <form [formGroup]="formGroup" [bitSubmit]="submit">
     <auth-registration-env-selector
       (selectedRegionChange)="handleSelectedRegionChange($event)"
@@ -14,6 +23,18 @@
         [attr.readonly]="emailReadonly ? true : null"
       />
     </bit-form-field>
+
+    <!-- Keykeeper: the server turned this address down and said why. -->
+    <p
+      *ngIf="keykeeperRefusal"
+      role="alert"
+      class="tw-mb-4 tw-text-sm tw-text-danger"
+      data-testid="keykeeper-new-account-refused"
+    >
+      <auth-keykeeper-new-accounts-closed
+        [reason]="keykeeperRefusal"
+      ></auth-keykeeper-new-accounts-closed>
+    </p>
 
     <bit-form-field>
       <bit-label>{{ "name" | i18n }}</bit-label>
