@@ -1,11 +1,17 @@
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { Router } from "@angular/router";
 import { mock } from "jest-mock-extended";
+import { of, ReplaySubject } from "rxjs";
 
 import { consumeDefaultPasswordManagerSuccessToast } from "@bitwarden/browser/autofill/default-password-manager-session.util";
 import { IntroCarouselComponent } from "@bitwarden/browser/vault/popup/components/vault/intro-carousel/intro-carousel.component";
 import { IntroCarouselService } from "@bitwarden/browser/vault/popup/services/intro-carousel.service";
+import {
+  EnvironmentService,
+  Region,
+} from "@bitwarden/common/platform/abstractions/environment.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
+import { DefaultServerSettingsService } from "@bitwarden/common/platform/services/default-server-settings.service";
 import { ToastService } from "@bitwarden/components";
 
 jest.mock("@bitwarden/browser/autofill/default-password-manager-session.util", () => ({
@@ -21,8 +27,11 @@ describe("IntroCarouselComponent", () => {
   let mockI18nService: I18nService;
   let navigateSpy: jest.SpyInstance;
   let carouselDismissedSpy: jest.SpyInstance;
+  // Keykeeper: whether the server takes new accounts, as its settings say once they're in.
+  let registrationDisabled$: ReplaySubject<boolean>;
 
   beforeEach(async () => {
+    registrationDisabled$ = new ReplaySubject<boolean>(1);
     mockRouter = mock<Router>();
     mockIntroCarouselService = mock<IntroCarouselService>();
     mockToastService = mock<ToastService>();
@@ -35,6 +44,14 @@ describe("IntroCarouselComponent", () => {
         { provide: IntroCarouselService, useValue: mockIntroCarouselService },
         { provide: ToastService, useValue: mockToastService },
         { provide: I18nService, useValue: mockI18nService },
+        {
+          provide: DefaultServerSettingsService,
+          useValue: { isUserRegistrationDisabled$: registrationDisabled$ },
+        },
+        {
+          provide: EnvironmentService,
+          useValue: { globalEnvironment$: of({ getRegion: () => Region.US }) },
+        },
       ],
     }).compileComponents();
 
@@ -81,6 +98,40 @@ describe("IntroCarouselComponent", () => {
 
       expect(carouselDismissedSpy).toHaveBeenCalled();
       expect(navigateSpy).toHaveBeenCalledWith(["/login"]);
+    });
+  });
+
+  // Keykeeper: Create account only where it works (DESIGN.md, "New accounts on a closed server").
+  describe("on a server that may not take new accounts", () => {
+    const el = () => fixture.nativeElement as HTMLElement;
+    const createAccount = () =>
+      el().querySelector<HTMLButtonElement>('[data-testid="intro-create-account"]');
+    const closed = () => el().querySelector('[data-testid="keykeeper-new-accounts-closed"]');
+    const buttons = () => [...el().querySelectorAll<HTMLButtonElement>("button[bitButton]")];
+
+    it("keeps Create account out of sight until the server's settings are in", () => {
+      expect(createAccount()?.classList).toContain("tw-invisible");
+      expect(closed()).toBeNull();
+    });
+
+    it("offers Create account on a server that takes new accounts", () => {
+      registrationDisabled$.next(false);
+      fixture.detectChanges();
+
+      expect(createAccount()).not.toBeNull();
+      expect(createAccount()?.classList).not.toContain("tw-invisible");
+      expect(closed()).toBeNull();
+      expect(buttons()).toHaveLength(2);
+    });
+
+    it("says new accounts aren't open, with no Create account button, on a server that doesn't", () => {
+      registrationDisabled$.next(true);
+      fixture.detectChanges();
+
+      expect(createAccount()).toBeNull();
+      expect(closed()).not.toBeNull();
+      // Signing in is all that's left to press.
+      expect(buttons()).toHaveLength(1);
     });
   });
 });

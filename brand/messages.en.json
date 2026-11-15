@@ -796,8 +796,20 @@
   "keykeeperNewHere": {
     "message": "New here?"
   },
-  "keykeeperNewHereInvite": {
-    "message": "New here? Your admin sends the invite."
+  "keykeeperNewAccountsNotOpenYet": {
+    "message": "New accounts aren't open yet."
+  },
+  "keykeeperNewAccountsAskForOne": {
+    "message": "Ask for one"
+  },
+  "keykeeperNewAccountsOwnServer": {
+    "message": "This server isn't taking new accounts. Ask the person who runs it."
+  },
+  "keykeeperNewAccountsNotThatAddress": {
+    "message": "New accounts aren't open for that address."
+  },
+  "keykeeperNewAccountsNotThatAddressOwnServer": {
+    "message": "New accounts aren't open for that address. Ask the person who runs this server."
   },
   "keykeeperForSite": {
     "message": "For $SITE$",
