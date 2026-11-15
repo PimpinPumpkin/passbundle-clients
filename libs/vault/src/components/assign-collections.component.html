@@ -1,4 +1,9 @@
 <form [formGroup]="formGroup" [bitSubmit]="submit" id="assign_collections_form">
+  <!-- Keykeeper: what the list that opened this has to say about the selected
+       items it left out (how many, and why). -->
+  @if (params.notice) {
+    <p data-testid="assign-notice">{{ params.notice }}</p>
+  }
   @if (!vfo1TerminologyService.enabled()) {
     <p>
       {{

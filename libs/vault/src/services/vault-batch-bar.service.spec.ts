@@ -3,16 +3,20 @@ import { TestBed } from "@angular/core/testing";
 import { mock, MockProxy } from "jest-mock-extended";
 import { BehaviorSubject, of } from "rxjs";
 
+import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { CollectionView, Unassigned } from "@bitwarden/common/admin-console/models/collections";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { Account, AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
+import { SyncService } from "@bitwarden/common/platform/sync";
 import { CipherId, OrganizationId, UserId } from "@bitwarden/common/types/guid";
 import { CipherArchiveService } from "@bitwarden/common/vault/abstractions/cipher-archive.service";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
+import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherRepromptType } from "@bitwarden/common/vault/enums/cipher-reprompt-type";
+import { CipherResponse } from "@bitwarden/common/vault/models/response/cipher.response";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { CipherAuthorizationService } from "@bitwarden/common/vault/services/cipher-authorization.service";
 import { DialogService, ToastService } from "@bitwarden/components";
@@ -36,6 +40,10 @@ import { RoutedVaultFilterService } from "./routed-vault-filter.service";
 import { VaultBatchBarConfig, VaultBatchBarService } from "./vault-batch-bar.service";
 
 const userId = "test-user-id" as UserId;
+
+// Keykeeper: the wording's key comes back as before; the mock also keeps what
+// it was asked with, for the counts in "selecting several items".
+const i18nT = jest.fn((key: string, ..._placeholders: Array<string | number>) => key);
 const orgId = "test-org-id" as OrganizationId;
 
 function makeCipher(overrides: Partial<CipherView> = {}): CipherView {
@@ -100,6 +108,8 @@ describe("VaultBatchBarService", () => {
   let mockDialogService: MockProxy<DialogService>;
   let mockToastService: MockProxy<ToastService>;
   let mockAccountService: MockProxy<AccountService>;
+  let mockApiService: MockProxy<ApiService>;
+  let mockSyncService: MockProxy<SyncService>;
   let filterSubject: BehaviorSubject<RoutedVaultFilterModel>;
   let organizationsSubject: BehaviorSubject<Organization[]>;
   let userCanArchiveSubject: BehaviorSubject<boolean>;
@@ -109,6 +119,7 @@ describe("VaultBatchBarService", () => {
   let activeFilterSubject: BehaviorSubject<RoutedVaultFilterModel>;
 
   beforeEach(() => {
+    i18nT.mockClear();
     filterSubject = new BehaviorSubject<RoutedVaultFilterModel>({});
     organizationsSubject = new BehaviorSubject<Organization[]>([]);
     userCanArchiveSubject = new BehaviorSubject<boolean>(false);
@@ -122,6 +133,9 @@ describe("VaultBatchBarService", () => {
     mockDialogService = mock<DialogService>();
     mockToastService = mock<ToastService>();
     mockAccountService = mock<AccountService>();
+    mockApiService = mock<ApiService>();
+    mockSyncService = mock<SyncService>();
+    mockSyncService.fullSync.mockResolvedValue(true);
 
     mockAccountService.activeAccount$ = of({ id: userId } as Account);
     mockAssignCollectionsDialogOpen = jest.fn();
@@ -145,12 +159,14 @@ describe("VaultBatchBarService", () => {
         { provide: DialogService, useValue: mockDialogService },
         { provide: ToastService, useValue: mockToastService },
         { provide: AccountService, useValue: mockAccountService },
+        { provide: ApiService, useValue: mockApiService },
+        { provide: SyncService, useValue: mockSyncService },
         { provide: RoutedVaultFilterService, useValue: { filter$: filterSubject } },
         {
           provide: RoutedVaultFilterBridgeService,
           useValue: { activeFilter$: activeFilterSubject },
         },
-        { provide: I18nService, useValue: { t: (key: string) => key } },
+        { provide: I18nService, useValue: { t: i18nT } },
         { provide: LogService, useValue: mock<LogService>() },
         { provide: ASSIGN_COLLECTIONS_DIALOG, useValue: { open: mockAssignCollectionsDialogOpen } },
         { provide: BULK_DELETE_DIALOG, useValue: { open: mockBulkDeleteDialogOpen } },
@@ -179,7 +195,9 @@ describe("VaultBatchBarService", () => {
           { provide: DialogService, useValue: mockDialogService },
           { provide: ToastService, useValue: mockToastService },
           { provide: AccountService, useValue: mockAccountService },
-          { provide: I18nService, useValue: { t: (key: string) => key } },
+          { provide: ApiService, useValue: mockApiService },
+          { provide: SyncService, useValue: mockSyncService },
+          { provide: I18nService, useValue: { t: i18nT } },
           { provide: LogService, useValue: mock<LogService>() },
           {
             provide: ASSIGN_COLLECTIONS_DIALOG,
@@ -205,8 +223,12 @@ describe("VaultBatchBarService", () => {
     });
 
     it("assigns to collections using the config's scope and the ciphers' organization", async () => {
-      const cipher = makeCipher({ organizationId: orgId });
-      service.setConfig(makeConfig({ hasCiphers: true }));
+      // Keykeeper: the item sits in a shared folder the person can share from,
+      // since each item is now asked whether it may be moved.
+      const folder = makeCollection({ readOnly: false, keykeeper: { share: true } } as any);
+      const cipher = makeCipher({ organizationId: orgId, collectionIds: [folder.id] } as any);
+      service.setConfig(makeConfig({ hasCiphers: true, allCollections: [folder] }));
+      organizationsSubject.next([makeOrg()]);
       service.selection.select({ cipher } as VaultItem<CipherView>);
       mockAssignCollectionsDialogOpen.mockResolvedValue(AssignCollectionsResult.Saved);
 
@@ -735,7 +757,10 @@ describe("VaultBatchBarService", () => {
       expect(service.canAssignToCollections()).toBe(false);
     });
 
-    it("returns false when ciphers from multiple orgs are selected", () => {
+    // Keykeeper: items of several organizations that could each be moved are
+    // now offered the action, which explains why they can't go together
+    // ("selecting several items" below). These two can't be moved at all.
+    it("returns false when ciphers from multiple orgs are selected and none may be moved", () => {
       service.setConfig(
         makeConfig({
           hasCiphers: true,
@@ -1062,7 +1087,12 @@ describe("VaultBatchBarService", () => {
       expect(completedSpy).toHaveBeenCalled();
     });
 
-    it("shows error toast and does NOT clear selection on failure", async () => {
+    // Keykeeper: upstream kept the selection after a failed restore. The
+    // server restores one item after the other and stops at the first it
+    // refuses, so some of the selection may already be restored: the vault is
+    // read again and the selection let go, rather than left pointing at rows
+    // that may have gone ("selecting several items" below).
+    it("shows error toast, reads the vault again and clears the selection on failure", async () => {
       mockCipherService.restoreManyWithServer.mockRejectedValue(new Error("fail"));
       service.selection.select(makeCipherItem());
 
@@ -1071,7 +1101,8 @@ describe("VaultBatchBarService", () => {
       expect(mockToastService.showToast).toHaveBeenCalledWith(
         expect.objectContaining({ variant: "error" }),
       );
-      expect(service.selectedCount()).toBeGreaterThan(0);
+      expect(mockSyncService.fullSync).toHaveBeenCalledWith(true);
+      expect(service.selectedCount()).toBe(0);
     });
 
     it("shows error toast when org vault has empty cipher arrays", async () => {
@@ -1437,6 +1468,524 @@ describe("VaultBatchBarService", () => {
       await service.bulkEditCollectionAccess();
 
       expect(service.selectedCount()).toBe(1);
+    });
+  });
+
+  // Keykeeper: selecting several items (DESIGN.md, "Selecting several items").
+  // An action is offered when it may be done to at least one selected item,
+  // it is done only to those, and the rest are counted before and after.
+  describe("selecting several items", () => {
+    const grid = {
+      seePasswords: true,
+      create: true,
+      edit: true,
+      delete: false,
+      export: false,
+      share: true,
+      print: false,
+      viewHistory: false,
+      manage: false,
+    };
+    const otherOrgId = "org-2" as OrganizationId;
+
+    function item(id: string, overrides: Partial<CipherView> = {}): VaultItem<CipherView> {
+      return makeCipherItem({ id: id as unknown as CipherId, ...overrides });
+    }
+
+    /** Lets the named items through and refuses the others. */
+    function only(...allowed: string[]) {
+      return (cipher: { id?: unknown }) => of(allowed.includes(cipher.id as string));
+    }
+
+    function folderOf(organizationId: OrganizationId, id: string, share = true) {
+      return makeCollection({
+        id,
+        organizationId,
+        readOnly: false,
+        keykeeper: { ...grid, share },
+      } as any);
+    }
+
+    describe("what the bar offers", () => {
+      it("offers restore when only some of the selected items may be restored", () => {
+        service.setConfig(makeConfig({ inTrash: true }));
+        mockCipherAuthorizationService.canRestoreCipher$.mockImplementation(only("a"));
+        service.selection.select(item("a"), item("b"));
+        TestBed.tick();
+
+        expect(service.canRestore()).toBe(true);
+      });
+
+      it("offers delete when only some of the selected items may be deleted", () => {
+        mockCipherAuthorizationService.canDeleteCipher$.mockImplementation(only("a"));
+        service.selection.select(item("a"), item("b"));
+        TestBed.tick();
+
+        expect(service.canDelete()).toBe(true);
+      });
+
+      it("offers delete for a shared folder that may be deleted beside an item that may not", () => {
+        mockCipherAuthorizationService.canDeleteCipher$.mockReturnValue(of(false));
+        organizationsSubject.next([makeOrg()]);
+        service.selection.select(item("a"), makeCollectionItem({}, true));
+        TestBed.tick();
+
+        expect(service.canDelete()).toBe(true);
+      });
+
+      it("offers adding to shared folders when only some of the items may be moved", () => {
+        const folder = folderOf(orgId, "col-1", false);
+        service.setConfig(makeConfig({ allCollections: [folder] }));
+        organizationsSubject.next([makeOrg()]);
+        service.selection.select(
+          item("mine"),
+          item("theirs", { organizationId: orgId, collectionIds: [folder.id] } as any),
+        );
+
+        expect(service.canAssignToCollections()).toBe(true);
+      });
+
+      it("offers adding to shared folders for items of several organizations, to explain it", () => {
+        const first = folderOf(orgId, "col-1");
+        const second = folderOf(otherOrgId, "col-2");
+        service.setConfig(makeConfig({ allCollections: [first, second] }));
+        organizationsSubject.next([makeOrg(), makeOrg({ id: otherOrgId })]);
+        service.selection.select(
+          item("a", { organizationId: orgId, collectionIds: [first.id] } as any),
+          item("b", { organizationId: otherOrgId, collectionIds: [second.id] } as any),
+        );
+
+        expect(service.canAssignToCollections()).toBe(true);
+      });
+
+      it("doesn't offer adding to shared folders in an organization's vault for an item the person can't share", () => {
+        const folder = folderOf(orgId, "col-1", false);
+        service.setConfig(
+          makeConfig({ isOrgVault: true, organization: makeOrg(), allCollections: [folder] }),
+        );
+        organizationsSubject.next([makeOrg()]);
+        service.selection.select(
+          item("a", { organizationId: orgId, collectionIds: [folder.id] } as any),
+        );
+
+        expect(service.canAssignToCollections()).toBe(false);
+      });
+
+      it("doesn't offer adding to shared folders in an organization's vault for an item the person can only look at", () => {
+        const folder = folderOf(orgId, "col-1");
+        service.setConfig(
+          makeConfig({ isOrgVault: true, organization: makeOrg(), allCollections: [folder] }),
+        );
+        organizationsSubject.next([makeOrg()]);
+        service.selection.select(
+          item("a", { organizationId: orgId, collectionIds: [folder.id], edit: false } as any),
+        );
+
+        expect(service.canAssignToCollections()).toBe(false);
+      });
+
+      it("offers adding to shared folders in an organization's vault to an admin who reaches every item", () => {
+        const org = makeOrg({ canEditAllCiphers: true });
+        service.setConfig(makeConfig({ isOrgVault: true, organization: org }));
+        organizationsSubject.next([org]);
+        service.selection.select(
+          item("a", { organizationId: orgId, edit: false, viewPassword: false }),
+        );
+
+        expect(service.canAssignToCollections()).toBe(true);
+      });
+
+      it("doesn't offer adding to shared folders in an organization's trash, as a single item's menu doesn't", () => {
+        const org = makeOrg({ canEditAllCiphers: true });
+        service.setConfig(makeConfig({ isOrgVault: true, organization: org, inTrash: true }));
+        organizationsSubject.next([org]);
+        service.selection.select(item("a", { organizationId: orgId }));
+
+        expect(service.canAssignToCollections()).toBe(false);
+      });
+
+      it("offers favorite for items in the personal vault", () => {
+        service.selection.select(item("a"), item("b", { favorite: true }));
+
+        expect(service.canFavorite()).toBe(true);
+        expect(service.favoriteAdds()).toBe(true);
+      });
+
+      it("offers taking out of the favorites when every selected item is one", () => {
+        service.selection.select(item("a", { favorite: true }), item("b", { favorite: true }));
+
+        expect(service.canFavorite()).toBe(true);
+        expect(service.favoriteAdds()).toBe(false);
+      });
+
+      it("doesn't offer favorite in an organization's vault, in the trash, or for a shared folder", () => {
+        service.selection.select(item("a"));
+
+        service.setConfig(makeConfig({ isOrgVault: true }));
+        expect(service.canFavorite()).toBe(false);
+
+        service.setConfig(makeConfig({ inTrash: true }));
+        expect(service.canFavorite()).toBe(false);
+
+        service.setConfig(makeConfig());
+        service.selection.select(makeCollectionItem());
+        expect(service.canFavorite()).toBe(false);
+      });
+    });
+
+    describe("deleting", () => {
+      beforeEach(() => {
+        mockCipherAuthorizationService.canDeleteCipher$.mockImplementation(only("a"));
+        mockBulkDeleteDialogOpen.mockResolvedValue(BulkDeleteDialogResult.Deleted);
+      });
+
+      it("deletes only the items the person may delete, and says one will be skipped", async () => {
+        service.selection.select(item("a"), item("b"));
+
+        await service.bulkDelete();
+
+        expect(i18nT).toHaveBeenCalledWith("keykeeperBulkSkipDeleteOne", 2);
+        expect(mockBulkDeleteDialogOpen).toHaveBeenCalledWith(
+          expect.objectContaining({ cipherIds: ["a"], notice: "keykeeperBulkSkipDeleteOne" }),
+        );
+      });
+
+      it("says how many will be skipped when it is more than one", async () => {
+        service.selection.select(item("a"), item("b"), item("c"));
+
+        await service.bulkDelete();
+
+        expect(i18nT).toHaveBeenCalledWith("keykeeperBulkSkipDelete", 2, 3);
+        expect(mockBulkDeleteDialogOpen).toHaveBeenCalledWith(
+          expect.objectContaining({ cipherIds: ["a"], notice: "keykeeperBulkSkipDelete" }),
+        );
+      });
+
+      it("says afterward how many were skipped", async () => {
+        service.selection.select(item("a"), item("b"), item("c"));
+
+        await service.bulkDelete();
+
+        expect(i18nT).toHaveBeenCalledWith("keykeeperBulkSkipped", 2);
+        expect(mockToastService.showToast).toHaveBeenCalledWith({
+          variant: "info",
+          message: "keykeeperBulkSkipped",
+        });
+      });
+
+      it("has no notice and no second message when nothing is skipped", async () => {
+        service.selection.select(item("a"));
+
+        await service.bulkDelete();
+
+        expect(mockBulkDeleteDialogOpen.mock.calls[0][0]).not.toHaveProperty("notice");
+        expect(mockToastService.showToast).not.toHaveBeenCalled();
+      });
+
+      it("leaves out a shared folder the person can't delete and counts it", async () => {
+        organizationsSubject.next([makeOrg()]);
+        const kept = makeCollection({ id: "kept" } as any, false);
+        const going = makeCollection({ id: "going" } as any, true);
+        service.selection.select(item("a"), { collection: kept }, { collection: going });
+
+        await service.bulkDelete();
+
+        expect(i18nT).toHaveBeenCalledWith("keykeeperBulkSkipFoldersOne", 2);
+        expect(mockBulkDeleteDialogOpen).toHaveBeenCalledWith(
+          expect.objectContaining({
+            cipherIds: ["a"],
+            collections: [going],
+            notice: "keykeeperBulkSkipFoldersOne",
+          }),
+        );
+        expect(mockToastService.showToast).toHaveBeenCalledWith({
+          variant: "info",
+          message: "keykeeperBulkSkippedFoldersOne",
+        });
+      });
+
+      it("asks for the password again only for the items it will delete", async () => {
+        service.selection.select(item("a"), item("b", { reprompt: CipherRepromptType.Password }));
+
+        await service.bulkDelete();
+
+        expect(mockPasswordRepromptService.showPasswordPrompt).not.toHaveBeenCalled();
+        expect(mockBulkDeleteDialogOpen).toHaveBeenCalled();
+      });
+
+      it("opens nothing when none of the selected items may be deleted", async () => {
+        service.selection.select(item("b"), item("c"));
+
+        await service.bulkDelete();
+
+        expect(mockBulkDeleteDialogOpen).not.toHaveBeenCalled();
+        expect(mockToastService.showToast).toHaveBeenCalledWith({
+          variant: "error",
+          message: "missingPermissions",
+        });
+      });
+
+      it("reads the vault again and lets go of the selection when the server refused partway", async () => {
+        const completedSpy = jest.fn();
+        service.completed$.subscribe(completedSpy);
+        mockBulkDeleteDialogOpen.mockResolvedValue(BulkDeleteDialogResult.Failed);
+        service.selection.select(item("a"));
+
+        await service.bulkDelete();
+
+        expect(mockSyncService.fullSync).toHaveBeenCalledWith(true);
+        expect(service.selectedCount()).toBe(0);
+        expect(completedSpy).toHaveBeenCalled();
+      });
+    });
+
+    describe("restoring", () => {
+      beforeEach(() => {
+        service.setConfig(makeConfig({ inTrash: true }));
+        mockCipherAuthorizationService.canRestoreCipher$.mockImplementation(only("a", "c"));
+      });
+
+      it("asks first when some items will be skipped, and restores the rest", async () => {
+        mockDialogService.openSimpleDialog.mockResolvedValue(true);
+        service.selection.select(item("a"), item("b"), item("c"));
+
+        await service.bulkRestore();
+
+        expect(i18nT).toHaveBeenCalledWith("keykeeperBulkSkipRestoreOne", 3);
+        expect(mockDialogService.openSimpleDialog).toHaveBeenCalledWith(
+          expect.objectContaining({
+            title: { key: "restoreSelected" },
+            content: "keykeeperBulkSkipRestoreOne",
+          }),
+        );
+        expect(mockCipherService.restoreManyWithServer).toHaveBeenCalledWith(["a", "c"], userId);
+        expect(mockToastService.showToast).toHaveBeenCalledWith({
+          variant: "info",
+          message: "keykeeperBulkSkippedOne",
+        });
+        expect(service.selectedCount()).toBe(0);
+      });
+
+      it("restores nothing and keeps the selection when the person backs out", async () => {
+        mockDialogService.openSimpleDialog.mockResolvedValue(false);
+        service.selection.select(item("a"), item("b"));
+
+        await service.bulkRestore();
+
+        expect(mockCipherService.restoreManyWithServer).not.toHaveBeenCalled();
+        expect(service.selectedCount()).toBe(2);
+      });
+
+      it("doesn't ask when every selected item may be restored", async () => {
+        service.selection.select(item("a"), item("c"));
+
+        await service.bulkRestore();
+
+        expect(mockDialogService.openSimpleDialog).not.toHaveBeenCalled();
+        expect(mockCipherService.restoreManyWithServer).toHaveBeenCalledWith(["a", "c"], userId);
+      });
+
+      it("counts an organization's item the person can't edit instead of dropping it quietly", async () => {
+        const org = makeOrg();
+        service.setConfig(makeConfig({ inTrash: true, isOrgVault: true, organization: org }));
+        mockCipherAuthorizationService.canRestoreCipher$.mockReturnValue(of(true));
+        mockDialogService.openSimpleDialog.mockResolvedValue(true);
+        service.selection.select(
+          item("a", { organizationId: orgId, collectionIds: ["col-1"] } as any),
+          item("b", { organizationId: orgId, collectionIds: ["col-1"], edit: false } as any),
+        );
+
+        await service.bulkRestore();
+
+        expect(i18nT).toHaveBeenCalledWith("keykeeperBulkSkipRestoreOne", 2);
+        expect(mockCipherService.restoreManyWithServer).toHaveBeenCalledWith(["a"], userId, org.id);
+      });
+
+      it("reads the vault again and lets go of the selection when the server refused partway", async () => {
+        const completedSpy = jest.fn();
+        service.completed$.subscribe(completedSpy);
+        mockCipherService.restoreManyWithServer.mockRejectedValue(new Error("refused"));
+        service.selection.select(item("a"), item("c"));
+
+        await service.bulkRestore();
+
+        expect(mockToastService.showToast).toHaveBeenCalledWith({
+          variant: "error",
+          message: "keykeeperBulkPartlyFailed",
+        });
+        expect(mockSyncService.fullSync).toHaveBeenCalledWith(true);
+        expect(service.selectedCount()).toBe(0);
+        expect(completedSpy).toHaveBeenCalled();
+      });
+    });
+
+    describe("adding to shared folders", () => {
+      it("explains instead of opening the dialog when the items belong to several organizations", async () => {
+        const first = folderOf(orgId, "col-1");
+        const second = folderOf(otherOrgId, "col-2");
+        service.setConfig(makeConfig({ allCollections: [first, second] }));
+        organizationsSubject.next([makeOrg(), makeOrg({ id: otherOrgId })]);
+        service.selection.select(
+          item("a", { organizationId: orgId, collectionIds: [first.id] } as any),
+          item("b", { organizationId: otherOrgId, collectionIds: [second.id] } as any),
+        );
+
+        await service.bulkAssignToCollections();
+
+        expect(mockDialogService.openSimpleDialog).toHaveBeenCalledWith(
+          expect.objectContaining({ content: { key: "keykeeperBulkSeveralOrganizations" } }),
+        );
+        expect(mockAssignCollectionsDialogOpen).not.toHaveBeenCalled();
+        expect(service.selectedCount()).toBe(2);
+      });
+
+      it("hands the dialog only the items that may be moved, with how many are left out", async () => {
+        const folder = folderOf(orgId, "col-1", false);
+        service.setConfig(makeConfig({ allCollections: [folder] }));
+        organizationsSubject.next([makeOrg()]);
+        const mine = makeCipher({ id: "mine" as unknown as CipherId });
+        service.selection.select(
+          { cipher: mine },
+          item("theirs", { organizationId: orgId, collectionIds: [folder.id] } as any),
+        );
+        mockAssignCollectionsDialogOpen.mockResolvedValue(AssignCollectionsResult.Saved);
+
+        await service.bulkAssignToCollections();
+
+        expect(i18nT).toHaveBeenCalledWith("keykeeperBulkSkipMoveOne", 2);
+        expect(mockAssignCollectionsDialogOpen).toHaveBeenCalledWith(
+          expect.objectContaining({ ciphers: [mine], notice: "keykeeperBulkSkipMoveOne" }),
+        );
+        expect(mockToastService.showToast).toHaveBeenCalledWith({
+          variant: "info",
+          message: "keykeeperBulkSkippedOne",
+        });
+      });
+
+      it("opens nothing when none of the selected items may be moved", async () => {
+        const folder = folderOf(orgId, "col-1", false);
+        service.setConfig(makeConfig({ allCollections: [folder] }));
+        organizationsSubject.next([makeOrg()]);
+        service.selection.select(
+          item("theirs", { organizationId: orgId, collectionIds: [folder.id] } as any),
+        );
+
+        await service.bulkAssignToCollections();
+
+        expect(mockAssignCollectionsDialogOpen).not.toHaveBeenCalled();
+        expect(mockToastService.showToast).toHaveBeenCalledWith({
+          variant: "error",
+          message: "missingPermissions",
+        });
+      });
+    });
+
+    describe("marking as favorites", () => {
+      beforeEach(() => {
+        mockCipherService.getFullCipherView.mockImplementation(async (cipher) => cipher as any);
+        mockApiService.putPartialCipher.mockImplementation(
+          async (id) => new CipherResponse({ id, type: CipherType.Login }),
+        );
+      });
+
+      it("marks the ones that aren't favorites yet, one request each, and says how many", async () => {
+        const completedSpy = jest.fn();
+        service.completed$.subscribe(completedSpy);
+        service.selection.select(
+          item("a", { folderId: "folder-1" }),
+          item("b"),
+          item("c", { favorite: true }),
+        );
+
+        await service.bulkFavorite();
+
+        expect(mockApiService.putPartialCipher).toHaveBeenCalledTimes(2);
+        expect(mockApiService.putPartialCipher).toHaveBeenCalledWith("a", {
+          folderId: "folder-1",
+          favorite: true,
+        });
+        expect(mockApiService.putPartialCipher).toHaveBeenCalledWith("b", {
+          folderId: undefined,
+          favorite: true,
+        });
+        expect(mockCipherService.upsert).toHaveBeenCalledTimes(2);
+        expect(i18nT).toHaveBeenCalledWith("keykeeperBulkFavorited", 2);
+        expect(mockToastService.showToast).toHaveBeenCalledWith({
+          variant: "success",
+          message: "keykeeperBulkFavorited",
+        });
+        expect(service.selectedCount()).toBe(0);
+        expect(completedSpy).toHaveBeenCalled();
+      });
+
+      it("takes them out of the favorites when every one already is one", async () => {
+        service.selection.select(item("a", { favorite: true }), item("b", { favorite: true }));
+
+        await service.bulkFavorite();
+
+        expect(mockApiService.putPartialCipher).toHaveBeenCalledWith("a", {
+          folderId: undefined,
+          favorite: false,
+        });
+        expect(i18nT).toHaveBeenCalledWith("keykeeperBulkUnfavorited", 2);
+      });
+
+      it("uses the single item's words for one item", async () => {
+        service.selection.select(item("a"));
+
+        await service.bulkFavorite();
+
+        expect(mockToastService.showToast).toHaveBeenCalledWith({
+          variant: "success",
+          message: "itemAddedToFavorites",
+        });
+      });
+
+      it("shows how far along it is while it runs", async () => {
+        const seen: unknown[] = [];
+        mockApiService.putPartialCipher.mockImplementation(async (id) => {
+          seen.push(service.progress());
+          return new CipherResponse({ id, type: CipherType.Login });
+        });
+        service.selection.select(item("a"), item("b"));
+
+        await service.bulkFavorite();
+
+        expect(seen).toEqual([
+          { done: 0, total: 2 },
+          { done: 1, total: 2 },
+        ]);
+        expect(service.progress()).toBeNull();
+      });
+
+      it("carries on past a refusal and says how many couldn't be changed", async () => {
+        mockApiService.putPartialCipher.mockImplementation(async (id) => {
+          if (id === "a") {
+            throw new Error("refused");
+          }
+          return new CipherResponse({ id, type: CipherType.Login });
+        });
+        service.selection.select(item("a"), item("b"));
+
+        await service.bulkFavorite();
+
+        expect(mockApiService.putPartialCipher).toHaveBeenCalledTimes(2);
+        expect(i18nT).toHaveBeenCalledWith("keykeeperBulkSomeFailed", 1, 2);
+        expect(mockToastService.showToast).toHaveBeenCalledWith({
+          variant: "error",
+          message: "keykeeperBulkSomeFailed",
+        });
+        expect(service.progress()).toBeNull();
+      });
+
+      it("does nothing in an organization's vault", async () => {
+        service.setConfig(makeConfig({ isOrgVault: true }));
+        service.selection.select(item("a"));
+
+        await service.bulkFavorite();
+
+        expect(mockApiService.putPartialCipher).not.toHaveBeenCalled();
+      });
     });
   });
 });

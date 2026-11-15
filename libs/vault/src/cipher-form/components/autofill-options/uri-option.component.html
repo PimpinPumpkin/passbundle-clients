@@ -22,21 +22,21 @@
           data-testid="remove-uri-button"
         ></button>
       }
-    </bit-form-field>
-    @if (canReorder) {
-      <div class="tw-flex tw-items-center tw-ml-1.5 tw-self-end tw-min-h-10">
+      <!-- Keykeeper: the reorder handle is the field's last button, so a
+           website's field is as wide as every other field in the form. -->
+      @if (canReorder) {
         <button
           role="application"
           type="button"
           bitIconButton="bwi-drag-and-drop"
-          class="!tw-py-0 !tw-px-1"
+          bitSuffix
           cdkDragHandle
           [label]="'reorderToggleButton' | i18n: uriLabel"
           (keydown)="handleKeydown($event)"
           data-testid="reorder-toggle-button"
         ></button>
-      </div>
-    }
+      }
+    </bit-form-field>
   </div>
   @if (showMatchDetection) {
     <bit-form-field class="!tw-mb-0">

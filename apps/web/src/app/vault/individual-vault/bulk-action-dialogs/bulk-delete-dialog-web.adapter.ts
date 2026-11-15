@@ -56,7 +56,7 @@ export class BulkDeleteDialogWebAdapter implements BulkDeleteDialogRef {
     const confirmed = await this.dialogService.openSimpleDialog({
       type: "danger",
       title: this.itemDeleteTitle(permanent, count),
-      content: this.itemDeleteContent(permanent, count),
+      content: this.withNotice(params, this.itemDeleteContent(permanent, count)),
       acceptButtonText: { key: "delete" },
       cancelButtonText: { key: "cancel" },
     });
@@ -65,12 +65,16 @@ export class BulkDeleteDialogWebAdapter implements BulkDeleteDialogRef {
       return BulkDeleteDialogResult.Canceled;
     }
 
-    await this.bulkDelete.deleteCiphers({
-      cipherIds,
-      unassignedCiphers,
-      permanent,
-      organization: params.organization,
-    });
+    try {
+      await this.bulkDelete.deleteCiphers({
+        cipherIds,
+        unassignedCiphers,
+        permanent,
+        organization: params.organization,
+      });
+    } catch {
+      return this.failed();
+    }
 
     this.toastService.showToast({
       variant: "success",
@@ -116,13 +120,13 @@ export class BulkDeleteDialogWebAdapter implements BulkDeleteDialogRef {
                       : "deleteCollectionsCount",
                     placeholders: [count],
                   },
-            content: {
+            content: this.withNotice(params, {
               key: sharedFolderTerminology
                 ? "deleteSharedFoldersKeepItemsDesc"
                 : count === 1
                   ? "deleteCollectionDesc"
                   : "deleteCollectionsDesc",
-            },
+            }),
             acceptButtonText: { key: "delete" },
             cancelButtonText: { key: "cancel" },
           });
@@ -131,7 +135,11 @@ export class BulkDeleteDialogWebAdapter implements BulkDeleteDialogRef {
       return BulkDeleteDialogResult.Canceled;
     }
 
-    await this.bulkDelete.deleteCollections(collections);
+    try {
+      await this.bulkDelete.deleteCollections(collections);
+    } catch {
+      return this.failed();
+    }
 
     this.toastService.showToast({
       variant: "success",
@@ -166,11 +174,11 @@ export class BulkDeleteDialogWebAdapter implements BulkDeleteDialogRef {
     const confirmed = await this.dialogService.openSimpleDialog({
       type: "danger",
       title: { key: "deleteSelection" },
-      content: {
+      content: this.withNotice(params, {
         key: sharedFolderTerminology
           ? "deleteItemsAndSharedFoldersDesc"
           : "deleteItemsAndCollectionsDesc",
-      },
+      }),
       acceptButtonText: { key: "delete" },
       cancelButtonText: { key: "cancel" },
     });
@@ -181,15 +189,19 @@ export class BulkDeleteDialogWebAdapter implements BulkDeleteDialogRef {
 
     const cipherCount = cipherIds.length + unassignedCiphers.length;
 
-    await Promise.all([
-      this.bulkDelete.deleteCiphers({
-        cipherIds,
-        unassignedCiphers,
-        permanent: false,
-        organization: params.organization,
-      }),
-      this.bulkDelete.deleteCollections(collections),
-    ]);
+    try {
+      await Promise.all([
+        this.bulkDelete.deleteCiphers({
+          cipherIds,
+          unassignedCiphers,
+          permanent: false,
+          organization: params.organization,
+        }),
+        this.bulkDelete.deleteCollections(collections),
+      ]);
+    } catch {
+      return this.failed();
+    }
 
     this.toastService.showToast({
       variant: "success",
@@ -209,6 +221,32 @@ export class BulkDeleteDialogWebAdapter implements BulkDeleteDialogRef {
     });
 
     return BulkDeleteDialogResult.Deleted;
+  }
+
+  /**
+   * Keykeeper: what the batch bar has to say about the items it left out goes
+   * above the confirmation's own sentence, so one dialog says both how many
+   * will be deleted and how many won't.
+   */
+  private withNotice(params: BulkDeleteDialogParams, content: Translation): string | Translation {
+    if (!params.notice) {
+      return content;
+    }
+    const [p1, p2, p3] = content.placeholders ?? [];
+    return `${params.notice} ${this.i18nService.t(content.key, p1, p2, p3)}`;
+  }
+
+  /**
+   * Keykeeper: the server stops at the first one it refuses, with the ones
+   * before it already deleted. Say that some may not have changed, and let the
+   * list read itself again.
+   */
+  private failed(): BulkDeleteDialogResult {
+    this.toastService.showToast({
+      variant: "error",
+      message: this.i18nService.t("keykeeperBulkPartlyFailed"),
+    });
+    return BulkDeleteDialogResult.Failed;
   }
 
   private itemDeleteTitle(permanent: boolean, count: number): Translation {
