@@ -36,7 +36,9 @@ export class DefaultChangeLoginPasswordService implements ChangeLoginPasswordSer
     }
 
     // Keykeeper: a site's own change-password page from a published list, found
-    // on the device without asking a server (ours doesn't answer the lookup below).
+    // on the device without asking a server. For a site the list doesn't have,
+    // the lookup below, when website icons are on, asks ours: passbundle-server
+    // answers /icons/change-password-uri with the site's well-known page, or null.
     for (const url of urls) {
       const known = changePasswordUrlFor(url.hostname);
       if (known) {
