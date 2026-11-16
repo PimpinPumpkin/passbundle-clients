@@ -69,18 +69,23 @@ describe("the Plan page in words", () => {
       expect(w.note).toBeNull();
     });
 
-    it("on Premium that renews: paid through and renews on", () => {
+    it("on Premium that renews: when it renews, once", () => {
       const w = words(premium({ until: DEC_15, renews: true }), person);
       expect(w.name).toBe("Premium");
-      expect(w.status).toEqual(["Paid through December 15, 2026", "Renews on December 15, 2026"]);
+      expect(w.status).toEqual(["Renews on December 15, 2026"]);
       expect(w.gives).toEqual(["5 GB for attachments", PREMIUM_FEATURES]);
       expect(w.note).toBeNull();
     });
 
-    it("on Premium that was canceled: paid through and ends on", () => {
+    it("on Premium that was canceled: when it ends, once", () => {
       expect(words(premium({ until: DEC_15, renews: false }), person).status).toEqual([
-        "Paid through December 15, 2026",
         "Ends on December 15, 2026",
+      ]);
+    });
+
+    it("on Premium where the server doesn't say whether it renews: paid through", () => {
+      expect(words(premium({ until: DEC_15, renews: null }), person).status).toEqual([
+        "Paid through December 15, 2026",
       ]);
     });
 

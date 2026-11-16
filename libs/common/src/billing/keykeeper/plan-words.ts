@@ -76,14 +76,16 @@ function statusLines(plan: KeykeeperPlanEnforced, t: Translate, date: DateInWord
       if (plan.until == null) {
         return [t("keykeeperPlanActive")];
       }
+      // One date, said once: when it renews, when it ends, or, where the
+      // server doesn't say which, how long it's paid for.
       const until = date(plan.until);
-      const lines = [t("keykeeperPlanPaidThrough", until)];
       if (plan.renews === true) {
-        lines.push(t("keykeeperPlanRenewsOn", until));
-      } else if (plan.renews === false) {
-        lines.push(t("keykeeperPlanEndsOn", until));
+        return [t("keykeeperPlanRenewsOn", until)];
       }
-      return lines;
+      if (plan.renews === false) {
+        return [t("keykeeperPlanEndsOn", until)];
+      }
+      return [t("keykeeperPlanPaidThrough", until)];
     }
     case "paymentDue":
       if (plan.until == null) {
