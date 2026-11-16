@@ -132,6 +132,16 @@ describe("PasskeyReportComponent", () => {
     expect(component).toBeTruthy();
   });
 
+  // Keykeeper: upstream also linked "how passkeys work" to its blog, which the website doesn't have.
+  it("links the description only to the help on using passkeys, not to a blog", () => {
+    const description = fixture.debugElement.query(By.css("bit-container > p"));
+    const hrefs = description
+      .queryAll(By.css("a[href]"))
+      .map((a) => a.nativeElement.getAttribute("href"));
+
+    expect(hrefs).toEqual(["https://bitwarden.com/help/storing-passkeys/"]);
+  });
+
   it("should render a header breadcrumb that navigates back to the reports home page", async () => {
     const harness = await RouterTestingHarness.create();
     await harness.navigateByUrl("/reports/passkey-report", PasskeyReportComponent);

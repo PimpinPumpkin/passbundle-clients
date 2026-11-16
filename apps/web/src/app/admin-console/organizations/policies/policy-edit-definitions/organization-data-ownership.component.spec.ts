@@ -86,6 +86,17 @@ describe("OrganizationDataOwnershipPolicyComponent", () => {
     component = fixture.componentInstance;
   });
 
+  // Keykeeper: upstream's "Learn more" went to a page on its website that ours doesn't have.
+  it("describes the policy without a link", async () => {
+    fixture.componentRef.setInput("policyResponse", makePolicyResponse(false));
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector("p")).not.toBeNull();
+    expect(el.querySelector("a")).toBeNull();
+  });
+
   describe("loadData with null server response", () => {
     it("should default enableIndividualItemsTransfer to false when data is null", async () => {
       fixture.componentRef.setInput("policyResponse", makePolicyResponse(true, null));

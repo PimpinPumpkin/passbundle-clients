@@ -49,16 +49,10 @@
         formControlName="receiveMarketingEmails"
       />
       <bit-label for="register-start-form-input-receive-marketing-emails">
+        <!-- Keykeeper: "Unsubscribe" isn't a link. Upstream's went to an email preferences page
+             on its website that ours doesn't have. -->
         {{ "receiveMarketingEmails" | i18n }}
-        <a
-          bitLink
-          linkType="primary"
-          href="https://bitwarden.com/email-preferences"
-          target="_blank"
-          rel="noreferrer"
-        >
-          {{ "unsubscribe" | i18n }}
-        </a>
+        {{ "unsubscribe" | i18n }}
         {{ "atAnyTime" | i18n }}
       </bit-label>
     </bit-form-control>
