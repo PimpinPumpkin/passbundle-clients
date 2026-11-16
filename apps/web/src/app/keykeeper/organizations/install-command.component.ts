@@ -65,10 +65,10 @@ export type ShownInstallParts = InstallCommandParts & { phrase?: string[] | null
       @case ("linux") {
         <p bitTypography="body2">
           Run this on {{ whose() }} Linux computers as root, from your RMM, in the folder with our
-          install script, {{ scripts.unix }}. It turns off Chrome's and Edge's own password saving,
-          and installs the extension once it's in their stores, with this server filled in. Anyone
-          who then signs in joins {{ joins() }}. With the app's folder from our package next to the
-          script, it installs the app too.
+          install script, {{ scripts.unix }}. It turns off the browsers' own password saving, and
+          installs the extension once it's in the Chrome and Edge stores, with this server filled
+          in. Anyone who then signs in joins {{ joins() }}. With the app's folder from our package
+          next to the script, it installs the app too.
         </p>
       }
     }
