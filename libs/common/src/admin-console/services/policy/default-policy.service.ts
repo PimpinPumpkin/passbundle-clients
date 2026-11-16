@@ -300,15 +300,22 @@ export class DefaultPolicyService implements PolicyService {
    * - Member policies treat it as an admin (the server's exempt_from_member_policies), so a policy
    *   that binds admins binds the technician too.
    * - "Require single sign-on" treats it as an owner (the server's exempt_from_requirement).
-   * - Two-step login keeps the real role: an MSP's staff are never let off it (DESIGN.md, "MSP
-   *   staff and two-step login").
+   * - "Require two-step login" never lets an MSP's staff off it (the server's
+   *   exempt_from_two_step_policy), so an admin there counts as a regular member, and the two-step
+   *   settings page warns them before they turn off their last method. An owner stays an owner:
+   *   the server never revokes one (DESIGN.md, "MSP staff and two-step login").
    */
   private static roleForPolicy(
     organization: Organization,
     policyType: PolicyType,
   ): OrganizationUserType {
-    if (!organization.keykeeperFromMsp || policyType === PolicyType.TwoFactorAuthentication) {
+    if (!organization.keykeeperFromMsp) {
       return organization.type;
+    }
+    if (policyType === PolicyType.TwoFactorAuthentication) {
+      return organization.type === OrganizationUserType.Admin
+        ? OrganizationUserType.User
+        : organization.type;
     }
     if (policyType === PolicyType.RequireSso || organization.type === OrganizationUserType.Owner) {
       return OrganizationUserType.Owner;

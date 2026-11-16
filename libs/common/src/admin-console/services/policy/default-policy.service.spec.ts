@@ -442,14 +442,72 @@ describe("PolicyService", () => {
         expect(rolesSent()).toEqual([OrganizationUserType.Admin, OrganizationUserType.Custom]);
       });
 
-      it("never lets a technician off two-step login", async () => {
-        signedInWith(
-          [membership(orgId1, OrganizationUserType.Custom, true)],
-          PolicyType.TwoFactorAuthentication,
-        );
+      // Two-step login: whether it applies is whether the two-step settings page warns someone
+      // before they turn off their last method, since the server then revokes them.
+      describe("two-step login", () => {
+        it("applies to a technician who is an admin there, so they're warned", async () => {
+          signedInWith(
+            [membership(orgId1, OrganizationUserType.Admin, true)],
+            PolicyType.TwoFactorAuthentication,
+          );
 
-        expect(await applies(PolicyType.TwoFactorAuthentication)).toBe(true);
-        expect(rolesSent()).toEqual([OrganizationUserType.Custom]);
+          expect(await applies(PolicyType.TwoFactorAuthentication)).toBe(true);
+          expect(rolesSent()).toEqual([OrganizationUserType.User]);
+        });
+
+        it("applies to a technician with a custom role, by that role", async () => {
+          signedInWith(
+            [membership(orgId1, OrganizationUserType.Custom, true)],
+            PolicyType.TwoFactorAuthentication,
+          );
+
+          expect(await applies(PolicyType.TwoFactorAuthentication)).toBe(true);
+          expect(rolesSent()).toEqual([OrganizationUserType.Custom]);
+        });
+
+        it("applies to a technician who is a regular member there, by that role", async () => {
+          signedInWith(
+            [membership(orgId1, OrganizationUserType.User, true)],
+            PolicyType.TwoFactorAuthentication,
+          );
+
+          expect(await applies(PolicyType.TwoFactorAuthentication)).toBe(true);
+          expect(rolesSent()).toEqual([OrganizationUserType.User]);
+        });
+
+        it("still leaves the client's own admin out of it", async () => {
+          signedInWith(
+            [membership(orgId1, OrganizationUserType.Admin, false)],
+            PolicyType.TwoFactorAuthentication,
+          );
+
+          expect(await applies(PolicyType.TwoFactorAuthentication)).toBe(false);
+          expect(rolesSent()).toEqual([OrganizationUserType.Admin]);
+        });
+
+        it("leaves the MSP's owner out of it, since the server never revokes an owner", async () => {
+          signedInWith(
+            [membership(orgId1, OrganizationUserType.Owner, true)],
+            PolicyType.TwoFactorAuthentication,
+          );
+
+          expect(await applies(PolicyType.TwoFactorAuthentication)).toBe(false);
+          expect(rolesSent()).toEqual([OrganizationUserType.Owner]);
+        });
+
+        it("changes nothing for the other policies a technician who is an admin has", async () => {
+          signedInWith(
+            [membership(orgId1, OrganizationUserType.Admin, true)],
+            PolicyType.TwoFactorAuthentication,
+            PolicyType.SingleOrg,
+            PolicyType.RequireSso,
+          );
+
+          expect(await applies(PolicyType.SingleOrg)).toBe(false);
+          expect(rolesSent()).toEqual([OrganizationUserType.Admin]);
+          expect(await applies(PolicyType.RequireSso)).toBe(false);
+          expect(rolesSent()).toEqual([OrganizationUserType.Owner]);
+        });
       });
 
       it("leaves a technician out of required single sign-on the way it leaves an owner out", async () => {
