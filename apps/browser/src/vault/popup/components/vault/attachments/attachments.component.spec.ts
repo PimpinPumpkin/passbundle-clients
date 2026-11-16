@@ -8,6 +8,7 @@ import { BehaviorSubject } from "rxjs";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions/account/billing-account-profile-state.service";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
@@ -81,6 +82,10 @@ describe("AttachmentsComponent", () => {
         },
         { provide: ApiService, useValue: mock<ApiService>() },
         { provide: OrganizationService, useValue: mock<OrganizationService>() },
+        {
+          provide: BillingAccountProfileStateService,
+          useValue: mock<BillingAccountProfileStateService>(),
+        },
       ],
     })
       .overrideComponent(AttachmentsComponent, {
@@ -113,6 +118,19 @@ describe("AttachmentsComponent", () => {
       .componentInstance;
 
     expect(cipherAttachment.submitBtn()).toEqual(submitBtn);
+  });
+
+  // Keykeeper: on a plan that can't add files, the page is for downloading
+  // and removing them: no Upload, and Cancel becomes Close.
+  it("hides Upload and says Close when the plan turns adding off", () => {
+    cipherAttachment.onAddingOff.emit("premium");
+    fixture.detectChanges();
+
+    const [upload, cancel] = fixture.debugElement
+      .queryAll(By.directive(ButtonComponent))
+      .map((button) => button.nativeElement as HTMLButtonElement);
+    expect(upload.classList).toContain("tw-hidden");
+    expect(cancel.textContent?.trim()).toBe("close");
   });
 
   it("navigates the user to the edit view `onUploadSuccess`", fakeAsync(() => {

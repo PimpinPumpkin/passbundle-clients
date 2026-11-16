@@ -3,7 +3,6 @@
 import { Component, Inject, OnInit } from "@angular/core";
 import { FormBuilder, Validators } from "@angular/forms";
 
-import { PremiumBadgeComponent } from "@bitwarden/angular/billing/components/premium-badge";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import {
@@ -38,7 +37,7 @@ export enum EmergencyAccessAddEditDialogResult {
 // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
 @Component({
   templateUrl: "emergency-access-add-edit.component.html",
-  imports: [SharedModule, PremiumBadgeComponent],
+  imports: [SharedModule],
 })
 export class EmergencyAccessAddEditComponent implements OnInit {
   loading = true;

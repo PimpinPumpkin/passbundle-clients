@@ -40,9 +40,8 @@
           <div>
             {{ "premiumSubscriptionEndedDesc" | i18n }}
           </div>
-          <a bitLink href="#" appStopClick (click)="navigateToGetPremium()">
-            {{ "restartPremium" | i18n }}
-          </a>
+          <!-- Keykeeper: upstream's Premium purchase page is gone; the website's Pricing page in its place. -->
+          <billing-keykeeper-pricing-link />
         </ng-container>
       </bit-callout>
     }

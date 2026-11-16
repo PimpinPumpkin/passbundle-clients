@@ -17,6 +17,11 @@ import { firstValueFrom, Observable, Subject, switchMap } from "rxjs";
 import { map } from "rxjs/operators";
 
 import { PremiumBadgeComponent } from "@bitwarden/angular/billing/components/premium-badge";
+import {
+  attachingOffSentence,
+  KeykeeperPlanNoticeDialogComponent,
+  KeykeeperPlanSentence,
+} from "@bitwarden/angular/billing/keykeeper";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import {
   FolderGrid,
@@ -42,6 +47,11 @@ import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.servi
 import { PremiumUpgradePromptService } from "@bitwarden/common/vault/abstractions/premium-upgrade-prompt.service";
 import { ViewPasswordHistoryService } from "@bitwarden/common/vault/abstractions/view-password-history.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
+import {
+  attachingOff,
+  AttachingOff,
+  attachmentsWindowOpens,
+} from "@bitwarden/common/vault/keykeeper/attachments-plan";
 import { CipherData } from "@bitwarden/common/vault/models/data/cipher.data";
 import { Cipher } from "@bitwarden/common/vault/models/domain/cipher";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
@@ -416,6 +426,27 @@ export class VaultItemDialogComponent implements OnInit, OnDestroy {
 
   protected attachmentsButtonDisabled = false;
 
+  /** Keykeeper: the sentence the Premium badge beside Attachments says. */
+  protected readonly attachFilesSentence = KeykeeperPlanSentence.AttachFiles;
+
+  private readonly userHasPremium = toSignal(this.userHasPremium$);
+
+  /** Keykeeper: whether the item has files, kept current as they're added and removed here. */
+  private itemHasFiles?: boolean;
+
+  /**
+   * Keykeeper: why files can't be added to this item on this plan, or null
+   * when they can (DESIGN.md, "Plans and billing"). A personal item goes by
+   * the person's Premium, an organization's by its storage.
+   */
+  protected get attachingOff(): AttachingOff | null {
+    const hasPremium = this.userHasPremium();
+    if (hasPremium === undefined) {
+      return null;
+    }
+    return attachingOff(this.cipher?.organizationId, this.organization, hasPremium);
+  }
+
   protected confirmedPremiumUpgrade = false;
 
   /**
@@ -657,10 +688,17 @@ export class VaultItemDialogComponent implements OnInit, OnDestroy {
   };
 
   openAttachmentsDialog = async () => {
-    const canAccessAttachments = await firstValueFrom(this.userHasPremium$);
+    // Keykeeper: the window opens for any item that has files, on any plan, so
+    // a file can be downloaded and removed. An item with no files and no right
+    // to add gets the plain sentence instead.
+    const hasPremium = await firstValueFrom(this.userHasPremium$);
+    const off = attachingOff(this.cipher?.organizationId, this.organization, hasPremium);
+    const hasFiles = this.itemHasFiles ?? this.cipher?.hasAttachments ?? false;
 
-    if (!canAccessAttachments) {
-      await this.premiumUpgradeService.promptForPremium(this.cipher?.organizationId);
+    if (off != null && !attachmentsWindowOpens(hasFiles, off)) {
+      KeykeeperPlanNoticeDialogComponent.open(this.dialogService, {
+        sentence: attachingOffSentence(off),
+      });
       return;
     }
 
@@ -709,6 +747,7 @@ export class VaultItemDialogComponent implements OnInit, OnDestroy {
 
         return currentCipher;
       });
+      this.itemHasFiles = (updatedCipherView.attachments?.length ?? 0) > 0;
 
       this._cipherModified = true;
     }

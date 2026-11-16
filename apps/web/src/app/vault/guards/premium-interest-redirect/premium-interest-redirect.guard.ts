@@ -24,9 +24,9 @@ export const premiumInterestRedirectGuard: CanActivateFn = async () => {
     );
 
     if (intendsToSetupPremium) {
-      return router.createUrlTree(["/settings/subscription/premium"], {
-        queryParams: { callToAction: "upgradeToPremium" },
-      });
+      // Keykeeper: upstream's Premium purchase page is gone (DESIGN.md,
+      // "Plans and billing"), so the vault opens as for anyone else.
+      await premiumInterestStateService.clearPremiumInterest(currentAcct.id);
     }
 
     return true;

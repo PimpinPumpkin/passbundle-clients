@@ -14,9 +14,8 @@
       <p bitTypography="body2" class="tw-mb-3">
         {{ "archivePremiumRestart" | i18n }}
       </p>
-      <button type="button" bitButton (click)="navigateToPremium()" buttonType="primary">
-        {{ "restartPremium" | i18n }}
-      </button>
+      <!-- Keykeeper: upstream's Premium page is gone; the website's Pricing page in its place. -->
+      <billing-keykeeper-pricing-link />
     </bit-card>
   }
 

@@ -5,6 +5,7 @@ import { mock } from "jest-mock-extended";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions/account/billing-account-profile-state.service";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
@@ -42,6 +43,10 @@ describe("AttachmentsV2Component", () => {
         { provide: ApiService, useValue: mock<ApiService>() },
         { provide: OrganizationService, useValue: mock<OrganizationService>() },
         { provide: ConfigService, useValue: mock<ConfigService>() },
+        {
+          provide: BillingAccountProfileStateService,
+          useValue: mock<BillingAccountProfileStateService>(),
+        },
       ],
     }).compileComponents();
 
@@ -78,5 +83,16 @@ describe("AttachmentsV2Component", () => {
     component.closeButtonPressed();
 
     expect(dialogRefCloseSpy).toHaveBeenCalledWith({ action: AttachmentDialogResult.Closed });
+  });
+  // Keykeeper: on a plan that can't add files the window is for downloading
+  // and removing, so it's titled Attachments and its button closes it.
+  it("is titled Attachments with a Close button when adding is off", () => {
+    const i18n = TestBed.inject(I18nService) as jest.Mocked<I18nService>;
+    i18n.t.mockImplementation((key: string) => key);
+
+    component.addingOff();
+
+    expect(component["titleKey"]).toBe("attachments");
+    expect(component.buttonText).toBe("close");
   });
 });

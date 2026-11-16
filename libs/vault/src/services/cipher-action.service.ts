@@ -2,6 +2,10 @@ import { inject, Injectable } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { firstValueFrom, map, Subject, switchMap } from "rxjs";
 
+import {
+  attachingOffSentence,
+  KeykeeperPlanNoticeDialogComponent,
+} from "@bitwarden/angular/billing/keykeeper";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
@@ -14,6 +18,10 @@ import { CipherArchiveService } from "@bitwarden/common/vault/abstractions/ciphe
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { PremiumUpgradePromptService } from "@bitwarden/common/vault/abstractions/premium-upgrade-prompt.service";
 import { CipherRepromptType } from "@bitwarden/common/vault/enums/cipher-reprompt-type";
+import {
+  attachingOff,
+  attachmentsWindowOpens,
+} from "@bitwarden/common/vault/keykeeper/attachments-plan";
 import {
   CipherViewLike,
   CipherViewLikeUtils,
@@ -161,7 +169,9 @@ export class CipherActionService {
       ? (uuidAsString(cipher.organizationId) as OrganizationId)
       : undefined;
 
-    if (!(await this.canAccessAttachments(organizationId))) {
+    if (
+      !(await this.canAccessAttachments(organizationId, CipherViewLikeUtils.hasAttachments(cipher)))
+    ) {
       return;
     }
 
@@ -213,29 +223,31 @@ export class CipherActionService {
   }
 
   /**
-   * Whether the user is entitled to open the attachments dialog, prompting for the relevant upgrade
-   * when they are not. File storage is a premium feature for personal items, while an organization
-   * item needs storage allocated to its owning organization.
+   * Whether the attachments dialog opens. Adding files is a premium feature for personal items,
+   * while an organization item needs storage allocated to its owning organization.
+   *
+   * Keykeeper: an item that has files opens it on any plan, so a file can be downloaded and
+   * removed; the dialog itself turns adding off. An item with no files and no right to add gets
+   * the plain sentence instead (DESIGN.md, "Plans and billing").
    *
    * An organization the user isn't a member of can't be checked for storage, so it is let through —
    * the dialog itself is read-only in that case.
    */
-  private async canAccessAttachments(organizationId: OrganizationId | undefined): Promise<boolean> {
-    if (organizationId == null) {
-      if (this.userHasPremium()) {
-        return true;
-      }
-      await this.premiumUpgradePromptService.promptForPremium();
-      return false;
-    }
-
+  private async canAccessAttachments(
+    organizationId: OrganizationId | undefined,
+    hasFiles: boolean,
+  ): Promise<boolean> {
     const organization = this.organizations().find((o) => o.id === organizationId);
-    if (organization != null && !organization.maxStorageGb) {
-      await this.premiumUpgradePromptService.promptForPremium(organizationId);
-      return false;
+    const off = attachingOff(organizationId, organization, this.userHasPremium());
+
+    if (off == null || attachmentsWindowOpens(hasFiles, off)) {
+      return true;
     }
 
-    return true;
+    KeykeeperPlanNoticeDialogComponent.open(this.dialogService, {
+      sentence: attachingOffSentence(off),
+    });
+    return false;
   }
 
   private async promptPassword(cipher: CipherViewLike): Promise<boolean> {

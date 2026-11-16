@@ -73,13 +73,10 @@ const routes: Routes = [
             (m) => m.organizationReportingRoutes,
           ),
       },
-      {
-        path: "billing",
-        loadChildren: () =>
-          import("../../billing/organizations/organization-billing.module").then(
-            (m) => m.OrganizationBillingModule,
-          ),
-      },
+      // Keykeeper: upstream's organization Billing pages are gone. They
+      // called a billing API this server never had (DESIGN.md, "Plans and
+      // billing"). An old link to any of them lands on the vault.
+      { path: "billing", redirectTo: "/" },
     ],
   },
 ];

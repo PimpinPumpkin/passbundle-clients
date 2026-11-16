@@ -758,6 +758,9 @@ describe("HealthComponent", () => {
     });
   });
 
+  // Keykeeper: the weak, reused and exposed categories are free (DESIGN.md,
+  // "Plans and billing"), so Health never locks them and never offers an
+  // upgrade.
   describe("premium gating", () => {
     /** Runs a scan to success so the Health Overview is mounted. */
     async function initWithReport() {
@@ -768,12 +771,12 @@ describe("HealthComponent", () => {
       await settle();
     }
 
-    it("locks the Health Overview for a user without premium", async () => {
+    it("leaves the Health Overview unlocked for a user without premium", async () => {
       hasPremium$.next(false);
 
       await initWithReport();
 
-      expect(overview()?.locked()).toBe(true);
+      expect(overview()?.locked()).toBe(false);
     });
 
     it("leaves the Health Overview unlocked for a user with premium", async () => {
@@ -784,52 +787,12 @@ describe("HealthComponent", () => {
       expect(overview()?.locked()).toBe(false);
     });
 
-    it("unlocks the Health Overview when the user upgrades, with no reload", async () => {
-      hasPremium$.next(false);
-      await initWithReport();
-      expect(overview()?.locked()).toBe(true);
-
-      // The subscription check reads hasPremiumFromAnySource$, so the view swaps
-      // itself once the upgrade lands rather than needing the tab reopened.
-      hasPremium$.next(true);
-      await settle();
-
-      expect(overview()?.locked()).toBe(false);
-    });
-
-    it("stays locked when the premium check has not yet emitted", async () => {
-      // A free user must never see navigable categories while the check settles.
-      billingAccountProfileStateService.hasPremiumFromAnySource$.mockReturnValue(
-        new Subject<boolean>(),
-      );
-
-      await initWithReport();
-
-      expect(overview()?.locked()).toBe(true);
-    });
-
-    it("scopes the premium check to the active user", async () => {
-      await initWithReport();
-
-      expect(billingAccountProfileStateService.hasPremiumFromAnySource$).toHaveBeenCalledWith(
-        userId,
-      );
-    });
-
-    it("launches the upgrade flow when the Health Overview asks for it", async () => {
+    it("never opens an upgrade window", async () => {
       hasPremium$.next(false);
       await initWithReport();
 
       overview()!.upgrade.emit();
       await settle();
-
-      expect(dialogService.open).toHaveBeenCalledTimes(1);
-    });
-
-    it("does not launch the upgrade flow on its own", async () => {
-      hasPremium$.next(false);
-
-      await initWithReport();
 
       expect(dialogService.open).not.toHaveBeenCalled();
     });

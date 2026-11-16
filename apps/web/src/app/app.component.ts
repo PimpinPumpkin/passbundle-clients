@@ -6,6 +6,10 @@ import { Router } from "@angular/router";
 import { Subject, filter, firstValueFrom, map, timeout } from "rxjs";
 
 import { DeviceTrustToastService } from "@bitwarden/angular/auth/services/device-trust-toast.service.abstraction";
+import {
+  KeykeeperPlanNoticeDialogComponent,
+  KeykeeperPlanSentence,
+} from "@bitwarden/angular/billing/keykeeper";
 import { DocumentLangSetter } from "@bitwarden/angular/platform/i18n";
 import { InternalOrganizationServiceAbstraction } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
@@ -132,22 +136,11 @@ export class AppComponent implements OnDestroy, OnInit {
             }
             break;
           case "upgradeOrganization": {
-            const upgradeConfirmed = await this.dialogService.openSimpleDialog({
-              title: { key: "upgradeOrganization" },
-              content: { key: "upgradeOrganizationDesc" },
-              acceptButtonText: { key: "upgradeOrganization" },
-              type: "info",
+            // Keykeeper: the organization's Billing pages are gone (DESIGN.md,
+            // "Plans and billing"), so this says the plan doesn't include it.
+            KeykeeperPlanNoticeDialogComponent.open(this.dialogService, {
+              sentence: KeykeeperPlanSentence.OrganizationPlan,
             });
-            if (upgradeConfirmed) {
-              // FIXME: Verify that this floating promise is intentional. If it is, add an explanatory comment and ensure there is proper error handling.
-              // eslint-disable-next-line @typescript-eslint/no-floating-promises
-              this.router.navigate([
-                "organizations",
-                message.organizationId,
-                "billing",
-                "subscription",
-              ]);
-            }
             break;
           }
           case "emailVerificationRequired": {

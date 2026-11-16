@@ -11,7 +11,7 @@ import {
   switchMap,
 } from "rxjs";
 
-import { PremiumUpgradeDialogComponent } from "@bitwarden/angular/billing/components";
+import { KeykeeperPricingLinkComponent } from "@bitwarden/angular/billing/keykeeper";
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { NudgesService, NudgeType } from "@bitwarden/angular/vault";
 import { AutomaticUserConfirmationService } from "@bitwarden/auto-confirm";
@@ -39,6 +39,7 @@ import { PopupPageComponent } from "../../../platform/popup/layout/popup-page.co
   imports: [
     CommonModule,
     JslibModule,
+    KeykeeperPricingLinkComponent,
     RouterModule,
     PopupPageComponent,
     PopupHeaderComponent,
@@ -110,10 +111,6 @@ export class SettingsV2Component {
     private readonly dialogService: DialogService,
     private readonly autofillSettingsService: AutofillSettingsServiceAbstraction,
   ) {}
-
-  protected openUpgradeDialog() {
-    PremiumUpgradeDialogComponent.open(this.dialogService);
-  }
 
   async dismissBadge(type: NudgeType) {
     if (await firstValueFrom(this.showVaultBadge$)) {

@@ -4,6 +4,10 @@ import { Router } from "@angular/router";
 import { mock, MockProxy } from "jest-mock-extended";
 import { BehaviorSubject, of, Subject } from "rxjs";
 
+import {
+  KeykeeperPlanNoticeDialogComponent,
+  KeykeeperPlanSentence,
+} from "@bitwarden/angular/billing/keykeeper";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { CollectionAdminView } from "@bitwarden/common/admin-console/models/collections";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
@@ -220,16 +224,40 @@ describe("VaultCipherActionsService", () => {
       expect(messagingService.send).not.toHaveBeenCalled();
     });
 
-    it("sends upgradeOrganization message when org has no storage", async () => {
+    // Keykeeper: an organization whose plan has ended has no storage. An item
+    // with no files gets the plain sentence; one with files opens, so they can
+    // be downloaded and removed (DESIGN.md, "Plans and billing").
+    it("says the plan has ended when org has no storage and the item has no files", async () => {
       const cipher = buildCipher();
       initService(buildOrg({ maxStorageGb: 0 }));
+      const noticeSpy = jest
+        .spyOn(KeykeeperPlanNoticeDialogComponent, "open")
+        .mockReturnValue(undefined as never);
+      const openSpy = jest.spyOn(AttachmentsV2Component, "open");
 
       await service.editCipherAttachments(cipher);
 
-      expect(messagingService.send).toHaveBeenCalledWith(
-        "upgradeOrganization",
-        expect.objectContaining({ organizationId: ORG_ID }),
-      );
+      expect(noticeSpy).toHaveBeenCalledTimes(1);
+      expect(noticeSpy.mock.calls[0][1]).toEqual({
+        sentence: KeykeeperPlanSentence.OrganizationEnded,
+      });
+      expect(openSpy).not.toHaveBeenCalled();
+      expect(messagingService.send).not.toHaveBeenCalled();
+      noticeSpy.mockRestore();
+      openSpy.mockRestore();
+    });
+
+    it("opens the attachments window when org has no storage and the item has files", async () => {
+      const cipher = buildCipher({ hasAttachments: true } as Partial<CipherView>);
+      initService(buildOrg({ maxStorageGb: 0 }));
+      const openSpy = jest
+        .spyOn(AttachmentsV2Component, "open")
+        .mockReturnValue(makeDialogRef({ action: AttachmentDialogResult.Closed }) as any);
+
+      await service.editCipherAttachments(cipher);
+
+      expect(openSpy).toHaveBeenCalled();
+      openSpy.mockRestore();
     });
 
     it("calls refresh when an attachment is uploaded", async () => {

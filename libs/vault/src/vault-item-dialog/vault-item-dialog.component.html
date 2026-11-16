@@ -100,7 +100,10 @@
           >
             <div class="tw-flex tw-items-center tw-gap-2">
               {{ "attachments" | i18n }}
-              <app-premium-badge></app-premium-badge>
+              <!-- Keykeeper: Premium's only where adding is: a personal item of someone without it. -->
+              @if (attachingOff === "premium") {
+                <app-premium-badge [sentence]="attachFilesSentence"></app-premium-badge>
+              }
             </div>
             <bit-icon name="bwi-angle-right" slot="end"></bit-icon>
           </button>

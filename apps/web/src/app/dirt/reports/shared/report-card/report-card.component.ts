@@ -2,6 +2,7 @@
 // @ts-strict-ignore
 import { Component, Input } from "@angular/core";
 
+import { KeykeeperPlanSentence } from "@bitwarden/angular/billing/keykeeper";
 import { BitSvg } from "@bitwarden/assets/svg";
 
 import { KEYKEEPER_REPORT_TILES } from "../../../../keykeeper/health/report-tiles";
@@ -30,6 +31,9 @@ export class ReportCardComponent {
   // FIXME(https://bitwarden.atlassian.net/browse/CL-903): Migrate to Signals
   // eslint-disable-next-line @angular-eslint/prefer-signals
   @Input() variant: ReportVariant;
+  /** Keykeeper: what the Premium badge says for this report, when it has a sentence of its own. */
+  // eslint-disable-next-line @angular-eslint/prefer-signals
+  @Input() keykeeperSentence: KeykeeperPlanSentence | undefined;
 
   /** Keykeeper: the report's tile, by its route, in place of the illustration. */
   protected get keykeeperTile() {

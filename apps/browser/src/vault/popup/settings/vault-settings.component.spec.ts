@@ -160,7 +160,9 @@ describe("VaultSettingsComponent", () => {
     it("prompts for premium when user cannot archive and has no archived items", async () => {
       setArchiveState(false, []);
       const badge = component["premiumBadgeComponent"]();
-      jest.spyOn(badge!, "promptForPremium");
+      // Keykeeper: the prompt opens our plan notice, a real dialog. This test
+      // checks only that the link asks for it, so it doesn't open one.
+      jest.spyOn(badge!, "promptForPremium").mockResolvedValue();
 
       const premiumArchiveLink = queryByTestId("premium-archive-link");
 

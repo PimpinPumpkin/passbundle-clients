@@ -68,13 +68,9 @@ import { AutofillComponent } from "../autofill/popup/settings/autofill.component
 import { BlockedDomainsComponent } from "../autofill/popup/settings/blocked-domains.component";
 import { ExcludedDomainsComponent } from "../autofill/popup/settings/excluded-domains.component";
 import { NotificationsSettingsComponent } from "../autofill/popup/settings/notifications.component";
-import { PremiumV2Component } from "../billing/popup/settings/premium-v2.component";
 import { HealthRiskCategoryDetailComponent } from "../dirt/health/popup/health-risk-category-detail.component";
 import { HealthComponent } from "../dirt/health/popup/health.component";
-import {
-  canAccessHealth,
-  canAccessHealthDetail,
-} from "../dirt/health/popup/services/health-access.service";
+import { canAccessHealth } from "../dirt/health/popup/services/health-access.service";
 import { PhishingWarningComponent } from "../dirt/phishing-detection/popup/phishing-warning.component";
 import { ProtectedByComponent } from "../dirt/phishing-detection/popup/protected-by-component";
 import { KeykeeperBrowserImportPageComponent } from "../keykeeper/popup/browser-import-page.component";
@@ -433,12 +429,10 @@ const routes: Routes = [
     canActivate: [authGuard],
     data: { elevation: 2 } satisfies RouteDataProperties,
   },
-  {
-    path: "premium",
-    component: PremiumV2Component,
-    canActivate: [authGuard],
-    data: { elevation: 3 } satisfies RouteDataProperties,
-  },
+  // Keykeeper: no Premium page. Upstream's sent people to a purchase page
+  // this server never had (DESIGN.md, "Plans and billing"). A popup that
+  // was last on it opens on the vault.
+  { path: "premium", redirectTo: "/tabs/vault" },
   {
     path: "appearance",
     component: AppearanceComponent,
@@ -887,7 +881,7 @@ const routes: Routes = [
   {
     path: "health/:category",
     component: HealthRiskCategoryDetailComponent,
-    canActivate: [authGuard, canAccessHealth, canAccessHealthDetail],
+    canActivate: [authGuard, canAccessHealth],
     data: { elevation: 1 } satisfies RouteDataProperties,
   },
   {

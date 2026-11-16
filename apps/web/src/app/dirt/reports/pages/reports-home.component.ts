@@ -5,6 +5,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, signal } from "@angular/core";
 import { firstValueFrom } from "rxjs";
 
+import { KeykeeperPlanSentence } from "@bitwarden/angular/billing/keykeeper";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions/account/billing-account-profile-state.service";
@@ -54,18 +55,21 @@ export class ReportsHomeComponent implements OnInit {
       FeatureFlag.PasskeyLoginReport,
     );
 
+    // Keykeeper: the weak, reused and exposed password reports are free, and
+    // the data breach report is part of Premium (DESIGN.md, "Plans and
+    // billing"). Upstream had it the other way round.
     const reportEntries: ReportEntry[] = [
       {
         ...reports[ReportType.ExposedPasswords],
-        variant: reportRequiresPremium,
+        variant: ReportVariant.Enabled,
       },
       {
         ...reports[ReportType.ReusedPasswords],
-        variant: reportRequiresPremium,
+        variant: ReportVariant.Enabled,
       },
       {
         ...reports[ReportType.WeakPasswords],
-        variant: reportRequiresPremium,
+        variant: ReportVariant.Enabled,
       },
       {
         ...reports[ReportType.UnsecuredWebsites],
@@ -77,7 +81,8 @@ export class ReportsHomeComponent implements OnInit {
       },
       {
         ...reports[ReportType.DataBreach],
-        variant: ReportVariant.Enabled,
+        variant: reportRequiresPremium,
+        keykeeperSentence: KeykeeperPlanSentence.BreachReport,
       },
       // Keykeeper: expiring items, for everyone.
       {

@@ -8,6 +8,7 @@
       [cipherId]="cipherId"
       [submitBtn]="submitButton"
       (onUploadSuccess)="navigateBack()"
+      (onAddingOff)="addingOff = true"
     ></app-cipher-attachments>
   }
 
@@ -18,11 +19,12 @@
       type="submit"
       buttonType="primary"
       [attr.form]="attachmentFormId"
+      [class.tw-hidden]="addingOff"
     >
       {{ "upload" | i18n }}
     </button>
     <button (click)="navigateBack()" bitButton type="button" buttonType="secondary">
-      {{ "cancel" | i18n }}
+      {{ (addingOff ? "close" : "cancel") | i18n }}
     </button>
   </popup-footer>
 </popup-page>

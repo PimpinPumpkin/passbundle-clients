@@ -5,6 +5,7 @@ import { Router } from "@angular/router";
 import { combineLatest, firstValueFrom, map, Observable, startWith, switchMap } from "rxjs";
 
 import { CollectionService } from "@bitwarden/admin-console/common";
+import { KeykeeperPricingLinkComponent } from "@bitwarden/angular/billing/keykeeper";
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { NoResults } from "@bitwarden/assets/svg";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
@@ -68,6 +69,7 @@ import { ROUTES_AFTER_EDIT_DELETION } from "../services/vault-popup-after-deleti
   imports: [
     CommonModule,
     JslibModule,
+    KeykeeperPricingLinkComponent,
     PopupPageComponent,
     PopupHeaderComponent,
     PopOutComponent,
@@ -184,10 +186,6 @@ export class ArchiveComponent {
       maySeeSecrets(cipher) &&
       itemGrid(itemLike(cipher), this.collections() ?? []).share
     );
-  }
-
-  async navigateToPremium() {
-    await this.router.navigate(["/premium"]);
   }
 
   async view(cipher: CipherViewLike) {

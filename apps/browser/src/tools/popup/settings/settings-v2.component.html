@@ -2,16 +2,8 @@
   @if (!(hasPremium$ | async)) {
     <bit-callout [icon]="null">
       {{ "unlockFeaturesWithPremium" | i18n }}
-      <button
-        bitLink
-        buttonType="primary"
-        class="tw-text-xs"
-        type="button"
-        (click)="openUpgradeDialog()"
-        [title]="'upgradeNow' | i18n"
-      >
-        {{ "upgradeNow" | i18n }}
-      </button>
+      <!-- Keykeeper: upstream's upgrade window is gone; the website's Pricing page in its place. -->
+      <billing-keykeeper-pricing-link class="tw-text-xs" />
     </bit-callout>
   }
   <popup-header slot="header" pageTitle="{{ 'settings' | i18n }}">

@@ -2,6 +2,10 @@ import { TestBed } from "@angular/core/testing";
 import { mock, MockProxy } from "jest-mock-extended";
 import { firstValueFrom, BehaviorSubject, of } from "rxjs";
 
+import {
+  KeykeeperPlanNoticeDialogComponent,
+  KeykeeperPlanSentence,
+} from "@bitwarden/angular/billing/keykeeper";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
@@ -38,6 +42,7 @@ function makeCipher(
     organizationId: string;
     reprompt: CipherRepromptType;
     type: CipherType;
+    hasAttachments: boolean;
   }> = {},
 ): CipherView {
   return {
@@ -297,20 +302,43 @@ describe("CipherActionService", () => {
   });
 
   describe("viewAttachments()", () => {
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
     function mockDialog(action: AttachmentDialogResult) {
       jest.spyOn(AttachmentsV2Component, "open").mockReturnValue({
         closed: of({ action }),
       } as unknown as DialogRef<{ action: AttachmentDialogResult }>);
     }
 
-    it("prompts for premium and returns when user does not have premium", async () => {
+    // Keykeeper: an item with no files and no right to add gets the plan's
+    // sentence; one with files opens on any plan (DESIGN.md, "Plans and billing").
+    it("says attaching files is part of Premium when user does not have premium and the item has no files", async () => {
       userHasPremiumSubject.next(false);
       const openSpy = jest.spyOn(AttachmentsV2Component, "open");
+      const noticeSpy = jest
+        .spyOn(KeykeeperPlanNoticeDialogComponent, "open")
+        .mockReturnValue(undefined as never);
 
       await service.viewAttachments(makeCipher());
 
-      expect(premiumUpgradePromptService.promptForPremium).toHaveBeenCalled();
+      expect(noticeSpy).toHaveBeenCalledWith(dialogService, {
+        sentence: KeykeeperPlanSentence.AttachFiles,
+      });
+      expect(premiumUpgradePromptService.promptForPremium).not.toHaveBeenCalled();
       expect(openSpy).not.toHaveBeenCalled();
+    });
+
+    it("opens for an item with files when user does not have premium", async () => {
+      userHasPremiumSubject.next(false);
+      mockDialog(AttachmentDialogResult.Closed);
+      const noticeSpy = jest.spyOn(KeykeeperPlanNoticeDialogComponent, "open");
+
+      await service.viewAttachments(makeCipher({ hasAttachments: true }));
+
+      expect(AttachmentsV2Component.open).toHaveBeenCalled();
+      expect(noticeSpy).not.toHaveBeenCalled();
     });
 
     it("does nothing when password reprompt is cancelled", async () => {
@@ -322,14 +350,32 @@ describe("CipherActionService", () => {
       expect(openSpy).not.toHaveBeenCalled();
     });
 
-    it("prompts to upgrade the organization when it has no storage allocated", async () => {
+    it("says the organization's plan has ended when it has no storage and the item has no files", async () => {
       organizationsSubject.next([{ id: "org-1", maxStorageGb: 0 } as Organization]);
       const openSpy = jest.spyOn(AttachmentsV2Component, "open");
+      const noticeSpy = jest
+        .spyOn(KeykeeperPlanNoticeDialogComponent, "open")
+        .mockReturnValue(undefined as never);
 
       await service.viewAttachments(makeCipher({ organizationId: "org-1" }));
 
-      expect(premiumUpgradePromptService.promptForPremium).toHaveBeenCalledWith("org-1");
+      expect(noticeSpy).toHaveBeenCalledWith(dialogService, {
+        sentence: KeykeeperPlanSentence.OrganizationEnded,
+      });
+      expect(premiumUpgradePromptService.promptForPremium).not.toHaveBeenCalled();
       expect(openSpy).not.toHaveBeenCalled();
+    });
+
+    it("opens for an organization item with files when the organization has no storage", async () => {
+      organizationsSubject.next([{ id: "org-1", maxStorageGb: 0 } as Organization]);
+      mockDialog(AttachmentDialogResult.Closed);
+
+      await service.viewAttachments(makeCipher({ organizationId: "org-1", hasAttachments: true }));
+
+      expect(AttachmentsV2Component.open).toHaveBeenCalledWith(
+        dialogService,
+        expect.objectContaining({ organizationId: "org-1" }),
+      );
     });
 
     it("opens for an organization item with storage, even without personal premium", async () => {

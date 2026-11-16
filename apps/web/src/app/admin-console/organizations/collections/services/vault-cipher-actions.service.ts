@@ -3,6 +3,10 @@ import { NavigationExtras, Router } from "@angular/router";
 import { combineLatest, firstValueFrom, lastValueFrom, Observable, Subject } from "rxjs";
 import { distinctUntilChanged, filter, map, shareReplay, switchMap } from "rxjs/operators";
 
+import {
+  attachingOffSentence,
+  KeykeeperPlanNoticeDialogComponent,
+} from "@bitwarden/angular/billing/keykeeper";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { CollectionView } from "@bitwarden/common/admin-console/models/collections";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
@@ -11,7 +15,6 @@ import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { EventCollectionService, EventType } from "@bitwarden/common/dirt/event-logs";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
-import { MessagingService } from "@bitwarden/common/platform/abstractions/messaging.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { getById } from "@bitwarden/common/platform/misc";
 import { OrganizationId, CipherId, CollectionId, UserId } from "@bitwarden/common/types/guid";
@@ -19,6 +22,10 @@ import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.servi
 import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherRepromptType } from "@bitwarden/common/vault/enums/cipher-reprompt-type";
+import {
+  attachingOff,
+  attachmentsWindowOpens,
+} from "@bitwarden/common/vault/keykeeper/attachments-plan";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { CipherAuthorizationService } from "@bitwarden/common/vault/services/cipher-authorization.service";
 import {
@@ -62,7 +69,6 @@ export class VaultCipherActionsService {
   private readonly toastService = inject(ToastService);
   private readonly logService = inject(LogService);
   private readonly accountService = inject(AccountService);
-  private readonly messagingService = inject(MessagingService);
   private readonly platformUtilsService = inject(PlatformUtilsService);
   private readonly router = inject(Router);
   private readonly i18nService = inject(I18nService);
@@ -122,9 +128,16 @@ export class VaultCipherActionsService {
       return;
     }
 
+    // Keykeeper: an organization whose plan has ended has no storage. Its
+    // files can still be downloaded and removed, so the window opens for an
+    // item that has any; one with none gets the plain sentence (DESIGN.md,
+    // "Plans and billing").
     const organization = await firstValueFrom(this.organization$);
-    if (organization.maxStorageGb == null || organization.maxStorageGb === 0) {
-      this.messagingService.send("upgradeOrganization", { organizationId: cipher.organizationId });
+    const off = attachingOff(organization.id, organization, false);
+    if (off != null && !attachmentsWindowOpens(cipher.hasAttachments, off)) {
+      KeykeeperPlanNoticeDialogComponent.open(this.dialogService, {
+        sentence: attachingOffSentence(off),
+      });
       return;
     }
 

@@ -40,6 +40,12 @@ export class AttachmentsComponent {
   /** Id of the cipher */
   cipherId: CipherId;
 
+  /**
+   * Keykeeper: the plan doesn't let files be added to this item, so there's
+   * nothing to upload. The files here can still be downloaded and removed.
+   */
+  addingOff = false;
+
   constructor(
     private popupRouterCacheService: PopupRouterCacheService,
     route: ActivatedRoute,

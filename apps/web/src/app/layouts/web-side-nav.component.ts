@@ -10,11 +10,8 @@ import { ConfigService } from "@bitwarden/common/platform/abstractions/config/co
 import { SideNavVariant, NavigationModule, SideNavService } from "@bitwarden/components";
 import { Vfo1TourCalloutService, VaultTourCalloutComponent } from "@bitwarden/vault";
 
-import { UpgradeCalloutComponent } from "../billing/individual/upgrade/upgrade-nav-button/upgrade-callout/upgrade-callout.component";
-
 import { AccountMenuComponent } from "./header/account-menu.component";
 import { ProductSwitcherModule } from "./product-switcher/product-switcher.module";
-import { ProductSwitcherService } from "./product-switcher/shared/product-switcher.service";
 
 @Component({
   selector: "app-side-nav",
@@ -24,7 +21,6 @@ import { ProductSwitcherService } from "./product-switcher/shared/product-switch
     AsyncPipe,
     NavigationModule,
     ProductSwitcherModule,
-    UpgradeCalloutComponent,
     VaultTourCalloutComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -33,12 +29,8 @@ export class WebSideNavComponent {
   readonly variant = input<SideNavVariant>("primary");
   protected readonly sideNavService = inject(SideNavService);
 
-  private readonly productSwitcherService = inject(ProductSwitcherService);
   private readonly accountService = inject(AccountService);
   private readonly tourCalloutService = inject(Vfo1TourCalloutService);
-
-  protected readonly shouldShowPremiumUpgradeButton$ =
-    this.productSwitcherService.shouldShowPremiumUpgradeButton$;
 
   /**
    * Whether the VFO1 Foundation flag is enabled. While it is off, the legacy header account menu

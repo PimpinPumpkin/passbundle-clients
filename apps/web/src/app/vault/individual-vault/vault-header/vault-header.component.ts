@@ -8,7 +8,6 @@ import {
   Output,
   output,
 } from "@angular/core";
-import { Router } from "@angular/router";
 import { firstValueFrom, switchMap } from "rxjs";
 
 import { CollectionAdminService } from "@bitwarden/admin-console/common";
@@ -139,7 +138,6 @@ export class VaultHeaderComponent {
     private readonly i18nService: I18nService,
     private readonly collectionAdminService: CollectionAdminService,
     private readonly dialogService: DialogService,
-    private readonly router: Router,
     private readonly accountService: AccountService,
   ) {}
 
@@ -350,26 +348,13 @@ export class VaultHeaderComponent {
         organization.maxCollections,
       ),
       type: "primary",
+      // Keykeeper: the organization's Billing pages are gone (DESIGN.md,
+      // "Plans and billing"), so the dialog only closes.
+      acceptButtonText: this.i18nService.t("ok"),
+      cancelButtonText: null, // hide secondary btn
     };
 
-    if (organization.canEditSubscription) {
-      orgUpgradeSimpleDialogOpts.acceptButtonText = this.i18nService.t("upgrade");
-    } else {
-      orgUpgradeSimpleDialogOpts.acceptButtonText = this.i18nService.t("ok");
-      orgUpgradeSimpleDialogOpts.cancelButtonText = null; // hide secondary btn
-    }
-
     const simpleDialog = this.dialogService.openSimpleDialogRef(orgUpgradeSimpleDialogOpts);
-    const result: boolean | undefined = await firstValueFrom(simpleDialog.closed);
-
-    if (!result) {
-      return;
-    }
-
-    if (organization.canEditSubscription) {
-      await this.router.navigate(["/organizations", organization.id, "billing", "subscription"], {
-        queryParams: { upgrade: true },
-      });
-    }
+    await firstValueFrom(simpleDialog.closed);
   }
 }
