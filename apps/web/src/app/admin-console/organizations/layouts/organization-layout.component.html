@@ -75,7 +75,13 @@
         *ngIf="organization.canAccessReports"
       ></bit-nav-item>
     </bit-nav-group>
-    <!-- Keykeeper: no Billing pages. Upstream's called a billing API this server never had (DESIGN.md, "Plans and billing"). -->
+    <!-- Keykeeper: no Billing pages. Upstream's called a billing API this server never had (DESIGN.md, "Plans and billing"). Our Plan page is in their place where plans are enforced. -->
+    <bit-nav-item
+      icon="bwi-billing"
+      [text]="'keykeeperPlanNav' | i18n"
+      route="plan"
+      *ngIf="showPlan(organization)"
+    ></bit-nav-item>
     <bit-nav-item
       icon="bwi-msp"
       [text]="'integrations' | i18n"

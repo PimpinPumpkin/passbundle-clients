@@ -30,6 +30,7 @@ import { EventCollectionService } from "@bitwarden/common/dirt/event-logs";
 import { VaultTimeoutSettingsService } from "@bitwarden/common/key-management/vault-timeout";
 import { BroadcasterService } from "@bitwarden/common/platform/abstractions/broadcaster.service";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
+import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { MessagingService } from "@bitwarden/common/platform/abstractions/messaging.service";
@@ -262,6 +263,8 @@ describe("VaultComponent", () => {
         { provide: CollectionService, useValue: collectionServiceMock },
         { provide: BillingAccountProfileStateService, useValue: billingMock },
         { provide: OrganizationService, useValue: organizationServiceMock },
+        // Keykeeper: the plan banners, which show nothing until a sync says plans are enforced.
+        { provide: EnvironmentService, useValue: { environment$: of({}) } },
         { provide: PolicyService, useValue: policyServiceMock },
         { provide: I18nService, useValue: { t: (key: string) => key } },
         { provide: MessageListener, useValue: { allMessages$: EMPTY } },

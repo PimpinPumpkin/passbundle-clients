@@ -35,6 +35,7 @@ import { TaxIdWarningComponent } from "@bitwarden/web-vault/app/billing/warnings
 import { TaxIdWarningType } from "@bitwarden/web-vault/app/billing/warnings/types";
 
 import { FreeFamiliesPolicyService } from "../../../billing/services/free-families-policy.service";
+import { hasOrganizationPlanPage } from "../../../keykeeper/plan/plan-pages";
 import { OrgSwitcherComponent } from "../../../layouts/org-switcher/org-switcher.component";
 import { WebLayoutModule } from "../../../layouts/web-layout.module";
 import { PamOrgNavSlotComponent } from "../../../pam/org-nav-slot/pam-org-nav-slot.component";
@@ -173,6 +174,11 @@ export class OrganizationLayoutComponent {
 
   canShowBillingTab(organization: Organization): boolean {
     return canAccessBillingTab(organization);
+  }
+
+  /** Keykeeper: the Plan page, where Billing was, for whoever has it (DESIGN.md, "Plans and billing"). */
+  showPlan(organization: Organization): boolean {
+    return hasOrganizationPlanPage(organization);
   }
 
   canShowAccessIntelligenceTab(organization: Organization): boolean {

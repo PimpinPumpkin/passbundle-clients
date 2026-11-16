@@ -1,18 +1,25 @@
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { RouterTestingModule } from "@angular/router/testing";
 import { mock } from "jest-mock-extended";
-import { BehaviorSubject, Subject } from "rxjs";
+import { BehaviorSubject, of, Subject } from "rxjs";
 
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
+import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { TokenService } from "@bitwarden/common/auth/abstractions/token.service";
+import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { MessageListener } from "@bitwarden/common/platform/messaging";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
-import { FakeAccountService, mockAccountServiceWith } from "@bitwarden/common/spec";
+import {
+  FakeAccountService,
+  FakeStateProvider,
+  mockAccountServiceWith,
+} from "@bitwarden/common/spec";
 import { UserId } from "@bitwarden/common/types/guid";
 import { BannerModule } from "@bitwarden/components";
+import { StateProvider } from "@bitwarden/state";
 import { I18nPipe } from "@bitwarden/ui-common";
 
 import { VerifyEmailComponent } from "../../../auth/settings/verify-email.component";
@@ -87,6 +94,10 @@ describe("VaultBannersComponent", () => {
             allMessages$: messageSubject.asObservable(),
           }),
         },
+        // Keykeeper: the plan banners, which show nothing until a sync says plans are enforced.
+        { provide: StateProvider, useValue: new FakeStateProvider(accountService) },
+        { provide: OrganizationService, useValue: { organizations$: () => of([]) } },
+        { provide: EnvironmentService, useValue: { environment$: of({}) } },
       ],
     })
       .overrideProvider(VaultBannersService, { useValue: bannerService })

@@ -329,3 +329,12 @@ export const KEYKEEPER_RELOAD_KEY_DISK = new StateDefinition("keykeeperReloadKey
 export const KEYKEEPER_RELOAD_SETTING_DISK = new StateDefinition("keykeeperReloadSetting", "disk", {
   web: "disk-local",
 });
+/**
+ * A person's own plan as their last sync told it, and the plan banners they
+ * put away today, per account (DESIGN.md, "Plans and billing"). Kept across
+ * browser sessions in the web vault, so a banner put away stays away in a new
+ * tab the same day.
+ */
+export const KEYKEEPER_PLAN_DISK = new StateDefinition("keykeeperPlan", "disk", {
+  web: "disk-local",
+});

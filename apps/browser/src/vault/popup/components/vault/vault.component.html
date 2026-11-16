@@ -42,6 +42,9 @@
     </vault-fade-in-out>
   }
 
+  <!-- Keykeeper: a trial ending, a payment due, or an organization's plan having ended (DESIGN.md, "Plans and billing") -->
+  <billing-keykeeper-plan-banners slot="full-width-notice" [inExtension]="true" />
+
   @if (vaultState !== VaultStateEnum.Empty) {
     <blocked-injection-banner slot="full-width-notice"></blocked-injection-banner>
   }

@@ -8,13 +8,19 @@ import { of } from "rxjs";
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import {
+  KEYKEEPER_OWN_PLAN,
+  KeykeeperPlan,
+  keykeeperPlanFrom,
+} from "@bitwarden/common/billing/keykeeper/keykeeper-plan";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { SyncService } from "@bitwarden/common/platform/sync";
-import { mockAccountServiceWith } from "@bitwarden/common/spec";
+import { FakeStateProvider, mockAccountServiceWith } from "@bitwarden/common/spec";
 import { UserId } from "@bitwarden/common/types/guid";
 import { NavigationModule, PopoverModule, SideNavService, SvgModule } from "@bitwarden/components";
 import { SendPolicyService } from "@bitwarden/send-ui";
+import { StateProvider } from "@bitwarden/state";
 import { CoachmarkComponent, CoachmarkService } from "@bitwarden/vault";
 import { PremiumSubscriptionRoutingService } from "@bitwarden/web-vault/app/billing/individual/services/premium-subscription-routing.service";
 
@@ -65,6 +71,7 @@ describe("UserLayoutComponent", () => {
     version: signal("default"),
   };
   let mspList: jest.Mock;
+  let stateProvider: FakeStateProvider;
 
   async function create() {
     fixture = TestBed.createComponent(UserLayoutComponent);
@@ -77,6 +84,7 @@ describe("UserLayoutComponent", () => {
     open.set(true);
     pushMode.set(true);
     mspList = jest.fn().mockResolvedValue([]);
+    stateProvider = new FakeStateProvider(mockAccountServiceWith("user-1" as UserId));
     const policyService = mock<PolicyService>();
     policyService.policyAppliesToUser$.mockReturnValue(of(false));
 
@@ -99,6 +107,7 @@ describe("UserLayoutComponent", () => {
           useValue: { getSubscriptionRoute$: () => of(null) },
         },
         { provide: KeykeeperMspApiService, useValue: { list: () => mspList() } },
+        { provide: StateProvider, useValue: stateProvider },
         { provide: SideNavService, useValue: sideNav },
         {
           provide: CoachmarkService,
@@ -165,6 +174,40 @@ describe("UserLayoutComponent", () => {
     await create();
 
     expect(menu().slice(-2)).toEqual(["keykeeperMspConsole", "settings"]);
+  });
+
+  // Keykeeper: the Plan page, where plans are enforced (DESIGN.md, "Plans and billing").
+  describe("Settings", () => {
+    async function settingsWith(plan: KeykeeperPlan) {
+      await stateProvider.setUserState(KEYKEEPER_OWN_PLAN, plan, "user-1" as UserId);
+      await create();
+      const settings = Array.from(
+        fixture.nativeElement.querySelectorAll("bit-nav-group") as NodeListOf<HTMLElement>,
+      ).find((group) => group.textContent!.includes("settings"))!;
+      settings.querySelector<HTMLElement>("[data-testid=nav-group-collapse-arrow]")!.click();
+      fixture.detectChanges();
+      return Array.from(settings.querySelectorAll("[role=group] bit-nav-item")).map((item) =>
+        item.textContent!.trim(),
+      );
+    }
+
+    it("has the Plan page where plans are enforced, where Subscription was", async () => {
+      const items = await settingsWith(
+        keykeeperPlanFrom({ enforced: true, plan: "free", canManage: true }),
+      );
+      expect(items.slice(0, 4)).toEqual([
+        "myAccount",
+        "security",
+        "appearance",
+        "keykeeperPlanNav",
+      ]);
+    });
+
+    it("has no Plan page where plans aren't enforced, as before", async () => {
+      const items = await settingsWith(keykeeperPlanFrom({ enforced: false }));
+      expect(items).not.toContain("keykeeperPlanNav");
+      expect(items.slice(0, 4)).toEqual(["myAccount", "security", "appearance", "domainRules"]);
+    });
   });
 
   it("keeps import and export together", async () => {

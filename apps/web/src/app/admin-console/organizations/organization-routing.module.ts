@@ -14,6 +14,7 @@ import { Organization } from "@bitwarden/common/admin-console/models/domain/orga
 
 import { deepLinkGuard } from "../../auth/guards/deep-link/deep-link.guard";
 import { canReviewAccess } from "../../keykeeper/access/access-review";
+import { keykeeperOrganizationPlanGuard } from "../../keykeeper/plan/plan-pages";
 
 import { VaultModule } from "./collections/vault.module";
 import { organizationPermissionsGuard } from "./guards/org-permissions.guard";
@@ -77,6 +78,18 @@ const routes: Routes = [
       // called a billing API this server never had (DESIGN.md, "Plans and
       // billing"). An old link to any of them lands on the vault.
       { path: "billing", redirectTo: "/" },
+      // Keykeeper: the Plan page in their place, where plans are enforced.
+      {
+        path: "plan",
+        loadComponent: () =>
+          import("../../keykeeper/plan/organization-plan.component").then(
+            (m) => m.KeykeeperOrganizationPlanComponent,
+          ),
+        canActivate: [keykeeperOrganizationPlanGuard],
+        data: {
+          titleId: "keykeeperPlanNav",
+        },
+      },
     ],
   },
 ];

@@ -35,6 +35,7 @@ import { AuthenticationStatus } from "../../auth/enums/authentication-status";
 import { ForceSetPasswordReason } from "../../auth/models/domain/force-set-password-reason";
 import { DomainSettingsService } from "../../autofill/services/domain-settings.service";
 import { BillingAccountProfileStateService } from "../../billing/abstractions";
+import { KEYKEEPER_OWN_PLAN } from "../../billing/keykeeper/keykeeper-plan";
 import { FeatureFlag } from "../../enums/feature-flag.enum";
 import { KeyConnectorService } from "../../key-management/key-connector/abstractions/key-connector.service";
 import { InternalMasterPasswordServiceAbstraction } from "../../key-management/master-password/abstractions/master-password.service.abstraction";
@@ -311,6 +312,9 @@ export class DefaultSyncService extends CoreSyncService {
       response.premiumFromOrganization,
       response.id,
     );
+    // Keykeeper: the person's own plan, for the Plan page and the plan banners (DESIGN.md,
+    // "Plans and billing").
+    await this.stateProvider.setUserState(KEYKEEPER_OWN_PLAN, response.keykeeperPlan, response.id);
     await this.keyConnectorService.setUsesKeyConnector(response.usesKeyConnector, response.id);
 
     await this.setForceSetPasswordReasonIfNeeded(response);
