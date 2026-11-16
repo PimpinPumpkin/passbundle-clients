@@ -25,9 +25,17 @@
       }
     </ng-container>
 
-    <!-- Keykeeper: see websitesLocked. English until our strings are translated. -->
+    <!-- Keykeeper: see websitesLocked. English until our strings are translated.
+         It sits under the last website as a field's hint does (4px), with
+         nothing extra under the card's last line, or 24px above the autofill
+         choice, as Add website has. -->
     @if (websitesLocked) {
-      <p bitTypography="helper" class="tw-mb-4" data-testid="websites-locked">
+      <p
+        bitTypography="helper"
+        class="-tw-mt-1 tw-mb-0"
+        [class.!tw-mb-6]="autofillOnPageLoadEnabled$ | async"
+        data-testid="websites-locked"
+      >
         Someone who can see this item's passwords can change its websites.
       </p>
     }

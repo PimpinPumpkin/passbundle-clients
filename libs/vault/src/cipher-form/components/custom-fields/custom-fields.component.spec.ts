@@ -599,6 +599,32 @@ describe("CustomFieldsComponent", () => {
     expect(count('button[data-testid="edit-custom-field-button"]')).toBe(4);
   });
 
+  // Keykeeper: a checkbox has no field to hold its buttons, so they end its
+  // row, after the checkbox and its name, the same size as the buttons the
+  // fields above and below hold (32px, so the row is as tall as they are).
+  it("Keykeeper: ends a checkbox field's row with its edit and reorder buttons", () => {
+    originalCipherView.fields = mockFieldViews;
+    originalCipherView.viewPassword = true;
+    config.mode = "edit";
+
+    component.ngOnInit();
+    fixture.detectChanges();
+
+    const row: HTMLElement = fixture.debugElement.query(
+      By.css('[data-testid="boolean label-entry"]'),
+    ).nativeElement;
+    const end = row.lastElementChild as HTMLElement;
+    const buttons = Array.from(end.querySelectorAll("button"));
+
+    expect(end.querySelector("bit-form-control")).toBeNull();
+    expect(buttons.map((b) => b.getAttribute("data-testid"))).toEqual([
+      "edit-custom-field-button",
+      "reorder-toggle-button",
+    ]);
+    // Small icon buttons are 32px, as a field's own suffix buttons are.
+    expect(buttons.every((b) => b.getAttribute("size") === "small")).toBe(true);
+  });
+
   it("shows all reorder buttons except for hidden fields when in edit mode and viewPassword is false", () => {
     originalCipherView.fields = mockFieldViews;
     originalCipherView.viewPassword = false;

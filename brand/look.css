@@ -1148,6 +1148,23 @@ app-vault-onboarding [data-accordion-content] > div {
   border-radius: 12px !important;
   box-shadow: var(--pb-shadow-resting) !important;
 }
+/* Its label starts where the cards' do, in the panel and in the dialog:
+   16px in, and 24px where the window is wide enough for the cards to have
+   24px. */
+.pb-web
+  :is([data-keykeeper="item-panel"], .cdk-overlay-pane bit-dialog)
+  bit-item[slot="attachment-button"]
+  [bit-item-content] {
+  padding-inline: 1rem !important;
+}
+@media (min-width: 769px) {
+  .pb-web
+    :is([data-keykeeper="item-panel"], .cdk-overlay-pane bit-dialog)
+    bit-item[slot="attachment-button"]
+    [bit-item-content] {
+    padding-inline: 1.5rem !important;
+  }
+}
 
 /* ----- Sign-in, unlock, and the other pages before the vault: the logo in
    the corner, the form on a card resting on the ground. */
@@ -1353,34 +1370,60 @@ html.pb-popup,
 
 /* An item's fields, in the popup and the web vault's item panel: a label over
    its value, no field chrome, a line between each, and the copy button
-   tinted. Upstream's headings over the login's fields and its website go;
-   the fields say what they are. */
+   tinted. Its note and custom fields too, which upstream drew as boxes inside
+   the card. Upstream's headings over the login's fields, its website, and its
+   note go; the fields say what they are. */
 :is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
-  :is(read-only-cipher-card, app-autofill-options-view)
+  :is(
+    read-only-cipher-card,
+    app-autofill-options-view,
+    app-additional-options,
+    app-custom-fields-v2
+  )
   bit-card {
   padding: 0 !important;
 }
 :is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
-  :is(read-only-cipher-card, app-autofill-options-view)
+  :is(
+    read-only-cipher-card,
+    app-autofill-options-view,
+    app-additional-options,
+    app-custom-fields-v2
+  )
   bit-form-field {
   margin: 0 !important;
   padding: 10px 8px 10px 14px;
   border-bottom: 1px solid var(--pb-divider);
 }
 :is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
-  :is(read-only-cipher-card, app-autofill-options-view)
+  :is(
+    read-only-cipher-card,
+    app-autofill-options-view,
+    app-additional-options,
+    app-custom-fields-v2
+  )
   bit-form-field:last-of-type {
   border-bottom: 0;
 }
 :is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
-  :is(read-only-cipher-card, app-autofill-options-view)
+  :is(
+    read-only-cipher-card,
+    app-autofill-options-view,
+    app-additional-options,
+    app-custom-fields-v2
+  )
   bit-form-field
   label {
   font-size: 12px;
   color: var(--pb-muted);
 }
 :is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
-  :is(read-only-cipher-card, app-autofill-options-view)
+  :is(
+    read-only-cipher-card,
+    app-autofill-options-view,
+    app-additional-options,
+    app-custom-fields-v2
+  )
   [bitfieldcontainer] {
   border: 0 !important;
   background: transparent !important;
@@ -1389,14 +1432,24 @@ html.pb-popup,
   --tw-ring-shadow: 0 0 #0000 !important;
 }
 :is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
-  :is(read-only-cipher-card, app-autofill-options-view)
+  :is(
+    read-only-cipher-card,
+    app-autofill-options-view,
+    app-additional-options,
+    app-custom-fields-v2
+  )
   [bitfieldcontainer]
   > div:last-child {
   padding-inline-start: 0;
 }
 :is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
-  :is(read-only-cipher-card, app-autofill-options-view)
-  input {
+  :is(
+    read-only-cipher-card,
+    app-autofill-options-view,
+    app-additional-options,
+    app-custom-fields-v2
+  )
+  :is(input, textarea) {
   font-size: 15px !important;
   color: var(--pb-text) !important;
 }
@@ -1411,7 +1464,12 @@ html.pb-popup,
   letter-spacing: 0.06em;
 }
 :is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
-  :is(read-only-cipher-card, app-autofill-options-view)
+  :is(
+    read-only-cipher-card,
+    app-autofill-options-view,
+    app-additional-options,
+    app-custom-fields-v2
+  )
   button[biticonbutton="bwi-clone"] {
   width: 36px;
   height: 36px;
@@ -1420,7 +1478,12 @@ html.pb-popup,
   color: var(--pb-brand) !important;
 }
 :is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
-  :is(read-only-cipher-card, app-autofill-options-view)
+  :is(
+    read-only-cipher-card,
+    app-autofill-options-view,
+    app-additional-options,
+    app-custom-fields-v2
+  )
   button[biticonbutton="bwi-clone"]:hover {
   background: var(--pb-brand-tint-strong) !important;
 }
@@ -1446,11 +1509,116 @@ html.pb-popup,
 :is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
   app-cipher-view
   app-autofill-options-view
+  bit-section-header,
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  app-cipher-view
+  app-additional-options
   bit-section-header {
   display: none;
 }
 :is(.pb-popup, .pb-web [data-keykeeper="item-panel"]) app-cipher-view section {
   margin-bottom: 12px !important;
+}
+/* The note is as tall as what it says, not five lines whatever its length. */
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"]) app-additional-options textarea {
+  field-sizing: content;
+  height: auto !important;
+  min-height: 0;
+  resize: none;
+}
+/* Each custom field is in a box of its own: a line between them, as between
+   the login's. */
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  app-custom-fields-v2
+  [data-testid="custom-field"] {
+  margin: 0 !important;
+}
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  app-custom-fields-v2
+  [data-testid="custom-field"]
+  + [data-testid="custom-field"] {
+  border-top: 1px solid var(--pb-divider);
+}
+/* A checkbox field is a row like the others, its name in the values' size,
+   checked in the brand's green rather than dimmed the way a checkbox nobody
+   may change is in a form. */
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"]) app-custom-fields-v2 bit-form-control {
+  display: block;
+  margin: 0 !important;
+  padding: 12px 8px 12px 14px;
+}
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  app-custom-fields-v2
+  bit-form-control
+  label
+  span {
+  font-size: 15px !important;
+  color: var(--pb-text) !important;
+}
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  app-custom-fields-v2
+  input[type="checkbox"]:disabled::before {
+  background: transparent !important;
+  border-color: var(--pb-field-border) !important;
+}
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  app-custom-fields-v2
+  input[type="checkbox"]:disabled:checked::before {
+  background: var(--pb-brand) !important;
+  border-color: var(--pb-brand) !important;
+}
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  app-custom-fields-v2
+  input[type="checkbox"]:disabled:checked::after {
+  background: var(--pb-on-brand) !important;
+}
+/* Attachments: rows of the same card, the file's name where a value is and
+   the download button tinted like copy. */
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  app-attachments-v2-view
+  bit-item
+  bit-item-content {
+  padding: 10px 8px 10px 14px !important;
+}
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  app-attachments-v2-view
+  [data-testid="file-name"] {
+  font-size: 15px;
+  color: var(--pb-text);
+}
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  app-attachments-v2-view
+  [data-testid="file-size"] {
+  font-size: 12px;
+  color: var(--pb-muted);
+}
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"]) app-attachments-v2-view bit-item-action {
+  padding: 0 !important;
+}
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  app-attachments-v2-view
+  [data-bit-item-end-slot] {
+  padding-inline-end: 8px !important;
+}
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  app-attachments-v2-view
+  button[biticonbutton="bwi-download"] {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px !important;
+  background: var(--pb-brand-tint) !important;
+  color: var(--pb-brand) !important;
+}
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  app-attachments-v2-view
+  button[biticonbutton="bwi-download"]:hover {
+  background: var(--pb-brand-tint-strong) !important;
+}
+/* The expiration date and the fill rules sit as far in as the fields. */
+:is(.pb-popup, .pb-web [data-keykeeper="item-panel"])
+  :is(app-keykeeper-expiration, app-keykeeper-fill-rules)
+  bit-card {
+  padding: 12px 14px !important;
 }
 
 /* The item page's header: back, the star, and Edit. */
@@ -1485,6 +1653,17 @@ html.pb-popup,
    mode, deep enough) that the glyph's own lines and dots still show. */
 .pb-popup bit-bottom-navigation svg .tw-fill-fg-brand-soft {
   fill: var(--pb-brand-tint-strong) !important;
+}
+/* The Attachments row under an item's form is one of the form's cards, its
+   label 16px in like theirs. */
+.pb-popup app-open-attachments bit-item {
+  background: var(--pb-surface) !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  box-shadow: var(--pb-shadow-resting) !important;
+}
+.pb-popup app-open-attachments [bit-item-content] {
+  padding-inline: 1rem !important;
 }
 .pb-popup popup-footer footer {
   background: var(--pb-surface) !important;
