@@ -107,3 +107,41 @@ describe("a membership that came from an MSP", () => {
     expect(fromProfile({ keykeeperFromMsp: null }).keykeeperFromMsp).toBe(false);
   });
 });
+
+// Keykeeper: the organization's plan, for the Plan page and the plan banners (DESIGN.md, "Plans and billing").
+describe("an organization's plan", () => {
+  function fromProfile(answer: Record<string, unknown>) {
+    const data = new OrganizationData(new ProfileOrganizationResponse({ id: "org", ...answer }), {
+      isMember: true,
+      isProviderUser: false,
+    });
+    // The way it comes back out of the stored state.
+    return new Organization(OrganizationData.fromJSON(JSON.parse(JSON.stringify(data))));
+  }
+
+  it("is kept as the server tells it", () => {
+    const plan = {
+      enforced: true,
+      plan: "business",
+      state: "ended",
+      freeUntil: null,
+      freeWhy: null,
+      until: null,
+      renews: null,
+      endsAt: null,
+      storageGb: 0,
+      people: null,
+      coveredBy: { id: "msp-1", name: "Contoso IT" },
+      canManage: false,
+      canPay: false,
+    };
+    expect(fromProfile({ keykeeperPlan: plan }).keykeeperPlan).toEqual(plan);
+  });
+
+  it("is not enforced on a server that doesn't say, or says so", () => {
+    expect(fromProfile({}).keykeeperPlan).toEqual({ enforced: false });
+    expect(fromProfile({ keykeeperPlan: { enforced: false } }).keykeeperPlan).toEqual({
+      enforced: false,
+    });
+  });
+});

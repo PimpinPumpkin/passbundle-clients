@@ -4,6 +4,7 @@ import { Jsonify } from "type-fest";
 
 import { MemberDecryptionType } from "../../../auth/enums/sso";
 import { ProductTierType } from "../../../billing/enums";
+import { KeykeeperPlan, keykeeperPlanFrom } from "../../../billing/keykeeper/keykeeper-plan";
 import { OrganizationId } from "../../../types/guid";
 import { OrganizationUserStatusType, OrganizationUserType, ProviderType } from "../../enums";
 import { BrowserAutofillMode, browserAutofillMode } from "../../keykeeper/browser-autofill";
@@ -111,6 +112,11 @@ export class Organization {
    * alone wherever they leave an admin alone (DESIGN.md, "MSP console").
    */
   keykeeperFromMsp: boolean;
+  /**
+   * Keykeeper: the organization's plan as the server told it, for the Plan page and the plan
+   * banners (DESIGN.md, "Plans and billing"). Nothing is enforced from it.
+   */
+  keykeeperPlan: KeykeeperPlan;
   useMyItems: boolean;
   useInviteLinks: boolean;
 
@@ -183,6 +189,7 @@ export class Organization {
     this.keykeeperPasswordChange = obj.keykeeperPasswordChange === true;
     this.keykeeperBrowserAutofill = browserAutofillMode(obj.keykeeperBrowserAutofill);
     this.keykeeperFromMsp = obj.keykeeperFromMsp === true;
+    this.keykeeperPlan = keykeeperPlanFrom(obj.keykeeperPlan);
     this.useMyItems = obj.useMyItems;
     this.useInviteLinks = obj.useInviteLinks;
   }

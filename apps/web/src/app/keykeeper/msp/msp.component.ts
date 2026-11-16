@@ -49,6 +49,7 @@ import {
   replaceTokenPrompt,
 } from "../offboarding/offboarding";
 import { KeykeeperInstallCommandComponent } from "../organizations/install-command.component";
+import { KeykeeperMspPlanComponent } from "../plan/msp-plan.component";
 import { KeykeeperTwoStepDetour } from "../two-step-setup/two-step-detour";
 
 import { withAdminTwoStep } from "./admin-two-step-policy";
@@ -120,6 +121,7 @@ const CLIENT_FEATURES = {
     KeykeeperDefaultPoliciesComponent,
     KeykeeperMspJoiningComponent,
     KeykeeperEventStreamingComponent,
+    KeykeeperMspPlanComponent,
     KeykeeperMspSeatsComponent,
     KeykeeperMspSiteFixesComponent,
     KeykeeperMspTemplatesComponent,
@@ -173,6 +175,11 @@ const CLIENT_FEATURES = {
             m.role === "admin" ? "Admin" : "Technician"
           }}</span>
         </p>
+
+        <!-- Keykeeper: the pool's plan, for the MSP's admins, where plans are enforced (DESIGN.md, "Plans and billing"). -->
+        @if (m.role === "admin") {
+          <app-keykeeper-msp-plan [mspId]="m.id" [mspName]="m.name" />
+        }
 
         <section class="tw-mb-8" aria-label="Clients">
           <h2 bitTypography="h3">Clients</h2>

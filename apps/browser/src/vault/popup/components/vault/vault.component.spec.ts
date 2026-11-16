@@ -9,6 +9,7 @@ import { BehaviorSubject, Observable, Subject, of } from "rxjs";
 
 import { CollectionService } from "@bitwarden/admin-console/common";
 import { PremiumUpgradeDialogComponent } from "@bitwarden/angular/billing/components";
+import { KeykeeperPlanBannersComponent } from "@bitwarden/angular/billing/keykeeper";
 import { NudgeType, NudgesService, PremiumUpsellService } from "@bitwarden/angular/vault";
 import {
   AutoConfirmExtensionSetupDialogComponent,
@@ -185,6 +186,16 @@ class KeykeeperTwoStepNudgeStubComponent {}
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 class KeykeeperBrowserAutofillNoticeStubComponent {}
+
+@Component({
+  selector: "billing-keykeeper-plan-banners",
+  standalone: true,
+  template: "",
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class KeykeeperPlanBannersStubComponent {
+  readonly inExtension = input(false);
+}
 
 @Component({
   selector: "app-autofill-vault-list-items",
@@ -472,6 +483,7 @@ describe("VaultComponent", () => {
           KeykeeperTwoStepNeededComponent,
           KeykeeperTwoStepNudgeComponent,
           KeykeeperBrowserAutofillNoticeComponent,
+          KeykeeperPlanBannersComponent,
           VaultPopupListTableComponent,
           VaultSwitcherComponent,
         ],
@@ -495,6 +507,7 @@ describe("VaultComponent", () => {
           KeykeeperTwoStepNeededStubComponent,
           KeykeeperTwoStepNudgeStubComponent,
           KeykeeperBrowserAutofillNoticeStubComponent,
+          KeykeeperPlanBannersStubComponent,
           VaultPopupListTableStubComponent,
           VaultSwitcherStubComponent,
         ],

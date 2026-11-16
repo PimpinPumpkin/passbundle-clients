@@ -51,7 +51,10 @@
       <bit-nav-item [text]="'myAccount' | i18n" route="settings/account"></bit-nav-item>
       <bit-nav-item [text]="'security' | i18n" route="settings/security"></bit-nav-item>
       <bit-nav-item [text]="'appearance' | i18n" route="settings/appearance"></bit-nav-item>
-      <!-- Keykeeper: no Subscription page. Upstream's called a billing API this server never had (DESIGN.md, "Plans and billing"). -->
+      <!-- Keykeeper: no Subscription page. Upstream's called a billing API this server never had (DESIGN.md, "Plans and billing"). Our Plan page is in its place where plans are enforced. -->
+      @if (showPlan()) {
+        <bit-nav-item [text]="'keykeeperPlanNav' | i18n" route="settings/plan"></bit-nav-item>
+      }
       <bit-nav-item [text]="'domainRules' | i18n" route="settings/domain-rules"></bit-nav-item>
       @if (showEmergencyAccess()) {
         <bit-nav-item

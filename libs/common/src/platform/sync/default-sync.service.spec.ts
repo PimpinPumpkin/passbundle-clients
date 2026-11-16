@@ -31,6 +31,7 @@ import { TokenService } from "../../auth/abstractions/token.service";
 import { AuthenticationStatus } from "../../auth/enums/authentication-status";
 import { DomainSettingsService } from "../../autofill/services/domain-settings.service";
 import { BillingAccountProfileStateService } from "../../billing/abstractions";
+import { KEYKEEPER_OWN_PLAN } from "../../billing/keykeeper/keykeeper-plan";
 import { FeatureFlag } from "../../enums/feature-flag.enum";
 import { KeyConnectorService } from "../../key-management/key-connector/abstractions/key-connector.service";
 import { InternalMasterPasswordServiceAbstraction } from "../../key-management/master-password/abstractions/master-password.service.abstraction";
@@ -192,6 +193,60 @@ describe("DefaultSyncService", () => {
         of({ hasMasterPassword: true } satisfies UserDecryptionOptions),
       );
       stateProvider.getUser.mockReturnValue(mock());
+    });
+
+    // Keykeeper: the Plan page and the plan banners read the person's own plan (DESIGN.md, "Plans and billing").
+    describe("the person's own plan", () => {
+      const syncWithPlan = (keykeeperPlan: unknown) =>
+        new SyncResponse({
+          profile: { id: user1, keykeeperPlan },
+          folders: [],
+          collections: [],
+          ciphers: [],
+          sends: [],
+          domains: [],
+          policies: [],
+        });
+
+      it("is kept as the profile says it", async () => {
+        const plan = {
+          enforced: true,
+          plan: "premium",
+          state: "active",
+          freeUntil: null,
+          freeWhy: null,
+          until: "2026-12-15T12:00:00.000000Z",
+          renews: true,
+          storageGb: 5,
+          people: null,
+          coveredBy: null,
+          canManage: true,
+        };
+        apiService.getSync.mockResolvedValue(syncWithPlan(plan));
+
+        await sut.fullSync(true);
+
+        expect(stateProvider.setUserState).toHaveBeenCalledWith(
+          KEYKEEPER_OWN_PLAN,
+          { ...plan, endsAt: null, canPay: false },
+          user1,
+        );
+      });
+
+      it("is kept as not enforced where the server says so, or says nothing", async () => {
+        for (const plan of [{ enforced: false }, undefined]) {
+          stateProvider.setUserState.mockClear();
+          apiService.getSync.mockResolvedValue(syncWithPlan(plan));
+
+          await sut.fullSync(true);
+
+          expect(stateProvider.setUserState).toHaveBeenCalledWith(
+            KEYKEEPER_OWN_PLAN,
+            { enforced: false },
+            user1,
+          );
+        }
+      });
     });
 
     describe("key management sync handler", () => {
