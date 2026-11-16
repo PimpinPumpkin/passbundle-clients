@@ -116,7 +116,6 @@ import { AppearanceComponent } from "../vault/popup/settings/appearance.componen
 import { ArchiveComponent } from "../vault/popup/settings/archive.component";
 import { DownloadBitwardenComponent } from "../vault/popup/settings/download-bitwarden.component";
 import { FoldersComponent } from "../vault/popup/settings/folders.component";
-import { MoreFromBitwardenPageComponent } from "../vault/popup/settings/more-from-bitwarden-page.component";
 import { TrashComponent } from "../vault/popup/settings/trash.component";
 import { VaultSettingsComponent } from "../vault/popup/settings/vault-settings.component";
 
@@ -767,12 +766,10 @@ const routes: Routes = [
     canActivate: [authGuard],
     data: { elevation: 1 } satisfies RouteDataProperties,
   },
-  {
-    path: "more-from-bitwarden",
-    component: MoreFromBitwardenPageComponent,
-    canActivate: [authGuard],
-    data: { elevation: 2 } satisfies RouteDataProperties,
-  },
+  // Keykeeper: no "More from" page. Upstream's advertised its other products
+  // and plans, none of which are ours. A popup that was last on it opens on
+  // Settings.
+  { path: "more-from-bitwarden", redirectTo: "/tabs/settings" },
   {
     path: "download-bitwarden",
     component: DownloadBitwardenComponent,

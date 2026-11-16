@@ -166,6 +166,23 @@ describe("SettingsV2Component", () => {
     expect(openSpy).not.toHaveBeenCalled();
   });
 
+  // Keykeeper: upstream's "More from" page advertised its other products and plans.
+  it("has no entry for a More from page, and still has About and the apps' download page", async () => {
+    pushActiveAccount();
+
+    const fixture = TestBed.createComponent(SettingsV2Component);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const links = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>("a[href]"),
+    ).map((a) => a.getAttribute("href"));
+    expect(links).toContain("/about");
+    expect(links).toContain("/download-bitwarden");
+    expect(links).not.toContain("/more-from-bitwarden");
+    expect(fixture.nativeElement.textContent).not.toContain("moreFromBitwarden");
+  });
+
   it("showAutofillBadge$ emits true when showNudgeBadge is true", async () => {
     pushActiveAccount();
 
