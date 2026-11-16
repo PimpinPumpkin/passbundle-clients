@@ -652,7 +652,7 @@
       "message": " that support passkeys. To further secure these accounts, consider setting up a passkey where available. Sourced from passkeys.2fa.directory"
     },
     "passkeyLoginReportDesc": {
-      "message": "Passkeys are a secure, phishing-resistant alternative to passwords. See which of your accounts support passkeys for a simpler, passwordless sign-in experience. Learn"
+      "message": "Passkeys are a secure, phishing-resistant alternative to passwords. See which of your accounts let you sign in with a passkey instead. Learn"
     },
     "passwordResetFor": {
       "message": "Password reset for $USER$. You can now sign in using the new password."
@@ -703,7 +703,7 @@
       "message": "Deleted all items of $ORGNAME$."
     },
     "quickLogin": {
-      "message": "Quick and easy sign-in"
+      "message": "Sign in without typing"
     },
     "quickLoginBody": {
       "message": "Set up biometric unlock and autofill to sign in to your accounts without typing a single letter."
@@ -781,7 +781,7 @@
       "message": "Search items"
     },
     "securityPrioritizedBody": {
-      "message": "Save logins, cards, and identities securely. Zero-knowledge, end-to-end encryption protects what's important to you."
+      "message": "Logins, cards, and identities are encrypted on your device before they're saved, so the server can't read them."
     },
     "seeMessageEveryLogin": {
       "message": "Users will see the message after every sign-in even if they dismiss it."
@@ -1001,6 +1001,48 @@
     },
     "onePasswordEmailHint": {
       "message": "Enter the email you use to sign in to 1Password"
+    },
+    "totpHelperTitle": {
+      "message": "Fill two-step login codes"
+    },
+    "generatorNudgeTitle": {
+      "message": "Generate a password"
+    },
+    "generatorNudgeBodyOne": {
+      "message": "Make a strong, unique password for this login with"
+    },
+    "generatorNudgeBodyTwo": {
+      "message": "beside the password field."
+    },
+    "generatorNudgeBodyAria": {
+      "message": "Make a strong, unique password for this login with the Generate password button beside the password field."
+    },
+    "newCardNudgeTitle": {
+      "message": "Fill payment forms"
+    },
+    "newCardNudgeBody": {
+      "message": "Save a card to fill its details on checkout pages."
+    },
+    "newIdentityNudgeTitle": {
+      "message": "Fill sign-up forms"
+    },
+    "newIdentityNudgeBody": {
+      "message": "Save an identity to fill your name, address, and other details on sign-up and contact forms."
+    },
+    "newLoginNudgeTitle": {
+      "message": "Fill this login on its website"
+    },
+    "newNoteNudgeTitle": {
+      "message": "Save anything else as a note"
+    },
+    "newNoteNudgeBody": {
+      "message": "A note keeps text like bank or insurance details, encrypted like everything else you save."
+    },
+    "newSshNudgeTitle": {
+      "message": "Save your SSH keys"
+    },
+    "newSshNudgeBodyOne": {
+      "message": "Store your keys here and use them with the SSH agent to connect."
     }
   },
   "web": {
@@ -1063,6 +1105,24 @@
     },
     "requireSsoPolicyDescListV2Vfo1": {
       "message": "Require members to sign in with single sign-on."
+    },
+    "onboardingChecklistSubtitle": {
+      "message": "Bring in your passwords, then add {brand} to your browser."
+    },
+    "onboardingInstallExtensionSubtitle": {
+      "message": "Pin the extension to your browser. It fills your passwords on websites and offers to save new ones."
+    },
+    "setupExtensionContentAlt": {
+      "message": "With the {brand} browser extension you can save new logins, open your saved logins from your browser's toolbar, and sign in to sites with autofill."
+    },
+    "centralizeDataOwnershipBenefit1": {
+      "message": "See the health of every item, shared or not."
+    },
+    "centralizeDataOwnershipBenefit2": {
+      "message": "Items stay with the organization when someone leaves or hands over their work, so nobody loses access to them."
+    },
+    "sendAccessTaglineProductDesc": {
+      "message": "{brand} Send shares sensitive information with others, encrypted, for a limited time."
     }
   },
   "browser": {
@@ -1086,6 +1146,45 @@
     },
     "vaults": {
       "message": "Owner"
+    },
+    "extDesc": {
+      "message": "Saves your passwords and passkeys and fills them in on websites."
+    },
+    "autofillSpotlightTitle": {
+      "message": "Avoid two autofill menus"
+    },
+    "topLayerHijackWarning": {
+      "message": "This page tried to put something over {brand}'s fill menu. To keep you safe, the menu is off on this page for now."
+    },
+    "defaultPasswordManagerCalloutTitle": {
+      "message": "Make {brand} your browser's password manager"
+    },
+    "defaultPasswordManagerPromptStep3": {
+      "message": "We'll turn off your browser's built-in password manager, so it stops offering to save and fill passwords."
+    },
+    "getTheMobileAppDesc": {
+      "message": "Use your passwords on your phone with the {brand} app."
+    },
+    "secureUser": {
+      "message": "Make strong passwords"
+    },
+    "secureDevices": {
+      "message": "On all your devices"
+    },
+    "secureDevicesBody": {
+      "message": "Save as many passwords as you like and use them on your phone, in your browser, and on your computer."
+    },
+    "securityPrioritized": {
+      "message": "Encrypted before it's saved"
+    },
+    "unlockAdvancedSecurity": {
+      "message": "Premium"
+    },
+    "unlockAdvancedSecurityDesc": {
+      "message": "Premium adds file attachments, file Sends, and the data breach report."
+    },
+    "emptyVaultNudgeBody": {
+      "message": "Bring logins in from another password manager or a browser instead of adding them one by one."
     }
   }
 }
