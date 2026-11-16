@@ -89,6 +89,8 @@ import { ConfirmKeyConnectorDomainComponent } from "./key-management/key-connect
 import { setupImportRedirectGuard } from "./keykeeper/import/setup-import-redirect.guard";
 import { KeykeeperMspComponent } from "./keykeeper/msp/msp.component";
 import { KeykeeperCreateOrganizationComponent } from "./keykeeper/organizations/create-organization.component";
+import { KeykeeperPersonalPlanComponent } from "./keykeeper/plan/personal-plan.component";
+import { keykeeperPersonalPlanGuard } from "./keykeeper/plan/plan-pages";
 import { FrontendLayoutComponent } from "./layouts/frontend-layout.component";
 import { UserLayoutComponent } from "./layouts/user-layout.component";
 import { RequestSMAccessComponent } from "./secrets-manager/secrets-manager-landing/request-sm-access.component";
@@ -835,6 +837,13 @@ const routes: Routes = [
           // server never had (DESIGN.md, "Plans and billing"). An old link to
           // any of them lands on the vault.
           { path: "subscription", redirectTo: "/" },
+          {
+            // Keykeeper: the Plan page in its place, where plans are enforced.
+            path: "plan",
+            component: KeykeeperPersonalPlanComponent,
+            canActivate: [keykeeperPersonalPlanGuard],
+            data: { titleId: "keykeeperPlanNav" } satisfies RouteDataProperties,
+          },
           {
             path: AuthWebRouteSegment.EmergencyAccess,
             children: [

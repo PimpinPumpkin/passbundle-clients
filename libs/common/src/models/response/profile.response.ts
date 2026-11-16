@@ -4,6 +4,7 @@ import { EncString } from "@bitwarden/legacy-crypto";
 import { ProfileOrganizationResponse } from "../../admin-console/models/response/profile-organization.response";
 import { ProfileProviderOrganizationResponse } from "../../admin-console/models/response/profile-provider-organization.response";
 import { ProfileProviderResponse } from "../../admin-console/models/response/profile-provider.response";
+import { KeykeeperPlan, keykeeperPlanFrom } from "../../billing/keykeeper/keykeeper-plan";
 import { PrivateKeysResponseModel } from "../../key-management/keys/response/private-keys.response";
 import { UserId } from "../../types/guid";
 
@@ -29,6 +30,8 @@ export class ProfileResponse extends BaseResponse {
   forcePasswordReset: boolean;
   usesKeyConnector: boolean;
   verifyDevices: boolean;
+  /** Keykeeper: the person's own plan, for the Plan page and the plan banners. */
+  keykeeperPlan: KeykeeperPlan;
   /**
    * Sync data for confirmed organizations only
    */
@@ -67,6 +70,8 @@ export class ProfileResponse extends BaseResponse {
     this.forcePasswordReset = this.getResponseProperty("ForcePasswordReset") ?? false;
     this.usesKeyConnector = this.getResponseProperty("UsesKeyConnector") ?? false;
     this.verifyDevices = this.getResponseProperty("VerifyDevices") ?? true;
+    // Keykeeper: a server that doesn't say doesn't enforce plans (DESIGN.md, "Plans and billing").
+    this.keykeeperPlan = keykeeperPlanFrom(this.getResponseProperty("KeykeeperPlan"));
 
     const organizations = this.getResponseProperty("Organizations");
     if (organizations != null) {

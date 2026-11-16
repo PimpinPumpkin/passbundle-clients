@@ -23,11 +23,13 @@ import {
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
+import { ownPlan$ } from "@bitwarden/common/billing/keykeeper/keykeeper-plan";
 import { FeatureFlag } from "@bitwarden/common/enums/feature-flag.enum";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { PopoverModule, SideNavService, SvgModule } from "@bitwarden/components";
 import { SendPolicyService } from "@bitwarden/send-ui";
+import { StateProvider } from "@bitwarden/state";
 import { I18nPipe } from "@bitwarden/ui-common";
 import { CoachmarkComponent, CoachmarkService } from "@bitwarden/vault";
 
@@ -95,6 +97,17 @@ export class UserLayoutComponent implements OnInit {
     from(inject(KeykeeperMspApiService).list()).pipe(
       map((msps) => msps.length > 0),
       catchError(() => of(false)),
+    ),
+    { initialValue: false },
+  );
+
+  /** Keykeeper: the Plan page shows in Settings where plans are enforced (DESIGN.md, "Plans and billing"). */
+  private readonly stateProvider = inject(StateProvider);
+  protected readonly showPlan = toSignal(
+    this.accountService.activeAccount$.pipe(
+      getUserId,
+      switchMap((userId) => ownPlan$(this.stateProvider, userId)),
+      map((plan) => plan.enforced),
     ),
     { initialValue: false },
   );

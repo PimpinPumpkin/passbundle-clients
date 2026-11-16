@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { Router } from "@angular/router";
 import { filter, firstValueFrom, map, of, switchMap } from "rxjs";
 
+import { KeykeeperPlanBannersComponent } from "@bitwarden/angular/billing/keykeeper";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { MessageListener } from "@bitwarden/common/platform/messaging";
@@ -24,6 +25,7 @@ import { VaultBannersService, VisibleVaultBanner } from "./services/vault-banner
     SharedModule,
     BannerModule,
     OrganizationFreeTrialWarningComponent,
+    KeykeeperPlanBannersComponent,
   ],
   providers: [VaultBannersService],
 })

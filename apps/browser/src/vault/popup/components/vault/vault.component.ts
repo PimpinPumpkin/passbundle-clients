@@ -31,7 +31,10 @@ import {
 } from "rxjs";
 
 import { CollectionService } from "@bitwarden/admin-console/common";
-import { KeykeeperPricingLinkComponent } from "@bitwarden/angular/billing/keykeeper";
+import {
+  KeykeeperPlanBannersComponent,
+  KeykeeperPricingLinkComponent,
+} from "@bitwarden/angular/billing/keykeeper";
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { NudgesService, NudgeType, PremiumUpsellService } from "@bitwarden/angular/vault";
 import { DeactivatedOrg, NoResults, VaultOpen } from "@bitwarden/assets/svg";
@@ -129,6 +132,7 @@ const NEW_EXPERIENCE_DARK_IMG = "../../../../images/new-experience/new-experienc
   selector: "app-vault",
   templateUrl: "vault.component.html",
   imports: [
+    KeykeeperPlanBannersComponent,
     KeykeeperPricingLinkComponent,
     KeykeeperTwoStepNeededComponent,
     KeykeeperTwoStepNudgeComponent,

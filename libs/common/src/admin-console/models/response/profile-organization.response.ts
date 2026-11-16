@@ -1,5 +1,6 @@
 import { MemberDecryptionType } from "../../../auth/enums/sso";
 import { ProductTierType } from "../../../billing/enums";
+import { KeykeeperPlan, keykeeperPlanFrom } from "../../../billing/keykeeper/keykeeper-plan";
 import { BaseResponse } from "../../../models/response/base.response";
 import { OrganizationUserStatusType, OrganizationUserType, ProviderType } from "../../enums";
 import { BrowserAutofillMode, browserAutofillMode } from "../../keykeeper/browser-autofill";
@@ -72,6 +73,8 @@ export class ProfileOrganizationResponse extends BaseResponse {
   keykeeperBrowserAutofill: BrowserAutofillMode;
   /** Keykeeper: whether this membership came from an MSP. */
   keykeeperFromMsp: boolean;
+  /** Keykeeper: the organization's plan, for the Plan page and the plan banners. */
+  keykeeperPlan: KeykeeperPlan;
   useMyItems: boolean;
   useInviteLinks: boolean;
 
@@ -159,6 +162,8 @@ export class ProfileOrganizationResponse extends BaseResponse {
     // Keykeeper: a server that doesn't say leaves the member under the organization's policies
     // (DESIGN.md, "MSP console").
     this.keykeeperFromMsp = this.getResponseProperty("KeykeeperFromMsp") === true;
+    // Keykeeper: a server that doesn't say doesn't enforce plans (DESIGN.md, "Plans and billing").
+    this.keykeeperPlan = keykeeperPlanFrom(this.getResponseProperty("KeykeeperPlan"));
     this.useMyItems = this.getResponseProperty("UseMyItems") ?? false;
     this.useInviteLinks = this.getResponseProperty("UseInviteLinks") ?? false;
   }

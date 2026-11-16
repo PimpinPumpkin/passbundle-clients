@@ -2,6 +2,7 @@ import { Jsonify } from "type-fest";
 
 import { MemberDecryptionType } from "../../../auth/enums/sso";
 import { ProductTierType } from "../../../billing/enums";
+import { KeykeeperPlan, keykeeperPlanFrom } from "../../../billing/keykeeper/keykeeper-plan";
 import { OrganizationUserStatusType, OrganizationUserType, ProviderType } from "../../enums";
 import { BrowserAutofillMode, browserAutofillMode } from "../../keykeeper/browser-autofill";
 import { PermissionsApi } from "../api/permissions.api";
@@ -72,6 +73,7 @@ export class OrganizationData {
   keykeeperPasswordChange: boolean;
   keykeeperBrowserAutofill: BrowserAutofillMode;
   keykeeperFromMsp: boolean;
+  keykeeperPlan: KeykeeperPlan;
   useMyItems: boolean;
   useInviteLinks: boolean;
 
@@ -144,6 +146,7 @@ export class OrganizationData {
     this.keykeeperPasswordChange = response.keykeeperPasswordChange === true;
     this.keykeeperBrowserAutofill = browserAutofillMode(response.keykeeperBrowserAutofill);
     this.keykeeperFromMsp = response.keykeeperFromMsp === true;
+    this.keykeeperPlan = keykeeperPlanFrom(response.keykeeperPlan);
     this.useMyItems = response.useMyItems;
     this.useInviteLinks = response.useInviteLinks;
 

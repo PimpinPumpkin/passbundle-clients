@@ -1566,6 +1566,330 @@
   "keykeeperPlanEndedTitle": {
     "message": "Plan ended"
   },
+  "keykeeperPlanNav": {
+    "message": "Plan"
+  },
+  "keykeeperPlanNameFree": {
+    "message": "Free"
+  },
+  "keykeeperPlanNamePremium": {
+    "message": "Premium"
+  },
+  "keykeeperPlanNameFamilies": {
+    "message": "Families"
+  },
+  "keykeeperPlanNameBusiness": {
+    "message": "Business"
+  },
+  "keykeeperPlanNameMsp": {
+    "message": "MSP seat pool"
+  },
+  "keykeeperPlanNameNone": {
+    "message": "No plan"
+  },
+  "keykeeperPlanTrial": {
+    "message": "Trial"
+  },
+  "keykeeperPlanTrialUntil": {
+    "message": "Trial until $DATE$",
+    "placeholders": {
+      "date": {
+        "content": "$1",
+        "example": "December 15, 2026"
+      }
+    }
+  },
+  "keykeeperPlanFreeUntil": {
+    "message": "Free until $DATE$",
+    "placeholders": {
+      "date": {
+        "content": "$1",
+        "example": "December 15, 2026"
+      }
+    }
+  },
+  "keykeeperPlanActive": {
+    "message": "Active"
+  },
+  "keykeeperPlanPaidThrough": {
+    "message": "Paid through $DATE$",
+    "placeholders": {
+      "date": {
+        "content": "$1",
+        "example": "December 15, 2026"
+      }
+    }
+  },
+  "keykeeperPlanRenewsOn": {
+    "message": "Renews on $DATE$",
+    "placeholders": {
+      "date": {
+        "content": "$1",
+        "example": "December 15, 2026"
+      }
+    }
+  },
+  "keykeeperPlanEndsOn": {
+    "message": "Ends on $DATE$",
+    "placeholders": {
+      "date": {
+        "content": "$1",
+        "example": "December 15, 2026"
+      }
+    }
+  },
+  "keykeeperPlanPaymentDue": {
+    "message": "Payment due"
+  },
+  "keykeeperPlanPaymentDueSince": {
+    "message": "Payment due. Paid through $UNTIL$.",
+    "placeholders": {
+      "until": {
+        "content": "$1",
+        "example": "November 15, 2026"
+      }
+    }
+  },
+  "keykeeperPlanPaymentDueEnds": {
+    "message": "Payment due. Paid through $UNTIL$; it ends on $ENDS$.",
+    "placeholders": {
+      "until": {
+        "content": "$1",
+        "example": "November 15, 2026"
+      },
+      "ends": {
+        "content": "$2",
+        "example": "November 29, 2026"
+      }
+    }
+  },
+  "keykeeperPlanEnded": {
+    "message": "Ended"
+  },
+  "keykeeperPlanEndedOn": {
+    "message": "Ended on $DATE$",
+    "placeholders": {
+      "date": {
+        "content": "$1",
+        "example": "December 15, 2026"
+      }
+    }
+  },
+  "keykeeperPlanCoveredBy": {
+    "message": "Covered by $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "Contoso IT"
+      }
+    }
+  },
+  "keykeeperPlanIncludes": {
+    "message": "Includes"
+  },
+  "keykeeperPlanGivesStorage": {
+    "message": "$GB$ GB for attachments",
+    "placeholders": {
+      "gb": {
+        "content": "$1",
+        "example": "5"
+      }
+    }
+  },
+  "keykeeperPlanGivesStorageShared": {
+    "message": "$GB$ GB for attachments in shared folders",
+    "placeholders": {
+      "gb": {
+        "content": "$1",
+        "example": "12"
+      }
+    }
+  },
+  "keykeeperPlanGivesPeople": {
+    "message": "Up to $PEOPLE$ people",
+    "placeholders": {
+      "people": {
+        "content": "$1",
+        "example": "6"
+      }
+    }
+  },
+  "keykeeperPlanGivesAnyNumber": {
+    "message": "Any number of people"
+  },
+  "keykeeperPlanGivesPremiumYou": {
+    "message": "Premium's features: attaching files, sending files, the data breach report, and two-step login codes for your other accounts"
+  },
+  "keykeeperPlanGivesPremiumMembers": {
+    "message": "Premium's features for every member: attaching files, sending files, the data breach report, and two-step login codes for their other accounts"
+  },
+  "keykeeperPlanGivesPool": {
+    "message": "Every client covered as Business, with any number of people"
+  },
+  "keykeeperPlanGivesPremiumPool": {
+    "message": "Premium's features for your staff and for every member of each client"
+  },
+  "keykeeperPlanPremiumThroughOrganization": {
+    "message": "You get Premium's features through an organization or an MSP you belong to."
+  },
+  "keykeeperPlanFreeNote": {
+    "message": "Attaching files, sending files, the data breach report, and two-step login codes for your other accounts are part of Premium."
+  },
+  "keykeeperPlanPremiumEnded": {
+    "message": "You're on Free now. Everything you saved stays, and files you attached can still be downloaded and removed."
+  },
+  "keykeeperPlanPoolEnded": {
+    "message": "Your clients' plan has ended, so nothing new can be added to them. Everything in them can still be opened, changed, exported, and deleted."
+  },
+  "keykeeperPlanPay": {
+    "message": "Set up payment"
+  },
+  "keykeeperPlanManage": {
+    "message": "Manage payment"
+  },
+  "keykeeperPlanSeePlan": {
+    "message": "See plan"
+  },
+  "keykeeperPlanBannerTrialYou": {
+    "message": "Your Premium trial ends on $DATE$. If it isn't paid for by then, attaching files, sending files, and the data breach report stop. Everything you saved stays.",
+    "placeholders": {
+      "date": {
+        "content": "$1",
+        "example": "December 15, 2026"
+      }
+    }
+  },
+  "keykeeperPlanBannerFreeYou": {
+    "message": "Premium is free for you until $DATE$. If it isn't paid for by then, attaching files, sending files, and the data breach report stop. Everything you saved stays.",
+    "placeholders": {
+      "date": {
+        "content": "$1",
+        "example": "December 15, 2026"
+      }
+    }
+  },
+  "keykeeperPlanBannerTrialOrganization": {
+    "message": "The trial for $NAME$ ends on $DATE$. If it isn't paid for by then, nothing new can be added to it. Everything in it can still be opened, changed, exported, and deleted.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "Acme Dental"
+      },
+      "date": {
+        "content": "$2",
+        "example": "December 15, 2026"
+      }
+    }
+  },
+  "keykeeperPlanBannerFreeOrganization": {
+    "message": "$NAME$ is free until $DATE$. If it isn't paid for by then, nothing new can be added to it. Everything in it can still be opened, changed, exported, and deleted.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "Acme Dental"
+      },
+      "date": {
+        "content": "$2",
+        "example": "December 15, 2026"
+      }
+    }
+  },
+  "keykeeperPlanBannerTrialPool": {
+    "message": "The trial for $NAME$ ends on $DATE$. If it isn't paid for by then, nothing new can be added to your clients. Everything in them can still be opened, changed, exported, and deleted.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "Contoso IT"
+      },
+      "date": {
+        "content": "$2",
+        "example": "December 15, 2026"
+      }
+    }
+  },
+  "keykeeperPlanBannerFreePool": {
+    "message": "$NAME$ is free until $DATE$. If it isn't paid for by then, nothing new can be added to your clients. Everything in them can still be opened, changed, exported, and deleted.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "Contoso IT"
+      },
+      "date": {
+        "content": "$2",
+        "example": "December 15, 2026"
+      }
+    }
+  },
+  "keykeeperPlanBannerDueYou": {
+    "message": "A payment for your Premium is due. It was paid through $UNTIL$.",
+    "placeholders": {
+      "until": {
+        "content": "$1",
+        "example": "November 15, 2026"
+      }
+    }
+  },
+  "keykeeperPlanBannerDueYouEnds": {
+    "message": "A payment for your Premium is due. It was paid through $UNTIL$, and it ends on $ENDS$ if it isn't paid by then.",
+    "placeholders": {
+      "until": {
+        "content": "$1",
+        "example": "November 15, 2026"
+      },
+      "ends": {
+        "content": "$2",
+        "example": "November 29, 2026"
+      }
+    }
+  },
+  "keykeeperPlanBannerDue": {
+    "message": "A payment for $NAME$ is due. It was paid through $UNTIL$.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "Acme Dental"
+      },
+      "until": {
+        "content": "$2",
+        "example": "November 15, 2026"
+      }
+    }
+  },
+  "keykeeperPlanBannerDueEnds": {
+    "message": "A payment for $NAME$ is due. It was paid through $UNTIL$, and it ends on $ENDS$ if it isn't paid by then.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "Acme Dental"
+      },
+      "until": {
+        "content": "$2",
+        "example": "November 15, 2026"
+      },
+      "ends": {
+        "content": "$3",
+        "example": "November 29, 2026"
+      }
+    }
+  },
+  "keykeeperPlanBannerEnded": {
+    "message": "The plan for $NAME$ has ended, so nothing new can be added to it. Everything in it can still be opened, changed, exported, and deleted.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "Acme Dental"
+      }
+    }
+  },
+  "keykeeperPlanBannerPoolEnded": {
+    "message": "The plan for $NAME$ has ended, so nothing new can be added to your clients. Everything in them can still be opened, changed, exported, and deleted.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "Contoso IT"
+      }
+    }
+  },
   "keykeeperSelectItem": {
     "message": "Select $NAME$",
     "placeholders": {
