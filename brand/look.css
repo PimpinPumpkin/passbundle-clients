@@ -624,8 +624,8 @@ html.pb-web,
   color: var(--pb-label) !important;
 }
 
-/* It's one list that scrolls: the logo and "More from" scroll with it, rather
-   than staying put over the entries. */
+/* It's one list that scrolls: the logo scrolls with it, rather than staying
+   put over the entries. */
 .keykeeper-menu bit-nav-logo > div,
 .keykeeper-menu #bit-side-nav--scroll [class*="tw-sticky"] {
   position: static !important;
@@ -649,23 +649,6 @@ html.pb-web,
 }
 .keykeeper-menu #bit-side-nav--scroll > div {
   padding-bottom: 1.5rem;
-}
-/* "More from PassBundle" is a heading like the menu's others (Categories,
-   Folders), and its links line up with the entries above them. */
-.keykeeper-menu navigation-product-switcher section > span {
-  display: block;
-  padding: 0.75rem 1.25rem 0 1.125rem;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--pb-muted);
-}
-.keykeeper-menu navigation-product-switcher section > div {
-  padding-inline: 0.75rem;
-}
-.keykeeper-menu navigation-product-switcher section a {
-  padding-inline-start: 2rem;
 }
 
 /* A page's header: its title, and the page's buttons, the product switcher,

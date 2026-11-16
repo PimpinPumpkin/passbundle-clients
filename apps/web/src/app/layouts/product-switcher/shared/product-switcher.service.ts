@@ -204,12 +204,6 @@ export class ProductSwitcherService {
             ? "Business Unit Portal"
             : "Provider Portal";
 
-        // Keykeeper: creating an organization happens in the app, never on a sales site.
-        const orgsMarketingRoute = {
-          route: "/create-organization",
-          external: false,
-        };
-
         const products = {
           pm: {
             name: "Password Manager",
@@ -254,15 +248,6 @@ export class ProductSwitcherService {
             appRoute: ["/providers", providers[0]?.id],
             isActive: this.router.url.includes("/providers/"),
           },
-          orgs: {
-            name: "Organizations",
-            icon: "bwi-business",
-            marketingRoute: orgsMarketingRoute,
-            otherProductOverrides: {
-              name: "Share your passwords",
-              supportingText: this.i18nService.t("protectYourFamilyOrBusiness"),
-            },
-          },
         } satisfies Record<string, ProductSwitcherItem>;
 
         const bento: ProductSwitcherItem[] = [products.pm];
@@ -273,12 +258,11 @@ export class ProductSwitcherService {
           bento.push(products.sm);
         }
 
+        // Keykeeper: no "More from" promo for organizations ("Share your
+        // passwords"), here or in the side navigation. Making one is New
+        // organization in the vault's left menu (DESIGN.md, "The left menu").
         if (acOrg) {
           bento.push(products.ac);
-        } else if (!userHasSingleOrgPolicy && !vfo1Enabled) {
-          // Offered only while VFO1 is off — flag-on, "Add plan" in Settings
-          // replaces the Organizations entry point.
-          other.push(products.orgs);
         }
 
         if (providers.length > 0) {

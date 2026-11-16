@@ -175,32 +175,25 @@ describe("ProductSwitcherService", () => {
     });
 
     describe("Admin/Organizations", () => {
-      it("includes Organizations with the internal route in other when there are organizations on cloud", async () => {
+      // Keykeeper: upstream offered Organizations under "More from" ("Share your passwords")
+      // to someone without an organization to administer. It's a promo, so it's gone; making
+      // an organization is New organization in the vault's left menu.
+      it("never offers Organizations in other when there are organizations on cloud", async () => {
         initiateService();
 
         const products = await firstValueFrom(service.products$);
 
-        const organizations = products.other.find((p) => p.name === "Organizations");
-        expect(organizations).toBeDefined();
-        expect(organizations.marketingRoute.route).toBe("/create-organization");
-        expect(organizations.marketingRoute.external).toBe(false);
-
-        expect(products.other.find((p) => p.name === "Organizations")).toBeDefined();
+        expect(products.other).toEqual([]);
         expect(products.bento.find((p) => p.name === "Admin Console")).toBeUndefined();
       });
 
-      it("includes Organizations with the internal route in other on Self-Host too", async () => {
+      it("never offers Organizations in other on Self-Host either", async () => {
         platformUtilsService.isSelfHost.mockReturnValue(true);
         initiateService();
 
         const products = await firstValueFrom(service.products$);
 
-        const organizations = products.other.find((p) => p.name === "Organizations");
-        expect(organizations).toBeDefined();
-        expect(organizations.marketingRoute.route).toBe("/create-organization");
-        expect(organizations.marketingRoute.external).toBe(false);
-
-        expect(products.other.find((p) => p.name === "Organizations")).toBeDefined();
+        expect(products.other).toEqual([]);
         expect(products.bento.find((p) => p.name === "Admin Console")).toBeUndefined();
       });
 

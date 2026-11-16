@@ -1,4 +1,5 @@
 import { AfterViewInit, ChangeDetectorRef, Component, Input } from "@angular/core";
+import { map } from "rxjs";
 
 import { ButtonType } from "@bitwarden/components";
 
@@ -33,5 +34,9 @@ export class ProductSwitcherComponent implements AfterViewInit {
     private productSwitcherService: ProductSwitcherService,
   ) {}
 
-  protected readonly products$ = this.productSwitcherService.products$;
+  // Keykeeper: no button when there's nothing to switch to, only the Password Manager, now that
+  // the menu doesn't advertise organizations.
+  protected readonly products$ = this.productSwitcherService.products$.pipe(
+    map((products) => (products.bento.length + products.other.length > 1 ? products : null)),
+  );
 }
