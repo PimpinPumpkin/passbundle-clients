@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, input, NO_ERRORS_SCHEMA } from "@angular/core";
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  input,
+  NO_ERRORS_SCHEMA,
+  signal,
+} from "@angular/core";
 import { ComponentFixture, TestBed, fakeAsync, flush, tick } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
 import { provideNoopAnimations } from "@angular/platform-browser/animations";
@@ -67,6 +74,7 @@ import { AtRiskPasswordCalloutComponent } from "../at-risk-callout/at-risk-passw
 import { AutofillVaultListItemsComponent } from "./autofill-vault-list-items/autofill-vault-list-items.component";
 import { BlockedInjectionBanner } from "./blocked-injection-banner/blocked-injection-banner.component";
 import { FillAssistActiveBannerComponent } from "./fill-assist-active-banner/fill-assist-active-banner.component";
+import { KeykeeperPopupSelectionService } from "./keykeeper-select/popup-selection.service";
 import { NewItemDropdownComponent } from "./new-item-dropdown/new-item-dropdown.component";
 import { VaultHeaderComponent } from "./vault-header/vault-header.component";
 import { VaultListItemsContainerComponent } from "./vault-list-items-container/vault-list-items-container.component";
@@ -87,7 +95,8 @@ export class VaultSearchStubComponent {}
 @Component({
   selector: "app-vault-header",
   standalone: true,
-  template: "",
+  // Keykeeper: the vault page puts Select or Cancel at the header's end.
+  template: '<ng-content select="[slot=end]"></ng-content>',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class VaultHeaderStubComponent {}
@@ -206,6 +215,33 @@ class VaultListItemsContainerStubComponent {
   readonly id = input<string>();
   readonly disableSectionMargin = input<boolean>();
   readonly collapsibleKey = input<string>();
+  readonly keykeeperSelectable = input<boolean>();
+}
+
+/** Keykeeper: Select mode's state, without the services its actions call. */
+function selectionStub() {
+  const active = signal(false);
+  const listed = signal<any[]>([]);
+  return {
+    active,
+    listed,
+    count: signal(0),
+    allSelected: signal(false),
+    someSelected: signal(false),
+    busy: signal(false),
+    canMove: signal(false),
+    archiveOffered: signal(true),
+    canArchive: signal(false),
+    canTrash: signal(false),
+    listedCount: computed(() => listed().length),
+    setListed: jest.fn((rows: any[]) => listed.set(rows)),
+    start: jest.fn(() => active.set(true)),
+    stop: jest.fn(() => active.set(false)),
+    clickAll: jest.fn(),
+    moveToFolder: jest.fn(),
+    archive: jest.fn(),
+    moveToTrash: jest.fn(),
+  };
 }
 
 @Component({
@@ -247,6 +283,7 @@ jest.spyOn(BrowserPopupUtils, "openCurrentPagePopout").mockResolvedValue();
 describe("VaultComponent", () => {
   let component: VaultComponent;
   let defaultFixture: ComponentFixture<VaultComponent>;
+  let selection: ReturnType<typeof selectionStub>;
 
   interface FakeAccount {
     id: string;
@@ -354,6 +391,7 @@ describe("VaultComponent", () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    selection = selectionStub();
     premiumUpsellSvc.showUpsell.mockReturnValue(false);
     await TestBed.configureTestingModule({
       imports: [VaultComponent, RouterTestingModule],
@@ -477,6 +515,7 @@ describe("VaultComponent", () => {
         ],
         providers: [
           { provide: VaultItemsTransferService, useValue: DefaultVaultItemsTransferService },
+          KeykeeperPopupSelectionService,
         ],
       },
       add: {
@@ -498,12 +537,94 @@ describe("VaultComponent", () => {
           VaultPopupListTableStubComponent,
           VaultSwitcherStubComponent,
         ],
-        providers: [{ provide: VaultItemsTransferService, useValue: vaultItemsTransferSvc }],
+        providers: [
+          { provide: VaultItemsTransferService, useValue: vaultItemsTransferSvc },
+          { provide: KeykeeperPopupSelectionService, useValue: selection },
+        ],
       },
     });
 
     defaultFixture = TestBed.createComponent(VaultComponent);
     component = defaultFixture.componentInstance;
+  });
+
+  // Keykeeper: Select mode (DESIGN.md, "Selecting several items").
+  describe("Select mode", () => {
+    const button = (fixture: ComponentFixture<VaultComponent>, key: string) =>
+      fixture.nativeElement.querySelector(`[data-keykeeper="${key}"]`) as HTMLButtonElement | null;
+
+    it("hands the selection what the list shows, and offers Select once it shows something", fakeAsync(() => {
+      const rows = [{ id: "a", name: "Alpha" }];
+      itemsSvc.filteredCiphers$.next(rows);
+      const fixture = TestBed.createComponent(VaultComponent);
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      expect(selection.setListed).toHaveBeenLastCalledWith(rows);
+      button(fixture, "select-start")!.click();
+      fixture.detectChanges();
+
+      expect(selection.start).toHaveBeenCalled();
+      expect(button(fixture, "select-start")).toBeNull();
+      expect(button(fixture, "select-cancel")).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-keykeeper="select-bar"]')).not.toBeNull();
+      // The notices above the list step aside, so the list has room.
+      const nudge = fixture.nativeElement.querySelector("app-keykeeper-two-step-nudge");
+      expect(nudge.classList).toContain("!tw-hidden");
+
+      itemsSvc.filteredCiphers$.next([]);
+      flush();
+    }));
+
+    it("offers no Select while the list shows nothing", fakeAsync(() => {
+      itemsSvc.filteredCiphers$.next([]);
+      const fixture = TestBed.createComponent(VaultComponent);
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      expect(button(fixture, "select-start")).toBeNull();
+      flush();
+    }));
+
+    it("leaves Select mode with Escape", fakeAsync(() => {
+      const fixture = TestBed.createComponent(VaultComponent);
+      fixture.detectChanges();
+      selection.active.set(true);
+
+      const escape = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
+      document.dispatchEvent(escape);
+
+      expect(selection.stop).toHaveBeenCalled();
+      expect(escape.defaultPrevented).toBe(true);
+      flush();
+    }));
+
+    it("leaves Escape to whatever took it first, such as a menu or a dialog", fakeAsync(() => {
+      const fixture = TestBed.createComponent(VaultComponent);
+      fixture.detectChanges();
+      selection.active.set(true);
+
+      const escape = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
+      escape.preventDefault();
+      document.dispatchEvent(escape);
+
+      expect(selection.stop).not.toHaveBeenCalled();
+      flush();
+    }));
+
+    it("does nothing with Escape outside Select mode", fakeAsync(() => {
+      const fixture = TestBed.createComponent(VaultComponent);
+      fixture.detectChanges();
+
+      const escape = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
+      document.dispatchEvent(escape);
+
+      expect(selection.stop).not.toHaveBeenCalled();
+      expect(escape.defaultPrevented).toBe(false);
+      flush();
+    }));
   });
 
   describe("vaultState", () => {

@@ -33,6 +33,7 @@ import {
 } from "@bitwarden/common/vault/utils/cipher-view-like-utils";
 import {
   ButtonModule,
+  CheckboxModule,
   CompactModeService,
   DisclosureComponent,
   DisclosureTriggerForDirective,
@@ -65,6 +66,10 @@ import {
 import { PopupCipherViewLike } from "../../../views/popup-cipher.view";
 import { ItemCopyActionsComponent } from "../item-copy-action/item-copy-actions.component";
 import { ItemMoreOptionsComponent } from "../item-more-options/item-more-options.component";
+import {
+  KeykeeperPopupSelectionService,
+  selectable,
+} from "../keykeeper-select/popup-selection.service";
 
 @Component({
   imports: [
@@ -87,6 +92,7 @@ import { ItemMoreOptionsComponent } from "../item-more-options/item-more-options
     DisclosureTriggerForDirective,
     ScrollLayoutDirective,
     IconComponent,
+    CheckboxModule,
   ],
   selector: "app-vault-list-items-container",
   templateUrl: "vault-list-items-container.component.html",
@@ -96,7 +102,23 @@ export class VaultListItemsContainerComponent {
   private compactModeService = inject(CompactModeService);
   private vaultPopupSectionService = inject(VaultPopupSectionService);
   private openAndFillService = inject(KeykeeperOpenAndFillService, { optional: true });
+  // Keykeeper: the vault page's Select mode, where the page provides it.
+  private readonly selection = inject(KeykeeperPopupSelectionService, { optional: true });
   protected CipherViewLikeUtils = CipherViewLikeUtils;
+
+  /**
+   * Keykeeper: this list takes part in the vault page's Select mode: while it's on, each row is
+   * a checkbox instead of opening its item (DESIGN.md, "Selecting several items").
+   */
+  readonly keykeeperSelectable = input(false, { transform: booleanAttribute });
+
+  /** Keykeeper: whether the rows are checkboxes now. */
+  protected readonly selecting = computed(
+    () => this.keykeeperSelectable() && (this.selection?.active() ?? false),
+  );
+
+  /** Keykeeper: whether Shift was held as the row was clicked, for selecting a range. */
+  private shiftHeld = false;
 
   // FIXME(https://bitwarden.atlassian.net/browse/CL-903): Migrate to Signals
   // eslint-disable-next-line @angular-eslint/prefer-signals
@@ -310,6 +332,29 @@ export class VaultListItemsContainerComponent {
     private dialogService: DialogService,
     private accountService: AccountService,
   ) {}
+
+  /** Keykeeper: an item that couldn't be decrypted can't be selected, as in the web vault. */
+  protected canSelect(cipher: PopupCipherViewLike): boolean {
+    return selectable(cipher);
+  }
+
+  protected isSelected(cipher: PopupCipherViewLike): boolean {
+    return this.selection?.isSelected(cipher) ?? false;
+  }
+
+  protected noteShift(event: PointerEvent) {
+    this.shiftHeld = event.shiftKey;
+  }
+
+  /**
+   * Keykeeper: a row's checkbox changed. The selection decides (a range with Shift, nothing past
+   * the limit), and the checkbox shows what it decided.
+   */
+  protected toggleSelected(cipher: PopupCipherViewLike, event: Event) {
+    this.selection?.click(cipher, this.shiftHeld);
+    this.shiftHeld = false;
+    (event.target as HTMLInputElement).checked = this.isSelected(cipher);
+  }
 
   onCipherSelect(cipher: PopupCipherViewLike) {
     return this.canAutofill() ? this.doAutofill(cipher) : this.onViewCipher(cipher);

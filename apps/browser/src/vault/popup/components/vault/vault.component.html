@@ -63,7 +63,9 @@
 
   <!-- Outside the page's scroll area; with vfo1 it collapses alongside the title bar. -->
   <ng-container slot="above-scroll-area">
-    @if (showPremiumSpotlight$ | async) {
+    <!-- Keykeeper: in Select mode the tips and notices here step aside, so the list has
+         room between them and the actions under it. -->
+    @if (!selection.active() && (showPremiumSpotlight$ | async)) {
       <bit-callout
         [title]="'unlockAdvancedSecurity' | i18n"
         [icon]="null"
@@ -93,11 +95,14 @@
       </bit-callout>
     }
     <!-- Keykeeper: organizations waiting for this person to turn on two-step login -->
-    <app-keykeeper-two-step-needed class="tw-mb-3 tw-block" />
+    <app-keykeeper-two-step-needed
+      class="tw-mb-3 tw-block"
+      [class.!tw-hidden]="selection.active()"
+    />
     <!-- Keykeeper: a nudge to set up two-step login, for someone with none whom no rule covers -->
-    <app-keykeeper-two-step-nudge />
+    <app-keykeeper-two-step-nudge [class.!tw-hidden]="selection.active()" />
     <!-- Keykeeper: what an organization did with the browser's own card and address autofill here -->
-    <app-keykeeper-browser-autofill-notice />
+    <app-keykeeper-browser-autofill-notice [class.!tw-hidden]="selection.active()" />
     @if (vaultState === VaultStateEnum.Empty && !vfo1Enabled()) {
       <vault-organization-user-notifications
         class="-tw-mx-5 -tw-mt-3 tw-flex tw-flex-col tw-px-2 tw-mb-3"
@@ -106,13 +111,16 @@
       <!-- At-Risk callout displays as a banner and should always remain visually above all other callouts -->
       <!-- When vfo1 is enabled these are rendered in the full-width-notice slot instead -->
       @if (!vfo1Enabled()) {
-        <vault-at-risk-password-callout></vault-at-risk-password-callout>
+        <vault-at-risk-password-callout
+          [class.!tw-hidden]="selection.active()"
+        ></vault-at-risk-password-callout>
         <vault-organization-user-notifications
           class="-tw-mx-5 -tw-mt-3 tw-flex tw-flex-col tw-px-2 tw-mb-3"
+          [class.!tw-hidden]="selection.active()"
         ></vault-organization-user-notifications>
       }
 
-      @if (showHasItemsVaultSpotlight$ | async) {
+      @if (!selection.active() && (showHasItemsVaultSpotlight$ | async)) {
         <div class="tw-mb-4">
           <bit-callout
             [title]="'hasItemsVaultNudgeTitle' | i18n"
@@ -129,7 +137,61 @@
       }
       <!-- The table supplies its own search/filter toolbar, so it replaces this header. -->
       @if (!vfo1Enabled()) {
-        <app-vault-header></app-vault-header>
+        <app-vault-header>
+          <!-- Keykeeper: Select changes several items at once; Cancel, or Escape, leaves it
+               (DESIGN.md, "Selecting several items"). -->
+          <span slot="end" class="tw-flex">
+            @if (selection.active()) {
+              <button
+                type="button"
+                bitButton
+                buttonType="secondary"
+                size="small"
+                data-keykeeper="select-cancel"
+                (click)="selection.stop()"
+              >
+                {{ "cancel" | i18n }}
+              </button>
+            } @else if (vaultState === null && listedCount() > 0) {
+              <button
+                type="button"
+                bitButton
+                buttonType="secondary"
+                size="small"
+                data-keykeeper="select-start"
+                (click)="selection.start()"
+              >
+                {{ "keykeeperSelectStart" | i18n }}
+              </button>
+            }
+          </span>
+        </app-vault-header>
+        <!-- Keykeeper: in Select mode, Select all and how many are selected -->
+        @if (selection.active()) {
+          <div
+            class="tw-mt-2 tw-flex tw-items-center tw-justify-between tw-gap-2"
+            data-keykeeper="select-bar"
+          >
+            <bit-form-control disableMargin>
+              <input
+                type="checkbox"
+                bitCheckbox
+                [checked]="selection.allSelected()"
+                [indeterminate]="selection.someSelected()"
+                [disabled]="listedCount() === 0"
+                (change)="selectAll($event)"
+              />
+              <bit-label>{{ "keykeeperSelectAll" | i18n }}</bit-label>
+            </bit-form-control>
+            <span
+              bitTypography="body2"
+              class="tw-text-muted"
+              role="status"
+              data-keykeeper="select-count"
+              >{{ "keykeeperSelectedCount" | i18n: selection.count() }}</span
+            >
+          </div>
+        }
       }
     }
   </ng-container>
@@ -176,8 +238,25 @@
     @if (vaultState === null) {
       <vault-fade-in-out>
         @if (!(loading$ | async)) {
-          <!--If there is search text fold all the filtered ciphers into one container-->
-          @if (hasSearchText$ | async) {
+          <!-- Keykeeper: in Select mode, the list that's showing (all items, a kind, a folder,
+               or the search's results) as one list, with a checkbox on each row. -->
+          @if (selection.active()) {
+            <app-vault-list-items-container
+              [title]="
+                ((hasSearchText$ | async)
+                  ? 'searchResults'
+                  : (numberOfAppliedFilters$ | async) === 0
+                    ? 'allItems'
+                    : 'items'
+                ) | i18n
+              "
+              [ciphers]="(filteredCiphers$ | async) || []"
+              id="allItems"
+              disableSectionMargin
+              keykeeperSelectable
+            ></app-vault-list-items-container>
+          } @else if (hasSearchText$ | async) {
+            <!--If there is search text fold all the filtered ciphers into one container-->
             <app-vault-list-items-container
               [title]="'searchResults' | i18n"
               [ciphers]="(filteredCiphers$ | async) || []"
@@ -205,6 +284,48 @@
         }
       </vault-fade-in-out>
     }
+  }
+
+  <!-- Keykeeper: what can be done to the selected items, where the single item's menu
+       allows it (DESIGN.md, "Selecting several items"). -->
+  @if (selection.active()) {
+    <popup-footer slot="footer" data-keykeeper="select-actions">
+      <button
+        type="button"
+        bitButton
+        buttonType="secondary"
+        size="small"
+        [disabled]="!selection.canMove() || selection.busy()"
+        [bitAction]="moveToFolder"
+      >
+        {{ "keykeeperSelectMoveToFolder" | i18n }}
+      </button>
+      @if (selection.archiveOffered()) {
+        <button
+          type="button"
+          bitButton
+          buttonType="secondary"
+          size="small"
+          [disabled]="!selection.canArchive() || selection.busy()"
+          [bitAction]="archive"
+        >
+          {{ "archiveVerb" | i18n }}
+        </button>
+      }
+      @if (selection.count() === 0 || selection.canTrash()) {
+        <button
+          slot="end"
+          type="button"
+          bitButton
+          buttonType="dangerOutline"
+          size="small"
+          [disabled]="selection.count() === 0 || selection.busy()"
+          [bitAction]="moveToTrash"
+        >
+          {{ "keykeeperSelectMoveToTrash" | i18n }}
+        </button>
+      }
+    </popup-footer>
   }
 
   <!-- The table renders its own skeleton rows via `bit-table-v2 [loading]`. -->

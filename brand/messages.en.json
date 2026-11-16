@@ -1748,5 +1748,86 @@
         "example": "12"
       }
     }
+  },
+  "keykeeperSelectStart": {
+    "message": "Select"
+  },
+  "keykeeperSelectAll": {
+    "message": "Select all"
+  },
+  "keykeeperSelectedCount": {
+    "message": "$COUNT$ selected",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "keykeeperSelectMoveToFolder": {
+    "message": "Move to folder"
+  },
+  "keykeeperSelectMoveToTrash": {
+    "message": "Move to trash"
+  },
+  "keykeeperSelectMoveTitle": {
+    "message": "Move $COUNT$ items to a folder",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "keykeeperSelectMoveTitleOne": {
+    "message": "Move 1 item to a folder"
+  },
+  "keykeeperSelectMoved": {
+    "message": "$COUNT$ items moved",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "keykeeperSelectMovedOne": {
+    "message": "Item moved"
+  },
+  "keykeeperSelectArchived": {
+    "message": "$COUNT$ items archived",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "keykeeperSelectTrashTitle": {
+    "message": "Move $COUNT$ items to the trash",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "keykeeperSelectTrashTitleOne": {
+    "message": "Move 1 item to the trash"
+  },
+  "keykeeperSelectTrashBody": {
+    "message": "You can restore them from the trash."
+  },
+  "keykeeperSelectTrashBodyOne": {
+    "message": "You can restore it from the trash."
+  },
+  "keykeeperSelectTrashed": {
+    "message": "$COUNT$ items sent to trash",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
   }
 }

@@ -4,6 +4,8 @@
 <div class="tw-flex tw-gap-1 tw-items-center">
   <app-keykeeper-category-chips class="tw-flex-1 tw-min-w-0"></app-keykeeper-category-chips>
   <app-keykeeper-folder-filter></app-keykeeper-folder-filter>
+  <!-- The vault page's Select or Cancel, last on the row. -->
+  <ng-content select="[slot=end]"></ng-content>
 </div>
 @if (pickedPlace$ | async; as place) {
   <div class="tw-mt-2 tw-flex" data-testid="keykeeper-picked-place">

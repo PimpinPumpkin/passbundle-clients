@@ -104,96 +104,126 @@
             'hover:tw-bg-hover-default hover:tw-cursor-pointer': showFillTextOnHover(),
           }"
         >
-          <button
-            bit-item-content
-            type="button"
-            (click)="onCipherSelect(cipher)"
-            (dblclick)="launchCipher(cipher)"
-            [appA11yTitle]="
-              cipherItemTitleKey()(cipher)
-                | i18n: cipher.name : CipherViewLikeUtils.getLogin(cipher)?.username
-            "
-            class="{{ itemHeightClass }}"
-          >
-            <!-- Keykeeper: the item's tile: its site's icon, its first letter, or its category's -->
-            <div slot="start" class="tw-flex tw-me-1">
-              <vault-keykeeper-item-tile [cipher]="cipher"></vault-keykeeper-item-tile>
-            </div>
-            <span data-testid="item-name">{{ cipher.name }}</span>
-            <!-- Keykeeper: expiration and template badges -->
-            <vault-keykeeper-expiration-badge [item]="cipher"></vault-keykeeper-expiration-badge>
-            <vault-keykeeper-template-badge [item]="cipher"></vault-keykeeper-template-badge>
-            <div slot="default-trailing" class="tw-flex tw-gap-1.5">
-              @if (cipher.organizationId) {
-                <i
-                  slot="default-trailing"
-                  appOrgIcon
-                  [tierType]="cipher.organization!.productTierType"
-                  [size]="'small'"
-                  [appA11yTitle]="orgIconTooltip(cipher)"
-                ></i>
-              }
-              @if (CipherViewLikeUtils.hasAttachments(cipher)) {
-                <bit-icon
-                  name="bwi-paperclip"
-                  class="bwi-sm"
-                  [appA11yTitle]="'attachments' | i18n"
-                ></bit-icon>
-              }
-            </div>
-            <span slot="secondary">{{ CipherViewLikeUtils.subtitle(cipher, i18nService) }}</span>
-          </button>
+          @if (selecting()) {
+            <!-- Keykeeper: in Select mode the row is its checkbox's label, so a click
+                 anywhere on it selects the item, and Shift+click takes the range
+                 (DESIGN.md, "Selecting several items"). -->
+            <label
+              bit-item-content
+              data-keykeeper="select-row"
+              class="{{ itemHeightClass }} tw-cursor-pointer"
+              [class.tw-cursor-not-allowed]="!canSelect(cipher)"
+              (pointerdown)="noteShift($event)"
+            >
+              <div slot="start" class="tw-flex tw-items-center tw-gap-3 tw-me-1">
+                <input
+                  type="checkbox"
+                  bitCheckbox
+                  [checked]="isSelected(cipher)"
+                  [disabled]="!canSelect(cipher)"
+                  (change)="toggleSelected(cipher, $event)"
+                  [attr.aria-label]="'keykeeperSelectItem' | i18n: cipher.name"
+                />
+                <vault-keykeeper-item-tile [cipher]="cipher"></vault-keykeeper-item-tile>
+              </div>
+              <span data-testid="item-name">{{ cipher.name }}</span>
+              <span slot="secondary">{{ CipherViewLikeUtils.subtitle(cipher, i18nService) }}</span>
+            </label>
+          } @else {
+            <button
+              bit-item-content
+              type="button"
+              (click)="onCipherSelect(cipher)"
+              (dblclick)="launchCipher(cipher)"
+              [appA11yTitle]="
+                cipherItemTitleKey()(cipher)
+                  | i18n: cipher.name : CipherViewLikeUtils.getLogin(cipher)?.username
+              "
+              class="{{ itemHeightClass }}"
+            >
+              <!-- Keykeeper: the item's tile: its site's icon, its first letter, or its category's -->
+              <div slot="start" class="tw-flex tw-me-1">
+                <vault-keykeeper-item-tile [cipher]="cipher"></vault-keykeeper-item-tile>
+              </div>
+              <span data-testid="item-name">{{ cipher.name }}</span>
+              <!-- Keykeeper: expiration and template badges -->
+              <vault-keykeeper-expiration-badge [item]="cipher"></vault-keykeeper-expiration-badge>
+              <vault-keykeeper-template-badge [item]="cipher"></vault-keykeeper-template-badge>
+              <div slot="default-trailing" class="tw-flex tw-gap-1.5">
+                @if (cipher.organizationId) {
+                  <i
+                    slot="default-trailing"
+                    appOrgIcon
+                    [tierType]="cipher.organization!.productTierType"
+                    [size]="'small'"
+                    [appA11yTitle]="orgIconTooltip(cipher)"
+                  ></i>
+                }
+                @if (CipherViewLikeUtils.hasAttachments(cipher)) {
+                  <bit-icon
+                    name="bwi-paperclip"
+                    class="bwi-sm"
+                    [appA11yTitle]="'attachments' | i18n"
+                  ></bit-icon>
+                }
+              </div>
+              <span slot="secondary">{{ CipherViewLikeUtils.subtitle(cipher, i18nService) }}</span>
+            </button>
+          }
 
           <ng-container slot="end">
-            @if (showFillTextOnHover()) {
-              <bit-item-action>
-                <!-- Keykeeper: Fill is a small primary button, as the design has it -->
-                <button
-                  type="button"
-                  bitButton
-                  buttonType="primary"
-                  size="small"
-                  data-keykeeper="fill"
-                  (click)="doAutofill(cipher)"
-                  [title]="'autofillTitle' | i18n: cipher.name"
-                  [attr.aria-label]="'autofillTitle' | i18n: cipher.name"
-                >
-                  {{ "fill" | i18n }}
-                </button>
-              </bit-item-action>
-            }
+            <!-- Keykeeper: in Select mode a row has only its checkbox. -->
+            @if (!selecting()) {
+              @if (showFillTextOnHover()) {
+                <bit-item-action>
+                  <!-- Keykeeper: Fill is a small primary button, as the design has it -->
+                  <button
+                    type="button"
+                    bitButton
+                    buttonType="primary"
+                    size="small"
+                    data-keykeeper="fill"
+                    (click)="doAutofill(cipher)"
+                    [title]="'autofillTitle' | i18n: cipher.name"
+                    [attr.aria-label]="'autofillTitle' | i18n: cipher.name"
+                  >
+                    {{ "fill" | i18n }}
+                  </button>
+                </bit-item-action>
+              }
 
-            @if (showLaunchButton() && CipherViewLikeUtils.canLaunch(cipher)) {
-              <!-- Keykeeper: shown with the row's pointer or focus on it, like More.
+              @if (showLaunchButton() && CipherViewLikeUtils.canLaunch(cipher)) {
+                <!-- Keykeeper: shown with the row's pointer or focus on it, like More.
                    For a login it opens the website and fills that tab once (DESIGN.md, "Open and fill"). -->
-              <bit-item-action data-keykeeper="row-more">
-                @if (openAndFillUrl(cipher)) {
-                  <button
-                    type="button"
-                    bitIconButton="bwi-sign-in"
-                    size="small"
-                    data-keykeeper="open-and-fill"
-                    (click)="launchCipher(cipher)"
-                    [label]="'keykeeperOpenAndFillName' | i18n: cipher.name"
-                  ></button>
-                } @else {
-                  <button
-                    type="button"
-                    bitIconButton="bwi-external-link"
-                    size="small"
-                    (click)="launchCipher(cipher)"
-                    [label]="'launchWebsite' | i18n"
-                  ></button>
-                }
-              </bit-item-action>
+                <bit-item-action data-keykeeper="row-more">
+                  @if (openAndFillUrl(cipher)) {
+                    <button
+                      type="button"
+                      bitIconButton="bwi-sign-in"
+                      size="small"
+                      data-keykeeper="open-and-fill"
+                      (click)="launchCipher(cipher)"
+                      [label]="'keykeeperOpenAndFillName' | i18n: cipher.name"
+                    ></button>
+                  } @else {
+                    <button
+                      type="button"
+                      bitIconButton="bwi-external-link"
+                      size="small"
+                      (click)="launchCipher(cipher)"
+                      [label]="'launchWebsite' | i18n"
+                    ></button>
+                  }
+                </bit-item-action>
+              }
+              <app-item-copy-actions [cipher]="cipher"></app-item-copy-actions>
+              <app-item-more-options
+                data-keykeeper="row-more"
+                [cipher]="cipher"
+                [showAutofill]="showAutofillInMenu()"
+                [showViewOption]="showViewInMenu()"
+              ></app-item-more-options>
             }
-            <app-item-copy-actions [cipher]="cipher"></app-item-copy-actions>
-            <app-item-more-options
-              data-keykeeper="row-more"
-              [cipher]="cipher"
-              [showAutofill]="showAutofillInMenu()"
-              [showViewOption]="showViewInMenu()"
-            ></app-item-more-options>
           </ng-container>
         </bit-item>
       </cdk-virtual-scroll-viewport>
