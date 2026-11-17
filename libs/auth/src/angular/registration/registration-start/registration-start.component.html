@@ -41,21 +41,9 @@
       <input id="register-start_form_input_name" bitInput type="text" formControlName="name" />
     </bit-form-field>
 
-    <bit-form-control *ngIf="!isSelfHost">
-      <input
-        id="register-start-form-input-receive-marketing-emails"
-        type="checkbox"
-        bitCheckbox
-        formControlName="receiveMarketingEmails"
-      />
-      <bit-label for="register-start-form-input-receive-marketing-emails">
-        <!-- Keykeeper: "Unsubscribe" isn't a link. Upstream's went to an email preferences page
-             on its website that ours doesn't have. -->
-        {{ "receiveMarketingEmails" | i18n }}
-        {{ "unsubscribe" | i18n }}
-        {{ "atAnyTime" | i18n }}
-      </bit-label>
-    </bit-form-control>
+    <!-- Keykeeper: no "Receive updates" checkbox. The server takes no list of who wants
+         emails and sends none, so the box would promise something nothing does. The request
+         still carries receiveMarketingEmails (false) because the API has the field. -->
 
     <button
       [block]="true"
