@@ -299,6 +299,10 @@
                             {{ "revoked" | i18n }}
                           </span>
                         }
+                        <!-- Keykeeper: provisioning (Microsoft Entra ID) manages them. -->
+                        @if (u.keykeeperProvisioned) {
+                          <app-keykeeper-from-entra-badge />
+                        }
                       </div>
                       @if (u.name) {
                         <div class="tw-text-sm tw-text-muted">
@@ -357,6 +361,10 @@
                           >
                             {{ "revoked" | i18n }}
                           </span>
+                        }
+                        <!-- Keykeeper: provisioning (Microsoft Entra ID) manages them. -->
+                        @if (u.keykeeperProvisioned) {
+                          <app-keykeeper-from-entra-badge />
                         }
                       </div>
                       @if (u.name) {

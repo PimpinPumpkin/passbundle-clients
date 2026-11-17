@@ -39,6 +39,10 @@ import {
   KeykeeperOffboarding,
   KeykeeperOffboardingService,
 } from "@bitwarden/web-vault/app/keykeeper/access/offboarding.service";
+import {
+  FROM_ENTRA,
+  FROM_ENTRA_NOTE,
+} from "@bitwarden/web-vault/app/keykeeper/organizations/from-entra.component";
 
 import { GroupApiService, OrganizationUserAdminView, UserAdminService } from "../../../core";
 import { DeleteManagedMemberWarningService } from "../../services/delete-managed-member/delete-managed-member-warning.service";
@@ -451,6 +455,36 @@ describe("EditMemberDialogComponent", () => {
       );
       expect(mocks.memberActionsService.revokeUser).not.toHaveBeenCalled();
       expect(mocks.keykeeperOffboarding.showPasswords).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Keykeeper: a member Microsoft Entra ID manages", () => {
+    const shown = async (params: EditMemberDialogParams) => {
+      const { fixture } = await createComponent(params);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      fixture.detectChanges();
+      const element: HTMLElement = fixture.nativeElement;
+      return {
+        badge: element.querySelector("[data-testid='member-from-entra']"),
+        note: element.querySelector("[data-testid='member-from-entra-note']"),
+      };
+    };
+
+    it("shows the badge where upstream shows its own, and says what Entra ID manages", async () => {
+      const { badge, note } = await shown(defaultParams({ keykeeperProvisioned: true }));
+
+      expect(badge?.textContent?.trim()).toBe(FROM_ENTRA);
+      expect(note?.textContent).toContain(FROM_ENTRA_NOTE);
+    });
+
+    it("shows neither for anyone else", async () => {
+      for (const keykeeperProvisioned of [false, undefined]) {
+        const { badge, note } = await shown(defaultParams({ keykeeperProvisioned }));
+
+        expect(badge).toBeNull();
+        expect(note).toBeNull();
+        TestBed.resetTestingModule();
+      }
     });
   });
 
