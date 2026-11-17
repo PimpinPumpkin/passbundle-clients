@@ -96,6 +96,9 @@
     "authenticationSessionTimedOut": {
       "message": "The authentication session timed out. Please restart the sign-in process."
     },
+    "authenticatorAppDescV2": {
+      "message": "Enter a code from your authenticator app."
+    },
     "awaitingSSODesc": {
       "message": "Please continue to sign in using your company credentials."
     },
