@@ -13,6 +13,7 @@ import { ActivatedRoute, Router } from "@angular/router";
 import { firstValueFrom, switchMap } from "rxjs";
 
 import { InstallCommandParts } from "@bitwarden/admin-console/common";
+import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
@@ -82,6 +83,8 @@ import {
   TechnicianAccess,
 } from "./msp-api.service";
 import { KeykeeperMspJoiningComponent } from "./msp-joining.component";
+import { getMspMemberHealth, MspMemberHealthClient, ownHealthLine } from "./msp-member-health";
+import { KeykeeperMspMemberHealthComponent } from "./msp-member-health.component";
 import { clientPolicySummary } from "./msp-policies";
 import { KeykeeperMspSeatsComponent } from "./msp-seats.component";
 import { KeykeeperMspSiteFixesComponent } from "./msp-site-fixes.component";
@@ -120,6 +123,7 @@ const CLIENT_FEATURES = {
     HeaderModule,
     KeykeeperDefaultPoliciesComponent,
     KeykeeperMspJoiningComponent,
+    KeykeeperMspMemberHealthComponent,
     KeykeeperEventStreamingComponent,
     KeykeeperMspPlanComponent,
     KeykeeperMspSeatsComponent,
@@ -282,6 +286,20 @@ const CLIENT_FEATURES = {
                               ? "synced " + (p.lastUsedAt | date: "short")
                               : "not synced yet"
                           }}
+                        </div>
+                      }
+                      <!-- Keykeeper: its members' own passwords, added up, for staff who manage it (DESIGN.md, "Members' own passwords"). -->
+                      @if (ownHealthLine(ownHealth()?.get(client.id)); as line) {
+                        <div class="tw-text-xs" data-testid="msp-client-own-health">
+                          <button
+                            type="button"
+                            bitLink
+                            class="tw-text-start"
+                            [attr.aria-expanded]="ownHealthFor()?.id === client.id"
+                            (click)="toggleOwnHealth(client)"
+                          >
+                            {{ line }}
+                          </button>
                         </div>
                       }
                       <!-- Keykeeper: people the client took out itself, who stay out (DESIGN.md, "Offboarding"). -->
@@ -620,6 +638,15 @@ const CLIENT_FEATURES = {
                 </bit-table>
               }
             </section>
+          }
+          @if (ownHealthFor(); as client) {
+            @if (ownHealth()?.get(client.id); as view) {
+              <app-keykeeper-msp-member-health
+                [client]="client"
+                [view]="view"
+                [canTurnOn]="m.role === 'admin'"
+              />
+            }
           }
           @if (m.role === "admin") {
             <form
@@ -1042,6 +1069,16 @@ export class KeykeeperMspComponent implements OnInit {
   protected readonly exposedAsked = signal(false);
   /** The client whose passwords to fix are showing. */
   protected readonly detailsFor = signal<MspClient | null>(null);
+  /**
+   * Keykeeper: members' own passwords in the clients the person manages, by
+   * client id (DESIGN.md, "Members' own passwords"); null from a server
+   * without it.
+   */
+  protected readonly ownHealth = signal<Map<string, MspMemberHealthClient> | null>(null);
+  /** The client whose members' own passwords are showing. */
+  protected readonly ownHealthFor = signal<MspClient | null>(null);
+  protected readonly ownHealthLine = ownHealthLine;
+  private readonly apiService = inject(ApiService);
   protected readonly exposedTitle =
     "Passwords found in known data breaches. Only the first 5 characters of each password's SHA-1 hash leave this browser.";
   /**
@@ -1536,11 +1573,25 @@ export class KeykeeperMspComponent implements OnInit {
     this.msp.set(msp);
     this.trusted.set(msp.role === "admin" ? await this.mspApi.trustedClientIds(mspId, msp) : null);
     void this.computeHealth(msp);
+    void this.loadOwnHealth(mspId);
     await this.loadPolicies(mspId);
     await this.loadTemplates(mspId);
     const events = await this.mspApi.listEvents(mspId);
     this.events.set(events);
     this.moreEvents.set(events.length === EVENTS_PER_PAGE);
+  }
+
+  /** Keykeeper: members' own passwords per client; nothing of it shows if it can't be read. */
+  private async loadOwnHealth(mspId: string) {
+    try {
+      this.ownHealth.set(await getMspMemberHealth(this.apiService, mspId));
+    } catch {
+      this.ownHealth.set(null);
+    }
+  }
+
+  protected toggleOwnHealth(client: MspClient) {
+    this.ownHealthFor.set(this.ownHealthFor()?.id === client.id ? null : client);
   }
 
   private async loadTemplates(mspId: string) {

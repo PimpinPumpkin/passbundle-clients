@@ -60,8 +60,11 @@ export function memberHealthRows(
   });
 }
 
-/** The page's totals: members who reported, and their numbers added up. */
-export function memberHealthTotals(rows: MemberHealthRow[]) {
+/**
+ * The page's totals: members who reported, and their numbers added up. The
+ * MSP console adds up a client's reports the same way, named or not.
+ */
+export function memberHealthTotals(rows: MemberHealthReport[]) {
   const reported = rows.filter((r) => r.reportedAt != null);
   const sum = (key: "logins" | "weak" | "reused") =>
     reported.reduce((total, r) => total + (r[key] ?? 0), 0);
