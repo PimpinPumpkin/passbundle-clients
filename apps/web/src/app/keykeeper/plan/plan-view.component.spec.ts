@@ -99,10 +99,28 @@ describe("KeykeeperPlanViewComponent", () => {
   });
 
   it("opens the provider's page to pay, for whoever can pay", async () => {
-    await render(plan({ state: "trial", freeUntil: DEC_15, freeWhy: "trial", canPay: true }));
+    await render(plan({ plan: "families", state: "ended", people: 6, canPay: true }));
     api.send.mockResolvedValue({ url: "https://pay.example.test/session/1" });
 
     expect(button().nativeElement.textContent.trim()).toBe("Set up payment");
+    button().nativeElement.click();
+    await fixture.whenStable();
+
+    expect(api.send).toHaveBeenCalledWith(
+      "POST",
+      "/keykeeper/plan/pay",
+      { organization: "org-1", plan: "families" },
+      true,
+      true,
+    );
+    expect(platformUtils.launchUri).toHaveBeenCalledWith("https://pay.example.test/session/1");
+  });
+
+  it("adds a card for a Business organization billed by the day", async () => {
+    await render(plan({ state: "trial", freeUntil: DEC_15, freeWhy: "trial", canPay: true }));
+    api.send.mockResolvedValue({ url: "https://pay.example.test/session/1" });
+
+    expect(button().nativeElement.textContent.trim()).toBe("Add a card");
     button().nativeElement.click();
     await fixture.whenStable();
 
@@ -141,6 +159,131 @@ describe("KeykeeperPlanViewComponent", () => {
     expect(toastService.showToast).toHaveBeenCalledWith({
       variant: "error",
       message: "The server didn't send a payment page to open.",
+    });
+  });
+
+  describe("the invoices of a plan billed by the day", () => {
+    const pool: PlanWhose = { kind: "msp", id: "msp-1", name: "Contoso IT" };
+    const invoices = {
+      invoices: [
+        {
+          month: "2026-11",
+          seatDays: 311,
+          freeDays: 0,
+          daysInMonth: 30,
+          prorated: 10.37,
+          priceCents: 150,
+          amountCents: 1556,
+          currency: "usd",
+          state: "invoiced",
+          sentAt: "2026-12-01T00:35:00.000000Z",
+        },
+        {
+          month: "2026-10",
+          seatDays: 120,
+          freeDays: 9,
+          daysInMonth: 31,
+          prorated: 3.87,
+          priceCents: 150,
+          amountCents: 581,
+          currency: "usd",
+          state: "pending",
+          sentAt: null,
+        },
+      ],
+    };
+    const rows = () =>
+      fixture.debugElement
+        .queryAll(By.css('[data-testid="keykeeper-plan-invoice"]'))
+        .map((row) =>
+          row
+            .queryAll(By.css("td"))
+            .map((cell) =>
+              (cell.nativeElement as HTMLElement).textContent?.replace(/\s+/g, " ").trim(),
+            ),
+        );
+
+    async function renderWith(answer: unknown, p: KeykeeperPlanEnforced, whose: PlanWhose) {
+      await TestBed.resetTestingModule();
+      api = mock<ApiService>();
+      api.send.mockResolvedValue(answer);
+      platformUtils = mock<PlatformUtilsService>();
+      toastService = mock<ToastService>();
+      await TestBed.configureTestingModule({
+        imports: [KeykeeperPlanViewComponent],
+        providers: [
+          { provide: ApiService, useValue: api },
+          { provide: PlatformUtilsService, useValue: platformUtils },
+          { provide: ToastService, useValue: toastService },
+          {
+            provide: I18nService,
+            useValue: {
+              t: (key: string, ...values: string[]) =>
+                key.startsWith("keykeeper") ? translate(key, ...values) : key,
+              translationLocale: "en-US",
+            },
+          },
+        ],
+      }).compileComponents();
+      fixture = TestBed.createComponent(KeykeeperPlanViewComponent);
+      fixture.componentRef.setInput("plan", p);
+      fixture.componentRef.setInput("whose", whose);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    }
+
+    it("lists the pool's months for its admins: seat-days, prorated seats, the price, the amount, and its state", async () => {
+      await renderWith(invoices, plan({ plan: "msp", storageGb: null, canPay: true }), pool);
+
+      expect(api.send).toHaveBeenCalledWith(
+        "GET",
+        "/keykeeper/plan/invoices?msp=msp-1",
+        null,
+        true,
+        true,
+      );
+      expect(text("keykeeper-plan-invoices").length).toBe(1);
+      expect(fixture.nativeElement.textContent).toContain(
+        "Billed after each month to the card on file: the month's seat-days (its seats each day, added up) divided by its days, times the price a seat.",
+      );
+      expect(rows()).toEqual([
+        ["November 2026", "311", "10.37", "$1.50", "$15.56", "Invoiced"],
+        ["October 2026", "120 (9 of 31 days free)", "3.87", "$1.50", "$5.81", "Being invoiced"],
+      ]);
+      // With a card on file, the button manages it.
+      expect(button().nativeElement.textContent.trim()).toBe("Manage payment");
+    });
+
+    it("says there are none yet, and offers to add a card", async () => {
+      await renderWith(
+        { invoices: [] },
+        plan({ state: "trial", freeUntil: DEC_15, freeWhy: "trial", canPay: true }),
+        acme,
+      );
+      expect(api.send).toHaveBeenCalledWith(
+        "GET",
+        "/keykeeper/plan/invoices?organization=org-1",
+        null,
+        true,
+        true,
+      );
+      expect(text("keykeeper-plan-invoices-none")).toEqual(["No invoices yet."]);
+      expect(rows()).toEqual([]);
+      expect(button().nativeElement.textContent.trim()).toBe("Add a card");
+    });
+
+    it("isn't asked for where the person can't pay, for a client of an MSP, or for a plan paid a year ahead", async () => {
+      for (const [p, whose] of [
+        [plan({ plan: "msp", storageGb: null, canPay: false }), pool],
+        [plan({ coveredBy: { id: "msp-1", name: "Contoso IT" }, canPay: true }), acme],
+        [plan({ plan: "families", people: 6, canPay: true }), acme],
+        [plan({ plan: "premium", canPay: true }), { kind: "person" }],
+      ] as [KeykeeperPlanEnforced, PlanWhose][]) {
+        await renderWith(invoices, p, whose);
+        expect(api.send).not.toHaveBeenCalled();
+        expect(text("keykeeper-plan-invoices")).toEqual([]);
+      }
     });
   });
 });

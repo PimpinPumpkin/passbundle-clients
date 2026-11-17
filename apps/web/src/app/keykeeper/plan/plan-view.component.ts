@@ -1,8 +1,21 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from "@angular/core";
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+} from "@angular/core";
 
 import { KeykeeperPricingLinkComponent } from "@bitwarden/angular/billing/keykeeper";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { KeykeeperPlanEnforced } from "@bitwarden/common/billing/keykeeper/keykeeper-plan";
+import {
+  InvoiceRow,
+  invoiceRows,
+  listsInvoices,
+} from "@bitwarden/common/billing/keykeeper/plan-invoices";
 import {
   dateInWords,
   planPageWords,
@@ -16,14 +29,17 @@ import { ToastService } from "@bitwarden/components";
 
 import { SharedModule } from "../../shared";
 
-import { providerPageAddress } from "./plan-api";
+import { planInvoices, providerPageAddress } from "./plan-api";
 
 /**
  * Keykeeper: one plan, on the Plan page (DESIGN.md, "Plans and billing",
  * "Upstream's billing pages go"): its name, its state and dates in words,
  * whether an MSP covers it, what it gives, and one button that opens the
  * provider's page. The button is there only when the server says the person
- * can pay; until a provider is set, it never is.
+ * can pay; until a provider is set, it never is. For a plan billed by the day
+ * (an MSP's pool, or Business with no MSP), the button adds a card, and the
+ * page lists the months the server invoiced, with what each amount comes
+ * from.
  */
 @Component({
   selector: "app-keykeeper-plan-view",
@@ -76,6 +92,55 @@ import { providerPageAddress } from "./plan-api";
           {{ action.label }}
         </button>
       }
+      @if (invoices(); as rows) {
+        <section
+          class="tw-mt-8"
+          data-testid="keykeeper-plan-invoices"
+          [attr.aria-label]="'keykeeperPlanInvoices' | i18n"
+        >
+          <h3 bitTypography="h5" class="tw-mb-2">{{ "keykeeperPlanInvoices" | i18n }}</h3>
+          <p bitTypography="body2" class="tw-mb-2">{{ "keykeeperPlanInvoicesHow" | i18n }}</p>
+          @if (rows.length === 0) {
+            <p
+              bitTypography="body2"
+              class="tw-mb-0 tw-text-muted"
+              data-testid="keykeeper-plan-invoices-none"
+            >
+              {{ "keykeeperPlanInvoicesNone" | i18n }}
+            </p>
+          } @else {
+            <bit-table>
+              <ng-container header>
+                <tr>
+                  <th bitCell>{{ "keykeeperPlanInvoiceMonth" | i18n }}</th>
+                  <th bitCell>{{ "keykeeperPlanInvoiceSeatDays" | i18n }}</th>
+                  <th bitCell>{{ "keykeeperPlanInvoiceProrated" | i18n }}</th>
+                  <th bitCell>{{ "keykeeperPlanInvoicePrice" | i18n }}</th>
+                  <th bitCell>{{ "keykeeperPlanInvoiceAmount" | i18n }}</th>
+                  <th bitCell>{{ "keykeeperPlanInvoiceState" | i18n }}</th>
+                </tr>
+              </ng-container>
+              <ng-template body>
+                @for (row of rows; track row.month) {
+                  <tr bitRow data-testid="keykeeper-plan-invoice">
+                    <td bitCell>{{ row.month }}</td>
+                    <td bitCell>
+                      {{ row.seatDays }}
+                      @if (row.freeDays) {
+                        <span class="tw-text-muted"> ({{ row.freeDays }})</span>
+                      }
+                    </td>
+                    <td bitCell>{{ row.prorated }}</td>
+                    <td bitCell>{{ row.price }}</td>
+                    <td bitCell>{{ row.amount }}</td>
+                    <td bitCell>{{ row.state }}</td>
+                  </tr>
+                }
+              </ng-template>
+            </bit-table>
+          }
+        </section>
+      }
     </section>
   `,
 })
@@ -91,6 +156,37 @@ export class KeykeeperPlanViewComponent {
   readonly premiumThroughOrganization = input(false);
 
   private readonly date = dateInWords(this.i18n.translationLocale);
+
+  /** The plan's invoices in words, where the page lists them; null where it doesn't. */
+  protected readonly invoices = signal<InvoiceRow[] | null>(null);
+  /** Which asking for invoices is the latest, so an earlier answer never replaces it. */
+  private readonly asking = { latest: 0 };
+
+  constructor() {
+    effect(() => {
+      const plan = this.plan();
+      const whose = this.whose();
+      const asking = ++this.asking.latest;
+      if (!listsInvoices(plan, whose)) {
+        this.invoices.set(null);
+        return;
+      }
+      void planInvoices(this.apiService, whose).then(
+        (invoices) => {
+          if (asking === this.asking.latest) {
+            this.invoices.set(
+              invoiceRows(invoices, translateWith(this.i18n), this.i18n.translationLocale),
+            );
+          }
+        },
+        () => {
+          if (asking === this.asking.latest) {
+            this.invoices.set(null);
+          }
+        },
+      );
+    });
+  }
 
   protected readonly words = computed(() =>
     planPageWords(
