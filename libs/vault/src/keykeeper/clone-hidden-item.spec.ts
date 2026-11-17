@@ -57,7 +57,7 @@ const SECRETS = [
   "older-password",
   "PASSKEY-KEY",
   "4242424242424242",
-  "987",
+  "CVC-987",
   "078-05-1120",
   "P1234567",
   "D7654321",
@@ -112,7 +112,7 @@ function source(type: CipherType): CipherView {
     case CipherType.Card:
       item.card = Object.assign(new CardView(), {
         cardholderName: "Lakeside Clinic",
-        code: "987",
+        code: "CVC-987",
         expMonth: "4",
         expYear: "2030",
       });
