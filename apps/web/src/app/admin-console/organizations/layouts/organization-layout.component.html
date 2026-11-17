@@ -38,12 +38,12 @@
         <bit-nav-item icon="bwi-user" [text]="'members' | i18n" route="members"></bit-nav-item>
       </ng-template>
     </ng-container>
-    <!-- Keykeeper: who can see what, for whoever manages members. -->
+    <!-- Keykeeper: who can see what, for whoever manages members, where the organization has the company features (not a family). -->
     <bit-nav-item
       icon="bwi-eye"
       [text]="'keykeeperAccess' | i18n"
       route="access"
-      *ngIf="organization.canManageUsers"
+      *ngIf="organization.canManageUsers && hasCompanyFeatures(organization)"
     ></bit-nav-item>
 
     <bit-nav-item
@@ -58,16 +58,17 @@
       route="reporting"
       *ngIf="canShowReportsTab(organization)"
     >
+      <!-- Keykeeper: the event log only where the organization has one; upstream's upgrade page in its place is gone. -->
       <bit-nav-item
         [text]="'eventLogs' | i18n"
         route="reporting/events"
-        *ngIf="organization.canAccessEventLogs || organization.isOwner"
+        *ngIf="canShowEventLogs(organization)"
       ></bit-nav-item>
-      <!-- Keykeeper: where the organization's events are sent. -->
+      <!-- Keykeeper: where the organization's events are sent, where it has the company features. -->
       <bit-nav-item
         [text]="'keykeeperEventStreaming' | i18n"
         route="reporting/event-streaming"
-        *ngIf="organization.isAdmin"
+        *ngIf="organization.isAdmin && hasCompanyFeatures(organization)"
       ></bit-nav-item>
       <bit-nav-item
         [text]="'reports' | i18n"
@@ -146,11 +147,11 @@
         route="settings/scim"
         *ngIf="organization.canManageScim"
       ></bit-nav-item>
-      <!-- Keykeeper: provisioning from Microsoft Entra ID. The server answers only those who manage it. -->
+      <!-- Keykeeper: provisioning from Microsoft Entra ID, where the organization has the company features. The server answers only those who manage it. -->
       <bit-nav-item
         text="Provisioning"
         route="settings/provisioning"
-        *ngIf="organization.isAdmin"
+        *ngIf="organization.isAdmin && hasCompanyFeatures(organization)"
       ></bit-nav-item>
     </bit-nav-group>
   </app-side-nav>

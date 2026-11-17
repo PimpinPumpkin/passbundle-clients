@@ -20,6 +20,7 @@ import { ReusedPasswordsReportComponent } from "../../../dirt/reports/pages/orga
 import { UnsecuredWebsitesReportComponent } from "../../../dirt/reports/pages/organizations/unsecured-websites-report.component";
 // eslint-disable-next-line no-restricted-imports
 import { WeakPasswordsReportComponent } from "../../../dirt/reports/pages/organizations/weak-passwords-report.component";
+import { hasCompanyFeatures } from "../../../keykeeper/plan/company-features";
 import { isPaidOrgGuard } from "../guards/is-paid-org.guard";
 import { organizationPermissionsGuard } from "../guards/org-permissions.guard";
 import { organizationRedirectGuard } from "../guards/org-redirect.guard";
@@ -118,10 +119,13 @@ export const organizationReportingRoutes: Routes = [
           },
         ],
       },
+      // Keykeeper: only where the organization has an event log. Upstream
+      // showed owners an upgrade page here, which read a billing API this
+      // server never had.
       {
         path: "events",
         component: EventsComponent,
-        canActivate: [organizationPermissionsGuard((org) => org.canAccessEventLogs || org.isOwner)],
+        canActivate: [organizationPermissionsGuard((org) => org.canAccessEventLogs)],
         data: {
           titleId: "eventLogs",
         },
@@ -135,7 +139,9 @@ export const organizationReportingRoutes: Routes = [
           import("../../../keykeeper/event-streaming/org-event-streaming.component").then(
             (m) => m.KeykeeperOrgEventStreamingComponent,
           ),
-        canActivate: [organizationPermissionsGuard((org) => org.isAdmin)],
+        canActivate: [
+          organizationPermissionsGuard((org) => org.isAdmin && hasCompanyFeatures(org)),
+        ],
         data: {
           titleId: "keykeeperEventStreaming",
         },
