@@ -132,18 +132,15 @@ describe("RegistrationStartComponent, on a server that may not take new accounts
     expect(sentence()).toBeUndefined();
   });
 
-  // Keykeeper: upstream linked "Unsubscribe" to an email preferences page on its website, which
-  // ours doesn't have. The extension, which isn't self-hosted, offers the emails.
-  it("says the emails can be stopped at any time without linking anywhere", async () => {
+  // Keykeeper: the server sends no update emails, so sign-up doesn't offer them, in the
+  // extension (not self-hosted) or the web vault.
+  it.each([false, true])("doesn't offer update emails (self-hosted: %s)", async (selfHost) => {
     registrationDisabled$.next(false);
-    component().isSelfHost = false;
+    component().isSelfHost = selfHost;
     await settle();
 
-    const label = el().querySelector('[for="register-start-form-input-receive-marketing-emails"]');
-    expect(label?.textContent?.replace(/\s+/g, " ").trim()).toBe(
-      "receiveMarketingEmails unsubscribe atAnyTime",
-    );
-    expect(label?.querySelector("a")).toBeNull();
+    expect(form()).not.toBeNull();
+    expect(el().querySelector("#register-start-form-input-receive-marketing-emails")).toBeNull();
   });
 
   it("follows the server when its settings change", async () => {
