@@ -1123,6 +1123,21 @@
     },
     "sendAccessTaglineProductDesc": {
       "message": "{brand} Send shares sensitive information with others, encrypted, for a limited time."
+    },
+    "customNonEnterpriseError": {
+      "message": "That's part of the Business plan."
+    },
+    "inviteMultipleEmailsWithSeatLimit": {
+      "message": "Enter up to $BATCHLIMIT$ emails, separated by commas. This family has room for $REMAININGSEATS$ more."
+    },
+    "inviteSingleEmailDesc": {
+      "message": "This family has room for 1 more."
+    },
+    "inviteZeroEmailDesc": {
+      "message": "This family has no room for anyone else. Remove someone first."
+    },
+    "tooManyEmailsForRemainingSeats": {
+      "message": "This family has room for $COUNT$ more. Remove an email address."
     }
   },
   "browser": {

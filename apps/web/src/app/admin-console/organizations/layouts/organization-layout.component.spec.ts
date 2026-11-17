@@ -295,6 +295,36 @@ describe("OrganizationLayoutComponent", () => {
       });
     });
 
+    // Keykeeper: no upgrade page for an owner without an event log, and our
+    // pages for the company features hidden from a family.
+    describe("canShowEventLogs", () => {
+      it("returns true when canAccessEventLogs", () => {
+        expect(component.canShowEventLogs(makeOrg({ canAccessEventLogs: true }))).toBe(true);
+      });
+
+      it("returns false for an owner without the event log", () => {
+        expect(
+          component.canShowEventLogs(
+            makeOrg({ isOwner: true, canAccessEventLogs: false, useEvents: false }),
+          ),
+        ).toBe(false);
+      });
+    });
+
+    describe("hasCompanyFeatures", () => {
+      it("returns true when the organization has policies, as every organization but a family does", () => {
+        expect(component.hasCompanyFeatures(makeOrg({ usePolicies: true }))).toBe(true);
+      });
+
+      it("returns false for a family, which has none of them", () => {
+        expect(
+          component.hasCompanyFeatures(
+            makeOrg({ usePolicies: false, useGroups: false, useEvents: false }),
+          ),
+        ).toBe(false);
+      });
+    });
+
     describe("getReportTabLabel", () => {
       it("returns 'reporting' when org.useEvents is true", () => {
         expect(component.getReportTabLabel(makeOrg({ useEvents: true }))).toBe("reporting");

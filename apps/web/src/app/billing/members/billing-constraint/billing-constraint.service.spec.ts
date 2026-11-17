@@ -628,4 +628,114 @@ describe("BillingConstraintService", () => {
       });
     });
   });
+  // Keykeeper: a family on a server that enforces plans (DESIGN.md, "Plans
+  // and billing"): the invite form and restoring stop at its six people with
+  // the server's own sentence, and no upgrade dialog or billing page opens.
+  describe("a family where plans are enforced", () => {
+    const family = (overrides: Partial<Organization> = {}) =>
+      createMockOrganization({
+        seats: 6,
+        productTierType: ProductTierType.Families,
+        keykeeperPlan: {
+          enforced: true,
+          plan: "families",
+          state: "active",
+          freeUntil: null,
+          freeWhy: null,
+          until: null,
+          renews: null,
+          endsAt: null,
+          storageGb: 6,
+          people: 6,
+          coveredBy: null,
+          canManage: true,
+          canPay: false,
+        },
+        ...overrides,
+      });
+
+    it("counts the seats it has taken, and has room below six", () => {
+      expect(
+        service.checkSeatLimit(
+          family(),
+          createMockBillingMetadata({ organizationOccupiedSeats: 5 }),
+        ),
+      ).toEqual({
+        canAddUsers: true,
+      });
+      expect(
+        service.checkSeatLimit(
+          family(),
+          createMockBillingMetadata({ organizationOccupiedSeats: 6 }),
+        ),
+      ).toEqual({
+        canAddUsers: false,
+        reason: "fixed-seat-limit",
+        shouldShowUpgradeDialog: true,
+        occupiedSeats: 6,
+      });
+      expect(
+        service.checkSeatLimit(
+          family(),
+          createMockBillingMetadata({ organizationOccupiedSeats: 8 }),
+        ).occupiedSeats,
+      ).toBe(8);
+    });
+
+    it.each(["invite", "restore"] as const)(
+      "says why in the server's sentence on %s, and opens no upgrade dialog, for an owner too",
+      async (action) => {
+        for (const canEditSubscription of [true, false]) {
+          jest.clearAllMocks();
+          const organization = family({ canEditSubscription });
+          const result = service.checkSeatLimit(
+            organization,
+            createMockBillingMetadata({ organizationOccupiedSeats: 6 }),
+          );
+
+          const reached = await service.seatLimitReached(result, organization, action);
+
+          expect(reached).toBe(true);
+          expect(i18nService.t).toHaveBeenCalledWith("keykeeperFamilyFull", 6, 6);
+          expect(toastService.showToast).toHaveBeenCalledWith({
+            variant: "error",
+            message: "translated-text",
+          });
+          expect(openChangePlanDialog).not.toHaveBeenCalled();
+          expect(dialogService.openSimpleDialogRef).not.toHaveBeenCalled();
+          expect(router.navigate).not.toHaveBeenCalled();
+        }
+      },
+    );
+
+    it("says how many it has when it has more than its plan covers", async () => {
+      const organization = family();
+      const result = service.checkSeatLimit(
+        organization,
+        createMockBillingMetadata({ organizationOccupiedSeats: 8 }),
+      );
+
+      await service.seatLimitReached(result, organization, "invite");
+
+      expect(i18nService.t).toHaveBeenCalledWith("keykeeperFamilyFull", 6, 8);
+    });
+
+    it("leaves upstream's answer as it is where plans aren't enforced", async () => {
+      const organization = family({ keykeeperPlan: { enforced: false } });
+      const result = service.checkSeatLimit(
+        organization,
+        createMockBillingMetadata({ organizationOccupiedSeats: 6 }),
+      );
+      expect(result.occupiedSeats).toBeUndefined();
+
+      await service.seatLimitReached(result, organization, "invite");
+
+      expect(openChangePlanDialog).toHaveBeenCalled();
+      expect(i18nService.t).not.toHaveBeenCalledWith(
+        "keykeeperFamilyFull",
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+  });
 });

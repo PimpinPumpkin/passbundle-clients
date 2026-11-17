@@ -35,6 +35,7 @@ import { TaxIdWarningComponent } from "@bitwarden/web-vault/app/billing/warnings
 import { TaxIdWarningType } from "@bitwarden/web-vault/app/billing/warnings/types";
 
 import { FreeFamiliesPolicyService } from "../../../billing/services/free-families-policy.service";
+import { hasCompanyFeatures } from "../../../keykeeper/plan/company-features";
 import { hasOrganizationPlanPage } from "../../../keykeeper/plan/plan-pages";
 import { OrgSwitcherComponent } from "../../../layouts/org-switcher/org-switcher.component";
 import { WebLayoutModule } from "../../../layouts/web-layout.module";
@@ -183,6 +184,20 @@ export class OrganizationLayoutComponent {
 
   canShowAccessIntelligenceTab(organization: Organization): boolean {
     return canAccessAccessIntelligence(organization);
+  }
+
+  /**
+   * Keykeeper: the event log, for whoever may read it where the organization
+   * has one. Upstream also showed owners an upgrade page in its place, which
+   * read a billing API this server never had.
+   */
+  canShowEventLogs(organization: Organization): boolean {
+    return organization.canAccessEventLogs;
+  }
+
+  /** Keykeeper: our pages for the company features, which a family doesn't have. */
+  hasCompanyFeatures(organization: Organization): boolean {
+    return hasCompanyFeatures(organization);
   }
 
   getReportTabLabel(organization: Organization): string {
