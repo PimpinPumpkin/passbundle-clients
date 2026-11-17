@@ -1747,6 +1747,55 @@
   "keykeeperPlanManage": {
     "message": "Manage payment"
   },
+  "keykeeperPlanAddCard": {
+    "message": "Add a card"
+  },
+  "keykeeperPlanInvoices": {
+    "message": "Invoices"
+  },
+  "keykeeperPlanInvoicesHow": {
+    "message": "Billed after each month to the card on file: the month's seat-days (its seats each day, added up) divided by its days, times the price a seat. Adding a card charges nothing, and days before a trial or an offer ends aren't billed."
+  },
+  "keykeeperPlanInvoicesNone": {
+    "message": "No invoices yet."
+  },
+  "keykeeperPlanInvoiceMonth": {
+    "message": "Month"
+  },
+  "keykeeperPlanInvoiceSeatDays": {
+    "message": "Seat-days"
+  },
+  "keykeeperPlanInvoiceProrated": {
+    "message": "Prorated seats"
+  },
+  "keykeeperPlanInvoicePrice": {
+    "message": "Price a seat"
+  },
+  "keykeeperPlanInvoiceAmount": {
+    "message": "Amount"
+  },
+  "keykeeperPlanInvoiceState": {
+    "message": "State"
+  },
+  "keykeeperPlanInvoiceFreeDays": {
+    "message": "$FREE$ of $DAYS$ days free",
+    "placeholders": {
+      "free": {
+        "content": "$1",
+        "example": "9"
+      },
+      "days": {
+        "content": "$2",
+        "example": "30"
+      }
+    }
+  },
+  "keykeeperPlanInvoiceSent": {
+    "message": "Invoiced"
+  },
+  "keykeeperPlanInvoicePending": {
+    "message": "Being invoiced"
+  },
   "keykeeperPlanSeePlan": {
     "message": "See plan"
   },

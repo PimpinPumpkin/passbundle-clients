@@ -4,13 +4,19 @@
 // or an MSP's pool, to whoever may manage it. `POST /api/keykeeper/plan/pay`
 // and `/manage` answer an address on the provider's site, and exist only
 // where a provider is set; the page asks for one only when `keykeeperPlan`
-// says the person can pay (`canPay`).
+// says the person can pay (`canPay`). `GET /api/keykeeper/plan/invoices`
+// answers the months a plan billed by the day was invoiced for, to the same
+// people.
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import {
   KeykeeperPlan,
   KeykeeperPlanEnforced,
   keykeeperPlanFrom,
 } from "@bitwarden/common/billing/keykeeper/keykeeper-plan";
+import {
+  KeykeeperPlanInvoice,
+  planInvoicesFrom,
+} from "@bitwarden/common/billing/keykeeper/plan-invoices";
 import {
   PlanAction,
   planToPayFor,
@@ -61,4 +67,21 @@ export async function providerPageAddress(
     throw new Error("The server didn't send a payment page to open.");
   }
   return address;
+}
+
+/** The months a plan billed by the day was invoiced for, newest first. */
+export async function planInvoices(
+  apiService: ApiService,
+  whose: PlanWhose,
+): Promise<KeykeeperPlanInvoice[]> {
+  const fields = whoseFields(whose);
+  const query = new URLSearchParams(fields as Record<string, string>).toString();
+  const answer = await apiService.send(
+    "GET",
+    `/keykeeper/plan/invoices${query === "" ? "" : `?${query}`}`,
+    null,
+    true,
+    true,
+  );
+  return planInvoicesFrom(answer);
 }
