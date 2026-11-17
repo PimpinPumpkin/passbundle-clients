@@ -23,6 +23,12 @@ const at = (ms: number) => new Date(NOW.getTime() + ms).toISOString();
 const STAYS =
   "If it isn't paid for by then, nothing new can be added to it. Everything in it can still be opened, changed, exported, and deleted.";
 
+/** Two-step codes, for Premium and Families: they need Premium, and the keys stay. */
+const CODES_YOURS =
+  "Without Premium, two-step login codes don't show on your items; their keys stay, and the codes come back with Premium.";
+const CODES_MEMBERS =
+  "Without Premium, members' two-step login codes don't show on their own items; the keys stay, and the codes come back with Premium.";
+
 function plan(fields: Partial<KeykeeperPlanEnforced>): KeykeeperPlanEnforced {
   return {
     enforced: true,
@@ -242,10 +248,10 @@ describe("what a plan banner says", () => {
       `Acme Dental is free until December 15, 2026. ${STAYS}`,
     ]);
     expect(say(plan({ ...trial(7 * DAY), plan: "premium" }), [])).toEqual([
-      "Your Premium trial ends on December 15, 2026. If it isn't paid for by then, attaching files, sending files, and the data breach report stop. Everything you saved stays.",
+      `Your Premium trial ends on December 15, 2026. If it isn't paid for by then, attaching files, sending files, and the data breach report stop. Everything you saved stays. ${CODES_YOURS}`,
     ]);
     expect(say(plan({ ...trial(7 * DAY, "offer"), plan: "premium" }), [])).toEqual([
-      "Premium is free for you until December 15, 2026. If it isn't paid for by then, attaching files, sending files, and the data breach report stop. Everything you saved stays.",
+      `Premium is free for you until December 15, 2026. If it isn't paid for by then, attaching files, sending files, and the data breach report stop. Everything you saved stays. ${CODES_YOURS}`,
     ]);
     expect(pool(plan({ ...trial(7 * DAY), plan: "msp" }))).toBe(
       "The trial for Contoso IT ends on December 15, 2026. If it isn't paid for by then, nothing new can be added to your clients. Everything in them can still be opened, changed, exported, and deleted.",
@@ -259,16 +265,39 @@ describe("what a plan banner says", () => {
     const due = plan({ state: "paymentDue", until: at(-7 * DAY), renews: true });
     const dueEnds = plan({ ...due, endsAt: at(7 * DAY) });
     expect(say(plan({ ...due, plan: "premium" }), [org("Acme Dental", due)])).toEqual([
-      "A payment for your Premium is due. It was paid through December 1, 2026.",
+      `A payment for your Premium is due. It was paid through December 1, 2026. ${CODES_YOURS}`,
       "A payment for Acme Dental is due. It was paid through December 1, 2026.",
     ]);
     expect(say(plan({ ...dueEnds, plan: "premium" }), [org("Acme Dental", dueEnds)])).toEqual([
-      "A payment for your Premium is due. It was paid through December 1, 2026, and it ends on December 15, 2026 if it isn't paid by then.",
+      `A payment for your Premium is due. It was paid through December 1, 2026, and it ends on December 15, 2026 if it isn't paid by then. ${CODES_YOURS}`,
       "A payment for Acme Dental is due. It was paid through December 1, 2026, and it ends on December 15, 2026 if it isn't paid by then.",
     ]);
     expect(pool(plan({ ...dueEnds, plan: "msp" }))).toBe(
       "A payment for Contoso IT is due. It was paid through December 1, 2026, and it ends on December 15, 2026 if it isn't paid by then.",
     );
+  });
+
+  it("for Families, what happens to members' two-step codes, and for Business and a pool, nothing about them", () => {
+    const family = (p: KeykeeperPlanEnforced) => plan({ ...p, plan: "families" });
+    expect(say(free, [org("The Lopez family", family(trial(7 * DAY, "offer")))])).toEqual([
+      `The Lopez family is free until December 15, 2026. ${STAYS} ${CODES_MEMBERS}`,
+    ]);
+    const due = plan({ state: "paymentDue", until: at(-7 * DAY), renews: true });
+    expect(say(free, [org("The Lopez family", family(due))])).toEqual([
+      `A payment for The Lopez family is due. It was paid through December 1, 2026. ${CODES_MEMBERS}`,
+    ]);
+    expect(say(free, [org("The Lopez family", family(plan({ state: "ended" })))])).toEqual([
+      `The plan for The Lopez family has ended, so nothing new can be added to it. Everything in it can still be opened, changed, exported, and deleted. ${CODES_MEMBERS}`,
+    ]);
+    const business = [
+      org("Acme Dental", trial(7 * DAY)),
+      org("Acme Labs", due),
+      org("Acme Tools", plan({ state: "ended" })),
+    ];
+    for (const words of say(free, business)) {
+      expect(words).not.toContain("two-step");
+    }
+    expect(pool(plan({ ...trial(7 * DAY), plan: "msp" }))).not.toContain("two-step");
   });
 
   it("once an organization's plan has ended", () => {

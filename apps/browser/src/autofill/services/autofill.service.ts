@@ -41,6 +41,7 @@ import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { FieldType, CipherType } from "@bitwarden/common/vault/enums";
 import { CipherRepromptType } from "@bitwarden/common/vault/enums/cipher-reprompt-type";
 import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
+import { showsTwoStepCode } from "@bitwarden/common/vault/keykeeper/two-step-codes";
 import { CardView } from "@bitwarden/common/vault/models/view/card.view";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
@@ -615,6 +616,21 @@ export default class AutofillService implements AutofillServiceInterface {
     }
 
     return Object.freeze({ outcome });
+  }
+
+  /**
+   * Keykeeper: whether an item's two-step code may show, be copied, and fill
+   * for the active account: with Premium, or where the item's organization
+   * gives codes (two-step-codes.ts), as `doAutoFill` decides it.
+   */
+  async showsTotp(cipher: CipherView): Promise<boolean> {
+    const activeAccount = await firstValueFrom(this.accountService.activeAccount$);
+    const hasPremium =
+      !!activeAccount?.id &&
+      (await firstValueFrom(
+        this.billingAccountProfileStateService.hasPremiumFromAnySource$(activeAccount.id),
+      ));
+    return showsTwoStepCode(cipher, hasPremium);
   }
 
   /**

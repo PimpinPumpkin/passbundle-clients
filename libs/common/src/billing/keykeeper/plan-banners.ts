@@ -140,12 +140,27 @@ export function poolBanner(
   );
 }
 
-/** What a banner says. */
+/**
+ * What a banner says, with, for Premium and Families, what happens to
+ * two-step codes, which need Premium (DESIGN.md, "Plans and billing",
+ * decision 2): they stop showing, and the keys stay.
+ */
 export function planBannerWords(
   banner: KeykeeperPlanBanner,
   t: Translate,
   date: DateInWords,
 ): string {
+  const words = bannerWords(banner, t, date);
+  const codes =
+    banner.whose.kind === "person"
+      ? "keykeeperPlanBannerCodesYou"
+      : banner.whose.kind === "organization" && banner.plan.plan === "families"
+        ? "keykeeperPlanBannerCodesMembers"
+        : null;
+  return codes == null ? words : `${words} ${t(codes)}`;
+}
+
+function bannerWords(banner: KeykeeperPlanBanner, t: Translate, date: DateInWords): string {
   const { plan, whose } = banner;
   const name = whose.kind === "person" ? "" : whose.name;
   switch (banner.kind) {
