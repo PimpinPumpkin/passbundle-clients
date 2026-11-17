@@ -1551,6 +1551,9 @@
   "keykeeperPlanBreachReport": {
     "message": "The data breach report is part of Premium."
   },
+  "keykeeperPlanTwoStepCodes": {
+    "message": "Two-step login codes are part of Premium."
+  },
   "keykeeperPlanOrganization": {
     "message": "Your organization's plan doesn't include that."
   },
@@ -1929,6 +1932,12 @@
         "example": "Acme Dental"
       }
     }
+  },
+  "keykeeperPlanBannerCodesYou": {
+    "message": "Without Premium, two-step login codes don't show on your items; their keys stay, and the codes come back with Premium."
+  },
+  "keykeeperPlanBannerCodesMembers": {
+    "message": "Without Premium, members' two-step login codes don't show on their own items; the keys stay, and the codes come back with Premium."
   },
   "keykeeperPlanBannerPoolEnded": {
     "message": "The plan for $NAME$ has ended, so nothing new can be added to your clients. Everything in them can still be opened, changed, exported, and deleted.",

@@ -2261,6 +2261,8 @@ describe("OverlayBackground", () => {
 
       beforeEach(() => {
         totpService.getCode$.mockReturnValue(of({ code: "123456", period: 30 }));
+        // With Premium, or an organization that gives codes (two-step-codes.ts).
+        autofillService.showsTotp.mockResolvedValue(true);
       });
 
       it("shows the code to someone who can see the item's passwords", async () => {
@@ -2283,6 +2285,32 @@ describe("OverlayBackground", () => {
         expect(data.login.totp).toBe("●●●●●●");
         expect(JSON.stringify(data)).not.toContain("123456");
         expect(JSON.stringify(data)).not.toContain("JBSWY3DPEHPK3PXP");
+      });
+
+      it("shows no code, nor offers it to the fill picker, where codes need Premium", async () => {
+        autofillService.showsTotp.mockResolvedValue(false);
+        const cipher = login(true);
+        const data = await overlayBackground["buildCipherData"]({
+          inlineMenuCipherId: "inline-menu-cipher-0",
+          cipher,
+          showFavicons: false,
+          iconsServerUrl: "https://icons.example.test",
+        } as any);
+        expect(autofillService.showsTotp).toHaveBeenCalledWith(cipher);
+        expect(data.login.totp).toBeUndefined();
+        expect(totpService.getCode$).not.toHaveBeenCalled();
+        expect(JSON.stringify(data)).not.toContain("123456");
+        expect(data.keykeeperFillChoices?.map((c) => c.key)).not.toContain("t");
+      });
+
+      it("offers the code to the fill picker where it shows", async () => {
+        const data = await overlayBackground["buildCipherData"]({
+          inlineMenuCipherId: "inline-menu-cipher-0",
+          cipher: login(true),
+          showFavicons: false,
+          iconsServerUrl: "https://icons.example.test",
+        } as any);
+        expect(data.keykeeperFillChoices?.map((c) => c.key)).toContain("t");
       });
     });
 
@@ -4300,6 +4328,35 @@ describe("OverlayBackground", () => {
             expect(listPortSpy.postMessage).toHaveBeenCalledWith({
               command: "triggerDelayedAutofillInlineMenuClosure",
             });
+          });
+
+          // Keykeeper: two-step codes need Premium, or an organization that
+          // gives codes (two-step-codes.ts).
+          it("copies the login's two-step code after its passkey only where codes show", async () => {
+            cipher1.login.totp = "JBSWY3DPEHPK3PXP";
+            cipher1.viewPassword = true;
+            totpService.getCode$.mockReturnValue(of({ code: "123456", period: 30 }));
+            const copyToClipboardSpy = jest
+              .spyOn(overlayBackground["platformUtilsService"], "copyToClipboard")
+              .mockImplementation();
+            const fill = async () => {
+              sendPortMessage(listMessageConnectorSpy, {
+                command: "fillAutofillInlineMenuCipher",
+                inlineMenuCipherId: "inline-menu-cipher-1",
+                usePasskey: true,
+                portKey,
+              });
+              await flushPromises();
+            };
+
+            autofillService.showsTotp.mockResolvedValue(false);
+            await fill();
+            expect(autofillService.showsTotp).toHaveBeenCalledWith(cipher1);
+            expect(copyToClipboardSpy).not.toHaveBeenCalled();
+
+            autofillService.showsTotp.mockResolvedValue(true);
+            await fill();
+            expect(copyToClipboardSpy).toHaveBeenCalledWith("123456");
           });
         });
       });

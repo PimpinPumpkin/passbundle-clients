@@ -78,7 +78,7 @@ describe("Keykeeper fill picker menu", () => {
       const cipher = bankItem();
       cipher.login.totp = "JBSWY3DPEHPK3PXP";
 
-      expect(choicesFor(cipher, words).map((c) => c.title)).toEqual([
+      expect(choicesFor(cipher, words, true).map((c) => c.title)).toEqual([
         "Benutzername",
         "Passwort",
         "Verifizierungscode",
@@ -86,9 +86,27 @@ describe("Keykeeper fill picker menu", () => {
         "Never fill this field",
       ]);
       // The keys stay the same, so a pick means the same in any language.
-      expect(choicesFor(cipher, words).map((c) => c.key)).toEqual(
-        choicesFor(cipher).map((c) => c.key),
+      expect(choicesFor(cipher, words, true).map((c) => c.key)).toEqual(
+        choicesFor(cipher, undefined, true).map((c) => c.key),
       );
+    });
+
+    // Two-step codes need Premium, or an organization that gives codes
+    // (two-step-codes.ts): the picker offers an item's code only where it shows.
+    it("offers the two-step code only where it shows", () => {
+      const cipher = bankItem();
+      cipher.login.totp = "JBSWY3DPEHPK3PXP";
+
+      expect(choicesFor(cipher, undefined, true).map((c) => c.key)).toEqual([
+        "u",
+        "p",
+        "t",
+        "f0",
+        "n",
+      ]);
+      expect(choicesFor(cipher, undefined, false).map((c) => c.key)).toEqual(["u", "p", "f0", "n"]);
+      // Unless told it shows, it doesn't.
+      expect(choicesFor(cipher).map((c) => c.key)).toEqual(["u", "p", "f0", "n"]);
     });
 
     it("hides the password and hidden fields when the item doesn't allow viewing them", () => {
@@ -178,6 +196,27 @@ describe("Keykeeper fill picker menu", () => {
       ]);
     });
 
+    it("lists an item's two-step code only where it shows", async () => {
+      const original = keykeeperFillPicker.showsTotp;
+      const cipher = bankItem();
+      cipher.login.totp = "JBSWY3DPEHPK3PXP";
+      try {
+        keykeeperFillPicker.showsTotp = async () => false;
+        await addCipherToFillFieldMenu(cipher);
+        const ids = () => createSpy.mock.calls.map(([props]) => props.id);
+        expect(ids()).not.toContain(`${FILL_FIELD_ID}_${cipherId}_t`);
+
+        createdFillFieldMenuIds.clear();
+        createSpy.mockClear();
+        keykeeperFillPicker.showsTotp = async () => true;
+        await addCipherToFillFieldMenu(cipher);
+        expect(ids()).toContain(`${FILL_FIELD_ID}_${cipherId}_t`);
+      } finally {
+        keykeeperFillPicker.showsTotp = original;
+        createdFillFieldMenuIds.clear();
+      }
+    });
+
     it("ignores items that aren't logins", async () => {
       const note = bankItem();
       note.type = CipherType.SecureNote;
@@ -206,6 +245,7 @@ describe("Keykeeper fill picker menu", () => {
       openReprompt: jest.Mock<Promise<void>, [chrome.tabs.Tab, CipherView]>;
     };
     const originalMatches = keykeeperFillPicker.itemMatches;
+    const originalShowsTotp = keykeeperFillPicker.showsTotp;
     let tabSendMessage: jest.SpyInstance;
     /** The page or frame the right-clicked field is in. */
     let frameUrl: string;
@@ -246,6 +286,7 @@ describe("Keykeeper fill picker menu", () => {
     afterEach(() => {
       jest.restoreAllMocks();
       keykeeperFillPicker.itemMatches = originalMatches;
+      keykeeperFillPicker.showsTotp = originalShowsTotp;
     });
 
     const click = (key: string) =>
@@ -292,6 +333,42 @@ describe("Keykeeper fill picker menu", () => {
 
     const filled = () =>
       tabSendMessage.mock.calls.some(([, message]) => message.command === "fillForm");
+
+    it("fills the item's current two-step code where it shows, and nothing where it doesn't", async () => {
+      cipher.login.totp = "JBSWY3DPEHPK3PXP";
+
+      keykeeperFillPicker.showsTotp = async () => false;
+      expect(await click("t")).toBe(true);
+      expect(filled()).toBe(false);
+      expect(readFillRules(cipher)).toEqual([]);
+      expect(deps.cipherService.updateWithServer).not.toHaveBeenCalled();
+
+      keykeeperFillPicker.showsTotp = async () => true;
+      expect(await click("t")).toBe(true);
+      expect(tabSendMessage).toHaveBeenCalledWith(
+        tab,
+        expect.objectContaining({
+          command: "fillForm",
+          fillScript: expect.objectContaining({
+            script: expect.arrayContaining([["fill_by_opid", "__3", "123456"]]),
+          }),
+        }),
+        { frameId: 0 },
+      );
+      expect(readFillRules(cipher)[0].fill).toEqual({ from: "totp" });
+    });
+
+    it("drops a two-step code pick waiting for the master password if codes stopped showing meanwhile", async () => {
+      cipher.login.totp = "JBSWY3DPEHPK3PXP";
+      deps.passwordRepromptRequired.mockResolvedValue(true);
+      keykeeperFillPicker.showsTotp = async () => true;
+      await click("t");
+      keykeeperFillPicker.showsTotp = async () => false;
+
+      expect(await finishPickAfterReprompt(cipherId, true)).toBe(false);
+      expect(filled()).toBe(false);
+      expect(readFillRules(cipher)).toEqual([]);
+    });
 
     it("asks for the master password first for any value of an item that wants it, and saves nothing until then", async () => {
       deps.passwordRepromptRequired.mockResolvedValue(true);

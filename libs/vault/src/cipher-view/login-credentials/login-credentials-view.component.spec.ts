@@ -2,7 +2,7 @@ import { DebugElement } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
 import { mock } from "jest-mock-extended";
-import { BehaviorSubject } from "rxjs";
+import { BehaviorSubject, NEVER } from "rxjs";
 
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions";
@@ -13,6 +13,7 @@ import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/pl
 import { mockAccountInfoWith } from "@bitwarden/common/spec";
 import { UserId } from "@bitwarden/common/types/guid";
 import { PremiumUpgradePromptService } from "@bitwarden/common/vault/abstractions/premium-upgrade-prompt.service";
+import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { Fido2CredentialView } from "@bitwarden/common/vault/models/view/fido2-credential.view";
@@ -77,6 +78,8 @@ describe("LoginCredentialsViewComponent", () => {
         { provide: ToastService, useValue: mock<ToastService>() },
         { provide: I18nService, useValue: { t: (...keys: string[]) => keys.join(" ") } },
         { provide: ConfigService, useValue: mock<ConfigService>() },
+        // A code that never arrives: the countdown shows without sending one.
+        { provide: TotpService, useValue: mock<TotpService>({ getCode$: () => NEVER }) },
       ],
     }).compileComponents();
 
@@ -230,6 +233,62 @@ describe("LoginCredentialsViewComponent", () => {
       const fido2Input = fido2Field.query(By.css("input")).nativeElement;
 
       expect(fido2Input.value).toBe("dateCreated 2/2/24 6:00PM");
+    });
+  });
+
+  describe("Keykeeper: two-step codes need Premium", () => {
+    const withKey = (organizationUseTotp: boolean) => {
+      const login = new LoginView();
+      login.username = "cipher-username";
+      login.password = "cipher-password";
+      login.totp = "JBSWY3DPEHPK3PXP";
+      return {
+        id: "cipher-id",
+        name: "Mock Cipher",
+        type: CipherType.Login,
+        viewPassword: true,
+        organizationUseTotp,
+        login,
+      } as CipherView;
+    };
+
+    const show = (cipher: CipherView, premium: boolean) => {
+      hasPremiumFromAnySource$.next(premium);
+      fixture.componentRef.setInput("activeUserId", mockAccount.id);
+      component.cipher = cipher;
+      fixture.detectChanges();
+    };
+
+    const find = (selector: string) => fixture.debugElement.queryAll(By.css(selector));
+
+    afterEach(() => hasPremiumFromAnySource$.next(true));
+
+    it("shows the code and its copy with Premium", () => {
+      show(withKey(false), true);
+      expect(find("[bitTotpCountdown]")).toHaveLength(1);
+      expect(find('[data-testid="copy-totp"]')).toHaveLength(1);
+      expect(find('[data-testid="keykeeper-totp-needs-premium"]')).toHaveLength(0);
+    });
+
+    it("without Premium, says so in the code's place, with no code, copy, or upgrade badge", () => {
+      show(withKey(false), false);
+      expect(find("[bitTotpCountdown]")).toHaveLength(0);
+      expect(find('[data-testid="copy-totp"]')).toHaveLength(0);
+      expect(find("app-premium-badge")).toHaveLength(0);
+      const totp = find('[data-testid="login-totp"]')[0].nativeElement as HTMLInputElement;
+      expect(totp.value).toBe("*** ***");
+      expect(totp.type).toBe("password");
+      const sentence = find('[data-testid="keykeeper-totp-needs-premium"]');
+      expect(sentence).toHaveLength(1);
+      expect(sentence[0].nativeElement.textContent.trim()).toBe("keykeeperPlanTwoStepCodes");
+      expect(fixture.nativeElement.textContent).not.toContain("JBSWY3DPEHPK3PXP");
+    });
+
+    it("without Premium, shows the code of an item whose organization gives codes", () => {
+      show(withKey(true), false);
+      expect(find("[bitTotpCountdown]")).toHaveLength(1);
+      expect(find('[data-testid="copy-totp"]')).toHaveLength(1);
+      expect(find('[data-testid="keykeeper-totp-needs-premium"]')).toHaveLength(0);
     });
   });
 });

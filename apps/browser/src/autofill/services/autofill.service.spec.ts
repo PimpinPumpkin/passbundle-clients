@@ -1242,6 +1242,41 @@ describe("AutofillService", () => {
     });
   });
 
+  // Keykeeper: two-step codes need Premium, or an organization that gives
+  // codes (two-step-codes.ts), as `doAutoFill` decides it.
+  describe("showsTotp", () => {
+    const login = (organizationUseTotp: boolean) => {
+      const cipher = new CipherView();
+      cipher.type = CipherType.Login;
+      cipher.login = new LoginView();
+      cipher.login.totp = "JBSWY3DPEHPK3PXP";
+      cipher.organizationUseTotp = organizationUseTotp;
+      return cipher;
+    };
+    const premium = (has: boolean) =>
+      jest
+        .spyOn(billingAccountProfileStateService, "hasPremiumFromAnySource$")
+        .mockImplementation(() => of(has));
+
+    it("shows codes with Premium", async () => {
+      premium(true);
+      expect(await autofillService.showsTotp(login(false))).toBe(true);
+      expect(billingAccountProfileStateService.hasPremiumFromAnySource$).toHaveBeenCalledWith(
+        mockUserId,
+      );
+    });
+
+    it("shows an item's codes without Premium where its organization gives them", async () => {
+      premium(false);
+      expect(await autofillService.showsTotp(login(true))).toBe(true);
+    });
+
+    it("shows none without either", async () => {
+      premium(false);
+      expect(await autofillService.showsTotp(login(false))).toBe(false);
+    });
+  });
+
   describe("generateFillScript", () => {
     let defaultUsernameField: AutofillField;
     let defaultUsernameFieldView: FieldView;
