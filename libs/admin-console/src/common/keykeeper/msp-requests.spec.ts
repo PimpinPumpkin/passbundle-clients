@@ -85,16 +85,16 @@ describe("script token requests", () => {
   });
 });
 
-describe("the nudge to set up two-step login", () => {
+describe("the nudges about two-step login", () => {
   const setUp = () => {
     const apiService = mock<ApiService>();
     return { apiService, requests: new KeykeeperMspRequests(apiService) };
   };
 
-  it("shows only when the server says so", async () => {
+  it("shows the nudge the server names", async () => {
     const { apiService, requests } = setUp();
-    apiService.send.mockResolvedValueOnce({ show: true });
-    expect(await requests.twoStepNudge()).toBe(true);
+    apiService.send.mockResolvedValueOnce({ show: true, nudge: "setUp" });
+    expect(await requests.twoStepNudge()).toBe("setUp");
     expect(apiService.send).toHaveBeenCalledWith(
       "GET",
       "/keykeeper/two-step-nudge",
@@ -102,22 +102,36 @@ describe("the nudge to set up two-step login", () => {
       true,
       true,
     );
+    // Email codes alone: `show` stays false for clients from before it.
+    apiService.send.mockResolvedValueOnce({ show: false, nudge: "stronger" });
+    expect(await requests.twoStepNudge()).toBe("stronger");
+    apiService.send.mockResolvedValueOnce({ show: false, nudge: null });
+    expect(await requests.twoStepNudge()).toBeNull();
+  });
+
+  it("takes an older server's show as the first nudge, and shows nothing it doesn't know", async () => {
+    const { apiService, requests } = setUp();
+    apiService.send.mockResolvedValueOnce({ show: true });
+    expect(await requests.twoStepNudge()).toBe("setUp");
     apiService.send.mockResolvedValueOnce({ show: false });
-    expect(await requests.twoStepNudge()).toBe(false);
+    expect(await requests.twoStepNudge()).toBeNull();
     // An older server answers something else.
     apiService.send.mockResolvedValueOnce(null);
-    expect(await requests.twoStepNudge()).toBe(false);
+    expect(await requests.twoStepNudge()).toBeNull();
+    // A nudge from a newer server that this doesn't know.
+    apiService.send.mockResolvedValueOnce({ show: true, nudge: "somethingNew" });
+    expect(await requests.twoStepNudge()).toBeNull();
   });
 
   it("never shows when the server can't be asked", async () => {
     const { apiService, requests } = setUp();
     apiService.send.mockRejectedValueOnce(new Error("offline"));
-    expect(await requests.twoStepNudge()).toBe(false);
+    expect(await requests.twoStepNudge()).toBeNull();
   });
 
   it("is dismissed on the server, for every device", async () => {
     const { apiService, requests } = setUp();
-    apiService.send.mockResolvedValueOnce({ show: false });
+    apiService.send.mockResolvedValueOnce({ show: false, nudge: null });
     await requests.dismissTwoStepNudge();
     expect(apiService.send).toHaveBeenCalledWith(
       "POST",

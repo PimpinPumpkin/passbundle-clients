@@ -102,7 +102,7 @@
       class="tw-mb-3 tw-block"
       [class.!tw-hidden]="selection.active()"
     />
-    <!-- Keykeeper: a nudge to set up two-step login, for someone with none whom no rule covers -->
+    <!-- Keykeeper: a nudge about two-step login, for someone whom no rule covers with none or with email codes alone -->
     <app-keykeeper-two-step-nudge [class.!tw-hidden]="selection.active()" />
     <!-- Keykeeper: what an organization did with the browser's own card and address autofill here -->
     <app-keykeeper-browser-autofill-notice [class.!tw-hidden]="selection.active()" />
