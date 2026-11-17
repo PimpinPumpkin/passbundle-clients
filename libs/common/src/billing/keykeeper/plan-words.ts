@@ -143,6 +143,8 @@ export type PlanAction = "pay" | "manage";
  * can pay (a provider is set and they may manage the plan), never for a
  * client of an MSP, whose pool is the MSP's to pay for, and never for an
  * organization with no plan, since it's unknown which plan it would pay for.
+ * For a plan billed by the day, paying is adding a card, which charges
+ * nothing until a month has ended.
  */
 export function planAction(plan: KeykeeperPlanEnforced): PlanAction | null {
   if (!plan.canPay || !plan.canManage || plan.coveredBy != null) {
@@ -152,6 +154,21 @@ export function planAction(plan: KeykeeperPlanEnforced): PlanAction | null {
     return "manage";
   }
   return plan.plan == null ? null : "pay";
+}
+
+/**
+ * Whether a plan is billed by the day after each month, to a card on file:
+ * an MSP's pool, and a Business organization's own plan (decision 8). A
+ * client of an MSP is covered by its MSP's pool, and pays nothing itself.
+ */
+export function billedByTheDay(plan: KeykeeperPlanEnforced, whose: PlanWhose): boolean {
+  if (plan.coveredBy != null) {
+    return false;
+  }
+  return (
+    (whose.kind === "msp" && plan.plan === "msp") ||
+    (whose.kind === "organization" && plan.plan === "business")
+  );
 }
 
 /** The plan a "pay" button pays for: a person on Free pays for Premium. */
@@ -225,7 +242,13 @@ export function planPageWords(
         ? null
         : {
             action,
-            label: t(action === "manage" ? "keykeeperPlanManage" : "keykeeperPlanPay"),
+            label: t(
+              action === "manage"
+                ? "keykeeperPlanManage"
+                : billedByTheDay(plan, whose)
+                  ? "keykeeperPlanAddCard"
+                  : "keykeeperPlanPay",
+            ),
           },
   };
 }

@@ -18,9 +18,19 @@ export interface SeatLimitResult {
   canAddUsers: boolean;
   reason?: "provider-limit" | "fixed-seat-limit";
   shouldShowUpgradeDialog?: boolean;
+  /**
+   * Keykeeper: the seats a family has taken, as the server counts them, where
+   * the server enforces plans: the sentence says how many it has.
+   */
+  occupiedSeats?: number;
 }
 
 export type SeatLimitAction = "invite" | "restore";
+
+/** Keykeeper: whether the server enforces plans, as the organization's plan in the sync says. */
+function enforcesPlans(organization: Organization): boolean {
+  return organization.keykeeperPlan?.enforced === true;
+}
 
 // Provided in root for the same reason as MemberActionsService: EditMemberDialogComponent injects
 // it, and dialogs resolve against the root environment injector. This service is stateless, so a
@@ -60,6 +70,7 @@ export class BillingConstraintService {
         canAddUsers: false,
         reason: "fixed-seat-limit",
         shouldShowUpgradeDialog: organization.canEditSubscription,
+        ...(enforcesPlans(organization) ? { occupiedSeats } : {}),
       };
     }
 
@@ -85,6 +96,22 @@ export class BillingConstraintService {
         return true;
 
       case "fixed-seat-limit":
+        // Keykeeper: on a server that enforces plans, the only organization
+        // with a fixed number of seats is a family, which nobody upgrades
+        // here (DESIGN.md, "Plans and billing"). Inviting and restoring stop
+        // with the server's own sentence, and upstream's upgrade dialogs and
+        // billing pages, which this server never had, don't open.
+        if (enforcesPlans(organization)) {
+          this.toastService.showToast({
+            variant: "error",
+            message: this.i18nService.t(
+              "keykeeperFamilyFull",
+              organization.seats,
+              result.occupiedSeats ?? organization.seats,
+            ),
+          });
+          return true;
+        }
         // Admins who can manage billing self-serve out of the limit through the change-plan dialog,
         // for both invite and restore.
         if (result.shouldShowUpgradeDialog) {

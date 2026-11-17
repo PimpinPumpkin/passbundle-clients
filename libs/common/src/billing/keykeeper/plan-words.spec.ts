@@ -1,6 +1,13 @@
 import { KeykeeperPlanEnforced, keykeeperPlanFrom } from "./keykeeper-plan";
 import { date, translate } from "./plan-messages.spec-util";
-import { dateInWords, planAction, planPageWords, planToPayFor, PlanWhose } from "./plan-words";
+import {
+  billedByTheDay,
+  dateInWords,
+  planAction,
+  planPageWords,
+  planToPayFor,
+  PlanWhose,
+} from "./plan-words";
 
 const NOV_15 = "2026-11-15T12:00:00.000000Z";
 const NOV_29 = "2026-11-29T12:00:00.000000Z";
@@ -251,6 +258,59 @@ describe("the Plan page's button", () => {
     const p = plan({ ...fields, canPay: true });
     expect(planAction(p)).toBe(action);
     expect(words(p, person).action).toEqual({ action, label });
+  });
+
+  it.each([
+    [
+      "an MSP's pool in its trial",
+      plan({ plan: "msp", state: "trial" }),
+      contoso,
+      "pay",
+      "Add a card",
+    ],
+    [
+      "an MSP's pool that has ended",
+      plan({ plan: "msp", state: "ended" }),
+      contoso,
+      "pay",
+      "Add a card",
+    ],
+    ["a Business organization in its trial", plan({ state: "trial" }), acme, "pay", "Add a card"],
+    [
+      "a pool with a card on file",
+      plan({ plan: "msp", state: "active" }),
+      contoso,
+      "manage",
+      "Manage payment",
+    ],
+    [
+      "a pool whose payment is due",
+      plan({ plan: "msp", state: "paymentDue", until: NOV_15 }),
+      contoso,
+      "manage",
+      "Manage payment",
+    ],
+    [
+      "a family, paid a year ahead",
+      plan({ plan: "families", state: "ended" }),
+      acme,
+      "pay",
+      "Set up payment",
+    ],
+  ] as const)("adds a card, or manages it, for %s", (_name, p, whose, action, label) => {
+    expect(words({ ...p, canPay: true }, whose).action).toEqual({ action, label });
+  });
+
+  it("is billed by the day for an MSP's pool and for Business with no MSP, and nothing else", () => {
+    expect(billedByTheDay(plan({ plan: "msp" }), contoso)).toBe(true);
+    expect(billedByTheDay(plan({ plan: "business" }), acme)).toBe(true);
+    expect(billedByTheDay(plan({ plan: "families" }), acme)).toBe(false);
+    expect(billedByTheDay(plan({ plan: "premium" }), person)).toBe(false);
+    expect(billedByTheDay(plan({ plan: null }), acme)).toBe(false);
+    // A client's plan is its MSP's pool, which the MSP pays for.
+    expect(billedByTheDay(plan({ coveredBy: { id: "msp-1", name: "Contoso IT" } }), acme)).toBe(
+      false,
+    );
   });
 
   it("isn't there for someone who doesn't manage the plan", () => {
