@@ -2202,5 +2202,18 @@
         "example": "3"
       }
     }
+  },
+  "keykeeperFamilyFull": {
+    "message": "A Families plan covers $PEOPLE$ people, and this one has $HAS$. Remove someone first.",
+    "placeholders": {
+      "people": {
+        "content": "$1",
+        "example": "6"
+      },
+      "has": {
+        "content": "$2",
+        "example": "6"
+      }
+    }
   }
 }

@@ -7,6 +7,7 @@ import { Organization } from "@bitwarden/common/admin-console/models/domain/orga
 import { FeatureFlag } from "@bitwarden/common/enums/feature-flag.enum";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 
+import { hasCompanyFeatures } from "../../../keykeeper/plan/company-features";
 import { organizationPermissionsGuard } from "../../organizations/guards/org-permissions.guard";
 import { organizationRedirectGuard } from "../../organizations/guards/org-redirect.guard";
 import { PoliciesComponent, PoliciesDeactivateGuard } from "../../organizations/policies";
@@ -61,14 +62,17 @@ const routes: Routes = [
           titleId: "policies",
         },
       },
-      // Keykeeper: provisioning from Microsoft Entra ID (DESIGN.md, "Provisioning from Entra ID").
+      // Keykeeper: provisioning from Microsoft Entra ID (DESIGN.md, "Provisioning from Entra ID"),
+      // where the organization has the company features.
       {
         path: "provisioning",
         loadComponent: () =>
           import("../../../keykeeper/organizations/provisioning.component").then(
             (mod) => mod.KeykeeperProvisioningComponent,
           ),
-        canActivate: [organizationPermissionsGuard((org) => org.isAdmin)],
+        canActivate: [
+          organizationPermissionsGuard((org) => org.isAdmin && hasCompanyFeatures(org)),
+        ],
       },
       // Keykeeper: sign in with Microsoft Entra ID, per organization (DESIGN.md,
       // "Sign in with Microsoft Entra ID"). Upstream's nav item links here.

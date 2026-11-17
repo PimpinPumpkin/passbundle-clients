@@ -14,6 +14,7 @@ import { Organization } from "@bitwarden/common/admin-console/models/domain/orga
 
 import { deepLinkGuard } from "../../auth/guards/deep-link/deep-link.guard";
 import { canReviewAccess } from "../../keykeeper/access/access-review";
+import { hasCompanyFeatures } from "../../keykeeper/plan/company-features";
 import { keykeeperOrganizationPlanGuard } from "../../keykeeper/plan/plan-pages";
 
 import { VaultModule } from "./collections/vault.module";
@@ -54,7 +55,10 @@ const routes: Routes = [
         path: "access",
         loadComponent: () =>
           import("../../keykeeper/access/access.component").then((m) => m.KeykeeperAccessComponent),
-        canActivate: [organizationPermissionsGuard(canReviewAccess)],
+        // A family doesn't have it (company features).
+        canActivate: [
+          organizationPermissionsGuard((org) => canReviewAccess(org) && hasCompanyFeatures(org)),
+        ],
         data: {
           titleId: "keykeeperAccess",
         },
