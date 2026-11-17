@@ -166,6 +166,7 @@ describe("KeykeeperVaultMenuComponent", () => {
           { path: "vault", component: PageComponent },
           { path: "sends", component: PageComponent },
           { path: "reports", component: PageComponent },
+          { path: "create-organization", component: PageComponent },
         ]),
         { provide: VaultFilterServiceAbstraction, useValue: vaultFilterService },
         { provide: PolicyService, useValue: policyService },
@@ -310,9 +311,17 @@ describe("KeykeeperVaultMenuComponent", () => {
       "No folder 1",
       "Contoso 1",
       "Office 1",
+      "newOrganization",
       "archiveNoun 0",
       "trash 0",
     ]);
+  });
+
+  it("starts a new organization from New organization, under the organizations", async () => {
+    click("newOrganization");
+    await settle();
+
+    expect(router.url).toBe("/create-organization");
   });
 
   it("shows tiles for All items, Favorites, Health, and the categories, and marks the folders' owners", async () => {

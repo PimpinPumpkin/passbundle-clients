@@ -133,6 +133,16 @@
   @for (e of m.places; track e.key) {
     <ng-container *ngTemplateOutlet="entry; context: { $implicit: e, rail: false }" />
   }
+  <!-- Keykeeper: making an organization starts under the organizations, unless a
+       policy keeps the person in one (DESIGN.md, "The left menu"). -->
+  @if (open && newOrganization(); as add) {
+    <bit-nav-item
+      icon="bwi-plus"
+      [text]="add.text | i18n"
+      data-testid="keykeeper-menu-new-organization"
+      (mainContentClicked)="newOrganizationClicked(add.route ?? '/create-organization')"
+    />
+  }
   @if (m.archive; as archive) {
     <ng-container *ngTemplateOutlet="entry; context: { $implicit: archive, rail: true }" />
   }

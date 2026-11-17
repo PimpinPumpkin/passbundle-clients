@@ -1,4 +1,4 @@
-import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
+import { CUSTOM_ELEMENTS_SCHEMA, signal } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { Router } from "@angular/router";
@@ -17,6 +17,7 @@ import { BrowserOpenAndFillService } from "../../../services/keykeeper-open-and-
 import { VaultPopupAutofillService } from "../../../services/vault-popup-autofill.service";
 import { VaultPopupSectionService } from "../../../services/vault-popup-section.service";
 import { PopupCipherViewLike } from "../../../views/popup-cipher.view";
+import { KeykeeperPopupSelectionService } from "../keykeeper-select/popup-selection.service";
 
 import { VaultListItemsContainerComponent } from "./vault-list-items-container.component";
 
@@ -58,9 +59,24 @@ describe("VaultListItemsContainerComponent", () => {
     updateSectionOpenStoredState: jest.fn(),
   };
 
+  // Keykeeper: the vault page's Select mode, which the page provides.
+  const selected = new Set<string>();
+  const selection = {
+    active: signal(false),
+    isSelected: jest.fn((c: PopupCipherViewLike) => selected.has(c.id as string)),
+    click: jest.fn((c: PopupCipherViewLike, _shift: boolean) => {
+      const id = c.id as string;
+      if (!selected.delete(id)) {
+        selected.add(id);
+      }
+    }),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
     currentTabIsOnBlocklist$.next(false);
+    selection.active.set(false);
+    selected.clear();
 
     await TestBed.configureTestingModule({
       imports: [VaultListItemsContainerComponent, NoopAnimationsModule],
@@ -77,6 +93,7 @@ describe("VaultListItemsContainerComponent", () => {
           provide: KeykeeperOpenAndFillService,
           useValue: Object.assign(new BrowserOpenAndFillService(), openAndFill),
         },
+        { provide: KeykeeperPopupSelectionService, useValue: selection },
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     })
@@ -272,6 +289,50 @@ describe("VaultListItemsContainerComponent", () => {
       const result = titleKeyFn(cipherWithoutUsername);
 
       expect(result).toBe("viewItemTitle");
+    });
+  });
+  describe("Select mode (Keykeeper)", () => {
+    const selecting = () => (component as any).selecting() as boolean;
+
+    it("turns the rows into checkboxes only in a list that takes part, while Select mode is on", () => {
+      fixture.detectChanges();
+      selection.active.set(true);
+      expect(selecting()).toBe(false);
+
+      fixture.componentRef.setInput("keykeeperSelectable", true);
+      expect(selecting()).toBe(true);
+
+      selection.active.set(false);
+      expect(selecting()).toBe(false);
+    });
+
+    it("selects with a row's checkbox, passing on whether Shift was held, and shows what was decided", () => {
+      fixture.componentRef.setInput("keykeeperSelectable", true);
+      selection.active.set(true);
+      fixture.detectChanges();
+      const box = document.createElement("input");
+      box.type = "checkbox";
+
+      (component as any).noteShift({ shiftKey: true } as PointerEvent);
+      box.checked = true;
+      (component as any).toggleSelected(mockCipher, { target: box } as unknown as Event);
+
+      expect(selection.click).toHaveBeenCalledWith(mockCipher, true);
+      expect(box.checked).toBe(true);
+
+      // The selection may say no (the limit): the checkbox shows that, not the click.
+      selection.click.mockImplementationOnce(() => {});
+      const other = { ...mockCipher, id: "cipher-2" };
+      box.checked = true;
+      (component as any).toggleSelected(other, { target: box } as unknown as Event);
+
+      expect(selection.click).toHaveBeenLastCalledWith(other, false);
+      expect(box.checked).toBe(false);
+    });
+
+    it("never lets an item that couldn't be decrypted be selected", () => {
+      expect((component as any).canSelect(mockCipher)).toBe(true);
+      expect((component as any).canSelect({ ...mockCipher, decryptionFailure: true })).toBe(false);
     });
   });
 });

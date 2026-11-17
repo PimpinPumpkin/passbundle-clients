@@ -1,7 +1,9 @@
 // Keykeeper: sites' own change-password pages, from Apple's published list
 // (site-change-password-urls.data.ts), looked up on the device, so "Change
-// password" opens the right page without asking any server. See DESIGN.md,
-// "Health (better than Watchtower)".
+// password" opens the right page for these sites without asking any server.
+// For other sites the apps then ask the server (with website icons on), which
+// answers /icons/change-password-uri. See DESIGN.md, "Health (better than
+// Watchtower)".
 
 import { SITE_CHANGE_PASSWORD_URLS } from "./site-change-password-urls.data";
 

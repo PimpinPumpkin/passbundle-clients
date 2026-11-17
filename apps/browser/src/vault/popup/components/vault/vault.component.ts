@@ -7,6 +7,7 @@ import {
   computed,
   DestroyRef,
   effect,
+  HostListener,
   inject,
   Injector,
   OnDestroy,
@@ -59,8 +60,11 @@ import { CipherType } from "@bitwarden/common/vault/enums";
 import { UnionOfValues } from "@bitwarden/common/vault/types/union-of-values";
 import { skeletonLoadingDelay } from "@bitwarden/common/vault/utils/skeleton-loading.operator";
 import {
+  AsyncActionsModule,
   ButtonModule,
+  CheckboxModule,
   DialogService,
+  FormControlModule,
   StatusLockupComponent,
   ScrollLayoutService,
   SvgComponent,
@@ -86,6 +90,7 @@ import { KeykeeperBrowserAutofillNoticeComponent } from "../../../../keykeeper/p
 import { KeykeeperTwoStepNeededComponent } from "../../../../keykeeper/popup/two-step-needed.component";
 import { KeykeeperTwoStepNudgeComponent } from "../../../../keykeeper/popup/two-step-nudge.component";
 import { PopOutComponent } from "../../../../platform/popup/components/pop-out.component";
+import { PopupFooterComponent } from "../../../../platform/popup/layout/popup-footer.component";
 import { PopupPageComponent } from "../../../../platform/popup/layout/popup-page.component";
 import { ImportUpgradeNavigationService } from "../../../../tools/popup/settings/import/import-upgrade-navigation.service";
 import { IntroCarouselService } from "../../services/intro-carousel.service";
@@ -102,6 +107,7 @@ import { VaultLoadingSkeletonComponent } from "../vault-loading-skeleton/vault-l
 
 import { BlockedInjectionBanner } from "./blocked-injection-banner/blocked-injection-banner.component";
 import { FillAssistActiveBannerComponent } from "./fill-assist-active-banner/fill-assist-active-banner.component";
+import { KeykeeperPopupSelectionService } from "./keykeeper-select/popup-selection.service";
 import {
   NewItemDropdownComponent,
   NewItemInitialValues,
@@ -140,6 +146,7 @@ const NEW_EXPERIENCE_DARK_IMG = "../../../../images/new-experience/new-experienc
     BlockedInjectionBanner,
     FillAssistActiveBannerComponent,
     PopupPageComponent,
+    PopupFooterComponent,
     PopOutComponent,
     CurrentAccountComponent,
     StatusLockupComponent,
@@ -164,8 +171,15 @@ const NEW_EXPERIENCE_DARK_IMG = "../../../../images/new-experience/new-experienc
     VaultOrganizationUserNotificationsComponent,
     VaultPopupListTableComponent,
     VaultSwitcherComponent,
+    AsyncActionsModule,
+    CheckboxModule,
+    FormControlModule,
   ],
-  providers: [{ provide: VaultItemsTransferService, useClass: DefaultVaultItemsTransferService }],
+  providers: [
+    { provide: VaultItemsTransferService, useClass: DefaultVaultItemsTransferService },
+    // Keykeeper: Select mode, which ends with the page.
+    KeykeeperPopupSelectionService,
+  ],
 })
 export class VaultComponent implements OnInit, OnDestroy {
   NudgeType = NudgeType;
@@ -227,6 +241,19 @@ export class VaultComponent implements OnInit, OnDestroy {
 
   protected filteredCiphers$ = this.vaultPopupItemsService.filteredCiphers$;
   protected favoriteCiphers$ = this.vaultPopupItemsService.favoriteCiphers$;
+
+  /**
+   * Keykeeper: Select mode, for changing several items at once (DESIGN.md, "Selecting several
+   * items"), and how many items the list shows, which Select needs one of.
+   */
+  protected readonly selection = inject(KeykeeperPopupSelectionService);
+  protected readonly listedCount = toSignal(
+    this.vaultPopupItemsService.filteredCiphers$.pipe(map((ciphers) => ciphers.length)),
+    { initialValue: 0 },
+  );
+  protected readonly moveToFolder = () => this.selection.moveToFolder();
+  protected readonly archive = () => this.selection.archive();
+  protected readonly moveToTrash = () => this.selection.moveToTrash();
   protected allFilters$ = this.vaultPopupListFiltersService.allFilters$;
   private readonly vaultPopupListTableService = inject(VaultPopupListTableService);
 
@@ -381,6 +408,11 @@ export class VaultComponent implements OnInit, OnDestroy {
         this.vaultPopupListTableFiltersService.setCachedVaultScopeId(params.get("vaultId")),
       );
 
+    // Keykeeper: what Select mode can select is what the list shows now.
+    this.vaultPopupItemsService.filteredCiphers$
+      .pipe(takeUntilDestroyed())
+      .subscribe((ciphers) => this.selection.setListed(ciphers));
+
     combineLatest([
       this.vaultPopupItemsService.emptyVault$,
       this.vaultPopupItemsService.noFilteredResults$,
@@ -531,6 +563,24 @@ export class VaultComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.vaultScrollPositionService.stop();
+  }
+
+  /** Keykeeper: "Select all", or letting go of everything when it's all selected. */
+  protected selectAll(event: Event) {
+    this.selection.clickAll();
+    const box = event.target as HTMLInputElement;
+    box.checked = this.selection.allSelected();
+    box.indeterminate = this.selection.someSelected();
+  }
+
+  /** Keykeeper: Escape leaves Select mode, unless something open (a menu, a dialog) took it. */
+  @HostListener("document:keydown.escape", ["$event"])
+  protected leaveSelectMode(event: Event) {
+    if (!this.selection.active() || event.defaultPrevented) {
+      return;
+    }
+    event.preventDefault();
+    this.selection.stop();
   }
 
   async navigateToImport() {
