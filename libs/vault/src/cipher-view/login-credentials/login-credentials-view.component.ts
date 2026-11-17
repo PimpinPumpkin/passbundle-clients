@@ -16,13 +16,13 @@ import {
 import { toObservable } from "@angular/core/rxjs-interop";
 import { Observable, switchMap } from "rxjs";
 
-import { PremiumBadgeComponent } from "@bitwarden/angular/billing/components/premium-badge";
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions";
 import { EventCollectionService, EventType } from "@bitwarden/common/dirt/event-logs";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { UserId } from "@bitwarden/common/types/guid";
 import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
+import { showsTwoStepCode } from "@bitwarden/common/vault/keykeeper/two-step-codes";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
   FormFieldModule,
@@ -57,7 +57,6 @@ type TotpCodeValues = {
     BitTotpCountdownComponent,
     ReadOnlyCipherCardComponent,
     LinkModule,
-    PremiumBadgeComponent,
   ],
 })
 export class LoginCredentialsViewComponent implements OnChanges {
@@ -141,6 +140,14 @@ export class LoginCredentialsViewComponent implements OnChanges {
 
   togglePasswordCount() {
     this.showPasswordCount = !this.showPasswordCount;
+  }
+
+  /**
+   * Keykeeper: whether the item's code shows: with Premium, or where its
+   * organization gives codes (two-step-codes.ts).
+   */
+  codeShows(isPremium: boolean | null): boolean {
+    return showsTwoStepCode(this.cipher, isPremium === true);
   }
 
   setTotpCopyCode(e: TotpCodeValues) {

@@ -919,7 +919,10 @@ export class OverlayBackground implements OverlayBackgroundInterface {
     };
 
     if (cipher.type === CipherType.Login) {
-      const totpResponse = cipher.login?.totp
+      // Keykeeper: a two-step code only where it shows: with Premium, or
+      // where the item's organization gives codes (two-step-codes.ts).
+      const codes = !!cipher.login?.totp && (await this.autofillService.showsTotp(cipher));
+      const totpResponse = codes
         ? await firstValueFrom(this.totpService.getCode$(cipher.login.totp))
         : undefined;
 
@@ -945,6 +948,7 @@ export class OverlayBackground implements OverlayBackgroundInterface {
         inlineMenuData.keykeeperFillChoices = choicesFor(
           cipher,
           fillPickerWords(this.i18nService),
+          codes,
         ).map(({ key, title }) => ({
           key,
           title,
@@ -1518,8 +1522,13 @@ export class OverlayBackground implements OverlayBackgroundInterface {
       }
       this.updateLastUsedInlineMenuCipher(inlineMenuCipherId, cipher);
 
-      // Keykeeper: not onto the clipboard for someone who can't see it.
-      if (cipher.login?.totp && maySeeSecrets(cipher)) {
+      // Keykeeper: not onto the clipboard for someone who can't see it, nor
+      // where codes don't show (two-step-codes.ts).
+      if (
+        cipher.login?.totp &&
+        maySeeSecrets(cipher) &&
+        (await this.autofillService.showsTotp(cipher))
+      ) {
         const totpResponse = await firstValueFrom(this.totpService.getCode$(cipher.login.totp));
 
         if (totpResponse?.code) {
@@ -2316,7 +2325,11 @@ export class OverlayBackground implements OverlayBackgroundInterface {
     // isn't refused as an edit to an older copy.
     const cipher =
       (await this.cipherService.getAllDecrypted(userId)).find((c) => c.id === listed.id) ?? null;
-    const choice = cipher ? choicesFor(cipher).find((c) => c.key === choiceKey) : undefined;
+    const choice = cipher
+      ? choicesFor(cipher, undefined, await this.autofillService.showsTotp(cipher)).find(
+          (c) => c.key === choiceKey,
+        )
+      : undefined;
     if (!cipher || !choice) {
       return;
     }

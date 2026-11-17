@@ -110,6 +110,11 @@ export abstract class AutofillService {
   doAutoFill!: (options: AutoFillOptions) => Promise<FillResult>;
   /** Non-null asserted. */
   setAutoFillOnPageLoadOrgPolicy!: () => Promise<void>;
+  /**
+   * Keykeeper: whether an item's two-step code may show, be copied, and fill
+   * for the active account (two-step-codes.ts). Non-null asserted.
+   */
+  showsTotp!: (cipher: CipherView) => Promise<boolean>;
   /** Non-null asserted. */
   isPasswordRepromptRequired!: (
     cipher: CipherView,

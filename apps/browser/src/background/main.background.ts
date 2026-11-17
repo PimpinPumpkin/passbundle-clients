@@ -1979,6 +1979,8 @@ export default class MainBackground {
       return cipher.login?.matchesUri(url, equivalentDomains, defaultUriMatch) ?? false;
     };
     fillPickerHooks.itemMatches = itemMatches;
+    // Keykeeper: and offers an item's two-step code only where it shows.
+    fillPickerHooks.showsTotp = (cipher) => this.autofillService.showsTotp(cipher);
     // Keykeeper: "Open and fill": a login's open button fills the tab it opens, once.
     this.keykeeperOpenAndFill = new KeykeeperOpenAndFill({
       autofillService: this.autofillService,

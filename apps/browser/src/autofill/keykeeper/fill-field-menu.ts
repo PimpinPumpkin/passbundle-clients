@@ -48,10 +48,13 @@ export { FILL_FIELD_REPROMPT_ACTION, FILL_FIELD_REPROMPTED } from "./fill-field-
 /**
  * What the picker asks of the background, set by main.background: whether an
  * item is for a page, by its websites and the person's match settings, as
- * upstream's autofill decides it. Until then, nothing is.
+ * upstream's autofill decides it; and whether its two-step code shows, which
+ * needs Premium or an organization that gives codes (two-step-codes.ts), as
+ * autofill decides it. Until then, nothing is, and no code is offered.
  */
 export const keykeeperFillPicker = {
   itemMatches: async (_cipher: CipherView, _url: string): Promise<boolean> => false,
+  showsTotp: async (_cipher: CipherView): Promise<boolean> => false,
 };
 
 /**
@@ -85,10 +88,14 @@ export function fillPickerWords(i18n: Pick<I18nService, "t">): FillPickerWords {
 
 export type FillChoice = { key: string; title: string; source: FillSource };
 
-/** What an item can fill into a field, in menu order, named in `words`. */
+/**
+ * What an item can fill into a field, in menu order, named in `words`: its
+ * two-step code only where `codes` says it shows (`keykeeperFillPicker.showsTotp`).
+ */
 export function choicesFor(
   cipher: CipherView,
   words: FillPickerWords = englishFillPickerWords,
+  codes = false,
 ): FillChoice[] {
   const choices: FillChoice[] = [];
   if (cipher.login?.username) {
@@ -97,7 +104,7 @@ export function choicesFor(
   if (cipher.login?.password && maySeeSecrets(cipher)) {
     choices.push({ key: "p", title: words("password"), source: { from: "password" } });
   }
-  if (cipher.login?.totp) {
+  if (cipher.login?.totp && codes) {
     choices.push({ key: "t", title: words("verificationCode"), source: { from: "totp" } });
   }
   visibleCustomFields(cipher).forEach((field, index) => {
@@ -185,7 +192,8 @@ export async function addCipherToFillFieldMenu(
   }
   await create({ id: parentId, parentId: FILL_FIELD_ID, title: sanitizeTitle(cipher.name ?? "") });
   createdFillFieldMenuIds.add(parentId);
-  for (const choice of choicesFor(cipher, words)) {
+  const codes = await keykeeperFillPicker.showsTotp(cipher);
+  for (const choice of choicesFor(cipher, words, codes)) {
     if (choice.source.from === "never") {
       await create({ id: `${parentId}_separator`, parentId, type: "separator" });
     }
@@ -271,7 +279,11 @@ export async function handleFillFieldMenuClick(
   const cipher = (await deps.cipherService.getAllDecrypted(userId)).find(
     (c) => c.id === parsed.cipherId,
   );
-  const choice = cipher ? choicesFor(cipher).find((c) => c.key === parsed.key) : undefined;
+  const choice = cipher
+    ? choicesFor(cipher, undefined, await keykeeperFillPicker.showsTotp(cipher)).find(
+        (c) => c.key === parsed.key,
+      )
+    : undefined;
   if (!cipher || !choice) {
     return true;
   }
@@ -345,7 +357,7 @@ export async function finishPickAfterReprompt(
     (c) => c.id === cipherId,
   );
   const choice = cipher
-    ? choicesFor(cipher).find(
+    ? choicesFor(cipher, undefined, await keykeeperFillPicker.showsTotp(cipher)).find(
         (c) =>
           c.key === pick.choice.key &&
           JSON.stringify(c.source) === JSON.stringify(pick.choice.source),
@@ -361,6 +373,11 @@ async function pickNow(
   { tab, frameId, target, cipher, choice, userId }: FillFieldTarget,
   deps: PickDependencies,
 ): Promise<boolean> {
+  // A two-step code only where it shows (two-step-codes.ts): nothing fills or
+  // is saved otherwise.
+  if (choice.source.from === "totp" && !(await keykeeperFillPicker.showsTotp(cipher))) {
+    return false;
+  }
   const secret = isSecretSource(cipher, choice.source);
   // Upstream's matching: the item is for the page (or frame) the field is in.
   // A secret goes nowhere else, such as an ad's frame; anything else asks
