@@ -7,10 +7,10 @@ import {
   inject,
   signal,
 } from "@angular/core";
-import { toSignal } from "@angular/core/rxjs-interop";
+import { takeUntilDestroyed, toSignal } from "@angular/core/rxjs-interop";
 import { FormBuilder, Validators } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
-import { firstValueFrom, switchMap } from "rxjs";
+import { distinctUntilChanged, firstValueFrom, map, switchMap } from "rxjs";
 
 import { InstallCommandParts } from "@bitwarden/admin-console/common";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
@@ -1128,7 +1128,8 @@ export class KeykeeperMspComponent implements OnInit {
    * calls it off, with the breach checks it's still waiting on.
    */
   private readonly healthRuns: { latest: AbortController | null } = { latest: null };
-  private readonly stopHealthOnLeave = inject(DestroyRef).onDestroy(() =>
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly stopHealthOnLeave = this.destroyRef.onDestroy(() =>
     this.healthRuns.latest?.abort(),
   );
   /** Expired and soon-expiring items across the clients, from the same items. */
@@ -1202,15 +1203,29 @@ export class KeykeeperMspComponent implements OnInit {
     if (back != null) {
       this.mspForm.setValue({ name: back.name });
     }
+    // Keykeeper: the invitation in the page's address, when the console opens
+    // and whenever a link with another one opens while it's already open (that
+    // changes only the address's query, which doesn't open the page again).
+    this.route.queryParamMap
+      .pipe(
+        map((params) => params.get("invite")),
+        distinctUntilChanged(),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((token) => void this.showInvitation(token));
+    await this.load();
+  }
+
+  /** Shows the invitation with this token above the console, unless it's already shown. */
+  private async showInvitation(token: string | null) {
+    if (!token || this.invitation()?.token === token) {
+      return;
+    }
     try {
-      const token = this.route.snapshot.queryParamMap.get("invite");
-      if (token) {
-        this.invitation.set({ token, info: await this.mspApi.invitationInfo(token) });
-      }
+      this.invitation.set({ token, info: await this.mspApi.invitationInfo(token) });
     } catch (e) {
       this.showError(e);
     }
-    await this.load();
   }
 
   /**
