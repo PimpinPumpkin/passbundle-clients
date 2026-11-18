@@ -44,16 +44,16 @@ describe("Staff fingerprint phrases", () => {
 
   it("say what to compare and how, in one line", () => {
     expect(compareLine({ name: "Dana", email: "dana@northwind.test" }, false)).toBe(
-      "Ask Dana to read the phrase in Settings, My account. If it's different, remove them and tell us.",
+      "Ask Dana to read the phrase in Settings, My account. If it's different, remove them from your staff: the key this server gave out for them isn't theirs.",
     );
     expect(compareLine({ name: null, email: "dana@northwind.test" }, false)).toBe(
-      "Ask dana@northwind.test to read the phrase in Settings, My account. If it's different, remove them and tell us.",
+      "Ask dana@northwind.test to read the phrase in Settings, My account. If it's different, remove them from your staff: the key this server gave out for them isn't theirs.",
     );
     expect(compareLine({ name: "  ", email: "dana@northwind.test" }, false)).toContain(
       "Ask dana@northwind.test",
     );
     expect(compareLine({ name: "Ana", email: "ana@northwind.test" }, true)).toBe(
-      "Yours. Your Settings, My account shows the same phrase. If it's different, tell us.",
+      "Yours. Your Settings, My account shows the same phrase. If it's different, the key this server gives out for you isn't yours: tell your MSP's other admins.",
     );
   });
 });

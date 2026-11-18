@@ -62,8 +62,8 @@ export function compareLine(
   isYou: boolean,
 ): string {
   if (isYou) {
-    return "Yours. Your Settings, My account shows the same phrase. If it's different, tell us.";
+    return "Yours. Your Settings, My account shows the same phrase. If it's different, the key this server gives out for you isn't yours: tell your MSP's other admins.";
   }
   const who = person.name?.trim() || person.email;
-  return `Ask ${who} to read the phrase in Settings, My account. If it's different, remove them and tell us.`;
+  return `Ask ${who} to read the phrase in Settings, My account. If it's different, remove them from your staff: the key this server gave out for them isn't theirs.`;
 }
