@@ -43,6 +43,7 @@ import { toSdkCollectionType } from "../sdk/sdk-collection-type";
 
 import { ImportApiServiceAbstraction } from "./import-api.service.abstraction";
 import { ImportService } from "./import.service";
+import { FolderPlace, ImportCanceled } from "./keykeeper/folder-places";
 
 describe("ImportService", () => {
   let importService: ImportService;
@@ -733,6 +734,156 @@ describe("ImportService", () => {
       await expect(
         importService.onePasswordSignInMethods("user@example.com", signInAddress),
       ).rejects.toThrow("SDK not available");
+    });
+  });
+
+  // Keykeeper: into an organization, the person says where each of the
+  // file's folders goes (keykeeper/folder-places.ts), and the request names
+  // that shared folder for each item.
+  describe("where each folder goes", () => {
+    const userId = Utils.newGuid() as UserId;
+    const organizationId = Utils.newGuid() as OrganizationId;
+    const clients = new CollectionView({
+      id: Utils.newGuid() as CollectionId,
+      organizationId,
+      name: "Clients",
+    });
+    const target = new CollectionView({
+      id: Utils.newGuid() as CollectionId,
+      organizationId,
+      name: "Imports",
+    });
+
+    /** Three folders, an item in each, and one with no folder, as an importer reads them. */
+    function importerOfThreeFolders(): Importer {
+      const result = new ImportResult();
+      result.success = true;
+      result.collections = ["Network", "Acme", "Old"].map(
+        (name) => new CollectionView({ id: null, organizationId: null, name }),
+      );
+      result.ciphers = ["Router", "Acme bank", "Old fax", "Loose"].map((name) =>
+        createCipher({ name, type: CipherType.Login }),
+      );
+      result.collectionRelationships = [
+        [0, 0],
+        [1, 1],
+        [2, 2],
+      ];
+      return { organizationId, parse: async () => result } as unknown as Importer;
+    }
+
+    const places: FolderPlace[] = [
+      { kind: "new" },
+      { kind: "existing", collection: clients },
+      { kind: "leave" },
+    ];
+
+    /** What the request asks for: each item's shared folders, by name. */
+    function requested() {
+      const request = importApiService.postImportOrganizationCiphers.mock.calls[0][1];
+      const items: CipherView[] = cipherService.encryptMany.mock.calls[0][0];
+      return {
+        collections: request.collections.map((c) => ({ id: c.id, name: c.name })),
+        items: Object.fromEntries(
+          items.map((item, i) => [
+            item.name,
+            request.collectionRelationships
+              .filter((r) => r.key === i)
+              .map((r) => request.collections[r.value].name),
+          ]),
+        ),
+      };
+    }
+
+    beforeEach(() => {
+      accountService.activeAccount$ = of({ id: userId } as any);
+      (restrictedItemTypesService as any).restricted$ = of([]);
+      i18nService.t.mockImplementation((key) => key);
+      keyService.userKey$.mockReturnValue(of(null));
+      cipherService.encryptMany.mockResolvedValue([]);
+      collectionService.encrypt.mockImplementation(
+        async (view) =>
+          ({ id: view.id, name: new EncString(`2.${view.name}`), externalId: undefined }) as any,
+      );
+    });
+
+    it("names the shared folder chosen for each item's folder, and leaves out the rest", async () => {
+      const placer = jest.fn().mockResolvedValue(places);
+
+      const result = await importService.import(
+        importerOfThreeFolders(),
+        "",
+        organizationId,
+        null,
+        true,
+        placer,
+      );
+
+      expect(placer).toHaveBeenCalledTimes(1);
+      expect(requested()).toEqual({
+        collections: [
+          { id: undefined, name: "2.Network" },
+          { id: clients.id, name: "2.Clients" },
+        ],
+        items: { Router: ["2.Network"], "Acme bank": ["2.Clients"], Loose: [] },
+      });
+      expect(result.placed).toEqual([
+        "Put 1 item in Network, a new shared folder.",
+        "Put 1 item in Clients.",
+        "1 item with no folder isn't in a shared folder.",
+      ]);
+      expect(result.leftOut).toEqual(["Left out 1 item in Old."]);
+    });
+
+    it("puts items with no folder, and new shared folders, in the import's shared folder", async () => {
+      await importService.import(
+        importerOfThreeFolders(),
+        "",
+        organizationId,
+        target,
+        false,
+        jest.fn().mockResolvedValue(places),
+      );
+
+      expect(requested()).toEqual({
+        collections: [
+          { id: target.id, name: "2.Imports" },
+          { id: undefined, name: "2.Imports/Network" },
+          { id: clients.id, name: "2.Clients" },
+        ],
+        items: {
+          Router: ["2.Imports/Network"],
+          "Acme bank": ["2.Clients"],
+          Loose: ["2.Imports"],
+        },
+      });
+    });
+
+    it("sends nothing when the question is closed", async () => {
+      await expect(
+        importService.import(
+          importerOfThreeFolders(),
+          "",
+          organizationId,
+          null,
+          true,
+          jest.fn().mockResolvedValue(null),
+        ),
+      ).rejects.toBeInstanceOf(ImportCanceled);
+
+      expect(importApiService.postImportOrganizationCiphers).not.toHaveBeenCalled();
+      expect(cipherService.encryptMany).not.toHaveBeenCalled();
+    });
+
+    it("doesn't ask for an import into Personal", async () => {
+      const placer = jest.fn();
+      const importer = importerOfThreeFolders();
+      importer.organizationId = null;
+
+      await importService.import(importer, "", null, null, false, placer);
+
+      expect(placer).not.toHaveBeenCalled();
+      expect(importApiService.postImportCiphers).toHaveBeenCalled();
     });
   });
 });

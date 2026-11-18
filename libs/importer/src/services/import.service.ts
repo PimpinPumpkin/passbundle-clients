@@ -129,6 +129,7 @@ import { toSdkCipherType } from "../sdk/sdk-cipher-type";
 import { toSdkCollectionType } from "../sdk/sdk-collection-type";
 import { ImportApiServiceAbstraction } from "../services/import-api.service.abstraction";
 import { ImportServiceAbstraction } from "../services/import.service.abstraction";
+import { applyFolderPlan, askFolderPlan, FolderPlacer } from "../services/keykeeper/folder-places";
 import { guardReservedFields, ImportSource } from "../services/keykeeper/reserved-fields";
 import { SdkImportCheck, SdkImportDestination } from "../services/keykeeper/sdk-import-check";
 
@@ -179,6 +180,7 @@ export class ImportService implements ImportServiceAbstraction {
     organizationId: OrganizationId = null,
     selectedImportTarget: FolderView | CollectionView = null,
     canAccessImportExport: boolean,
+    placeFolders?: FolderPlacer,
   ): Promise<ImportResult> {
     let importResult: ImportResult;
     try {
@@ -197,6 +199,7 @@ export class ImportService implements ImportServiceAbstraction {
       organizationId,
       selectedImportTarget,
       canAccessImportExport,
+      placeFolders,
     );
   }
 
@@ -222,6 +225,7 @@ export class ImportService implements ImportServiceAbstraction {
     organizationId: OrganizationId = null,
     selectedImportTarget: FolderView | CollectionView = null,
     canAccessImportExport: boolean = false,
+    placeFolders?: FolderPlacer,
   ): Promise<ImportResult> {
     if (!importResult.success) {
       if (!Utils.isNullOrWhitespace(importResult.errorMessage)) {
@@ -269,8 +273,20 @@ export class ImportService implements ImportServiceAbstraction {
       }
     }
 
+    // Keykeeper: into an organization, where each of the file's folders goes,
+    // asked before anything is saved (keykeeper/folder-places.ts).
+    const plan = await askFolderPlan(
+      importResult,
+      organizationId,
+      selectedImportTarget,
+      placeFolders,
+    );
+
     try {
       await this.setImportTarget(importResult, organizationId, selectedImportTarget);
+      if (plan != null) {
+        applyFolderPlan(importResult, plan);
+      }
       const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
       if (organizationId != null) {
         await this.handleOrganizationalImport(importResult, organizationId, userId);
