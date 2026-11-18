@@ -29,6 +29,7 @@ import {
   MAX_SUB_FRAME_DEPTH,
   RedirectFocusDirection,
 } from "../enums/autofill-overlay.enum";
+import { isStreetTextArea } from "../keykeeper/address-fields";
 import { isOneTimeCodeField } from "../keykeeper/one-time-code-fields";
 import AutofillField from "../models/autofill-field";
 import AutofillPageDetails from "../models/autofill-page-details";
@@ -66,6 +67,9 @@ import {
   identityQualifiers,
   targetedFormCategoryFillTypes,
 } from "./autofill-constants";
+
+/** Keykeeper: room for a list's own arrow, left of which the menu's button goes. */
+const KEYKEEPER_LIST_ARROW_WIDTH = 20;
 
 export class AutofillOverlayContentService implements AutofillOverlayContentServiceInterface {
   pageDetailsUpdateRequired = false;
@@ -461,6 +465,11 @@ export class AutofillOverlayContentService implements AutofillOverlayContentServ
     );
 
     if (elementIsSelectElement(formFieldElement)) {
+      // Keykeeper: an address list with the menu closes it when the person
+      // leaves it, as a text field does (keykeeper/address-fields.ts).
+      if (this.keykeeperHasListMenu(formFieldElement)) {
+        formFieldElement.addEventListener(EVENTS.BLUR, this.handleFormFieldBlurEvent);
+      }
       return;
     }
 
@@ -899,6 +908,12 @@ export class AutofillOverlayContentService implements AutofillOverlayContentServ
 
     this.storeModifiedFormElement(formFieldElement);
     if (elementIsSelectElement(formFieldElement)) {
+      // Keykeeper: choosing an option in an address list closes its menu.
+      if (this.keykeeperHasListMenu(formFieldElement)) {
+        await this.sendExtensionMessage("closeAutofillInlineMenu", {
+          forceCloseInlineMenu: true,
+        });
+      }
       return;
     }
 
@@ -1070,7 +1085,9 @@ export class AutofillOverlayContentService implements AutofillOverlayContentServ
       this.pageDetailsUpdateRequired = false;
     }
 
-    if (elementIsSelectElement(formFieldElement)) {
+    // Keykeeper: except an address list, which opens the identities' menu
+    // (keykeeper/address-fields.ts).
+    if (elementIsSelectElement(formFieldElement) && !this.keykeeperHasListMenu(formFieldElement)) {
       await this.sendExtensionMessage("closeAutofillInlineMenu", {
         forceCloseInlineMenu: true,
       });
@@ -1103,13 +1120,20 @@ export class AutofillOverlayContentService implements AutofillOverlayContentServ
     if (
       !formFieldElement ||
       !elementIsFillableFormField(formFieldElement) ||
-      elementIsSelectElement(formFieldElement)
+      // Keykeeper: see keykeeperHasListMenu.
+      (elementIsSelectElement(formFieldElement) && !this.keykeeperHasListMenu(formFieldElement))
     ) {
       return;
     }
 
     this.mostRecentlyFocusedField = formFieldElement;
-    const { paddingRight, paddingLeft } = globalThis.getComputedStyle(formFieldElement);
+    const styles = globalThis.getComputedStyle(formFieldElement);
+    const { paddingLeft } = styles;
+    let { paddingRight } = styles;
+    // Keykeeper: the menu's button goes beside a list's arrow, not over it.
+    if (elementIsSelectElement(formFieldElement)) {
+      paddingRight = `${(parseInt(paddingRight, 10) || 0) + KEYKEEPER_LIST_ARROW_WIDTH}px`;
+    }
     const { width, height, top, left } =
       await this.getMostRecentlyFocusedFieldRects(formFieldElement);
     const autofillFieldData = this.formFieldElements.get(formFieldElement);
@@ -1197,6 +1221,18 @@ export class AutofillOverlayContentService implements AutofillOverlayContentServ
   }
 
   /**
+   * Keykeeper: whether a list opens the menu inside it, as a text field does.
+   * Upstream's never opens on a list; an address list (a state or province,
+   * or a country) opens the identities' menu (keykeeper/address-fields.ts).
+   */
+  private keykeeperHasListMenu(formFieldElement: ElementWithOpId<FormFieldElement>): boolean {
+    return (
+      elementIsSelectElement(formFieldElement) &&
+      this.formFieldElements.get(formFieldElement)?.inlineMenuFillType === CipherType.Identity
+    );
+  }
+
+  /**
    * Identifies if the field should have the autofill inline menu setup on it. Currently, this is mainly
    * determined by whether the field correlates with a login cipher. This method will need to be
    * updated in the future to support other types of forms.
@@ -1224,6 +1260,13 @@ export class AutofillOverlayContentService implements AutofillOverlayContentServ
       this.inlineMenuFieldQualificationService.isFieldForSshKeyForm(autofillFieldData, pageDetails)
     ) {
       autofillFieldData.inlineMenuFillType = CipherType.SshKey;
+      return false;
+    }
+
+    // Keykeeper: a text area for the street, in a form that asks for an
+    // address, gets the identities' menu (keykeeper/address-fields.ts).
+    if (this.showInlineMenuIdentities && isStreetTextArea(autofillFieldData, pageDetails)) {
+      autofillFieldData.inlineMenuFillType = CipherType.Identity;
       return false;
     }
 
