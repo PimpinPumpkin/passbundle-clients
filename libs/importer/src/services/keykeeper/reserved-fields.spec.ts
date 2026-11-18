@@ -20,6 +20,7 @@ import { UserId } from "@bitwarden/user-core";
 import { BitwardenPasswordProtectedImporter } from "../../importers/bitwarden/bitwarden-password-protected-importer";
 import { KeePass2XmlImporter } from "../../importers/keepass2-xml-importer";
 import { LastPassCsvImporter } from "../../importers/lastpass/lastpass-csv-importer";
+import { ITGlueCsvImporter, PassportalCsvImporter } from "../../importers/msp";
 import { OnePassword1PuxImporter } from "../../importers/onepassword/onepassword-1pux-importer";
 import { OnePassword8CsvImporter } from "../../importers/onepassword/onepassword-8-csv-importer";
 import { ProtonPassJsonImporter } from "../../importers/protonpass/protonpass-json-importer";
@@ -132,6 +133,30 @@ describe("Keykeeper: imports never plant our own fields", () => {
     expectDefused(
       await new ProtonPassJsonImporter(mock<I18nService>(), configService).parse(
         JSON.stringify(data),
+      ),
+      ["keykeeper.fill", "keykeeper.template-definition"],
+    );
+  });
+
+  it("Passportal and IT Glue: a column named like ours", async () => {
+    const quoted = (value: string) => `"${value.replace(/"/g, '""')}"`;
+    const planted = `${quoted(PLANTED_RULE)},${quoted(PLANTED_COPY)}`;
+
+    expectDefused(
+      await new PassportalCsvImporter().parse(
+        [
+          "Client Name,Credential Type,Username,Password,Description,URL,keykeeper.fill, Keykeeper.Template-Definition ",
+          `Test Dental Group,Website,ana,Fake-1,Example Bank,https://bank.example.test/,${planted}`,
+        ].join("\n"),
+      ),
+      ["keykeeper.fill", "Keykeeper.Template-Definition"],
+    );
+    expectDefused(
+      await new ITGlueCsvImporter().parse(
+        [
+          "organization,name,username,password,url,keykeeper.fill,keykeeper.template-definition",
+          `Sample Law LLP,Example Bank,ana,Fake-1,https://bank.example.test/,${planted}`,
+        ].join("\n"),
       ),
       ["keykeeper.fill", "keykeeper.template-definition"],
     );

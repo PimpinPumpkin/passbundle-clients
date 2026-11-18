@@ -865,6 +865,26 @@ export const importOptionsById = deepFreeze({
     loaders: [Loader.file],
     instructionKey: "importDelineaCsvInstructions",
   },
+  // Keykeeper: the two password managers MSPs move from (importers/msp; the
+  // steps are in components/keykeeper/msp-import.ts).
+  passportalcsv: {
+    name: "Passportal (csv)",
+    featuredImporter: false,
+    isBrowser: false,
+    acceptedFileTypes: ["csv"],
+    pasteFormats: ["csv"],
+    hasDirectImporter: false,
+    loaders: [Loader.file],
+  },
+  itgluecsv: {
+    name: "IT Glue (csv)",
+    featuredImporter: false,
+    isBrowser: false,
+    acceptedFileTypes: ["csv"],
+    pasteFormats: ["csv"],
+    hasDirectImporter: false,
+    loaders: [Loader.file],
+  },
 } as const satisfies Record<string, ImportOptionData>);
 
 export type ImportType = keyof typeof importOptionsById;
