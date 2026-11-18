@@ -15,6 +15,8 @@ import { ButtonModule, CalloutModule, DialogService, ToastService } from "@bitwa
 
 import { KeykeeperMspRemovedDialogComponent } from "../offboarding/msp-removed-dialog.component";
 
+import { seesMspActivity } from "./client-msp-activity";
+import { KeykeeperClientMspActivityComponent } from "./client-msp-activity.component";
 import { ClientMsp, KeykeeperMspApiService } from "./msp-api.service";
 import { describeStaffRole } from "./technician-access";
 
@@ -23,12 +25,14 @@ import { describeStaffRole } from "./technician-access";
  * who its staff are, and what each can do there (their role, a custom role's
  * permissions, and whether they see vault items). The client's own owners can
  * remove the MSP, which takes all of its staff out of the organization at once,
- * with what they made there, and then says what went.
+ * with what they made there, and then says what went. The client's own
+ * owners and admins also see what the MSP did here (DESIGN.md, "The client
+ * sees its MSP's actions").
  */
 @Component({
   selector: "app-keykeeper-client-msp-banner",
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ButtonModule, CalloutModule],
+  imports: [ButtonModule, CalloutModule, KeykeeperClientMspActivityComponent],
   template: `
     @if (info()?.msp; as msp) {
       <bit-callout type="info" [title]="null" data-testid="client-msp">
@@ -42,6 +46,13 @@ import { describeStaffRole } from "./technician-access";
           <button bitButton buttonType="danger" type="button" (click)="remove(msp.name)">
             Remove {{ msp.name }}
           </button>
+        }
+        @if (showsActivity()) {
+          <app-keykeeper-client-msp-activity
+            [organizationId]="organization().id"
+            [mspName]="msp.name"
+            [members]="members()"
+          />
         }
       </bit-callout>
     }
@@ -63,6 +74,14 @@ export class KeykeeperClientMspBannerComponent {
       const role = describeStaffRole(s, (key) => this.i18nService.t(key));
       return { memberId: s.memberId, line: role == null ? who : `${who}: ${role}` };
     }),
+  );
+
+  /** Keykeeper: what the MSP did here, for the client's own owners and admins. */
+  protected readonly showsActivity = computed(() =>
+    seesMspActivity(
+      this.organization(),
+      (this.info()?.staff ?? []).map((s) => s.memberId),
+    ),
   );
 
   /** The client's own owners, never the MSP's staff. */

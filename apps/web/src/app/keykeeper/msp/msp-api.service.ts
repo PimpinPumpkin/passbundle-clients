@@ -57,7 +57,7 @@ import { EncryptService, LegacyCompatKeyService } from "@bitwarden/legacy-crypto
 
 import { KeykeeperJoinSealer, ReportedJoining } from "../joining/join-sealer.service";
 
-import { MspEvent } from "./msp-activity";
+import { ClientMspEvent, MspEvent } from "./msp-activity";
 import { staffPhrases } from "./staff-fingerprint";
 import { reachesEveryClient } from "./technician-access";
 
@@ -917,6 +917,29 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
   /** For a client's owners and admins: the MSP that manages the organization, and its staff there. */
   async getOrganizationMsp(orgId: string): Promise<ClientMsp> {
     return this.apiService.send("GET", `/keykeeper/organizations/${orgId}/msp`, null, true, true);
+  }
+
+  /**
+   * For a client's own owners and admins: what its MSP did in the
+   * organization, newest first, older than `before` (DESIGN.md, "The client
+   * sees its MSP's actions"). An organization without an MSP has none.
+   */
+  async getOrganizationMspActivity(
+    orgId: string,
+    before?: string,
+    limit = 10,
+  ): Promise<{ msp: { id: string; name: string } | null; data: ClientMspEvent[] }> {
+    const query = new URLSearchParams({ limit: String(limit) });
+    if (before) {
+      query.set("before", before);
+    }
+    return this.apiService.send(
+      "GET",
+      `/keykeeper/organizations/${orgId}/msp/activity?${query}`,
+      null,
+      true,
+      true,
+    );
   }
 
   /**

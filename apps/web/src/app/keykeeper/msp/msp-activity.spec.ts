@@ -1,4 +1,4 @@
-import { describeEvent, MspEvent } from "./msp-activity";
+import { ClientMspEvent, describeClientEvent, describeEvent, MspEvent } from "./msp-activity";
 
 const event = (fields: Partial<MspEvent>): MspEvent => ({
   id: "1",
@@ -315,6 +315,123 @@ describe("MSP activity sentences", () => {
     );
     expect(
       describeEvent(event({ event: "something_new", organizationName: null, actorEmail: null })),
+    ).toBe("Something new (by Someone)");
+  });
+});
+
+const clientEvent = (fields: Partial<ClientMspEvent>): ClientMspEvent => ({
+  id: "1",
+  date: "2026-11-17T09:30:00.000Z",
+  event: "",
+  actorEmail: "ana@northwind.test",
+  targetEmail: "ben@northwind.test",
+  detail: null,
+  ...fields,
+});
+
+describe("What the MSP did, as the client's own people read it", () => {
+  it.each([
+    [
+      { event: "client_created", detail: "Default policies" },
+      "ana@northwind.test set up your organization as a client of Northwind IT, with its default policies",
+    ],
+    [
+      { event: "client_created", detail: "No defaults" },
+      "ana@northwind.test set up your organization as a client of Northwind IT",
+    ],
+    [
+      { event: "client_staff_added", detail: "owner" },
+      "ana@northwind.test added ben@northwind.test to your organization as an owner",
+    ],
+    [
+      { event: "client_staff_added", detail: "admin" },
+      "ana@northwind.test added ben@northwind.test to your organization as an admin",
+    ],
+    [
+      { event: "client_staff_added", detail: "custom" },
+      "ana@northwind.test added ben@northwind.test to your organization with a custom role",
+    ],
+    [
+      { event: "client_staff_role_changed", detail: "custom items" },
+      "ana@northwind.test changed ben@northwind.test's role in your organization: now with a custom role that sees every item",
+    ],
+    [
+      { event: "client_staff_removed" },
+      "ana@northwind.test removed ben@northwind.test from your organization",
+    ],
+    [
+      { event: "member_confirmed" },
+      "ana@northwind.test confirmed ben@northwind.test in your organization",
+    ],
+    [
+      { event: "member_confirmed", detail: "automatic" },
+      "ana@northwind.test confirmed ben@northwind.test in your organization automatically, without comparing fingerprints",
+    ],
+    [
+      { event: "install_token_replaced" },
+      "ana@northwind.test replaced your organization's install command",
+    ],
+    [
+      { event: "install_domains_set", detail: "acme.test branch.acme.test" },
+      "ana@northwind.test limited your organization's install command to acme.test, branch.acme.test accounts",
+    ],
+    [
+      { event: "install_domains_set", detail: "" },
+      "ana@northwind.test let anyone with your organization's install command join",
+    ],
+    [
+      { event: "joined_with_install_command", actorEmail: "ben@northwind.test" },
+      "ben@northwind.test joined your organization with the install command",
+    ],
+    [
+      { event: "client_policy_pushed", detail: "Master password requirements to on" },
+      "ana@northwind.test set Master password requirements to on in your organization, as Northwind IT's default",
+    ],
+    [
+      { event: "client_policy_required", detail: "Require two-step login" },
+      "ana@northwind.test required Require two-step login for every client of Northwind IT, including your organization",
+    ],
+    [
+      { event: "client_policy_default", detail: "Vault lock" },
+      "ana@northwind.test put your organization back on Northwind IT's default Vault lock",
+    ],
+    [
+      { event: "client_template_sent", detail: "4f6c-fw" },
+      "ana@northwind.test sent your organization a template from Northwind IT",
+    ],
+    [
+      { event: "templates_collection_set", detail: "collection-1" },
+      "ana@northwind.test made your organization's Templates folder, for Northwind IT's templates",
+    ],
+  ])("%j", (fields, sentence) => {
+    expect(describeClientEvent(clientEvent(fields), "Northwind IT")).toBe(sentence);
+  });
+
+  it('names nothing but the organization itself, as "your organization"', () => {
+    for (const event of [
+      "client_created",
+      "client_staff_added",
+      "client_staff_removed",
+      "member_confirmed",
+      "install_token_replaced",
+      "joined_with_install_command",
+      "client_policy_pushed",
+    ]) {
+      expect(describeClientEvent(clientEvent({ event }), "Northwind IT")).toMatch(
+        /your organization/,
+      );
+    }
+  });
+
+  it("reads an entry it has no sentence for yet, never as the bare code", () => {
+    expect(describeClientEvent(clientEvent({ event: "client_seat_report" }), "Northwind IT")).toBe(
+      "Client seat report (by ana@northwind.test)",
+    );
+    expect(
+      describeClientEvent(
+        clientEvent({ event: "something_new", actorEmail: null }),
+        "Northwind IT",
+      ),
     ).toBe("Something new (by Someone)");
   });
 });

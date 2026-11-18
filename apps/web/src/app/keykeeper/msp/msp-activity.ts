@@ -197,3 +197,77 @@ function readableCode(code: string): string {
   const words = code.replace(/[_-]+/g, " ").trim();
   return words === "" ? "Something changed" : words[0].toUpperCase() + words.slice(1);
 }
+
+/**
+ * One of the MSP's entries as a client's own owners and admins see it on
+ * their Members page (GET /keykeeper/organizations/<id>/msp/activity): only
+ * entries about their organization, without where each came from.
+ */
+export type ClientMspEvent = {
+  id: string;
+  date: string;
+  event: string;
+  actorEmail: string | null;
+  targetEmail: string | null;
+  detail: string | null;
+};
+
+/** A role in the client, as the server records it for the MSP's people there. */
+function clientRole(detail: string | null): string {
+  switch (detail) {
+    case "owner":
+      return "as an owner";
+    case "admin":
+      return "as an admin";
+    case "custom items":
+      return "with a custom role that sees every item";
+    default:
+      return "with a custom role";
+  }
+}
+
+/**
+ * What the MSP did in the client's organization, in one sentence for its own
+ * people: "your organization" rather than its name, and the MSP by name.
+ * Template entries record only the template's id (the server never sees its
+ * name), so they say "a template".
+ */
+export function describeClientEvent(e: ClientMspEvent, mspName: string): string {
+  const actor = e.actorEmail ?? "Someone";
+  const target = e.targetEmail ?? "someone";
+  switch (e.event) {
+    case "client_created":
+      return `${actor} set up your organization as a client of ${mspName}${e.detail === "Default policies" || e.detail === "Business defaults" ? ", with its default policies" : ""}`;
+    case "client_staff_added":
+      return `${actor} added ${target} to your organization ${clientRole(e.detail)}`;
+    case "client_staff_role_changed":
+      return `${actor} changed ${target}'s role in your organization: now ${clientRole(e.detail)}`;
+    case "client_staff_removed":
+      return `${actor} removed ${target} from your organization`;
+    case "member_confirmed":
+      return e.detail === AUTOMATIC
+        ? `${actor} confirmed ${target} in your organization automatically, without comparing fingerprints`
+        : `${actor} confirmed ${target} in your organization`;
+    case "install_token_replaced":
+      return `${actor} replaced your organization's install command`;
+    case "install_domains_set":
+      return e.detail
+        ? `${actor} limited your organization's install command to ${e.detail.split(" ").join(", ")} accounts`
+        : `${actor} let anyone with your organization's install command join`;
+    case "joined_with_install_command":
+      return `${target} joined your organization with the install command`;
+    case "client_policy_pushed":
+      return `${actor} set ${e.detail ?? "a policy"} in your organization, as ${mspName}'s default`;
+    case "client_policy_required":
+      return `${actor} required ${e.detail ?? "a policy"} for every client of ${mspName}, including your organization`;
+    case "client_policy_default":
+      return `${actor} put your organization back on ${mspName}'s default ${e.detail ?? "policy"}`;
+    case "client_template_sent":
+      return `${actor} sent your organization a template from ${mspName}`;
+    case "templates_collection_set":
+      return `${actor} made your organization's Templates folder, for ${mspName}'s templates`;
+    default:
+      // A newer server's, which this page has no sentence for yet.
+      return `${readableCode(e.event)} (by ${actor})`;
+  }
+}
