@@ -28,7 +28,12 @@ import {
 
 import { KeykeeperJoinSealer } from "../joining/join-sealer.service";
 
-import { KeykeeperMspApiService, STAFF_EMAIL_CHANGED, UNTRUSTED_CLIENT } from "./msp-api.service";
+import {
+  KeykeeperMspApiService,
+  NO_JOINED_CLIENT_KEY_YET,
+  STAFF_EMAIL_CHANGED,
+  UNTRUSTED_CLIENT,
+} from "./msp-api.service";
 
 // Keykeeper: what an MSP admin's browser seals for the clients a server lists.
 // A hacked server could list any organization the admin belongs to as a
@@ -167,6 +172,20 @@ describe("Which clients an MSP admin's browser trusts", () => {
     await api.confirmClient(MSP, LAW);
     const put = sent.find((s) => s.method === "PUT" && s.path === `/keykeeper/msp/${MSP}/seals`);
     expect(put!.body.clients).toEqual([{ organizationId: LAW, seal: await clientSeal(LAW) }]);
+  });
+
+  it("says a client that joined with a code waits for its own owner to confirm you, and seals nothing", async () => {
+    const joined = "3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f";
+    const msp = await mspWith({
+      ...client(joined, null),
+      name: "Alpine Dental",
+      joinedWithCode: true,
+    });
+    const { api, sent } = setUp(msp);
+    await expect(api.confirmClient(MSP, joined)).rejects.toThrow(
+      NO_JOINED_CLIENT_KEY_YET("Alpine Dental"),
+    );
+    expect(sent.filter((s) => s.method === "PUT")).toEqual([]);
   });
 
   it("seals the places of the staff who reach a client it confirms, so the console lets them in as usual", async () => {

@@ -96,6 +96,14 @@ export const NO_ORG_KEY_YET =
 export const NO_CLIENT_KEY_YET =
   "This browser doesn't have the client's key yet: you still have to be confirmed there. That happens on its own once one of its admins, or another admin of your MSP, has the web vault or the extension open and unlocked. Then reload this page.";
 
+/**
+ * The same for a client that joined with a code: nobody on the MSP's side
+ * had its key, so its own owner confirms the MSP's first people by hand
+ * (DESIGN.md, "An organization that already uses PassBundle").
+ */
+export const NO_JOINED_CLIENT_KEY_YET = (name: string) =>
+  `This browser doesn't have ${name}'s key yet: its owner confirms you first, on its Members page, after comparing your fingerprint phrase with the one in your Settings, My account. Then reload this page.`;
+
 /** Said when the server names a client this browser can't check is one. */
 export const UNTRUSTED_CLIENT =
   "This browser can't check that this organization is your client. An MSP admin can confirm it under Clients.";
@@ -179,12 +187,15 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
    * already uses PassBundle").
    */
   async confirmClient(mspId: string, orgId: string): Promise<void> {
+    const msp = await this.get(mspId);
     const seal = await this.sealer.clientSeal(orgId, mspId);
     if (seal == null) {
-      throw new Error(NO_CLIENT_KEY_YET);
+      const client = msp.clients.find((c) => c.id === orgId);
+      throw new Error(
+        client?.joinedWithCode ? NO_JOINED_CLIENT_KEY_YET(client.name) : NO_CLIENT_KEY_YET,
+      );
     }
     await this.putMspSeals(mspId, { clients: [{ organizationId: orgId, seal }] });
-    const msp = await this.get(mspId);
     const reaching = msp.staff.filter(
       (s) =>
         s.role === "admin" ||
