@@ -958,6 +958,9 @@ describe("AutofillService", () => {
           autoCompleteType: "cc-name",
         }),
       ];
+      // Keykeeper: a card fills a frame of the page's own site, not one of
+      // another (keykeeper/card-frames.ts).
+      autofillOptions.pageDetails[0].details.url = autofillOptions.tab.url;
       jest.spyOn(autofillService as any, "generateCardFillScript");
       jest.spyOn(eventCollectionService, "collect");
 
@@ -6609,6 +6612,108 @@ describe("AutofillService", () => {
           select("country", [["unitedstates", "US"]]),
         ];
         expect(await identityFill(fields, { state: "Bayern", country: "DE" })).toEqual({});
+      });
+    });
+
+    describe("the frames a card fills", () => {
+      const shop = "https://shop.example.test/checkout";
+      let tab: chrome.tabs.Tab;
+      const frame = (frameId: number, url: string, fields?: AutofillField[]) => ({
+        frameId,
+        tab,
+        details: createAutofillPageDetailsMock({
+          url,
+          fields: fields ?? [
+            field(`number-${frameId}`, { autoCompleteType: "cc-number", form: "__form__0" }),
+          ],
+        }),
+      });
+      const cardItem = () =>
+        mock<CipherView>({
+          id: "card",
+          type: CipherType.Card,
+          viewPassword: true,
+          fields: [],
+          card: card(),
+        });
+      const filledFrames = () =>
+        (BrowserApi.tabSendMessage as jest.Mock).mock.calls
+          .filter(([, message]) => message?.command === "fillForm")
+          .map(([, , options]) => options.frameId)
+          .sort();
+
+      beforeEach(() => {
+        tab = createChromeTabMock({ url: shop });
+        jest.spyOn(BrowserApi, "tabSendMessage").mockResolvedValue(undefined);
+        (BrowserApi.tabSendMessage as jest.Mock).mockClear();
+        jest.spyOn(autofillService, "getDefaultUriMatchStrategy").mockResolvedValue(0);
+        jest
+          .spyOn(billingAccountProfileStateService, "hasPremiumFromAnySource$")
+          .mockImplementation(() => of(false));
+      });
+
+      it("fills the page, its own site's frames, payment services' frames, and the frame the fill started in", async () => {
+        const result = await autofillService.doAutoFill({
+          tab,
+          cipher: cardItem(),
+          pageDetails: [
+            frame(0, shop),
+            frame(2, "https://pay.example.test/card"),
+            frame(3, "https://widget.elsewhere.test/card"),
+            frame(4, "https://js.stripe.com/v3/elements-inner-card.html"),
+            frame(5, "https://form.elsewhere.test/card"),
+          ],
+          keykeeperStartFrameId: 5,
+        });
+        expect(result.outcome).toBe(AutofillOutcome.Filled);
+        // Never frame 3, another site's that the fill didn't start in.
+        expect(filledFrames()).toEqual([0, 2, 4, 5]);
+      });
+
+      it("refuses the fill when only another site's frame has the card's fields", async () => {
+        const result = await autofillService.doAutoFill({
+          tab,
+          cipher: cardItem(),
+          pageDetails: [frame(0, shop, []), frame(3, "https://widget.elsewhere.test/card")],
+          keykeeperStartFrameId: 0,
+        });
+        expect(result.outcome).toBe(AutofillOutcome.Denied);
+        expect(filledFrames()).toEqual([]);
+      });
+
+      it("still fills an identity into every frame", async () => {
+        const address = () => [field("address1", { autoCompleteType: "address-line1" })];
+        await autofillService.doAutoFill({
+          tab,
+          cipher: mock<CipherView>({
+            id: "home",
+            type: CipherType.Identity,
+            viewPassword: true,
+            fields: [],
+            identity: { address1: "1 Main Street" } as IdentityView,
+          }),
+          pageDetails: [
+            frame(0, shop, address()),
+            frame(3, "https://widget.elsewhere.test/a", address()),
+          ],
+        });
+        expect(filledFrames()).toEqual([0, 3]);
+      });
+
+      it("fills a payment service's frame whatever form the fill started in", async () => {
+        await autofillService.doAutoFill({
+          tab,
+          cipher: cardItem(),
+          pageDetails: [
+            frame(0, shop, [field("ccname", { autoCompleteType: "cc-name", form: "__form__1" })]),
+            frame(2, "https://pay.example.test/card"),
+            frame(4, "https://js.stripe.com/v3/elements-inner-card.html"),
+          ],
+          focusedFieldForm: "__form__1",
+          keykeeperStartFrameId: 0,
+        });
+        // The page's own frame is narrowed to that form, as upstream has it.
+        expect(filledFrames()).toEqual([0, 4]);
       });
     });
   });

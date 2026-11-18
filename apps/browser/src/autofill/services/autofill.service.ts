@@ -65,6 +65,7 @@ import {
   nameParts,
   yearOption,
 } from "../keykeeper/card-fields";
+import { cardMayFillFrame, isPaymentServiceFrame } from "../keykeeper/card-frames";
 import {
   applyFillRules,
   FillSource,
@@ -526,13 +527,38 @@ export default class AutofillService implements AutofillServiceInterface {
           return AutofillOutcome.Denied;
         }
 
+        // Keykeeper: a card fills only the page's own site, the frame the
+        // person started the fill from, and payment services' frames; any
+        // other frame is refused before a value leaves the extension
+        // (keykeeper/card-frames.ts).
+        const keykeeperCard = options.cipher.type === CipherType.Card;
+        if (
+          keykeeperCard &&
+          !cardMayFillFrame({
+            frameId: pd.frameId,
+            frameUrl: pd.details?.url,
+            tabUrl,
+            startedInFrameId: options.keykeeperStartFrameId,
+          })
+        ) {
+          return pd.details?.fields?.length ? AutofillOutcome.Denied : AutofillOutcome.Absent;
+        }
+        // Keykeeper: and a payment service's frame holds only the payment's
+        // fields, so the form the person is in, which belongs to another
+        // frame, doesn't narrow it.
+        const keykeeperPaymentFrame =
+          keykeeperCard &&
+          pd.frameId !== options.keykeeperStartFrameId &&
+          isPaymentServiceFrame(pd.details?.url);
+
         // If we have a focused form, filter the page details to only include fields from that form
-        const details = options.focusedFieldForm
-          ? {
-              ...pd.details,
-              fields: pd.details.fields.filter((f) => f.form === options.focusedFieldForm),
-            }
-          : pd.details;
+        const details =
+          options.focusedFieldForm && !keykeeperPaymentFrame
+            ? {
+                ...pd.details,
+                fields: pd.details.fields.filter((f) => f.form === options.focusedFieldForm),
+              }
+            : pd.details;
 
         const fillScript = await this.generateFillScript(details, {
           skipUsernameOnlyFill: options.skipUsernameOnlyFill || false,

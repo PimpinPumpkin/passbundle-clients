@@ -34,6 +34,11 @@ export interface AutoFillOptions {
   inlineMenuFillType?: InlineMenuFillType;
   /** Keykeeper: autofill on page load, not a fill the person started (keykeeper/fill-rules.ts). */
   onPageLoad?: boolean;
+  /**
+   * Keykeeper: the frame the person started the fill from, which a card may
+   * fill whatever its site (keykeeper/card-frames.ts).
+   */
+  keykeeperStartFrameId?: number;
 }
 
 interface FormDataBase {
