@@ -16,6 +16,39 @@ const event = (fields: Partial<MspEvent>): MspEvent => ({
 describe("MSP activity sentences", () => {
   it.each([
     [
+      {
+        event: "link_code_created",
+        organizationName: null,
+        targetEmail: null,
+        detail: "Acme Dental",
+      },
+      "ana@northwind.test made a code for an organization to join (for Acme Dental)",
+    ],
+    [
+      { event: "link_code_created", organizationName: null, targetEmail: null },
+      "ana@northwind.test made a code for an organization to join",
+    ],
+    [
+      { event: "link_code_revoked", organizationName: null, detail: "Acme Dental" },
+      "ana@northwind.test revoked ben@northwind.test's code for Acme Dental",
+    ],
+    [
+      { event: "link_code_used", actorEmail: "owner@acme.test", detail: "Acme Dental" },
+      "owner@acme.test used ben@northwind.test's code for Acme Dental to bring in Acme Dental",
+    ],
+    [
+      { event: "client_joined", actorEmail: "owner@acme.test" },
+      "Acme Dental joined as a client (owner@acme.test); its owner confirms your staff there",
+    ],
+    [
+      { event: "client_joined", actorEmail: "owner@acme.test", detail: "move" },
+      "Acme Dental moved here from another MSP (owner@acme.test); its owner confirms your staff there",
+    ],
+    [
+      { event: "client_moved_away", actorEmail: "owner@acme.test" },
+      "Acme Dental moved to another MSP (owner@acme.test)",
+    ],
+    [
       { event: "event_stream_added", detail: "SOC (webhook: https://siem.example/…)" },
       "ana@northwind.test started sending the MSP's events to SOC (webhook: https://siem.example/…)",
     ],
@@ -338,6 +371,14 @@ describe("What the MSP did, as the client's own people read it", () => {
     [
       { event: "client_created", detail: "No defaults" },
       "ana@northwind.test set up your organization as a client of Northwind IT",
+    ],
+    [
+      { event: "client_joined", actorEmail: "owner@acme.test" },
+      "owner@acme.test made your organization a client of Northwind IT",
+    ],
+    [
+      { event: "client_joined", actorEmail: "owner@acme.test", detail: "move" },
+      "owner@acme.test made your organization a client of Northwind IT, moving it from its MSP before",
     ],
     [
       { event: "client_staff_added", detail: "owner" },

@@ -130,6 +130,21 @@ export function describeEvent(
         : `${actor} confirmed ${target} in ${org}`;
     case "client_removed_msp":
       return `${org} removed this MSP (${actor})`;
+    // Keykeeper: an organization that already uses PassBundle joins with a
+    // code its owner enters, or moves to another MSP (DESIGN.md, "An
+    // organization that already uses PassBundle").
+    case "link_code_created":
+      return `${actor} made a code for an organization to join${e.detail ? ` (for ${e.detail})` : ""}`;
+    case "link_code_revoked":
+      return `${actor} revoked ${e.targetEmail ? `${e.targetEmail}'s` : "a"} code${e.detail ? ` for ${e.detail}` : ""}`;
+    case "link_code_used":
+      return `${actor} used ${e.targetEmail ? `${e.targetEmail}'s` : "a"} code${e.detail ? ` for ${e.detail}` : ""} to bring in ${org}`;
+    case "client_joined":
+      return e.detail === "move"
+        ? `${org} moved here from another MSP (${actor}); its owner confirms your staff there`
+        : `${org} joined as a client (${actor}); its owner confirms your staff there`;
+    case "client_moved_away":
+      return `${org} moved to another MSP (${actor})`;
     // Keykeeper: the client took one of the MSP's people out itself; they stay
     // out (DESIGN.md, "Offboarding"). No actor means the client's directory.
     case "client_removed_staff":
@@ -238,6 +253,8 @@ export function describeClientEvent(e: ClientMspEvent, mspName: string): string 
   switch (e.event) {
     case "client_created":
       return `${actor} set up your organization as a client of ${mspName}${e.detail === "Default policies" || e.detail === "Business defaults" ? ", with its default policies" : ""}`;
+    case "client_joined":
+      return `${actor} made your organization a client of ${mspName}${e.detail === "move" ? ", moving it from its MSP before" : ""}`;
     case "client_staff_added":
       return `${actor} added ${target} to your organization ${clientRole(e.detail)}`;
     case "client_staff_role_changed":

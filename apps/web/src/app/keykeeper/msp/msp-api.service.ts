@@ -24,7 +24,10 @@ import {
   joiningSealedAt,
   KeykeeperJoinSeals,
   KeykeeperMspRequests,
+  LinkPreview,
+  LinkResult,
   MspDetails,
+  MspLinkCode,
   MspJoining,
   MspPolicies,
   MspRemoval,
@@ -58,7 +61,7 @@ import { EncryptService, LegacyCompatKeyService } from "@bitwarden/legacy-crypto
 import { KeykeeperJoinSealer, ReportedJoining } from "../joining/join-sealer.service";
 
 import { ClientMspEvent, MspEvent } from "./msp-activity";
-import { staffPhrases } from "./staff-fingerprint";
+import { StaffKey, staffPhrases } from "./staff-fingerprint";
 import { reachesEveryClient } from "./technician-access";
 
 /** Email domains as the server keeps them, so a seal covers exactly those. */
@@ -167,9 +170,13 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
   }
 
   /**
-   * Seals, with its key, that a client made before client seals existed is
-   * this MSP's, once an MSP admin says so for that client by name in the
-   * console. From then on it's trusted like a client made here.
+   * Seals, with its key, that a client made before client seals existed, or
+   * one that joined with a code, is this MSP's, once an MSP admin says so for
+   * that client by name in the console. From then on it's trusted like a
+   * client made here. As making a client does, it also seals the places of
+   * the staff the console lists as reaching it, so the console's usual
+   * confirming lets the rest of them in (DESIGN.md, "An organization that
+   * already uses PassBundle").
    */
   async confirmClient(mspId: string, orgId: string): Promise<void> {
     const seal = await this.sealer.clientSeal(orgId, mspId);
@@ -177,6 +184,74 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
       throw new Error(NO_CLIENT_KEY_YET);
     }
     await this.putMspSeals(mspId, { clients: [{ organizationId: orgId, seal }] });
+    const msp = await this.get(mspId);
+    const reaching = msp.staff.filter(
+      (s) =>
+        s.role === "admin" ||
+        reachesEveryClient(s.access ?? undefined) ||
+        (s.access?.clients ?? []).includes(orgId),
+    );
+    const staff = [];
+    for (const person of reaching) {
+      staff.push(...(await this.sealer.staffSeals([orgId], person.email)));
+    }
+    if (staff.length > 0) {
+      await this.putMspSeals(mspId, { staff });
+    }
+  }
+
+  /** The MSP's codes nobody has used yet. MSP admins only. */
+  async linkCodes(mspId: string): Promise<MspLinkCode[]> {
+    return (
+      await this.apiService.send("GET", `/keykeeper/msp/${mspId}/link-codes`, null, true, true)
+    ).data;
+  }
+
+  /** A new code for an organization's owner, with who it's for; its answer has the code, once. */
+  async makeLinkCode(mspId: string, label: string): Promise<MspLinkCode> {
+    return this.apiService.send(
+      "POST",
+      `/keykeeper/msp/${mspId}/link-codes`,
+      { label: label.trim() === "" ? null : label.trim() },
+      true,
+      true,
+    );
+  }
+
+  /** Revokes a code nobody has used: it stops working at once. */
+  async revokeLinkCode(mspId: string, codeId: string): Promise<void> {
+    await this.apiService.send(
+      "DELETE",
+      `/keykeeper/msp/${mspId}/link-codes/${codeId}`,
+      null,
+      true,
+      false,
+    );
+  }
+
+  /**
+   * For an organization's own owners: what a code would do, before anything
+   * changes (DESIGN.md, "An organization that already uses PassBundle").
+   */
+  async previewLink(orgId: string, code: string): Promise<LinkPreview> {
+    return this.apiService.send(
+      "POST",
+      `/keykeeper/organizations/${orgId}/msp/link/preview`,
+      { code },
+      true,
+      true,
+    );
+  }
+
+  /** Joins the organization to the code's MSP; `move` says the owner saw that its MSP now goes first. */
+  async joinWithCode(orgId: string, code: string, move: boolean): Promise<LinkResult> {
+    return this.apiService.send(
+      "POST",
+      `/keykeeper/organizations/${orgId}/msp/link`,
+      { code, move },
+      true,
+      true,
+    );
   }
 
   /**
@@ -949,6 +1024,15 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
    */
   async staffFingerprints(staff: MspStaffMember[]): Promise<Map<string, string>> {
     return staffPhrases(this.legacyCompatKeyService, staff);
+  }
+
+  /**
+   * The same phrases for any of an MSP's people the server gives a key for,
+   * by account id: for a client's Members page, where its own owners confirm
+   * them (DESIGN.md, "An organization that already uses PassBundle").
+   */
+  async staffPhrases(people: StaffKey[]): Promise<Map<string, string>> {
+    return staffPhrases(this.legacyCompatKeyService, people);
   }
 
   /**

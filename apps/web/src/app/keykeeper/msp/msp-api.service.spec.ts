@@ -168,6 +168,61 @@ describe("Which clients an MSP admin's browser trusts", () => {
     const put = sent.find((s) => s.method === "PUT" && s.path === `/keykeeper/msp/${MSP}/seals`);
     expect(put!.body.clients).toEqual([{ organizationId: LAW, seal: await clientSeal(LAW) }]);
   });
+
+  it("seals the places of the staff who reach a client it confirms, so the console lets them in as usual", async () => {
+    // A client that joined with a code: its own owner confirmed this admin,
+    // and the rest of the staff wait without a staff seal (DESIGN.md, "An
+    // organization that already uses PassBundle").
+    const msp: MspDetails = {
+      ...(await mspWith(client(LAW, null), client(DENTAL, await clientSeal(DENTAL)))),
+      staff: [
+        {
+          userId: "u-admin",
+          email: "admin@northwind.example",
+          name: null,
+          role: "admin",
+          access: null,
+        },
+        {
+          userId: "u-all",
+          email: "all@northwind.example",
+          name: null,
+          role: "technician",
+          access: { allClients: true, clients: [], custom: null, installCommands: true },
+        },
+        {
+          userId: "u-law",
+          email: "law@northwind.example",
+          name: null,
+          role: "technician",
+          access: { allClients: false, clients: [LAW], custom: null, installCommands: true },
+        },
+        {
+          userId: "u-dental",
+          email: "dental@northwind.example",
+          name: null,
+          role: "technician",
+          access: { allClients: false, clients: [DENTAL], custom: null, installCommands: true },
+        },
+      ],
+    };
+    const { api, sent } = setUp(msp);
+    await api.confirmClient(MSP, LAW);
+    const puts = sent.filter((s) => s.method === "PUT" && s.path === `/keykeeper/msp/${MSP}/seals`);
+    expect(puts).toHaveLength(2);
+    expect(puts[0].body.clients).toEqual([{ organizationId: LAW, seal: await clientSeal(LAW) }]);
+    const staff = puts[1].body.staff as { organizationId: string; email: string; seal: string }[];
+    expect(staff.map((s) => [s.organizationId, s.email])).toEqual([
+      [LAW, "admin@northwind.example"],
+      [LAW, "all@northwind.example"],
+      [LAW, "law@northwind.example"],
+    ]);
+    for (const s of staff) {
+      expect(await seals.checkStaffSeal(s.seal, await joinKey(LAW), LAW, s.email, new Date())).toBe(
+        true,
+      );
+    }
+  });
 });
 
 describe("Sealing a staff member's place after a change in the console", () => {
