@@ -131,8 +131,21 @@ describe("AuthPopoutWindow", () => {
     it("opens a window that facilitates presentation of the results for SSO authentication", async () => {
       await openSsoAuthResultPopout({ code: "code", state: "state" });
 
-      expect(openPopoutSpy).toHaveBeenCalledWith("popup/index.html#/sso?code=code&state=state", {
+      expect(openPopoutSpy).toHaveBeenCalledWith(
+        "popup/index.html#/sso?code=code&state=state",
+        expect.objectContaining({ singleActionKey: AuthPopoutType.ssoAuthResult }),
+      );
+    });
+
+    // Keykeeper: a window left from an earlier try (a refused sign-in stays
+    // open with its message) would otherwise only be brought forward, and the
+    // new answer never redeemed.
+    it("replaces a window an earlier sign-in left open, so a new answer is never lost", async () => {
+      await openSsoAuthResultPopout({ code: "second", state: "state" });
+
+      expect(openPopoutSpy).toHaveBeenCalledWith("popup/index.html#/sso?code=second&state=state", {
         singleActionKey: AuthPopoutType.ssoAuthResult,
+        forceCloseExistingWindows: true,
       });
     });
   });
