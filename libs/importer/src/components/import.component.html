@@ -134,6 +134,10 @@
             passwords; to bring cards, identities, secure notes, and custom fields too, export 1PUX
             instead and choose "1Password (1pux/json)" here.
           }
+          <!-- Keykeeper: Passportal's and IT Glue's exports (keykeeper/msp-import.ts). -->
+          @if (mspSteps; as steps) {
+            {{ steps }}
+          }
           <!-- GNOME: text is interleaved with a help link and four <code> filenames/commands. -->
           @if (format === "gnomejson") {
             {{ "importGnomeInstructionsIntro" | i18n }}

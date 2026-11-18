@@ -116,6 +116,7 @@ import {
 } from "./import-source-groups";
 import { ImporterProviders } from "./importer-providers";
 import { ImportKeeperComponent, defaultKeeperImportMethod } from "./keeper";
+import { chooseMspCustomer, mspImportSteps } from "./keykeeper/msp-import";
 import { ImportLastPassComponent } from "./lastpass";
 import { ImportOnePasswordComponent } from "./onepassword";
 
@@ -384,6 +385,11 @@ export class ImportComponent implements OnInit, OnDestroy, AfterViewInit {
 
   protected get isOnePasswordDirectFormat(): boolean {
     return this.format === "onepassword";
+  }
+
+  /** Keykeeper: Passportal's or IT Glue's export steps (keykeeper/msp-import.ts). */
+  protected get mspSteps(): string | null {
+    return mspImportSteps(this.format);
   }
 
   /** The i18n key of the hint for the selected method of a grouped source, if it has one. */
@@ -732,6 +738,20 @@ export class ImportComponent implements OnInit, OnDestroy, AfterViewInit {
         title: this.i18nService.t("errorOccurred"),
         message: this.i18nService.t("selectFile"),
       });
+      return;
+    }
+
+    // Keykeeper: an MSP's export into an organization asks whose rows go in
+    // when it names more than one customer (keykeeper/msp-import.ts).
+    if (
+      this.organizationId != null &&
+      !(await chooseMspCustomer(
+        this.dialogService,
+        importer,
+        importContents,
+        this.organization?.name ?? "this organization",
+      ))
+    ) {
       return;
     }
 
