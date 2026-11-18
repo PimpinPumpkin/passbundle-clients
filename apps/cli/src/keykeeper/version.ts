@@ -9,11 +9,3 @@ import { CLI_BRAND } from "./brand";
 export function cliVersion(appVersion: string, brand = CLI_BRAND): string {
   return brand.version || appVersion;
 }
-
-/** What `update` says when the tool doesn't update itself. */
-export function updateMessage(version: string, brand = CLI_BRAND): string {
-  return (
-    `${brand.name} CLI ${version}. It doesn't update itself: ` +
-    `get the newest version from ${brand.releases}`
-  );
-}

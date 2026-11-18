@@ -1,7 +1,7 @@
 // Keykeeper: see sign-in.ts and version.ts.
 import { CliBrand } from "./brand";
 import { ssoPromptMessage, ssoRequiredRefusal } from "./sign-in";
-import { cliVersion, updateMessage } from "./version";
+import { cliVersion } from "./version";
 
 describe("ssoRequiredRefusal", () => {
   it("sends someone not linked yet to the web vault to link first", () => {
@@ -38,16 +38,12 @@ describe("the tool's version", () => {
     envPrefix: "PASSBUNDLE_",
     version: "0.1.7",
     releases: "https://github.com/example/releases",
+    releaseRepository: "example/releases",
+    releaseKeys: [],
   };
 
   it("is its own when it has one, and the app's otherwise", () => {
     expect(cliVersion("2026.8.0", brand)).toBe("0.1.7");
     expect(cliVersion("2026.8.0", { ...brand, version: "" })).toBe("2026.8.0");
-  });
-
-  it("says where updates are, since it doesn't update itself", () => {
-    expect(updateMessage("0.1.7", brand)).toBe(
-      "PassBundle CLI 0.1.7. It doesn't update itself: get the newest version from https://github.com/example/releases",
-    );
   });
 });

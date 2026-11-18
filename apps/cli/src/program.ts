@@ -16,6 +16,7 @@ import { StatusCommand } from "./commands/status.command";
 import { UpdateCommand } from "./commands/update.command";
 import { UnlockCommand } from "./key-management/commands/unlock.command";
 import { passwordOnCommandLine, sessionOnCommandLine, warn } from "./keykeeper/command-line";
+import { approveReprompted } from "./keykeeper/reprompt";
 import { cliVersion } from "./keykeeper/version";
 import { Response } from "./models/response";
 import { MessageResponse } from "./models/response/message.response";
@@ -36,6 +37,11 @@ export class Program extends BaseProgram {
       .option("--quiet", "Don't return anything to stdout.")
       .option("--nointeraction", "Do not prompt for interactive user input.")
       .option("--session <session>", "Pass session key instead of reading from env.")
+      // Keykeeper: keykeeper/reprompt.ts.
+      .option(
+        "--reprompt-ok",
+        'Read and change items marked "Master password re-prompt" without asking for the master password, for a script approved to.',
+      )
       .version(
         // Keykeeper: the tool's own version, when it has one (keykeeper/version.ts).
         cliVersion(await this.serviceContainer.platformUtilsService.getApplicationVersion()),
@@ -64,6 +70,10 @@ export class Program extends BaseProgram {
 
     program.on("option:nointeraction", () => {
       process.env.BW_NOINTERACTION = "true";
+    });
+
+    program.on("option:reprompt-ok", () => {
+      approveReprompted();
     });
 
     program.on("option:session", (key) => {
@@ -125,6 +135,11 @@ export class Program extends BaseProgram {
         "Log in with Single-Sign On with optional organization identifier.",
       )
       .option("--apikey", "Log in with an Api Key.")
+      // Keykeeper: another device's approval (keykeeper/device-sign-in.ts).
+      .option(
+        "--device",
+        "Sign in with the approval of a device where you're signed in, with no password here.",
+      )
       .option("--passwordenv <passwordenv>", "Environment variable storing your password")
       .option(
         "--passwordfile <passwordfile>",
@@ -161,6 +176,7 @@ export class Program extends BaseProgram {
         writeLn("    bw login john@example.com myPassword321 --raw");
         writeLn("    bw login john@example.com myPassword321 --method 1 --code 249213");
         writeLn("    bw login --sso");
+        writeLn("    bw login john@example.com --device");
         writeLn("", true);
       })
       .action(async (email: string, password: string, options: OptionValues) => {
@@ -189,6 +205,8 @@ export class Program extends BaseProgram {
             this.serviceContainer.userDecryptionOptionsService,
             this.serviceContainer.encryptedMigrator,
             this.serviceContainer.apiService,
+            this.serviceContainer.authRequestService,
+            this.serviceContainer.appIdService,
           );
           const response = await command.run(email, password, options);
           this.processResponse(response, true);
@@ -450,26 +468,29 @@ export class Program extends BaseProgram {
 
     program
       .command("update")
-      .description("Check for updates.")
+      .description("Update this tool to its newest release.")
+      // Keykeeper: the tool updates itself (keykeeper/self-update*.ts).
+      .option("--check", "Only say whether there's a newer release. Changes nothing.")
       .on("--help", () => {
         writeLn("\n  Notes:");
         writeLn("");
-        writeLn("    Returns the URL to download the newest version of this CLI tool.");
+        writeLn("    Installs the newest release, once its signature checks out.");
+        writeLn("    Nothing checks for updates by itself: only this command does.");
         writeLn("");
-        writeLn("    Use the `--raw` option to return only the download URL for the update.");
+        writeLn("    Use the `--raw` option to return only the newer version, if there is one.");
         writeLn("");
         writeLn("  Examples:");
         writeLn("");
+        writeLn("    bw update --check");
         writeLn("    bw update");
-        writeLn("    bw update --raw");
         writeLn("", true);
       })
-      .action(async () => {
+      .action(async (options: OptionValues) => {
         const command = new UpdateCommand(
           this.serviceContainer.platformUtilsService,
           this.serviceContainer.apiService,
         );
-        const response = await command.run();
+        const response = await command.run({ check: !!options.check });
         this.processResponse(response);
       });
 

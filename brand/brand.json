@@ -28,6 +28,8 @@
   "cli": {
     "command": "passbundle",
     "envPrefix": "PASSBUNDLE_",
-    "releases": "https://github.com/PimpinPumpkin/Passbundle/releases?q=cli-v&expanded=true"
+    "releases": "https://github.com/PimpinPumpkin/Passbundle/releases?q=cli-v&expanded=true",
+    "releaseRepository": "PimpinPumpkin/Passbundle",
+    "releaseKeys": []
   }
 }

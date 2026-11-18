@@ -34,6 +34,7 @@ import {
   keepHiddenSecrets,
   refuseSentSecrets,
 } from "../keykeeper/hidden-items";
+import { reprompt } from "../keykeeper/reprompt";
 import { Response } from "../models/response";
 import { CliUtils } from "../utils";
 import { CipherResponse } from "../vault/models/cipher.response";
@@ -123,6 +124,13 @@ export class EditCommand {
     let cipherView = await this.cipherService.decrypt(cipher, activeUserId);
     if (cipherView.isDeleted) {
       return Response.badRequest("You may not edit a deleted item. Use the restore command first.");
+    }
+    // Keykeeper: an item that asks for the master password again asks before
+    // it's changed, as in the web vault (keykeeper/reprompt.ts), so an edit
+    // piped from its plain values can't overwrite secrets it never saw.
+    const reprompted = await reprompt([cipherView]);
+    if (reprompted != null) {
+      return Response.error(reprompted);
     }
     // Keykeeper: an edit can't carry a value for a secret the person can't
     // see; and those secrets, before the edit below changes cipherView in
