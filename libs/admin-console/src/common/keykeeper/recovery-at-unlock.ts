@@ -1,0 +1,203 @@
+// Keykeeper: enrolling people in account recovery at unlock, when their
+// organization turned it on (or turned on its automatic enrollment) after
+// they joined. Upstream enrolls someone automatically only as they accept an
+// emailed invitation, so everyone already in the organization stayed out
+// until they enrolled by hand from its options. At each unlock, for every
+// organization where the person is confirmed and not enrolled yet, and whose
+// Account recovery administration policy is on with automatic enrollment,
+// this enrolls them with upstream's own enrollment
+// (PasswordResetEnrollmentServiceImplementation.enroll): their user key,
+// encrypted to the organization's public key as the server serves it, as
+// accepting an invitation does. It says nothing: joining disclosed it, the
+// organization's event log records it, and the organization's options show it
+// as they do today. An organization gets at most one try per unlock,
+// whatever happens: a refusal (an MSP's staff) or a failure (offline) waits
+// for the next unlock. Runs in the web vault and the browser extension. See
+// DESIGN.md, "Enrolling at unlock".
+
+import {
+  EMPTY,
+  debounceTime,
+  distinctUntilChanged,
+  filter,
+  firstValueFrom,
+  map,
+  switchMap,
+} from "rxjs";
+
+import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
+import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
+import { OrganizationUserStatusType, PolicyType } from "@bitwarden/common/admin-console/enums";
+import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
+import { Policy } from "@bitwarden/common/admin-console/models/domain/policy";
+import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import { AuthService } from "@bitwarden/common/auth/abstractions/auth.service";
+import { PasswordResetEnrollmentServiceAbstraction } from "@bitwarden/common/auth/abstractions/password-reset-enrollment.service.abstraction";
+import { AuthenticationStatus } from "@bitwarden/common/auth/enums/authentication-status";
+import { getOptionalUserId } from "@bitwarden/common/auth/services/account.service";
+import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
+import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
+import {
+  KEYKEEPER_RECOVERY_MEMORY,
+  StateProvider,
+  UserKeyDefinition,
+} from "@bitwarden/common/platform/state";
+import { SyncService } from "@bitwarden/common/platform/sync";
+import { UserId } from "@bitwarden/common/types/guid";
+import { KeyService } from "@bitwarden/key-management";
+
+/**
+ * Whether this unlock already had its try. Kept in memory, which the
+ * extension keeps across its background's restarts, and cleared when the
+ * account locks or signs out, so the next unlock tries again.
+ */
+export const KEYKEEPER_RECOVERY_TRIED = new UserKeyDefinition<boolean>(
+  KEYKEEPER_RECOVERY_MEMORY,
+  "triedThisUnlock",
+  {
+    deserializer: (tried) => tried === true,
+    clearOn: ["lock", "logout"],
+  },
+);
+
+/** Lets the sync an app starts as it unlocks finish first. */
+const SETTLE_MS = 3000;
+
+/** What happened in one organization, for the log and for tests. */
+export type RecoveryAtUnlock = {
+  organizationId: string;
+  enrolled: boolean;
+  /** Why not, in a sentence: the server's refusal, or being offline. */
+  error?: string;
+};
+
+/**
+ * Whether this membership is due to be enrolled: confirmed, not from an MSP
+ * (the server never enrolls an MSP's staff, so their key isn't sent), not
+ * enrolled yet, in an organization that offers account recovery (as
+ * upstream's organization options decide) and whose policy is on with
+ * automatic enrollment.
+ */
+export function dueForRecovery(organization: Organization, policies: Policy[]): boolean {
+  if (
+    organization.status !== OrganizationUserStatusType.Confirmed ||
+    organization.keykeeperFromMsp ||
+    organization.resetPasswordEnrolled ||
+    !organization.usePolicies ||
+    !organization.useResetPassword ||
+    !organization.hasPublicAndPrivateKeys
+  ) {
+    return false;
+  }
+  const policy = policies.find(
+    (p) => p.type === PolicyType.ResetPassword && p.organizationId === organization.id,
+  );
+  return policy?.enabled === true && policy.data?.autoEnrollEnabled === true;
+}
+
+export class KeykeeperRecoveryAtUnlock {
+  /** The run in progress for each account, so two triggers can't both try. */
+  private readonly running = new Map<UserId, Promise<RecoveryAtUnlock[]>>();
+
+  constructor(
+    private readonly accountService: AccountService,
+    private readonly authService: AuthService,
+    private readonly organizationService: OrganizationService,
+    private readonly policyService: PolicyService,
+    private readonly syncService: SyncService,
+    private readonly keyService: KeyService,
+    /** Upstream's enrollment, as accepting an invitation and enrolling by hand use. */
+    private readonly enrollment: PasswordResetEnrollmentServiceAbstraction,
+    private readonly stateProvider: StateProvider,
+    private readonly logService: LogService,
+    private readonly settleMs = SETTLE_MS,
+  ) {}
+
+  /** Runs each time the active account becomes unlocked. */
+  start() {
+    this.accountService.activeAccount$
+      .pipe(
+        getOptionalUserId,
+        switchMap((userId) =>
+          userId == null
+            ? EMPTY
+            : this.authService.authStatusFor$(userId).pipe(
+                map((status) => status === AuthenticationStatus.Unlocked),
+                distinctUntilChanged(),
+                filter((unlocked) => unlocked),
+                map(() => userId),
+              ),
+        ),
+        debounceTime(this.settleMs),
+      )
+      .subscribe((userId) => void this.run(userId));
+  }
+
+  /**
+   * Enrolls the person in every organization they're due in, once per
+   * unlock. Never throws and never tells the person; resolves to what
+   * happened in each organization it tried.
+   */
+  run(userId: UserId): Promise<RecoveryAtUnlock[]> {
+    const running = this.running.get(userId);
+    if (running != null) {
+      return running;
+    }
+    const run = this.runOnce(userId)
+      .catch((e: unknown): RecoveryAtUnlock[] => {
+        this.logService.warning(`Account recovery at unlock: ${plainErrorMessage(e)}`);
+        return [];
+      })
+      .finally(() => this.running.delete(userId));
+    this.running.set(userId, run);
+    return run;
+  }
+
+  private async runOnce(userId: UserId): Promise<RecoveryAtUnlock[]> {
+    // Requests go out as the active account, and need its user key.
+    const active = await firstValueFrom(this.accountService.activeAccount$.pipe(getOptionalUserId));
+    if (
+      active !== userId ||
+      (await firstValueFrom(this.authService.authStatusFor$(userId))) !==
+        AuthenticationStatus.Unlocked
+    ) {
+      return [];
+    }
+    const tried = this.stateProvider.getUser(userId, KEYKEEPER_RECOVERY_TRIED);
+    if ((await firstValueFrom(tried.state$)) === true) {
+      return [];
+    }
+    // Marked first, so nothing can make this unlock try twice.
+    await tried.update(() => true);
+
+    // The policy may have changed since this device last synced; turning it
+    // on changes every member's account, so this syncs only then.
+    await this.syncService.fullSync(false);
+    const [organizations, policies, userKey] = await Promise.all([
+      firstValueFrom(this.organizationService.organizations$(userId)),
+      firstValueFrom(this.policyService.policies$(userId)),
+      firstValueFrom(this.keyService.userKey$(userId)),
+    ]);
+    if (userKey == null) {
+      return [];
+    }
+    const outcomes: RecoveryAtUnlock[] = [];
+    for (const organization of organizations.filter((o) => dueForRecovery(o, policies))) {
+      try {
+        await this.enrollment.enroll(organization.id, userId, userKey);
+        outcomes.push({ organizationId: organization.id, enrolled: true });
+      } catch (e) {
+        // Quietly: the server refused (an MSP's staff) or couldn't be
+        // reached. The next unlock tries again.
+        const error = plainErrorMessage(e);
+        this.logService.info(`Account recovery at unlock in ${organization.id}: ${error}`);
+        outcomes.push({ organizationId: organization.id, enrolled: false, error });
+      }
+    }
+    if (outcomes.some((o) => o.enrolled)) {
+      // So the organization's options show it, as after enrolling by hand.
+      await this.syncService.fullSync(true);
+    }
+    return outcomes;
+  }
+}

@@ -34,6 +34,7 @@ import { UnlockService } from "@bitwarden/unlock";
 
 import { breachCheckSyncedPart } from "../keykeeper/health/breach-check-setting.service";
 import { KeykeeperMspWorkService } from "../keykeeper/msp/msp-work.service";
+import { KeykeeperRecoveryAtUnlockService } from "../keykeeper/recovery/recovery-at-unlock.service";
 import { KeykeeperReloadKeyService } from "../keykeeper/reload-key/reload-key.service";
 import { VersionService } from "../platform/version.service";
 
@@ -41,6 +42,9 @@ import { VersionService } from "../platform/version.service";
 export class InitService {
   // Keykeeper: an MSP's background work (confirming members, keeping templates current).
   private readonly keykeeperMspWork = inject(KeykeeperMspWorkService);
+  // Keykeeper: enrolls people in account recovery at unlock, where their
+  // organization turned it on after they joined.
+  private readonly keykeeperRecoveryAtUnlock = inject(KeykeeperRecoveryAtUnlockService);
   // Keykeeper: a tab stays unlocked across a reload, within its timeout.
   private readonly keykeeperReloadKey = inject(KeykeeperReloadKeyService);
   // Keykeeper: prompts for the account's sign-ins on new devices.
@@ -125,6 +129,7 @@ export class InitService {
       this.taskService.listenForTaskNotifications();
       // Keykeeper: see KeykeeperMspWork.
       this.keykeeperMspWork.start();
+      this.keykeeperRecoveryAtUnlock.start();
       this.keykeeperNewDeviceApprovals.start();
       this.keykeeperGeneratorSettings.start();
 
