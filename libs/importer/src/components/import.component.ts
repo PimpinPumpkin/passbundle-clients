@@ -96,6 +96,7 @@ import {
   ImportMetadataServiceAbstraction,
   ImportServiceAbstraction,
 } from "../services";
+import { ImportCanceled } from "../services/keykeeper/folder-places";
 
 import { ImportChromeComponent } from "./chrome";
 import {
@@ -116,6 +117,7 @@ import {
 } from "./import-source-groups";
 import { ImporterProviders } from "./importer-providers";
 import { ImportKeeperComponent, defaultKeeperImportMethod } from "./keeper";
+import { folderPlacer } from "./keykeeper/folder-places";
 import { chooseMspCustomer, mspImportSteps } from "./keykeeper/msp-import";
 import { ImportLastPassComponent } from "./lastpass";
 import { ImportOnePasswordComponent } from "./onepassword";
@@ -762,6 +764,18 @@ export class ImportComponent implements OnInit, OnDestroy, AfterViewInit {
         this.organizationId,
         this.formGroup.controls.targetSelector.value,
         this.organization?.canAccessImport && this.isFromAC,
+        // Keykeeper: into an organization, where each of the file's folders
+        // goes, asked before anything is saved (keykeeper/folder-places.ts).
+        folderPlacer(
+          this.dialogService,
+          this.organization,
+          this.formGroup.controls.targetSelector.value,
+          this.isFromAC
+            ? this.collections$
+            : this.activeUserId$.pipe(
+                switchMap((userId) => this.collectionService.decryptedCollections$(userId)),
+              ),
+        ),
       ),
     );
   }
@@ -880,6 +894,10 @@ export class ImportComponent implements OnInit, OnDestroy, AfterViewInit {
       this.syncService.fullSync(true);
       this.onSuccessfulImport.emit(this._organizationId);
     } catch (e) {
+      // Keykeeper: the folders question was closed; nothing was imported.
+      if (e instanceof ImportCanceled) {
+        return;
+      }
       this.dialogService.open<unknown, Error>(ImportErrorDialogComponent, {
         data: e,
       });

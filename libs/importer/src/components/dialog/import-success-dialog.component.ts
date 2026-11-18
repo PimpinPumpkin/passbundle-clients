@@ -123,8 +123,11 @@ export class ImportSuccessDialogComponent implements OnInit {
     if (folderCount > 0) {
       list.push({ icon: "folder", type: "folders", count: folderCount });
     }
+    // Keykeeper: shared folders the organization already had aren't new ones.
     const collectionCount =
-      importResult.collections.length - (importResult.targetCollectionIncluded ? 1 : 0);
+      importResult.collections.length -
+      (importResult.targetCollectionIncluded ? 1 : 0) -
+      (importResult.existingCollections ?? 0);
     if (collectionCount > 0) {
       list.push({ icon: "collection", type: "collections", count: collectionCount });
     }

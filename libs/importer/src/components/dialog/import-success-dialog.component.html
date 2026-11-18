@@ -5,6 +5,10 @@
 
   <div bitDialogContent>
     <span>{{ "importSuccessNumberOfItems" | i18n: totalImported }}</span>
+    <!-- Keykeeper: into an organization, how many items went into each shared folder. -->
+    @for (line of data.importResult?.placed ?? []; track line) {
+      <p class="tw-mt-2 tw-mb-0" data-testid="import-placed">{{ line }}</p>
+    }
     <!-- Keykeeper: what the file had that was left out on purpose, counted. -->
     @for (line of data.importResult?.leftOut ?? []; track line) {
       <p class="tw-mt-2 tw-mb-0" data-testid="import-left-out">{{ line }}</p>

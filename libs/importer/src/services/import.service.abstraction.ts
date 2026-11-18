@@ -15,6 +15,8 @@ import {
   SdkImportSummary,
 } from "../sdk";
 
+import { FolderPlacer } from "./keykeeper/folder-places";
+
 export abstract class ImportServiceAbstraction {
   /** Every supported importer. See `ImportOption.featuredImporter` to split featured/regular. */
   importOptions: readonly ImportOption[];
@@ -28,6 +30,8 @@ export abstract class ImportServiceAbstraction {
     organizationId?: string,
     selectedImportTarget?: FolderView | CollectionView,
     canAccessImportExport?: boolean,
+    /** Keykeeper: into an organization, asks where each of the file's folders goes. */
+    placeFolders?: FolderPlacer,
   ) => Promise<ImportResult>;
   getImporter: (
     format: ImportType | "bitwardenpasswordprotected",

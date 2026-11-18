@@ -102,4 +102,35 @@ describe("ImportSuccessDialogComponent", () => {
 
     expect(rowsOf(fixture)).toEqual([{ icon: "globe", type: "typeLogin", count: 1 }]);
   });
+
+  // Keykeeper: an organization import's folders went into new and existing shared folders.
+  it("counts only new shared folders, and says how many items went into each", async () => {
+    const importResult = new ImportResult();
+    importResult.ciphers = [createCipher(), createCipher(), createCipher()];
+    importResult.collections = ["Network", "Clients"].map(
+      (name) => new CollectionView({ id: null, name, organizationId: "org" as OrganizationId }),
+    );
+    importResult.existingCollections = 1;
+    importResult.placed = [
+      "Put 1 item in Network, a new shared folder.",
+      "Put 2 items in Clients.",
+    ];
+    importResult.leftOut = ["Left out 1 item in Old."];
+
+    const fixture = await createComponent({ importResult });
+
+    expect(rowsOf(fixture)).toEqual([
+      { icon: "globe", type: "typeLogin", count: 3 },
+      { icon: "collection", type: "collections", count: 1 },
+    ]);
+    const lines = (id: string) =>
+      [...fixture.nativeElement.querySelectorAll(`[data-testid="${id}"]`)].map((e: Element) =>
+        e.textContent?.trim(),
+      );
+    expect(lines("import-placed")).toEqual([
+      "Put 1 item in Network, a new shared folder.",
+      "Put 2 items in Clients.",
+    ]);
+    expect(lines("import-left-out")).toEqual(["Left out 1 item in Old."]);
+  });
 });

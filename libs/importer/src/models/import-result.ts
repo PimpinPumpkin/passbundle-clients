@@ -32,4 +32,16 @@ export class ImportResult {
    * nothing goes missing without a count.
    */
   leftOut?: string[] = [];
+  /**
+   * Keykeeper: into an organization, how many items went into each shared
+   * folder, each as a line the summary shows ("Put 3 items in Network, a new
+   * shared folder."; services/keykeeper/folder-places.ts).
+   */
+  placed?: string[] = [];
+  /**
+   * Keykeeper: how many of `collections`, after the import's target, are
+   * shared folders the organization already had, which the summary doesn't
+   * count as new.
+   */
+  existingCollections?: number = 0;
 }
