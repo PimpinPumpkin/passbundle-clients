@@ -579,7 +579,15 @@ html.pb-web,
   right: 0.25rem;
   transform: none !important;
 }
-.pb-web bit-side-nav bit-nav-group > bit-nav-item [data-testid="nav-item-interactive"] {
+/* Room for the arrow, only where there is one: the closed menu (the icon
+   rail) has none, and there the room pushed a group's icon (the
+   organization's, Reporting's, Settings', Import and export's) left of the
+   others. */
+.pb-web
+  bit-side-nav
+  bit-nav-group
+  > bit-nav-item:has([data-testid="nav-group-collapse-arrow"])
+  [data-testid="nav-item-interactive"] {
   padding-inline-end: 1.75rem !important;
 }
 .pb-web bit-side-nav bit-nav-item {
