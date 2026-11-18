@@ -24,19 +24,16 @@
   <app-keykeeper-two-step-detour *ngIf="!organizationId" />
   <ng-container *ngIf="organizationId">
     <p>
+      <!-- Keykeeper: no line about the organization's Duo, which our server doesn't have. -->
       <ng-container *ngIf="isEnterpriseOrg; else teamsDescription">
         {{ "twoStepLoginEnterpriseDescStart" | i18n }}
         <a bitLink routerLink="../policies">{{ "twoStepLoginPolicy" | i18n }}.</a>
-        <br />
-        {{ "twoStepLoginOrganizationDuoDesc" | i18n }}
         <br />
         <br />
         <p>{{ "twoStepLoginOrganizationSsoDesc" | i18n }}</p>
       </ng-container>
       <ng-template #teamsDescription>
         {{ "twoStepLoginTeamsDesc" | i18n }}
-        <br />
-        {{ "twoStepLoginOrganizationDuoDesc" | i18n }}
       </ng-template>
     </p>
   </ng-container>
@@ -46,7 +43,8 @@
       {{ "viewRecoveryCode" | i18n }}
     </button>
   </bit-callout>
-  <h2 [ngClass]="{ 'mt-5': !organizationId }">
+  <!-- Keykeeper: an organization has no providers here (our server has no organization Duo). -->
+  <h2 [ngClass]="{ 'mt-5': !organizationId }" *ngIf="!organizationId">
     {{ "providers" | i18n }}
     <small *ngIf="loading">
       <bit-icon
@@ -59,7 +57,7 @@
   <bit-callout type="warning" *ngIf="showPolicyWarning">
     {{ "twoStepLoginPolicyUserWarning" | i18n }}
   </bit-callout>
-  <bit-item-group [attr.aria-label]="'providers' | i18n">
+  <bit-item-group [attr.aria-label]="'providers' | i18n" *ngIf="!organizationId">
     <bit-item *ngFor="let p of providers" class="tw-py-4">
       <div slot="start" class="tw-min-w-[120px] tw-flex tw-justify-center">
         <auth-two-factor-icon class="tw-flex tw-items-center" [provider]="p.type" [name]="p.name" />

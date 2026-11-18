@@ -1148,9 +1148,6 @@
     "twoStepLoginPolicy": {
       "message": "Require two-step login policy"
     },
-    "twoStepLoginOrganizationDuoDesc": {
-      "message": "To require two-step login through Duo, set up Duo below."
-    },
     "twoStepLoginOrganizationSsoDesc": {
       "message": "If your organization uses single sign-on, your identity provider may already require two-step login."
     }

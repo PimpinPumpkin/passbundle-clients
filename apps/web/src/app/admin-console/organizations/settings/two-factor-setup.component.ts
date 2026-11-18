@@ -123,7 +123,18 @@ export class TwoFactorSetupComponent extends BaseTwoFactorSetupComponent impleme
     return this.twoFactorService.getTwoFactorOrganizationProviders(this.organizationId);
   }
 
-  protected filterProvider(type: TwoFactorProviderType): boolean {
-    return type !== TwoFactorProviderType.OrganizationDuo;
+  /**
+   * Keykeeper: our server has no two-step login of an organization's own
+   * (upstream's organization Duo, the only provider here) and no API for it,
+   * so the page lists no providers and asks the server for none. It says how
+   * to require two-step login of members instead. See DESIGN.md, "Two-step
+   * login settings".
+   */
+  protected filterProvider(): boolean {
+    return true;
+  }
+
+  async load() {
+    this.loading = false;
   }
 }
