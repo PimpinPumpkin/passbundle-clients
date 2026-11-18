@@ -103,6 +103,8 @@ import {
   PasswordDepot17XmlImporter,
   DelineaXmlImporter,
   DelineaCsvImporter,
+  ITGlueCsvImporter,
+  PassportalCsvImporter,
 } from "../importers";
 import { Importer } from "../importers/importer";
 import {
@@ -596,6 +598,11 @@ export class ImportService implements ImportServiceAbstraction {
         return new DelineaXmlImporter();
       case "delineacsv":
         return new DelineaCsvImporter();
+      // Keykeeper: Passportal's and IT Glue's exports (importers/msp).
+      case "passportalcsv":
+        return new PassportalCsvImporter();
+      case "itgluecsv":
+        return new ITGlueCsvImporter();
       default:
         return null;
     }
