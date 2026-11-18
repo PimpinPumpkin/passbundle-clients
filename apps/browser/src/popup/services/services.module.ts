@@ -836,7 +836,15 @@ const safeProviders: SafeProvider[] = [
   safeProvider({
     provide: SsoComponentService,
     useClass: ExtensionSsoComponentService,
-    deps: [SyncService, AuthService, EnvironmentService, I18nServiceAbstraction, LogService],
+    deps: [
+      SyncService,
+      AuthService,
+      EnvironmentService,
+      I18nServiceAbstraction,
+      LogService,
+      // Keykeeper: to start single sign-on again from its own window.
+      LoginComponentService,
+    ],
   }),
   // Keykeeper: "Open and fill" for the item view's websites.
   safeProvider({
