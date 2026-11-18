@@ -1568,6 +1568,8 @@ export default class MainBackground {
       this.syncService,
       this.accountService,
       this.logService,
+      // Keykeeper: refuses a counting passkey in a login kept out of Personal before it signs.
+      this.policyService,
     );
     this.fido2ActiveRequestManager = new Fido2ActiveRequestManager();
     this.fido2ClientService = new Fido2ClientService(

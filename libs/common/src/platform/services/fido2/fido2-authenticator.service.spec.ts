@@ -6,6 +6,8 @@ import { BehaviorSubject, of } from "rxjs";
 import { SdkRandomNumberClient } from "@bitwarden/sdk-internal";
 
 import { mockAccountServiceWith, mockAccountInfoWith } from "../../../../spec";
+import { PolicyService } from "../../../admin-console/abstractions/policy/policy.service.abstraction";
+import { PolicyType } from "../../../admin-console/enums";
 import { Account } from "../../../auth/abstractions/account.service";
 import { CipherId, UserId } from "../../../types/guid";
 import { CipherService, EncryptionContext } from "../../../vault/abstractions/cipher.service";
@@ -34,6 +36,7 @@ import { CBOR } from "./cbor";
 import { parseCredentialId } from "./credential-id-utils";
 import { AAGUID, Fido2AuthenticatorService } from "./fido2-authenticator.service";
 import { Fido2Utils } from "./fido2-utils";
+import { COUNTING_PASSKEY_KEPT_OUT } from "./keykeeper/counting-passkeys";
 
 type ParentWindowReference = string;
 
@@ -818,6 +821,104 @@ describe("FidoAuthenticatorService", () => {
         const result = async () => await authenticator.getAssertion(params, windowReference);
 
         await expect(result).rejects.toThrow(Fido2AuthenticatorErrorCode.Unknown);
+      });
+
+      // Keykeeper: a counting passkey in one of a bound member's own logins, where "Remove
+      // individual vault" keeps items out of Personal, is refused before anything is raised,
+      // saved, or signed (keykeeper/counting-passkeys.ts).
+      describe("in a login kept out of Personal", () => {
+        let policyService: MockProxy<PolicyService>;
+        let importKey: jest.SpyInstance;
+        let sign: jest.SpyInstance;
+
+        beforeEach(() => {
+          policyService = mock<PolicyService>();
+          policyService.policyAppliesToUser$.mockReturnValue(of(true));
+          const accountService = mockAccountServiceWith(userId);
+          accountService.activeAccount$ = activeAccountSubject;
+          authenticator = new Fido2AuthenticatorService(
+            cipherService,
+            userInterface,
+            syncService,
+            accountService,
+            undefined,
+            policyService,
+          );
+          importKey = jest.spyOn(crypto.subtle, "importKey");
+          sign = jest.spyOn(crypto.subtle, "sign");
+        });
+
+        afterEach(() => {
+          importKey.mockRestore();
+          sign.mockRestore();
+        });
+
+        it("refuses a counting passkey in a bound member's own login before raising, saving, or signing, and says why", async () => {
+          ciphers[0].login.fido2Credentials[0].counter = 9000;
+
+          const result = async () => await authenticator.getAssertion(params, windowReference);
+
+          await expect(result).rejects.toThrow(Fido2AuthenticatorErrorCode.NotAllowed);
+          expect(policyService.policyAppliesToUser$).toHaveBeenCalledWith(
+            PolicyType.OrganizationDataOwnership,
+            userId,
+          );
+          expect(userInterfaceSession.pickCredential).toHaveBeenCalled();
+          expect(userInterfaceSession.informRefused).toHaveBeenCalledWith(
+            COUNTING_PASSKEY_KEPT_OUT,
+          );
+          expect(ciphers[0].login.fido2Credentials[0].counter).toBe(9000);
+          expect(ciphers[0].localData?.lastUsedDate).toBeUndefined();
+          expect(cipherService.updateWithServer).not.toHaveBeenCalled();
+          expect(importKey).not.toHaveBeenCalled();
+          expect(sign).not.toHaveBeenCalled();
+          expect(userInterfaceSession.close).toHaveBeenCalled();
+        });
+
+        it("signs as before where the policy doesn't bind them (an owner, an admin, or no policy)", async () => {
+          policyService.policyAppliesToUser$.mockReturnValue(of(false));
+
+          const result = await authenticator.getAssertion(params, windowReference);
+
+          expect(cipherService.updateWithServer).toHaveBeenCalledWith(
+            expect.objectContaining({
+              login: expect.objectContaining({
+                fido2Credentials: [expect.objectContaining({ counter: 9001 })],
+              }),
+            }),
+            userId,
+          );
+          expect(sign).toHaveBeenCalledTimes(1);
+          expect(result.authenticatorData.slice(33, 37)).toEqual(
+            new Uint8Array([0, 0, 0x23, 0x29]),
+          );
+          expect(userInterfaceSession.informRefused).not.toHaveBeenCalled();
+        });
+
+        it("signs as before with a passkey whose counter is 0, which saves nothing", async () => {
+          ciphers[0].login.fido2Credentials[0].counter = 0;
+
+          const result = await authenticator.getAssertion(params, windowReference);
+
+          expect(cipherService.updateWithServer).not.toHaveBeenCalled();
+          expect(sign).toHaveBeenCalledTimes(1);
+          expect(result.authenticatorData.slice(33, 37)).toEqual(new Uint8Array([0, 0, 0, 0]));
+          expect(userInterfaceSession.informRefused).not.toHaveBeenCalled();
+          expect(policyService.policyAppliesToUser$).not.toHaveBeenCalled();
+        });
+
+        it("saves and signs as before in a shared folder's login", async () => {
+          ciphers[0].organizationId = "organization-1";
+
+          await authenticator.getAssertion(params, windowReference);
+
+          expect(cipherService.updateWithServer).toHaveBeenCalledWith(
+            expect.objectContaining({ id: ciphers[0].id, organizationId: "organization-1" }),
+            userId,
+          );
+          expect(sign).toHaveBeenCalledTimes(1);
+          expect(userInterfaceSession.informRefused).not.toHaveBeenCalled();
+        });
       });
     });
 

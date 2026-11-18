@@ -141,6 +141,17 @@
             </button>
           </bit-section>
         }
+        <!-- Keykeeper: why a passkey was refused before it signed, in our words -->
+        @case (BrowserFido2MessageTypes.InformRefusedRequest) {
+          <bit-section>
+            <div class="tw-space-y-4">
+              <p>{{ refusedWords }}</p>
+            </div>
+            <button bitButton block buttonType="primary" type="button" (click)="abort(false)">
+              {{ "close" | i18n }}
+            </button>
+          </bit-section>
+        }
       }
       <app-fido2-use-browser-link></app-fido2-use-browser-link>
     </div>

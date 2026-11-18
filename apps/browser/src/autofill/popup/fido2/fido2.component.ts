@@ -105,6 +105,8 @@ export class Fido2Component implements OnInit, OnDestroy {
   protected loading = false;
   protected noResultsIcon = NoResults;
   protected passkeyAction: PasskeyActionValue = PasskeyActions.Register;
+  // Keykeeper: why a passkey was refused before it signed (InformRefusedRequest).
+  protected refusedWords: string | null = null;
   protected PasskeyActions = PasskeyActions;
   protected hasSearched = false;
   protected searchText: string | null = null;
@@ -252,6 +254,15 @@ export class Fido2Component implements OnInit, OnDestroy {
 
           case BrowserFido2MessageTypes.InformCredentialNotFoundRequest: {
             this.passkeyAction = PasskeyActions.Authenticate;
+
+            break;
+          }
+
+          // Keykeeper: refused after the person picked the login, so its Close isn't left loading.
+          case BrowserFido2MessageTypes.InformRefusedRequest: {
+            this.refusedWords = message.words;
+            this.passkeyAction = PasskeyActions.Authenticate;
+            this.loading = false;
 
             break;
           }

@@ -4,6 +4,7 @@ import { filter, firstValueFrom, map, timeout } from "rxjs";
 
 import { SdkRandomNumberClient } from "@bitwarden/sdk-internal";
 
+import { PolicyService } from "../../../admin-console/abstractions/policy/policy.service.abstraction";
 import { AccountService } from "../../../auth/abstractions/account.service";
 import { getUserId } from "../../../auth/services/account.service";
 import { CipherId } from "../../../types/guid";
@@ -35,6 +36,7 @@ import { compareCredentialIds, parseCredentialId } from "./credential-id-utils";
 import { p1363ToDer } from "./ecdsa-utils";
 import { Fido2Utils } from "./fido2-utils";
 import { guidToStandardFormat } from "./guid-utils";
+import { refuseCountingPasskeyKeptOut } from "./keykeeper/counting-passkeys";
 
 // Keykeeper: PassBundle's AAGUID, 09c5ee5f-0845-48e6-aef4-c7c443317de5, the same one its own apps
 // use: what a site sees as the maker of a passkey made here. It only goes into the attested
@@ -61,6 +63,9 @@ export class Fido2AuthenticatorService<
     private syncService: SyncService,
     private accountService: AccountService,
     private logService?: LogService,
+    // Keykeeper: whether an organization keeps the person's items out of Personal
+    // (keykeeper/counting-passkeys.ts).
+    private policyService?: PolicyService,
   ) {}
 
   async makeCredential(
@@ -314,6 +319,16 @@ export class Fido2AuthenticatorService<
         );
         throw new Fido2AuthenticatorError(Fido2AuthenticatorErrorCode.NotAllowed);
       }
+
+      // Keykeeper: a counting passkey in a login the server won't take a change to is refused
+      // here, before its counter is raised, the login saved, or anything signed
+      // (keykeeper/counting-passkeys.ts).
+      await refuseCountingPasskeyKeptOut(
+        selectedCipher,
+        userInterfaceSession,
+        this.policyService,
+        this.accountService,
+      );
 
       try {
         const selectedFido2Credential = selectedCipher.login.fido2Credentials[0];

@@ -116,6 +116,12 @@ export abstract class Fido2UserInterfaceSession {
   abstract informCredentialNotFound(abortController?: AbortController): Promise<void>;
 
   /**
+   * Keykeeper: inform the user, in these words, why the operation was refused before anything was
+   * signed (fido2/keykeeper/counting-passkeys.ts). Optional: a session without it refuses quietly.
+   */
+  informRefused?(words: string): Promise<void>;
+
+  /**
    * Close the session, including any windows that may be open.
    */
   abstract close(): void;
