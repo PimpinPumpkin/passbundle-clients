@@ -1,10 +1,15 @@
 import { CipherType, FieldType } from "../enums";
 import { FieldView } from "../models/view/field.view";
 
+import { storedExpiration } from "./expiration";
 import {
   BUILT_IN_TEMPLATES,
   customTemplate,
   customTemplates,
+  expirationFieldOf,
+  fieldKind,
+  isOwnTemplate,
+  itemTyping,
   newTemplateDefinitionField,
   TEMPLATE_DEFINITION_FIELD_NAME,
   TEMPLATE_FIELD_NAME,
@@ -14,6 +19,9 @@ import {
   templateFieldsFromItem,
   templateGroups,
   templateOf,
+  typedFieldProblem,
+  typingOf,
+  withTyping,
 } from "./templates";
 
 const apiKey = BUILT_IN_TEMPLATES.find((t) => t.id === "api-key")!;
@@ -36,12 +44,17 @@ describe("Keykeeper item templates", () => {
   it("start a new item with empty typed fields and a marker", () => {
     const fields = templateFields(apiKey);
 
+    // The marker carries the template's typed fields, from code for a built-in one.
     expect(fields.map((f) => [f.name, f.type, f.value])).toEqual([
       ["Key", FieldType.Hidden, ""],
       ["Secret", FieldType.Hidden, ""],
       ["Service URL", FieldType.Text, ""],
       ["Scopes", FieldType.Text, ""],
-      [TEMPLATE_FIELD_NAME, FieldType.Text, '{"id":"api-key","name":"API key","v":1}'],
+      [
+        TEMPLATE_FIELD_NAME,
+        FieldType.Text,
+        '{"id":"api-key","name":"API key","v":1,"types":{"Service URL":"url"}}',
+      ],
     ]);
     expect(templateFields(domain).find((f) => f.name === "Auto-renew")).toMatchObject({
       type: FieldType.Boolean,
@@ -406,5 +419,284 @@ describe("templateFieldsFromItem", () => {
     const template = { type: CipherType.SecureNote, fields: [newTemplateDefinitionField("login")] };
     expect(templateFieldsFromItem(template)).toBeNull();
     expect(templateFieldsFromItem({ type: CipherType.Card, fields: [] })).toBeNull();
+  });
+});
+
+describe('typed fields (DESIGN.md, "Where a field\'s type is kept")', () => {
+  const text = (name: string, value = "") => field(name, FieldType.Text, value);
+  const hidden = (name: string, value = "") => field(name, FieldType.Hidden, value);
+  const definition = (extra: object) =>
+    field(
+      TEMPLATE_DEFINITION_FIELD_NAME,
+      FieldType.Text,
+      JSON.stringify({ id: "t-1", base: "note", v: 1, ...extra }),
+    );
+  const licenseTemplate = {
+    id: "cipher-9",
+    name: "Software license",
+    type: CipherType.SecureNote,
+    organizationId: null,
+    viewPassword: true,
+    fields: [
+      text("Vendor site"),
+      text("Renews"),
+      text("Seats"),
+      hidden("Admin console code"),
+      field("Auto-renew", FieldType.Boolean, "false"),
+      definition({
+        types: {
+          "Vendor site": "url",
+          Renews: "date",
+          Seats: "number",
+          "Admin console code": "totp",
+        },
+        expires: "Renews",
+      }),
+    ],
+  };
+
+  it("are read from a template's definition, with its expiration date field", () => {
+    expect(customTemplate(licenseTemplate)!.fields).toEqual([
+      { label: "Vendor site", kind: "url", value: "" },
+      { label: "Renews", kind: "date", value: "", expires: true },
+      { label: "Seats", kind: "number", value: "" },
+      { label: "Admin console code", kind: "totp", value: "" },
+      { label: "Auto-renew", kind: "boolean", value: "false" },
+    ]);
+  });
+
+  it("go into a new item's marker, stored as text and hidden fields", () => {
+    const fields = templateFields(customTemplate(licenseTemplate)!);
+
+    expect(fields.slice(0, 4).map((f) => [f.name, f.type])).toEqual([
+      ["Vendor site", FieldType.Text],
+      ["Renews", FieldType.Text],
+      ["Seats", FieldType.Text],
+      ["Admin console code", FieldType.Hidden],
+    ]);
+    expect(JSON.parse(fields.find((f) => f.name === TEMPLATE_FIELD_NAME)!.value)).toEqual({
+      id: "t-1",
+      name: "Software license",
+      v: 1,
+      types: {
+        "Vendor site": "url",
+        Renews: "date",
+        Seats: "number",
+        "Admin console code": "totp",
+      },
+      expires: "Renews",
+    });
+    // So the item knows them without the template.
+    expect(itemTyping({ fields })).toEqual({
+      types: {
+        "Vendor site": "url",
+        Renews: "date",
+        Seats: "number",
+        "Admin console code": "totp",
+      },
+      expires: "Renews",
+    });
+  });
+
+  it("come from code for the built-in templates", () => {
+    const kinds = (id: string) =>
+      Object.fromEntries(
+        BUILT_IN_TEMPLATES.find((t) => t.id === id)!
+          .fields.filter((f) => !["text", "hidden", "boolean"].includes(f.kind))
+          .map((f) => [f.label, f.kind]),
+      );
+    expect(kinds("api-key")).toEqual({ "Service URL": "url" });
+    expect(kinds("server")).toEqual({ Port: "number" });
+    expect(kinds("database")).toEqual({ Port: "number" });
+    expect(kinds("software-license")).toEqual({ "Purchase date": "date" });
+    expect(kinds("email-account")).toEqual({ Port: "number" });
+    expect(kinds("membership")).toEqual({ Phone: "phone" });
+  });
+
+  it("fall back to the field's own type for a type nobody knows, or one that doesn't fit", () => {
+    const typing = typingOf(
+      JSON.parse(
+        '{"types":{"Later":"fingerprint","Hidden":"date","Code":"totp","Odd":7,"__proto__":"url"},"expires":"Code"}',
+      ),
+    );
+    expect(typing).toEqual({ types: { Hidden: "date", Code: "totp" } });
+    // An unknown type is text.
+    expect(fieldKind(text("Later"), typing)).toBe("text");
+    // A date must be a text field, a one-time code a hidden one.
+    expect(fieldKind(hidden("Hidden"), typing)).toBe("hidden");
+    expect(fieldKind(text("Code"), typing)).toBe("text");
+    expect(fieldKind(hidden("Code"), typing)).toBe("totp");
+    expect(fieldKind(field("Linked", FieldType.Linked, ""), typing)).toBeNull();
+    // Nothing odd from the object's own properties.
+    expect(fieldKind(text("constructor"), typing)).toBe("text");
+    // Expires only names a date field.
+    expect(typingOf({ types: { A: "url" }, expires: "A" })).toEqual({ types: { A: "url" } });
+    expect(typingOf({ types: { A: "date" }, expires: "B" })).toEqual({ types: { A: "date" } });
+  });
+
+  it("are written over a definition or marker, keeping the rest of it", () => {
+    const marker = '{"id":"t-1","name":"License","v":1,"types":{"Old":"url"},"expires":"Old"}';
+
+    expect(withTyping(marker, { types: { Renews: "date" }, expires: "Renews" })).toBe(
+      '{"id":"t-1","name":"License","v":1,"types":{"Renews":"date"},"expires":"Renews"}',
+    );
+    expect(withTyping(marker, { types: {} })).toBe('{"id":"t-1","name":"License","v":1}');
+    expect(withTyping("not json", { types: {} })).toBeNull();
+  });
+
+  it("come along with Save as template, labels and kinds only", () => {
+    const item = {
+      type: CipherType.SecureNote,
+      fields: [
+        text("Vendor site", "https://vendor.example"),
+        text("Renews", "2027-03-31"),
+        hidden("Admin console code", "JBSWY3DPEHPK3PXP"),
+        ...templateFields(customTemplate(licenseTemplate)!).filter(
+          (f) => f.name === TEMPLATE_FIELD_NAME,
+        ),
+      ],
+    };
+    const fields = templateFieldsFromItem(item)!;
+    const made = customTemplate({ ...licenseTemplate, fields })!;
+
+    expect(made.fields).toEqual([
+      { label: "Vendor site", kind: "url", value: "" },
+      { label: "Renews", kind: "date", value: "", expires: true },
+      { label: "Admin console code", kind: "totp", value: "" },
+    ]);
+    expect(JSON.stringify(fields)).not.toContain("JBSWY3DPEHPK3PXP");
+    expect(JSON.stringify(fields)).not.toContain("2027-03-31");
+  });
+
+  it("keep a hidden default from someone who can't see the template's passwords", () => {
+    const withSecret = {
+      ...licenseTemplate,
+      viewPassword: false,
+      fields: [
+        hidden("Admin console code", "JBSWY3DPEHPK3PXP"),
+        definition({ types: { "Admin console code": "totp" } }),
+      ],
+    };
+    const template = customTemplate(withSecret)!;
+
+    expect(template.fields).toEqual([
+      { label: "Admin console code", kind: "totp", value: undefined },
+    ]);
+    expect(JSON.stringify(templateFields(template))).not.toContain("JBSWY3DPEHPK3PXP");
+  });
+
+  it("are checked, warning only, and an empty field is fine", () => {
+    expect(typedFieldProblem("url", "https://vendor.example/login")).toBeNull();
+    expect(typedFieldProblem("url", "vendor.example")).toBeNull();
+    expect(typedFieldProblem("url", "not a site")).toBe("This doesn't look like a web address.");
+    expect(typedFieldProblem("url", "ftp://vendor.example")).toBe(
+      "This doesn't look like a web address.",
+    );
+    expect(typedFieldProblem("email", "it@contoso.example")).toBeNull();
+    expect(typedFieldProblem("email", "it@contoso")).toBe(
+      "This doesn't look like an email address.",
+    );
+    expect(typedFieldProblem("phone", "+1 (555) 010-4477")).toBeNull();
+    expect(typedFieldProblem("phone", "call me")).toBe("This doesn't look like a phone number.");
+    expect(typedFieldProblem("phone", "12")).toBe("This doesn't look like a phone number.");
+    expect(typedFieldProblem("number", "8443")).toBeNull();
+    expect(typedFieldProblem("number", "-1,250.5")).toBeNull();
+    expect(typedFieldProblem("number", "about 3")).toBe("This isn't a number.");
+    expect(typedFieldProblem("date", "2027-03-31")).toBeNull();
+    expect(typedFieldProblem("date", "2027-02-30")).toBe(
+      "Write the date as year, month, and day, such as 2027-03-31.",
+    );
+    for (const kind of ["url", "email", "phone", "number", "date"] as const) {
+      expect(typedFieldProblem(kind, "")).toBeNull();
+      expect(typedFieldProblem(kind, "  ")).toBeNull();
+    }
+    expect(typedFieldProblem("text", "anything")).toBeNull();
+    expect(typedFieldProblem("totp", "anything")).toBeNull();
+  });
+});
+
+describe('a template\'s expiration date field (DESIGN.md, "A date field that sets Expires")', () => {
+  const marker = (extra: object) =>
+    field(
+      TEMPLATE_FIELD_NAME,
+      FieldType.Text,
+      JSON.stringify({ id: "t-1", name: "License", v: 1, ...extra }),
+    );
+  const item = (renews: string, expires?: string) => ({
+    fields: [
+      field("Renews", FieldType.Text, renews),
+      marker({ types: { Renews: "date" }, expires: "Renews" }),
+      ...(expires ? [field("keykeeper.expires", FieldType.Text, expires)] : []),
+    ],
+  });
+
+  it("is the item's expiration date, and wins while it holds a date", () => {
+    expect(expirationFieldOf(item("2027-03-31"))?.value).toBe("2027-03-31");
+    expect(storedExpiration(item("2027-03-31", "2027-03-31"))).toBe("2027-03-31");
+    // Another app changed one and not the other: the field wins.
+    expect(storedExpiration(item("2027-06-30", "2027-03-31"))).toBe("2027-06-30");
+    // Without a date in it, Expires stands.
+    expect(storedExpiration(item("", "2027-03-31"))).toBe("2027-03-31");
+    expect(storedExpiration(item("next spring", "2027-03-31"))).toBe("2027-03-31");
+    expect(storedExpiration(item("2027-06-30"))).toBe("2027-06-30");
+  });
+
+  it("is only a date text field the marker names", () => {
+    const notDate = {
+      fields: [
+        field("Renews", FieldType.Text, "2027-06-30"),
+        marker({ types: { Renews: "url" }, expires: "Renews" }),
+      ],
+    };
+    expect(expirationFieldOf(notDate)).toBeNull();
+    expect(storedExpiration(notDate)).toBeNull();
+    const unmarked = {
+      fields: [
+        field("Renews", FieldType.Text, "2027-06-30"),
+        marker({ types: { Renews: "date" } }),
+      ],
+    };
+    expect(storedExpiration(unmarked)).toBeNull();
+  });
+
+  it("is a default on a template, never the template's own expiration", () => {
+    const template = {
+      type: CipherType.SecureNote,
+      fields: [
+        field("Renews", FieldType.Text, "2027-06-30"),
+        field(
+          TEMPLATE_DEFINITION_FIELD_NAME,
+          FieldType.Text,
+          JSON.stringify({
+            id: "t-1",
+            base: "note",
+            v: 1,
+            types: { Renews: "date" },
+            expires: "Renews",
+          }),
+        ),
+      ],
+    };
+    expect(expirationFieldOf(template)).toBeNull();
+    expect(storedExpiration(template)).toBeNull();
+  });
+});
+
+describe("isOwnTemplate", () => {
+  const definition = (extra: object = {}) =>
+    field(
+      TEMPLATE_DEFINITION_FIELD_NAME,
+      FieldType.Text,
+      JSON.stringify({ id: "t-1", base: "note", v: 1, ...extra }),
+    );
+
+  it("is a note with a definition, not an MSP's copy, as a full view or a list view", () => {
+    expect(isOwnTemplate({ type: CipherType.SecureNote, fields: [definition()] })).toBe(true);
+    expect(isOwnTemplate({ type: "secureNote", fields: [definition()] })).toBe(true);
+    expect(
+      isOwnTemplate({ type: CipherType.SecureNote, fields: [definition({ from: "MSP" })] }),
+    ).toBe(false);
+    expect(isOwnTemplate({ type: CipherType.Login, fields: [definition()] })).toBe(false);
+    expect(isOwnTemplate({ type: CipherType.SecureNote, fields: [] })).toBe(false);
   });
 });

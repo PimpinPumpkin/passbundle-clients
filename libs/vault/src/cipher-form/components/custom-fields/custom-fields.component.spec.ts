@@ -15,6 +15,10 @@ import {
   IdentityLinkedId,
   LoginLinkedId,
 } from "@bitwarden/common/vault/enums";
+import {
+  TEMPLATE_DEFINITION_FIELD_NAME,
+  TEMPLATE_FIELD_NAME,
+} from "@bitwarden/common/vault/keykeeper/templates";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
 import {
@@ -24,6 +28,7 @@ import {
   BitIconButtonComponent,
 } from "@bitwarden/components";
 
+import { KeykeeperExpiresLink } from "../../../keykeeper/expires-link";
 import { CipherFormConfig } from "../../abstractions/cipher-form-config.service";
 import { CipherFormContainer } from "../../cipher-form-container";
 
@@ -79,6 +84,7 @@ describe("CustomFieldsComponent", () => {
           provide: LiveAnnouncer,
           useValue: { announce },
         },
+        KeykeeperExpiresLink,
       ],
     })
       .overrideProvider(DialogService, {
@@ -730,6 +736,162 @@ describe("CustomFieldsComponent", () => {
       addFieldButton = fixture.debugElement.query(query);
 
       expect(addFieldButton).not.toBeNull();
+    });
+  });
+
+  // Keykeeper: DESIGN.md, "Item templates", "Typed fields".
+  describe("typed fields from a template", () => {
+    const field = (name: string, type: FieldType, value = "") =>
+      Object.assign(new FieldView(), { name, type, value });
+    const json = (name: string, value: object) =>
+      field(name, FieldType.Text, JSON.stringify(value));
+    const typing = {
+      types: { "Vendor site": "url", Renews: "date", Seats: "number", "Console code": "totp" },
+      expires: "Renews",
+    };
+    const itemFields = () => [
+      field("Vendor site", FieldType.Text, "https://vendor.example"),
+      field("Renews", FieldType.Text, ""),
+      field("Seats", FieldType.Text, "25"),
+      field("Console code", FieldType.Hidden, "JBSWY3DPEHPK3PXP"),
+      json(TEMPLATE_FIELD_NAME, { id: "t-1", name: "License", v: 1, ...typing }),
+    ];
+    const ours = (fields: FieldView[], name: string) =>
+      JSON.parse(fields.find((f) => f.name === name)!.value);
+    const saved = () => {
+      const current = new CipherView();
+      current.fields = itemFields().filter((f) => f.name.startsWith("keykeeper."));
+      return patchCipher.mock.lastCall[0](current).fields as FieldView[];
+    };
+    const inputs = () =>
+      fixture.debugElement
+        .queryAll(By.css('[data-testid="custom-text-field"]'))
+        .map((el) => el.nativeElement as HTMLInputElement);
+
+    beforeEach(() => {
+      originalCipherView.viewPassword = true;
+      originalCipherView.fields = itemFields();
+      component.ngOnInit();
+      fixture.detectChanges();
+    });
+
+    it("gives each its own input, from the item's marker", () => {
+      expect(inputs().map((i) => i.type)).toEqual(["text", "date", "text"]);
+      expect(inputs().map((i) => i.getAttribute("inputmode"))).toEqual(["url", null, "decimal"]);
+      expect(fixture.nativeElement.textContent).toContain("Also when this item expires.");
+    });
+
+    it("warns about a value that doesn't fit, without stopping a save", () => {
+      component.fields.at(0).patchValue({ value: "not a site" });
+      fixture.detectChanges();
+
+      const warning = fixture.debugElement.query(By.css('[data-testid="keykeeper-field-warning"]'));
+      expect(warning.nativeElement.textContent).toContain("This doesn't look like a web address.");
+      expect(component.customFieldsForm.valid).toBe(true);
+    });
+
+    it("keeps each field's kind in the marker, so a renamed field takes its kind along", () => {
+      component.updateLabel(0, "Vendor portal");
+
+      expect(ours(saved(), TEMPLATE_FIELD_NAME)).toEqual({
+        id: "t-1",
+        name: "License",
+        v: 1,
+        types: { "Vendor portal": "url", Renews: "date", Seats: "number", "Console code": "totp" },
+        expires: "Renews",
+      });
+    });
+
+    it("keeps the item's Expires and its expiration date field the same, both ways", () => {
+      const link = TestBed.inject(KeykeeperExpiresLink);
+      const sent: string[] = [];
+      link.fromField$.subscribe((date) => sent.push(date));
+
+      component.fields.at(1).patchValue({ value: "2027-03-31" });
+      expect(sent).toEqual(["2027-03-31"]);
+
+      link.expiresChanged("2027-06-30");
+      expect(component.fields.at(1).value.value).toBe("2027-06-30");
+      // Said once more, and "Expires" already has it.
+      expect(sent).toEqual(["2027-03-31", "2027-06-30"]);
+
+      // Another field's change says nothing.
+      component.fields.at(2).patchValue({ value: "30" });
+      expect(sent).toHaveLength(2);
+    });
+
+    it("is plain text where the item has no template", () => {
+      originalCipherView.fields = itemFields().filter((f) => f.name !== TEMPLATE_FIELD_NAME);
+      component.fields.clear();
+      component.ngOnInit();
+      fixture.detectChanges();
+
+      expect(inputs().map((i) => i.type)).toEqual(["text", "text", "text"]);
+    });
+  });
+
+  describe("a template's own fields", () => {
+    const definition = (extra: object = {}) =>
+      Object.assign(new FieldView(), {
+        name: TEMPLATE_DEFINITION_FIELD_NAME,
+        type: FieldType.Text,
+        value: JSON.stringify({ id: "t-1", base: "note", v: 1, ...extra }),
+      });
+    const savedDefinition = () => {
+      const current = new CipherView();
+      current.fields = [definition()];
+      const fields = patchCipher.mock.lastCall[0](current).fields as FieldView[];
+      return JSON.parse(fields.find((f) => f.name === TEMPLATE_DEFINITION_FIELD_NAME)!.value);
+    };
+
+    beforeEach(() => {
+      originalCipherView.fields = [
+        Object.assign(new FieldView(), { name: "Renews", type: FieldType.Text, value: "" }),
+        definition({ types: { Renews: "date" } }),
+      ];
+      component.ngOnInit();
+    });
+
+    it("let the field dialog give kinds", () => {
+      component.openAddEditCustomFieldDialog({ index: 0, label: "Renews" });
+
+      expect(open.mock.lastCall[1].data).toMatchObject({
+        template: true,
+        editKind: { kind: "date", expires: false },
+      });
+    });
+
+    it("are written to its definition with their kinds, one date the expiration date", () => {
+      component.addField(FieldType.Text, "Ends", "date", true);
+      component.addField(FieldType.Hidden, "Console code", "totp");
+
+      expect(savedDefinition()).toEqual({
+        id: "t-1",
+        base: "note",
+        v: 1,
+        types: { Renews: "date", Ends: "date", "Console code": "totp" },
+        expires: "Ends",
+      });
+
+      component.updateLabel(0, "Renews", "date", true);
+      expect(savedDefinition().expires).toBe("Renews");
+    });
+
+    it("never become the template's own expiration", () => {
+      const link = TestBed.inject(KeykeeperExpiresLink);
+      const sent: string[] = [];
+      link.fromField$.subscribe((date) => sent.push(date));
+      component.updateLabel(0, "Renews", "date", true);
+
+      component.fields.at(0).patchValue({ value: "2027-03-31" });
+
+      expect(sent).toEqual([]);
+    });
+
+    it("a kind that doesn't fit how the field is kept is ignored", () => {
+      component.addField(FieldType.Text, "Code", "totp");
+
+      expect(savedDefinition().types).toEqual({ Renews: "date" });
     });
   });
 });

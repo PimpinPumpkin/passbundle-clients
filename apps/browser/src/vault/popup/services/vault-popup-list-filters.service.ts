@@ -48,7 +48,7 @@ import { KeykeeperCategoryLook } from "@bitwarden/common/vault/keykeeper/categor
 import { isExpiringSoon } from "@bitwarden/common/vault/keykeeper/expiration";
 import { folderTileLook } from "@bitwarden/common/vault/keykeeper/folder-looks";
 import { OwnerPlace, ownerPlaces } from "@bitwarden/common/vault/keykeeper/folders-by-owner";
-import { isMspTemplateCopy } from "@bitwarden/common/vault/keykeeper/templates";
+import { isMspTemplateCopy, isOwnTemplate } from "@bitwarden/common/vault/keykeeper/templates";
 import { ITreeNodeObject, TreeNode } from "@bitwarden/common/vault/models/domain/tree-node";
 import { FolderView } from "@bitwarden/common/vault/models/view/folder.view";
 import { ServiceUtils } from "@bitwarden/common/vault/service-utils";
@@ -76,6 +76,7 @@ export interface CachedFilterState {
   folderId?: string;
   cipherType?: CipherType | null;
   keykeeperExpiring?: boolean;
+  keykeeperTemplates?: boolean;
 }
 
 /** All available cipher filters */
@@ -89,6 +90,11 @@ export type PopupListFilter = {
    * chips' "Expiring soon" (DESIGN.md, "Expiration dates").
    */
   keykeeperExpiring?: boolean;
+  /**
+   * Keykeeper: only the person's own templates and their organizations', the
+   * category chips' "Item templates" (DESIGN.md, "Item templates").
+   */
+  keykeeperTemplates?: boolean;
 };
 
 /**
@@ -143,6 +149,16 @@ export function passesPopupFilters(cipher: PopupCipherViewLike, filters: PopupLi
     return false;
   }
 
+  // Keykeeper: templates are under Item templates, and in their own folder
+  // or shared folder; the rest of the list is for items.
+  const template = isOwnTemplate(cipher);
+  if (filters.keykeeperTemplates && !template) {
+    return false;
+  }
+  if (template && !filters.keykeeperTemplates && !filters.collection && !filters.folder) {
+    return false;
+  }
+
   if (filters.folder) {
     if (!filters.folder.id) {
       // "Items with no folder" (id is falsy): match ciphers where folderId is null, undefined, or empty
@@ -181,6 +197,7 @@ const INITIAL_FILTERS: PopupListFilter = {
   folder: null,
   cipherType: null,
   keykeeperExpiring: false,
+  keykeeperTemplates: false,
 };
 
 @Injectable({
@@ -231,6 +248,7 @@ export class VaultPopupListFiltersService {
       folderId: this.filterForm.value.folder?.id,
       cipherType: this.filterForm.value.cipherType,
       keykeeperExpiring: this.filterForm.value.keykeeperExpiring ?? false,
+      keykeeperTemplates: this.filterForm.value.keykeeperTemplates ?? false,
     };
   }
 
@@ -248,6 +266,7 @@ export class VaultPopupListFiltersService {
           folder: null,
           cipherType: null,
           keykeeperExpiring: state.keykeeperExpiring === true,
+          keykeeperTemplates: state.keykeeperTemplates === true,
         };
 
         if (state.organizationId) {

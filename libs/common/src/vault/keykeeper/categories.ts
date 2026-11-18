@@ -32,7 +32,8 @@ export type KeykeeperCategory =
   // Not kinds of items: the web vault's menu entries for them (DESIGN.md, "The left menu").
   | "favorites"
   | "health"
-  | "expiring";
+  | "expiring"
+  | "templates";
 
 export type KeykeeperCategoryLook = {
   /** The tone on light backgrounds: the glyph's color, and the tile's tint. */
@@ -90,6 +91,8 @@ export const KEYKEEPER_CATEGORY_LOOKS: Readonly<Record<KeykeeperCategory, Keykee
     health: { light: "#0E7A47", dark: "#6FDBA0", glyph: glyphs.shield },
     // Expiring soon, in topaz, the color of an "Expires in" badge.
     expiring: { light: "#A9600C", dark: "#F2B766", glyph: glyphs.clock },
+    // Item templates: a note, which a template is, in onyx.
+    templates: { light: "#353B4A", dark: "#C3C9D6", glyph: glyphs.note },
   };
 
 /** A login without a site icon shows its first letter on a tint of the login color. */

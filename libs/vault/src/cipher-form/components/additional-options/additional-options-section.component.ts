@@ -18,6 +18,7 @@ import {
 } from "@bitwarden/components";
 
 import { KeykeeperExpirationFieldComponent } from "../../../keykeeper/expiration-field.component";
+import { KeykeeperExpiresLink } from "../../../keykeeper/expires-link";
 import { KeykeeperFillRulesFieldComponent } from "../../../keykeeper/fill-rules-field.component";
 import { PasswordRepromptService } from "../../../services/password-reprompt.service";
 import { CipherFormContainer } from "../../cipher-form-container";
@@ -43,6 +44,8 @@ import { CustomFieldsComponent } from "../custom-fields/custom-fields.component"
     KeykeeperExpirationFieldComponent,
     KeykeeperFillRulesFieldComponent,
   ],
+  // Keykeeper: "Expires" and a template's expiration date field, kept the same.
+  providers: [KeykeeperExpiresLink],
 })
 export class AdditionalOptionsSectionComponent implements OnInit {
   // FIXME(https://bitwarden.atlassian.net/browse/CL-903): Migrate to Signals

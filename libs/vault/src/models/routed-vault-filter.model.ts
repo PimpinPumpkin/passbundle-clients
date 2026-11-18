@@ -22,6 +22,8 @@ const itemTypes = [
   "trash",
   // Keykeeper: items expired or expiring within 30 days (DESIGN.md, "Expiration dates").
   "expiring",
+  // Keykeeper: the person's own templates and their organizations' (DESIGN.md, "Item templates").
+  "templates",
   All,
 ] as const;
 

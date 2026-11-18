@@ -3,7 +3,22 @@
     {{ (variant === "add" ? "addField" : "editField") | i18n }}
   </span>
   <div bitDialogContent>
-    @if (variant === "add") {
+    <!-- Keykeeper: a template's field has a kind of its own (DESIGN.md, "Typed fields"). -->
+    @if (isTemplate) {
+      @if (variant === "add" || kindOptions.length > 1) {
+        <bit-form-field [formGroup]="kindForm">
+          <bit-label>{{ "fieldType" | i18n }}</bit-label>
+          <bit-select id="fieldType" formControlName="kind">
+            @for (option of kindOptions; track option.value) {
+              <bit-option [value]="option.value" [label]="option.name"></bit-option>
+            }
+          </bit-select>
+          <bit-hint>
+            {{ getTypeHint() }}
+          </bit-hint>
+        </bit-form-field>
+      }
+    } @else if (variant === "add") {
       <bit-form-field>
         <bit-label>{{ "fieldType" | i18n }}</bit-label>
         <bit-select id="fieldType" formControlName="type">
@@ -26,6 +41,17 @@
         </bit-hint>
       }
     </bit-form-field>
+    @if (isTemplate && kindForm.value.kind === "date") {
+      <bit-form-control class="tw-mt-4" disableMargin [formGroup]="kindForm">
+        <input
+          type="checkbox"
+          bitCheckbox
+          formControlName="expires"
+          data-testid="keykeeper-field-expires"
+        />
+        <bit-label>New items expire on this date</bit-label>
+      </bit-form-control>
+    }
   </div>
   <ng-container bitDialogFooter>
     <button bitButton buttonType="primary" type="submit" [disabled]="customFieldForm.invalid">

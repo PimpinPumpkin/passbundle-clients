@@ -199,6 +199,56 @@ describe("Keykeeper: imports never plant our own fields", () => {
       ]);
     });
 
+    // DESIGN.md, "Where a field's type is kept".
+    it("brings back a template's and an item's typed fields, only the well-formed ones", async () => {
+      const template = await parse(
+        bitwardenExport([
+          {
+            name: "keykeeper.template-definition",
+            value: JSON.stringify({
+              id: "lic",
+              base: "note",
+              v: 1,
+              types: { Renews: "date", Site: "url", Odd: "script", Hidden: 5 },
+              expires: "Renews",
+              from: "Your MSP",
+            }),
+            type: FieldType.Text,
+          },
+        ]),
+      );
+      expect(JSON.parse(template.fields[0].value)).toEqual({
+        id: "lic",
+        base: "note",
+        v: 1,
+        types: { Renews: "date", Site: "url" },
+        expires: "Renews",
+      });
+
+      const item = await parse(
+        bitwardenExport([
+          {
+            name: "keykeeper.template",
+            value: JSON.stringify({
+              id: "lic",
+              name: "License",
+              v: 1,
+              types: { Code: "totp" },
+              expires: "Code",
+            }),
+            type: FieldType.Text,
+          },
+        ]),
+      );
+      // Expires names only a date field.
+      expect(JSON.parse(item.fields[0].value)).toEqual({
+        id: "lic",
+        name: "License",
+        v: 1,
+        types: { Code: "totp" },
+      });
+    });
+
     it("never brings a template back as an MSP's copy", async () => {
       const cipher = await parse(
         bitwardenExport([

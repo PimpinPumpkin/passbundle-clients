@@ -1,7 +1,7 @@
 import { Unassigned } from "@bitwarden/common/admin-console/models/collections";
 import { CipherType } from "@bitwarden/common/vault/enums";
 import { isExpiringSoon } from "@bitwarden/common/vault/keykeeper/expiration";
-import { isMspTemplateCopy } from "@bitwarden/common/vault/keykeeper/templates";
+import { isMspTemplateCopy, isOwnTemplate } from "@bitwarden/common/vault/keykeeper/templates";
 import {
   CipherViewLike,
   CipherViewLikeUtils,
@@ -120,6 +120,24 @@ export function createFilterFunction(filter: RoutedVaultFilterModel): FilterFunc
 
     // Keykeeper: an MSP's template copies show only in their collection.
     if (filter.collectionId === undefined && isMspTemplateCopy(cipher)) {
+      return false;
+    }
+
+    // Keykeeper: templates are under Item templates, in their own folder or
+    // shared folder, and in the trash and the archive; the rest of the lists
+    // are for items (DESIGN.md, "Item templates").
+    const template = isOwnTemplate(cipher);
+    if (filter.type === "templates" && !template) {
+      return false;
+    }
+    if (
+      template &&
+      filter.type !== "templates" &&
+      filter.type !== "trash" &&
+      filter.type !== "archive" &&
+      filter.folderId === undefined &&
+      filter.collectionId === undefined
+    ) {
       return false;
     }
 
