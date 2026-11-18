@@ -310,6 +310,18 @@ export class SsoComponent implements OnInit {
 
     this.identifier = this.identifierFormControl.value ?? "";
     await this.ssoLoginService.setOrganizationSsoIdentifier(this.identifier);
+
+    // Keykeeper: the extension starts again through the web vault, as its
+    // sign-in page does, so the answer comes back to it.
+    if (this.ssoComponentService.keykeeperHandOff != null) {
+      try {
+        await this.ssoComponentService.keykeeperHandOff(this.email ?? "", this.identifier);
+      } catch (error) {
+        this.validationService.showError(error);
+      }
+      return;
+    }
+
     this.ssoComponentService.setDocumentCookies?.();
 
     try {

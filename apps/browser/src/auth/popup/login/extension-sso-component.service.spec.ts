@@ -2,6 +2,7 @@ import { TestBed } from "@angular/core/testing";
 import { mock, MockProxy } from "jest-mock-extended";
 import { BehaviorSubject } from "rxjs";
 
+import { LoginComponentService } from "@bitwarden/auth/angular";
 import { AuthService } from "@bitwarden/common/auth/abstractions/auth.service";
 import {
   EnvironmentService,
@@ -24,6 +25,7 @@ describe("ExtensionSsoComponentService", () => {
   let environmentService: MockProxy<EnvironmentService>;
   let i18nService: MockProxy<I18nService>;
   let logService: MockProxy<LogService>;
+  let loginComponentService: MockProxy<LoginComponentService>;
 
   beforeEach(() => {
     syncService = mock<SyncService>();
@@ -31,6 +33,7 @@ describe("ExtensionSsoComponentService", () => {
     environmentService = mock<EnvironmentService>();
     i18nService = mock<I18nService>();
     logService = mock<LogService>();
+    loginComponentService = mock<LoginComponentService>();
     environmentService.environment$ = new BehaviorSubject<Environment>({
       getWebVaultUrl: () => baseUrl,
     } as Environment);
@@ -42,6 +45,7 @@ describe("ExtensionSsoComponentService", () => {
         { provide: EnvironmentService, useValue: environmentService },
         { provide: I18nService, useValue: i18nService },
         { provide: LogService, useValue: logService },
+        { provide: LoginComponentService, useValue: loginComponentService },
         ExtensionSsoComponentService,
       ],
     });
@@ -62,6 +66,19 @@ describe("ExtensionSsoComponentService", () => {
       await service.closeWindow?.();
 
       expect(windowSpy).toHaveBeenCalled();
+    });
+  });
+
+  // Keykeeper: the window that finishes single sign-on offers the identifier
+  // again after a refusal. Sent to Microsoft from there, the answer would end
+  // on the web vault's sign-in page and never reach the extension.
+  describe("keykeeperHandOff", () => {
+    it("starts again through the web vault, as the sign-in page does", async () => {
+      await service.keykeeperHandOff("ana@fabrikam.test", "fabrikam");
+
+      expect(
+        loginComponentService.redirectToSsoLoginWithOrganizationSsoIdentifier,
+      ).toHaveBeenCalledWith("ana@fabrikam.test", "fabrikam");
     });
   });
 });

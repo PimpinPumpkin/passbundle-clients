@@ -68,6 +68,10 @@ async function openSsoAuthResultPopout(resultData: { code: string; state: string
 
   await BrowserPopupUtils.openPopout(authResultUrl, {
     singleActionKey: AuthPopoutType.ssoAuthResult,
+    // Keykeeper: a window left open by an earlier sign-in (one the server
+    // refused, say) would only be brought forward, and this answer would be
+    // lost. Replace it, so trying again always reaches the extension.
+    forceCloseExistingWindows: true,
   });
 }
 
