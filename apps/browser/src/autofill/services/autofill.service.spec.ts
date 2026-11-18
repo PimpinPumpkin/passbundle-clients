@@ -6525,5 +6525,91 @@ describe("AutofillService", () => {
       );
       expect(fills(script)).toEqual({ cc: "+1", area: "555", local: "1234567" });
     });
+
+    describe("states, provinces, and countries", () => {
+      const identityFill = async (fields: AutofillField[], identity: Partial<IdentityView>) => {
+        const options = createGenerateFillScriptOptionsMock({
+          cipher: mock<CipherView>({ viewPassword: true, identity: identity as IdentityView }),
+        });
+        const script = await autofillService["generateIdentityFillScript"](
+          createAutofillScriptMock({ script: [] }),
+          createAutofillPageDetailsMock({ fields }),
+          {},
+          options,
+        );
+        return fills(script);
+      };
+
+      it("chooses a state list's full name and a country list's name from the identity's codes", async () => {
+        const fields = [
+          select("state", [
+            ["state", ""],
+            ["arizona", "Arizona"],
+            ["california", "California"],
+          ]),
+          select("country", [
+            ["unitedkingdom", "United Kingdom"],
+            ["unitedstates", "United States"],
+          ]),
+        ];
+        expect(await identityFill(fields, { state: "CA", country: "US" })).toEqual({
+          state: "California",
+          country: "United States",
+        });
+        expect(await identityFill(fields, { state: "California", country: "UK" })).toEqual({
+          state: "California",
+          country: "United Kingdom",
+        });
+      });
+
+      it("chooses a German state and country in lists of German names, from codes", async () => {
+        const fields = [
+          select("bundesland", [
+            ["bittewählen", ""],
+            ["bayern", "Bayern"],
+            ["berlin", "Berlin"],
+          ]),
+          select("land", [
+            ["deutschland", "Deutschland"],
+            ["österreich", "Österreich"],
+          ]),
+        ];
+        expect(await identityFill(fields, { state: "BY", country: "DE" })).toEqual({
+          bundesland: "Bayern",
+          land: "Deutschland",
+        });
+        expect(await identityFill(fields, { state: "Bavaria", country: "Austria" })).toEqual({
+          land: "Österreich",
+        });
+      });
+
+      it("fills a state elsewhere written as a name, and a country name upstream's table doesn't have", async () => {
+        const fields = [field("state"), field("country")];
+        expect(await identityFill(fields, { state: "Bayern", country: "Deutschland" })).toEqual({
+          state: "Bayern",
+          country: "DE",
+        });
+        expect(await identityFill(fields, { state: "Kent", country: "Narnia" })).toEqual({
+          state: "Kent",
+          country: "Narnia",
+        });
+        // As before for US states and Canadian provinces: their codes.
+        expect(await identityFill(fields, { state: "California", country: "Germany" })).toEqual({
+          state: "CA",
+          country: "DE",
+        });
+      });
+
+      it("leaves a list alone when none of its options is the identity's", async () => {
+        const fields = [
+          select("state", [
+            ["arizona", "AZ"],
+            ["california", "CA"],
+          ]),
+          select("country", [["unitedstates", "US"]]),
+        ];
+        expect(await identityFill(fields, { state: "Bayern", country: "DE" })).toEqual({});
+      });
+    });
   });
 });

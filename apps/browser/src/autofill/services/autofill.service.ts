@@ -56,6 +56,7 @@ import { openVaultItemPasswordRepromptPopout } from "../../vault/popup/utils/vau
 import { AutofillMessageCommand, AutofillMessageSender } from "../enums/autofill-message.enums";
 import { AutofillOutcome } from "../enums/autofill-outcome.enum";
 import { InlineMenuFillTypes, type InlineMenuFillType } from "../enums/autofill-overlay.enum";
+import { countryOption, countryText, stateOption } from "../keykeeper/address-names";
 import {
   cardFieldsByHint,
   hasOptionValue,
@@ -2641,6 +2642,18 @@ export default class AutofillService implements AutofillServiceInterface {
       return;
     }
 
+    // Keykeeper: a list by its options' codes and names, whether the identity
+    // has a code or a name, and left alone when none is its state
+    // (keykeeper/address-names.ts).
+    if (field.selectInfo?.options != null) {
+      const option = stateOption(field.selectInfo.options, identity.state, identity.country);
+      if (option != null && field.opid != null) {
+        filledFields[field.opid] = field;
+        AutofillService.fillByOpid(fillScript, field, option);
+      }
+      return;
+    }
+
     if (identity.state.length <= 2) {
       this.makeScriptActionWithValue(fillScript, identity.state, field, filledFields);
       return;
@@ -2652,6 +2665,9 @@ export default class AutofillService implements AutofillServiceInterface {
       IdentityAutoFillConstants.IsoProvinces[stateLower];
     if (isoState) {
       this.makeScriptActionWithValue(fillScript, isoState, field, filledFields);
+    } else {
+      // Keykeeper: a state elsewhere, written as a name, as the identity has it.
+      this.makeScriptActionWithValue(fillScript, identity.state, field, filledFields);
     }
   }
 
@@ -2675,6 +2691,18 @@ export default class AutofillService implements AutofillServiceInterface {
       return;
     }
 
+    // Keykeeper: a list by its options' codes and names, whether the identity
+    // has a code or a name, and left alone when none is its country
+    // (keykeeper/address-names.ts).
+    if (field.selectInfo?.options != null) {
+      const option = countryOption(field.selectInfo.options, identity.country);
+      if (option != null && field.opid != null) {
+        filledFields[field.opid] = field;
+        AutofillService.fillByOpid(fillScript, field, option);
+      }
+      return;
+    }
+
     if (identity.country.length <= 2) {
       this.makeScriptActionWithValue(fillScript, identity.country, field, filledFields);
       return;
@@ -2684,6 +2712,15 @@ export default class AutofillService implements AutofillServiceInterface {
     const isoCountry = IdentityAutoFillConstants.IsoCountries[countryLower];
     if (isoCountry) {
       this.makeScriptActionWithValue(fillScript, isoCountry, field, filledFields);
+    } else {
+      // Keykeeper: a name upstream's table doesn't have ("Deutschland"): its
+      // code where ours knows it, as above, or the country as the identity has it.
+      this.makeScriptActionWithValue(
+        fillScript,
+        countryText(identity.country),
+        field,
+        filledFields,
+      );
     }
   }
 
