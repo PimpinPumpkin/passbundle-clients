@@ -886,6 +886,96 @@ describe("ImportService", () => {
       expect(importApiService.postImportCiphers).toHaveBeenCalled();
     });
   });
+
+  // Keykeeper: leaving out a restricted kind of item (an organization's
+  // policy against cards) used to leave every folder link pointing at the
+  // old positions, so the items after it went into the wrong folders.
+  describe("items left out for a restricted kind", () => {
+    const userId = Utils.newGuid() as UserId;
+    const organizationId = Utils.newGuid() as OrganizationId;
+
+    /** A card first, in Office, then a login in Network and a login in Office. */
+    function fileWithACardFirst(organization: boolean): Importer {
+      const result = new ImportResult();
+      result.success = true;
+      result.ciphers = [
+        createCipher({ name: "Company card", type: CipherType.Card }),
+        createCipher({ name: "Router", type: CipherType.Login }),
+        createCipher({ name: "Front desk", type: CipherType.Login }),
+      ];
+      const relationships: [number, number][] = [
+        [0, 1],
+        [1, 0],
+        [2, 1],
+      ];
+      if (organization) {
+        result.collections = ["Network", "Office"].map(
+          (name) => new CollectionView({ id: null, organizationId: null, name }),
+        );
+        result.collectionRelationships = relationships;
+      } else {
+        result.folders = ["Network", "Office"].map((name) =>
+          Object.assign(new FolderView(), { name }),
+        );
+        result.folderRelationships = relationships;
+      }
+      return {
+        organizationId: organization ? organizationId : null,
+        parse: async () => result,
+      } as unknown as Importer;
+    }
+
+    /** Each item sent, with the names of the folders the request puts it in. */
+    function sent(request: {
+      folders?: { name: string }[];
+      collections?: { name: string }[];
+      folderRelationships?: { key: number; value: number }[];
+      collectionRelationships?: { key: number; value: number }[];
+    }) {
+      const items: CipherView[] = cipherService.encryptMany.mock.calls[0][0];
+      const folders = request.collections ?? request.folders;
+      const links = request.collectionRelationships ?? request.folderRelationships;
+      return Object.fromEntries(
+        items.map((item, i) => [
+          item.name,
+          links.filter((r) => r.key === i).map((r) => folders[r.value].name),
+        ]),
+      );
+    }
+
+    beforeEach(() => {
+      accountService.activeAccount$ = of({ id: userId } as any);
+      (restrictedItemTypesService as any).restricted$ = of([
+        { cipherType: CipherType.Card, allowViewOrgIds: [] },
+      ]);
+      i18nService.t.mockImplementation((key) => key);
+      keyService.userKey$.mockReturnValue(of(null));
+      cipherService.encryptMany.mockResolvedValue([]);
+      collectionService.encrypt.mockImplementation(
+        async (view) =>
+          ({ id: view.id, name: new EncString(`2.${view.name}`), externalId: undefined }) as any,
+      );
+      folderService.encrypt.mockImplementation(async (view) =>
+        Object.assign(new Folder(), { id: "", name: new EncString(`2.${view.name}`) }),
+      );
+    });
+
+    it("keeps each login in its own shared folder in an organization", async () => {
+      await importService.import(fileWithACardFirst(true), "", organizationId, null, true);
+
+      const request = importApiService.postImportOrganizationCiphers.mock.calls[0][1];
+      expect(sent(request)).toEqual({ Router: ["2.Network"], "Front desk": ["2.Office"] });
+      expect(request.collectionRelationships).toHaveLength(2);
+    });
+
+    it("keeps each login in its own folder in Personal", async () => {
+      await importService.import(fileWithACardFirst(false), "", null, null, false);
+
+      const request = importApiService.postImportCiphers.mock.calls[0][0];
+      expect(sent(request)).toEqual({ Router: ["2.Network"], "Front desk": ["2.Office"] });
+      expect(request.folderRelationships).toHaveLength(2);
+    });
+  });
 });
 
 function createCipher(options: Partial<CipherView> = {}) {

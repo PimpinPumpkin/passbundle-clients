@@ -130,6 +130,7 @@ import { toSdkCollectionType } from "../sdk/sdk-collection-type";
 import { ImportApiServiceAbstraction } from "../services/import-api.service.abstraction";
 import { ImportServiceAbstraction } from "../services/import.service.abstraction";
 import { applyFolderPlan, askFolderPlan, FolderPlacer } from "../services/keykeeper/folder-places";
+import { keepItems } from "../services/keykeeper/keep-items";
 import { guardReservedFields, ImportSource } from "../services/keykeeper/reserved-fields";
 import { SdkImportCheck, SdkImportDestination } from "../services/keykeeper/sdk-import-check";
 
@@ -258,9 +259,9 @@ export class ImportService implements ImportServiceAbstraction {
     );
 
     // Filter out restricted item types from the import result
-    importResult.ciphers = importResult.ciphers.filter(
-      (cipher) => !restrictedItemTypes.includes(cipher.type),
-    );
+    // Keykeeper: and renumber the folder links, so each item keeps its own
+    // folder (keykeeper/keep-items.ts).
+    keepItems(importResult, (cipher) => !restrictedItemTypes.includes(cipher.type));
 
     // Keykeeper: no import plants our own fields (fill rules, template markers).
     guardReservedFields(importResult, source);
