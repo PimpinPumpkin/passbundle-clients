@@ -5,6 +5,12 @@
       <span class="tw-text-sm tw-normal-case tw-text-muted">{{ params.name }}</span>
     }
   </span>
+  <!-- Keykeeper: provisioning (Microsoft Entra ID) manages them. -->
+  @if (params.keykeeperProvisioned) {
+    <span bitDialogHeaderEnd class="tw-mr-4">
+      <app-keykeeper-from-entra-badge />
+    </span>
+  }
   @if (isRevoked()) {
     <span bitDialogHeaderEnd class="tw-mr-4">
       <span bitBadge variant="subtle">{{ "revoked" | i18n }}</span>
@@ -22,6 +28,10 @@
     @if (!loading() && (organization$ | async); as organization) {
       <bit-tab-group [selectedIndex]="tabIndex()" (selectedIndexChange)="tabIndex.set($event)">
         <bit-tab [label]="'details' | i18n">
+          <!-- Keykeeper: what Microsoft Entra ID manages for them, which a change here won't keep. -->
+          @if (params.keykeeperProvisioned) {
+            <app-keykeeper-from-entra-note class="tw-mb-4 tw-block" />
+          }
           <bit-form-field>
             <bit-label>{{ "name" | i18n }}</bit-label>
             <input bitInput type="text" formControlName="name" />

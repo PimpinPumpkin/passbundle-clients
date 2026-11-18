@@ -39,6 +39,8 @@ export interface EditMemberDialogParams extends CommonMemberDialogParams {
   usesKeyConnector: boolean;
   claimedByOrganization?: boolean;
   hasMasterPassword?: boolean;
+  /** Keykeeper: provisioning (Microsoft Entra ID) manages this member. */
+  keykeeperProvisioned?: boolean;
   initialTab: MemberDialogTab;
 }
 

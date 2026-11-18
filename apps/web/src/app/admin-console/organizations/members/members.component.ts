@@ -67,6 +67,7 @@ import {
 import { KeykeeperMembersJoiningComponent } from "../../../keykeeper/joining/members-joining.component";
 import { KeykeeperClientMspBannerComponent } from "../../../keykeeper/msp/client-msp-banner.component";
 import { KeykeeperInstallTokenPromptComponent } from "../../../keykeeper/offboarding/install-token-prompt.component";
+import { KeykeeperFromEntraBadgeComponent } from "../../../keykeeper/organizations/from-entra.component";
 import { HeaderModule } from "../../../layouts/header/header.module";
 import {
   MaxCheckedCount,
@@ -119,6 +120,7 @@ interface BulkMemberFlags {
     Vfo1IconPipe,
     // Keykeeper
     KeykeeperClientMspBannerComponent,
+    KeykeeperFromEntraBadgeComponent,
     KeykeeperInstallTokenPromptComponent,
     KeykeeperMembersJoiningComponent,
   ],

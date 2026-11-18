@@ -62,6 +62,10 @@ import { I18nPipe } from "@bitwarden/ui-common";
 import { Vfo1I18nPipe, Vfo1TerminologyService } from "@bitwarden/vault";
 import { BillingConstraintService } from "@bitwarden/web-vault/app/billing/members/billing-constraint/billing-constraint.service";
 import { KeykeeperOffboardingService } from "@bitwarden/web-vault/app/keykeeper/access/offboarding.service";
+import {
+  KeykeeperFromEntraBadgeComponent,
+  KeykeeperFromEntraNoteComponent,
+} from "@bitwarden/web-vault/app/keykeeper/organizations/from-entra.component";
 
 import {
   GroupApiService,
@@ -120,6 +124,9 @@ import { NestedCheckboxComponent } from "../member-dialog/nested-checkbox.compon
     AccessSelectorModule,
     NestedCheckboxComponent,
     Vfo1I18nPipe,
+    // Keykeeper
+    KeykeeperFromEntraBadgeComponent,
+    KeykeeperFromEntraNoteComponent,
   ],
 })
 export class EditMemberDialogComponent {

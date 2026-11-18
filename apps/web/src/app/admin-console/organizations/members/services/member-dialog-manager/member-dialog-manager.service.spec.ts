@@ -213,6 +213,25 @@ describe("MemberDialogManagerService", () => {
 
       expect(result).toBe(MemberDialogResult.Canceled);
     });
+
+    it("Keykeeper: tells the dialog whether Microsoft Entra ID manages them", async () => {
+      dialogService.open.mockReturnValue({ closed: of(MemberDialogResult.Saved) } as any);
+
+      for (const keykeeperProvisioned of [true, false]) {
+        await service.openEditDialog(
+          { ...mockUser, keykeeperProvisioned } as OrganizationUserView,
+          mockOrganization,
+          mockBillingMetadata,
+        );
+
+        expect(dialogService.open).toHaveBeenLastCalledWith(
+          EditMemberDialogComponent,
+          expect.objectContaining({
+            data: expect.objectContaining({ keykeeperProvisioned }),
+          }),
+        );
+      }
+    });
   });
 
   describe("openAccountRecoveryDialog", () => {
