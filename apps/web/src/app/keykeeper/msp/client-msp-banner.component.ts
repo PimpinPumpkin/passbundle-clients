@@ -17,6 +17,8 @@ import { KeykeeperMspRemovedDialogComponent } from "../offboarding/msp-removed-d
 
 import { seesMspActivity } from "./client-msp-activity";
 import { KeykeeperClientMspActivityComponent } from "./client-msp-activity.component";
+import { KeykeeperClientMspConfirmComponent } from "./client-msp-confirm.component";
+import { KeykeeperClientMspJoinComponent } from "./client-msp-join.component";
 import { ClientMsp, KeykeeperMspApiService } from "./msp-api.service";
 import { describeStaffRole } from "./technician-access";
 
@@ -32,7 +34,13 @@ import { describeStaffRole } from "./technician-access";
 @Component({
   selector: "app-keykeeper-client-msp-banner",
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ButtonModule, CalloutModule, KeykeeperClientMspActivityComponent],
+  imports: [
+    ButtonModule,
+    CalloutModule,
+    KeykeeperClientMspActivityComponent,
+    KeykeeperClientMspConfirmComponent,
+    KeykeeperClientMspJoinComponent,
+  ],
   template: `
     @if (info()?.msp; as msp) {
       <bit-callout type="info" [title]="null" data-testid="client-msp">
@@ -42,6 +50,14 @@ import { describeStaffRole } from "./technician-access";
             <li data-testid="client-msp-staff">{{ person.line }}</li>
           }
         </ul>
+        @if (showsActivity()) {
+          <!-- Keykeeper: the MSP's people waiting for this organization's key, to confirm by hand. -->
+          <app-keykeeper-client-msp-confirm
+            [organization]="organization()"
+            [staff]="info()?.staff ?? []"
+            (confirmed)="changed.emit()"
+          />
+        }
         @if (canRemove()) {
           <button bitButton buttonType="danger" type="button" (click)="remove(msp.name)">
             Remove {{ msp.name }}
@@ -56,6 +72,14 @@ import { describeStaffRole } from "./technician-access";
         }
       </bit-callout>
     }
+    @if (info() != null) {
+      <!-- Keykeeper: an MSP's code, to join one or move to another. -->
+      <app-keykeeper-client-msp-join
+        [organization]="organization()"
+        [hasMsp]="info()?.msp != null"
+        (joined)="changed.emit()"
+      />
+    }
   `,
 })
 export class KeykeeperClientMspBannerComponent {
@@ -64,6 +88,8 @@ export class KeykeeperClientMspBannerComponent {
   readonly members = input<unknown>(null);
   /** The MSP was removed, so the member list has changed. */
   readonly removed = output<void>();
+  /** The organization joined an MSP, moved to another, or confirmed one of its people: the member list has changed. */
+  readonly changed = output<void>();
 
   protected readonly info = signal<ClientMsp | null>(null);
 
@@ -114,7 +140,7 @@ export class KeykeeperClientMspBannerComponent {
   protected async remove(name: string) {
     const confirmed = await this.dialogService.openSimpleDialog({
       title: `Remove ${name}?`,
-      content: `${name}'s staff lose access to this organization right away, and so does what they made here: script and provisioning tokens, event destinations, and ${name}'s install command. To work with ${name} again, they'll need to add you as a client again.`,
+      content: `${name}'s staff lose access to this organization right away, and so does what they made here: script and provisioning tokens, event destinations, and ${name}'s install command. To work with ${name} again, ask them for a code and enter it on this page.`,
       acceptButtonText: `Remove ${name}`,
       type: "warning",
     });
