@@ -1150,6 +1150,9 @@
     },
     "twoStepLoginOrganizationSsoDesc": {
       "message": "If your organization uses single sign-on, your identity provider may already require two-step login."
+    },
+    "twoStepLoginTeamsDesc": {
+      "message": "Each person sets up two-step login for their own account, in their own settings."
     }
   },
   "browser": {
