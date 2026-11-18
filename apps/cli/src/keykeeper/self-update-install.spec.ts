@@ -8,6 +8,7 @@ import {
   removeLeftover,
   replaceProgram,
   windowsAclScript,
+  windowsPowerShell,
 } from "./self-update-install";
 
 type Entry = {
@@ -315,6 +316,8 @@ const usual = (path: string) => ({
   ],
 });
 
+const POWERSHELL = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
+
 function windows(disk: Disk, acl: Acl = {}, execPath = PROGRAM) {
   const powershell: string[][] = [];
   const answer = { user: ANA, elevated: false, paths: [usual(FOLDER), usual(PROGRAM)], ...acl };
@@ -334,7 +337,7 @@ function windows(disk: Disk, acl: Acl = {}, execPath = PROGRAM) {
     },
     fs: disk.fs,
     run: (file, args) => {
-      if (file === "powershell.exe") {
+      if (file === POWERSHELL) {
         powershell.push(args);
         return JSON.stringify(answer);
       }
@@ -497,6 +500,16 @@ describe("putting a new release in place on Windows", () => {
       throw new Error("powershell.exe not found");
     };
     expect(installRefusal(sys)).toContain("couldn't check who can change");
+  });
+
+  it("starts Windows' own PowerShell by its full path, never one in the current folder", () => {
+    expect(windowsPowerShell({ SystemRoot: "D:\\WINDOWS" })).toBe(
+      "D:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    );
+    expect(windowsPowerShell({ windir: "C:\\Windows" })).toBe(POWERSHELL);
+    expect(windowsPowerShell({ SystemRoot: "." })).toBe(POWERSHELL);
+    expect(windowsPowerShell({ SystemRoot: "\\\\server\\share" })).toBe(POWERSHELL);
+    expect(windowsPowerShell({})).toBe(POWERSHELL);
   });
 
   it("asks PowerShell by security identifier, with each path quoted", () => {

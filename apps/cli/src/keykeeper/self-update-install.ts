@@ -231,6 +231,17 @@ type WindowsAcl = {
   }[];
 };
 
+/**
+ * Windows' own PowerShell, by its full path. Started by its bare name, it's
+ * looked for in the current folder first, where anyone could have left a
+ * powershell.exe for an update to run.
+ */
+export function windowsPowerShell(env: NodeJS.ProcessEnv): string {
+  const root = env.SystemRoot ?? env.windir ?? "";
+  const windows = /^[A-Za-z]:\\/.test(root) ? root : "C:\\Windows";
+  return path.win32.join(windows, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+}
+
 /** Reads who the person is, whether they're elevated, and the program's and its folder's owners and rules, by SID. */
 export function windowsAclScript(paths: string[]): string {
   const quoted = paths.map((p) => `'${p.replace(/'/g, "''")}'`).join(",");
@@ -270,7 +281,7 @@ function windowsRefusal(sys: InstallSystem): string | null {
     return `it's in ${dir}, a place of Windows' or a package manager's. ${installed("with its installer or package manager")}`;
   }
   const script = windowsAclScript([dir, program]);
-  const output = sys.run("powershell.exe", [
+  const output = sys.run(windowsPowerShell(sys.env), [
     "-NoProfile",
     "-NonInteractive",
     "-ExecutionPolicy",
