@@ -624,11 +624,34 @@ html.pb-web,
   color: var(--pb-label) !important;
 }
 
-/* It's one list that scrolls: the logo scrolls with it, rather than staying
-   put over the entries. */
-.keykeeper-menu bit-nav-logo > div,
+/* The logo scrolls with the menu's entries rather than staying put over
+   them: the card is see-through, so they would show through it. The vault's
+   menu is one list that scrolls, with the product switcher at its end. */
+.pb-web bit-side-nav bit-nav-logo > div,
 .keykeeper-menu #bit-side-nav--scroll [class*="tw-sticky"] {
   position: static !important;
+}
+/* The admin console's menu keeps upstream's product switcher at its foot
+   once the menu is 600px tall or more. There the logo and the entries (the
+   column's first part) scroll in an area of their own above the switcher,
+   rather than under it. */
+@container (min-height: 600px) {
+  .pb-web
+    app-side-nav:not(.keykeeper-menu)
+    [data-nav-version="default"]
+    #bit-side-nav--scroll
+    > div {
+    height: 100%;
+  }
+  .pb-web
+    app-side-nav:not(.keykeeper-menu)
+    [data-nav-version="default"]
+    #bit-side-nav--scroll
+    > div
+    > :first-child {
+    min-height: 0;
+    overflow-y: auto;
+  }
 }
 /* An entry inside a group (Import and export's, Settings') lines its text up
    with its group's, past the group's icon (16px and an 8px gap). */
