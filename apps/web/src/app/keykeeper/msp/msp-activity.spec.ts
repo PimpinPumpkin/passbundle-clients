@@ -109,6 +109,11 @@ describe("MSP activity sentences", () => {
       { event: "member_confirmed" },
       "ana@northwind.test confirmed ben@northwind.test in Acme Dental",
     ],
+    // Keykeeper: the console or the background work let them in on its own.
+    [
+      { event: "member_confirmed", detail: "automatic" },
+      "ana@northwind.test confirmed ben@northwind.test in Acme Dental automatically, without comparing fingerprints",
+    ],
     [
       { event: "client_removed_msp", actorEmail: "owner@acme.test" },
       "Acme Dental removed this MSP (owner@acme.test)",

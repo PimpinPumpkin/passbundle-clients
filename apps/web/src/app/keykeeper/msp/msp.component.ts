@@ -92,6 +92,7 @@ import { KeykeeperMspTemplatesComponent } from "./msp-templates.component";
 import { KeykeeperMspTwoStepComponent } from "./msp-two-step.component";
 import { KeykeeperMspWorkService } from "./msp-work.service";
 import { withPasswordChangeOff } from "./password-change-policy";
+import { compareLine } from "./staff-fingerprint";
 import { DEFAULT_ACCESS, describeAccess, reachesEveryClient } from "./technician-access";
 import { KeykeeperTechnicianAccessEditorComponent } from "./technician-access-editor.component";
 
@@ -769,6 +770,18 @@ const CLIENT_FEATURES = {
                   <td bitCell>
                     <div>{{ person.name || person.email }}</div>
                     <div class="tw-text-sm tw-text-muted">{{ person.email }}</div>
+                    <!-- Keykeeper: their fingerprint phrase, to compare with theirs (DESIGN.md, "Key fingerprints"). -->
+                    @if (phrases().get(person.userId); as phrase) {
+                      <div class="tw-mt-1 tw-text-sm" data-testid="msp-staff-fingerprint">
+                        Fingerprint phrase:
+                        <code class="tw-text-code" data-testid="msp-staff-phrase">{{
+                          phrase
+                        }}</code>
+                      </div>
+                      <div class="tw-text-xs tw-text-muted" data-testid="msp-staff-compare">
+                        {{ compareLine(person, person.userId === myUserId()) }}
+                      </div>
+                    }
                     @if (removedByClientLine(person, m.clients); as removed) {
                       <div class="tw-text-sm tw-text-muted" data-testid="msp-staff-removed">
                         {{ removed }}
@@ -1021,6 +1034,11 @@ export class KeykeeperMspComponent implements OnInit {
   /** Keykeeper: why the console couldn't open, with Try again (never the Create MSP form). */
   protected readonly loadError = signal<string | null>(null);
   protected readonly msp = signal<MspDetails | null>(null);
+  /** Keykeeper: the signed-in account, for their own row on the Staff list. */
+  protected readonly myUserId = signal<string | null>(null);
+  /** Keykeeper: each staff member's fingerprint phrase, by account id (staff-fingerprint.ts). */
+  protected readonly phrases = signal(new Map<string, string>());
+  protected readonly compareLine = compareLine;
   /**
    * For MSP admins, the clients this browser trusts (their client seal
    * checks out), so the others can be confirmed by name. Null until known.
@@ -1180,6 +1198,7 @@ export class KeykeeperMspComponent implements OnInit {
     this.loading.set(true);
     this.loadError.set(null);
     try {
+      this.myUserId.set(await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId)));
       const [first] = await this.mspApi.list();
       if (first) {
         await this.confirmWaiting(first.id);
@@ -1571,6 +1590,14 @@ export class KeykeeperMspComponent implements OnInit {
   protected async reload(mspId: string) {
     const msp = await this.mspApi.get(mspId);
     this.msp.set(msp);
+    void this.mspApi.staffFingerprints(msp.staff).then(
+      (phrases) => {
+        if (this.msp()?.id === mspId) {
+          this.phrases.set(phrases);
+        }
+      },
+      () => this.phrases.set(new Map()),
+    );
     this.trusted.set(msp.role === "admin" ? await this.mspApi.trustedClientIds(mspId, msp) : null);
     void this.computeHealth(msp);
     void this.loadOwnHealth(mspId);

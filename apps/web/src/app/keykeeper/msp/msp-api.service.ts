@@ -35,6 +35,7 @@ import {
   OrgBrowserAutofill,
   MspRole,
   MspSiteFixes,
+  MspStaffMember,
   MspSummary,
   OrgJoining,
   ProvisioningView,
@@ -57,6 +58,7 @@ import { EncryptService, LegacyCompatKeyService } from "@bitwarden/legacy-crypto
 import { KeykeeperJoinSealer, ReportedJoining } from "../joining/join-sealer.service";
 
 import { MspEvent } from "./msp-activity";
+import { staffPhrases } from "./staff-fingerprint";
 import { reachesEveryClient } from "./technician-access";
 
 /** Email domains as the server keeps them, so a seal covers exactly those. */
@@ -915,6 +917,15 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
   /** For a client's owners and admins: the MSP that manages the organization, and its staff there. */
   async getOrganizationMsp(orgId: string): Promise<ClientMsp> {
     return this.apiService.send("GET", `/keykeeper/organizations/${orgId}/msp`, null, true, true);
+  }
+
+  /**
+   * Each staff member's fingerprint phrase, by account id, made here with
+   * upstream's code from the public key the server gives for them
+   * (DESIGN.md, "Key fingerprints").
+   */
+  async staffFingerprints(staff: MspStaffMember[]): Promise<Map<string, string>> {
+    return staffPhrases(this.legacyCompatKeyService, staff);
   }
 
   /**

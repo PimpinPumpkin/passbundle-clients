@@ -14,6 +14,9 @@ export type MspEvent = {
 
 const roleName = (role: string | null) => (role === "admin" ? "an admin" : "a technician");
 
+/** A confirm's detail when the app that made it did it on its own. */
+const AUTOMATIC = "automatic";
+
 /**
  * What happened, in one sentence. Template events record only the template's
  * id (the server never sees its name), so `templateName` supplies the names
@@ -118,8 +121,13 @@ export function describeEvent(
       return e.detail
         ? `${actor} limited ${org}'s install command to ${e.detail.split(" ").join(", ")} accounts`
         : `${actor} let anyone with ${org}'s install command join`;
+    // Keykeeper: confirmed by an app on its own, as the console and the
+    // background work do: nobody compared fingerprints (DESIGN.md, "Key
+    // fingerprints").
     case "member_confirmed":
-      return `${actor} confirmed ${target} in ${org}`;
+      return e.detail === AUTOMATIC
+        ? `${actor} confirmed ${target} in ${org} automatically, without comparing fingerprints`
+        : `${actor} confirmed ${target} in ${org}`;
     case "client_removed_msp":
       return `${org} removed this MSP (${actor})`;
     // Keykeeper: the client took one of the MSP's people out itself; they stay

@@ -4,6 +4,8 @@
 
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 
+import { OrganizationUserConfirmRequest } from "../organization-user";
+
 import {
   ChangeVerification,
   Joining,
@@ -51,6 +53,26 @@ export class KeykeeperMspRequests {
   async pending(mspId: string): Promise<PendingMember[]> {
     return (await this.apiService.send("GET", `/keykeeper/msp/${mspId}/pending`, null, true, true))
       .data;
+  }
+
+  /**
+   * Upstream's confirm, with upstream's request (the org key encrypted to the
+   * member's public key), saying this app let them in on its own. The server
+   * changes nothing about the confirm for it: the MSP's activity log says
+   * nobody compared fingerprints (DESIGN.md, "Key fingerprints").
+   */
+  async confirmOnItsOwn(
+    organizationId: string,
+    memberId: string,
+    request: OrganizationUserConfirmRequest,
+  ): Promise<void> {
+    await this.apiService.send(
+      "POST",
+      `/organizations/${organizationId}/users/${memberId}/confirm`,
+      { ...request, keykeeperAutomatic: true },
+      true,
+      false,
+    );
   }
 
   /** Memberships waiting for an org key in every organization where the person can confirm them. */
