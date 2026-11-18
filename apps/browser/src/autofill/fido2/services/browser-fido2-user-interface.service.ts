@@ -42,6 +42,8 @@ export const BrowserFido2MessageTypes = {
   ConfirmNewCredentialResponse: "ConfirmNewCredentialResponse",
   InformExcludedCredentialRequest: "InformExcludedCredentialRequest",
   InformCredentialNotFoundRequest: "InformCredentialNotFoundRequest",
+  // Keykeeper: why it was refused before anything was signed, in our words.
+  InformRefusedRequest: "InformRefusedRequest",
   AbortRequest: "AbortRequest",
   AbortResponse: "AbortResponse",
 } as const;
@@ -101,6 +103,11 @@ export type BrowserFido2Message = { sessionId: string } & (
     }
   | {
       type: typeof BrowserFido2MessageTypes.InformCredentialNotFoundRequest;
+      fallbackSupported: boolean;
+    }
+  | {
+      type: typeof BrowserFido2MessageTypes.InformRefusedRequest;
+      words: string;
       fallbackSupported: boolean;
     }
   | {
@@ -305,6 +312,19 @@ export class BrowserFido2UserInterfaceSession implements Fido2UserInterfaceSessi
     const data: BrowserFido2Message = {
       type: BrowserFido2MessageTypes.InformCredentialNotFoundRequest,
       sessionId: this.sessionId,
+      fallbackSupported: this.fallbackSupported,
+    };
+
+    await this.send(data);
+    await this.receive(BrowserFido2MessageTypes.AbortResponse);
+  }
+
+  // Keykeeper: shown in the passkey window as "not found" is, until the person closes it.
+  async informRefused(words: string): Promise<void> {
+    const data: BrowserFido2Message = {
+      type: BrowserFido2MessageTypes.InformRefusedRequest,
+      sessionId: this.sessionId,
+      words,
       fallbackSupported: this.fallbackSupported,
     };
 
