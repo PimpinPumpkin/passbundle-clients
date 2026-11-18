@@ -43,9 +43,14 @@ export type ScriptFetch = (url: string, headers: Record<string, string>) => Prom
 const TOKEN = /^pbs1_([0-9a-f]{32})_([A-Za-z0-9_-]{43})$/;
 const ID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
-/** The variable a script keeps its token in, such as PASSBUNDLE_SCRIPT_TOKEN. */
+/**
+ * The variable a script keeps its token in: PASSBUNDLE_TOKEN, the PowerShell
+ * module's and the settings page's name, so an RMM sets one variable for
+ * Windows, Mac, and Linux scripts alike. Upstream's code reads no variable of
+ * that name, and env.ts copies it to none (it isn't one of SCRIPT_VARIABLES).
+ */
 export function scriptTokenVariable(brand: CliBrand = CLI_BRAND): string {
-  return `${brand.envPrefix}SCRIPT_TOKEN`;
+  return `${brand.envPrefix}TOKEN`;
 }
 
 /** The variable that names the server, such as PASSBUNDLE_SERVER. */

@@ -5,7 +5,8 @@
 // which would make the data folder; the main program lists it too, for help
 // and for options before it that only the main program knows.
 //
-// The token comes from PASSBUNDLE_SCRIPT_TOKEN or the first line on stdin,
+// The token comes from PASSBUNDLE_TOKEN (the module's name for it) or the
+// first line on stdin,
 // never from the command line without a warning: other programs on the
 // computer can read a command line, and the shell may keep it.
 

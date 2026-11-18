@@ -2,7 +2,7 @@
 // on the computer can read them (the process list) and the shell keeps them
 // (its history). The tool takes the session key from PASSBUNDLE_SESSION, the
 // master password from a variable or file the script names, and a script
-// token from PASSBUNDLE_SCRIPT_TOKEN or stdin; given any of them on the
+// token from PASSBUNDLE_TOKEN or stdin; given any of them on the
 // command line, it still works, and says so on stderr. See docs/cli.md,
 // "Sessions and environment variables" and "Script access".
 
@@ -20,7 +20,7 @@ export function sessionOnCommandLine(brand = CLI_BRAND): string {
 export function scriptTokenOnCommandLine(brand = CLI_BRAND): string {
   return (
     "Warning: the script token is on the command line, where other programs on this computer " +
-    `can read it, and your shell may keep it. Set ${brand.envPrefix}SCRIPT_TOKEN instead, ` +
+    `can read it, and your shell may keep it. Set ${brand.envPrefix}TOKEN instead, ` +
     "or give it on stdin."
   );
 }

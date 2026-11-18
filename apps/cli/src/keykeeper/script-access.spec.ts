@@ -14,6 +14,7 @@ import {
   readScriptToken,
   scriptAuthorization,
   scriptServer,
+  scriptTokenVariable,
   ScriptAnswer,
 } from "./script-access";
 // docs/vectors/script-access-v1.json in the meta repo; tier 1 checks the copy is the same.
@@ -81,7 +82,7 @@ function io(
 ): ScriptIo & { warned: string[] } {
   const warned: string[] = [];
   return {
-    env: { PASSBUNDLE_SCRIPT_TOKEN: vectors.tokenString },
+    env: { PASSBUNDLE_TOKEN: vectors.tokenString },
     stdinIsTerminal: true,
     readLine: () => Promise.reject(new Error("stdin wasn't to be read")),
     stderr: { write: (s: string) => warned.push(s) },
@@ -319,6 +320,8 @@ describe("one-time codes", () => {
 
 describe("where the token comes from", () => {
   it("is the brand's variable, without a word on stderr", async () => {
+    // The PowerShell module's name, so one RMM variable serves both.
+    expect(scriptTokenVariable(brand)).toBe("PASSBUNDLE_TOKEN");
     const how = io(vectorServer().fetch);
     expect((await get(itemId, undefined, how)).success).toBe(true);
     expect(how.warned).toEqual([]);
@@ -335,11 +338,14 @@ describe("where the token comes from", () => {
   });
 
   it("is never a terminal's stdin, and says where to put it", async () => {
-    for (const env of [{}, { PASSBUNDLE_SCRIPT_TOKEN: "  " }]) {
+    // The name this command once had is nothing to it.
+    for (const env of [
+      {},
+      { PASSBUNDLE_TOKEN: "  " },
+      { PASSBUNDLE_SCRIPT_TOKEN: vectors.tokenString },
+    ]) {
       const response = await get(itemId, undefined, io(vectorServer().fetch, { env }));
-      expect(response.message).toBe(
-        "No script token: set PASSBUNDLE_SCRIPT_TOKEN, or give it on stdin.",
-      );
+      expect(response.message).toBe("No script token: set PASSBUNDLE_TOKEN, or give it on stdin.");
     }
     const empty = io(vectorServer().fetch, {
       env: {},
@@ -364,7 +370,7 @@ describe("where the token comes from", () => {
       const given = await run(["script", "get", itemId, "--token", vectors.tokenString]);
       expect(out.mock.lastCall![0]).toMatch(/^not-a-real-password-1\n?$/);
       expect(given.warned).toEqual([scriptTokenOnCommandLine(brand) + "\n"]);
-      expect(scriptTokenOnCommandLine(brand)).toContain("Set PASSBUNDLE_SCRIPT_TOKEN instead");
+      expect(scriptTokenOnCommandLine(brand)).toContain("Set PASSBUNDLE_TOKEN instead");
 
       // A token anywhere else on the command line is only an argument: never read as one.
       out.mockClear();
