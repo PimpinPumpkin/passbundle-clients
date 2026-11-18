@@ -64,7 +64,6 @@ import { InternalPolicyService as InternalPolicyServiceAbstraction } from "@bitw
 import { ProviderService as ProviderServiceAbstraction } from "@bitwarden/common/admin-console/abstractions/provider.service";
 import { OrganizationUserStatusType } from "@bitwarden/common/admin-console/enums";
 import { DefaultOrganizationService } from "@bitwarden/common/admin-console/services/organization/default-organization.service";
-import { OrganizationApiService } from "@bitwarden/common/admin-console/services/organization/organization-api.service";
 import { DefaultNewPolicyService } from "@bitwarden/common/admin-console/services/policy/default-new-policy.service";
 import { DefaultPolicyService } from "@bitwarden/common/admin-console/services/policy/default-policy.service";
 import { PolicyApiService } from "@bitwarden/common/admin-console/services/policy/policy-api.service";
@@ -88,7 +87,6 @@ import { AvatarService } from "@bitwarden/common/auth/services/avatar.service";
 import { DefaultActiveUserAccessor } from "@bitwarden/common/auth/services/default-active-user.accessor";
 import { DevicesServiceImplementation } from "@bitwarden/common/auth/services/devices/devices.service.implementation";
 import { DevicesApiServiceImplementation } from "@bitwarden/common/auth/services/devices-api.service.implementation";
-import { PasswordResetEnrollmentServiceImplementation } from "@bitwarden/common/auth/services/password-reset-enrollment.service.implementation";
 import { SsoLoginService } from "@bitwarden/common/auth/services/sso-login/sso-login.service";
 import { TokenService } from "@bitwarden/common/auth/services/token.service";
 import { UserVerificationApiService } from "@bitwarden/common/auth/services/user-verification/user-verification-api.service";
@@ -422,6 +420,7 @@ import { KeykeeperDevReload } from "../keykeeper/dev-reload";
 import { KeykeeperEnrollment } from "../keykeeper/enrollment";
 import { KeykeeperExpirationReminders } from "../keykeeper/expiration-reminders";
 import { startMspWork } from "../keykeeper/msp-work";
+import { extensionRecoveryAtUnlock } from "../keykeeper/recovery-at-unlock";
 import { BrowserActionsService } from "../platform/actions/browser-actions.service";
 import { DefaultBadgeBrowserApi } from "../platform/badge/badge-browser-api";
 import { BadgeService } from "../platform/badge/badge.service";
@@ -2104,25 +2103,23 @@ export default class MainBackground {
     );
     startMspWork(this.keykeeperMspWork);
     // Keykeeper: enrolls people in account recovery at unlock, where their
-    // organization turned it on after they joined, as in the web vault.
-    this.keykeeperRecoveryAtUnlock = new KeykeeperRecoveryAtUnlock(
-      this.accountService,
-      this.authService,
-      this.organizationService,
-      this.policyService,
-      this.syncService,
-      this.keyService,
-      new PasswordResetEnrollmentServiceImplementation(
-        new OrganizationApiService(this.apiService, this.syncService),
-        this.accountService,
-        this.keyService,
-        this.encryptService,
-        this.organizationUserApiService,
-        this.i18nService,
-      ),
-      this.stateProvider,
-      this.logService,
-    );
+    // organization turned it on after they joined, only to the organization
+    // key the install command names (recovery-at-unlock.ts).
+    this.keykeeperRecoveryAtUnlock = extensionRecoveryAtUnlock({
+      accountService: this.accountService,
+      authService: this.authService,
+      organizationService: this.organizationService,
+      policyService: this.policyService,
+      syncService: this.syncService,
+      keyService: this.keyService,
+      encryptService: this.encryptService,
+      apiService: this.apiService,
+      organizationUserApiService: this.organizationUserApiService,
+      i18nService: this.i18nService,
+      stateProvider: this.stateProvider,
+      logService: this.logService,
+      pin: () => this.keykeeperEnrollment.recoveryPin(),
+    });
     this.keykeeperRecoveryAtUnlock.start();
     // Keykeeper: the generator's settings follow someone to each device.
     new KeykeeperGeneratorSettingsSync(

@@ -22,6 +22,9 @@ import {
   dueForRecovery,
   KEYKEEPER_RECOVERY_TRIED,
   KeykeeperRecoveryAtUnlock,
+  NO_RECOVERY_PIN,
+  RecoveryKeyPin,
+  RecoveryKeyRefused,
 } from "./recovery-at-unlock";
 
 const USER = "user-1" as UserId;
@@ -61,6 +64,7 @@ function setup(
   organizations: Organization[],
   policies: Policy[],
   status = AuthenticationStatus.Unlocked,
+  pin?: RecoveryKeyPin,
 ) {
   const accountService = mock<AccountService>();
   const activeAccount = new BehaviorSubject<{ id: UserId } | null>({ id: USER });
@@ -92,7 +96,7 @@ function setup(
     enrollment,
     stateProvider,
     logService,
-    0,
+    { pin, settleMs: 0 },
   );
   /** What clearOn: ["lock"] does when the account locks, then unlocking again. */
   const lockAndUnlock = async () => {
@@ -299,6 +303,58 @@ describe("enrolling in account recovery at unlock", () => {
 
     activeAccount.next({ id: USER });
     expect(await recovery.run(USER)).toEqual([{ organizationId: "dental", enrolled: true }]);
+  });
+
+  it("with a pin (the extension) but none on this device, sends nothing at all and says why in the log", async () => {
+    const pin = { pin: jest.fn().mockResolvedValue(null) };
+    const { recovery, enrollment, logService } = setup(
+      [membership("dental")],
+      [recoveryPolicy("dental")],
+      AuthenticationStatus.Unlocked,
+      pin,
+    );
+
+    expect(await recovery.run(USER)).toEqual([
+      { organizationId: "dental", enrolled: false, error: NO_RECOVERY_PIN },
+    ]);
+    expect(enrollment.enroll).not.toHaveBeenCalled();
+    expect(logService.info).toHaveBeenCalledWith(expect.stringContaining(NO_RECOVERY_PIN));
+    // Not asked again this unlock.
+    expect(await recovery.run(USER)).toEqual([]);
+    expect(pin.pin).toHaveBeenCalledTimes(1);
+  });
+
+  it("with a pin on this device, enrolls through the enrollment it was given, which checks the key", async () => {
+    const pin = { pin: jest.fn().mockResolvedValue("the-install-command-fingerprint") };
+    const { recovery, enrollment } = setup(
+      [membership("dental")],
+      [recoveryPolicy("dental")],
+      AuthenticationStatus.Unlocked,
+      pin,
+    );
+
+    expect(await recovery.run(USER)).toEqual([{ organizationId: "dental", enrolled: true }]);
+    expect(enrollment.enroll).toHaveBeenCalledWith("dental", USER, USER_KEY);
+  });
+
+  it("logs a key that isn't the pinned one as a warning, and doesn't try again this unlock", async () => {
+    const pin = { pin: jest.fn().mockResolvedValue("the-install-command-fingerprint") };
+    const { recovery, enrollment, logService } = setup(
+      [membership("dental")],
+      [recoveryPolicy("dental")],
+      AuthenticationStatus.Unlocked,
+      pin,
+    );
+    enrollment.enroll.mockRejectedValue(new RecoveryKeyRefused("Not the install command's key."));
+
+    expect(await recovery.run(USER)).toEqual([
+      { organizationId: "dental", enrolled: false, error: "Not the install command's key." },
+    ]);
+    expect(logService.warning).toHaveBeenCalledWith(
+      expect.stringContaining("Org dental (dental): Not the install command's key."),
+    );
+    expect(await recovery.run(USER)).toEqual([]);
+    expect(enrollment.enroll).toHaveBeenCalledTimes(1);
   });
 
   it("is never more than one try per unlock, and forgets it when the account locks or signs out", () => {
