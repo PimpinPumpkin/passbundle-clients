@@ -86,6 +86,7 @@ export class MemberDialogManagerService {
         initialTab: initialTab,
         claimedByOrganization: user.claimedByOrganization,
         hasMasterPassword: user.hasMasterPassword,
+        keykeeperProvisioned: user.keykeeperProvisioned,
       },
     });
 

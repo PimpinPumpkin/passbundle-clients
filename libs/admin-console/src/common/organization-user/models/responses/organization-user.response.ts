@@ -60,6 +60,11 @@ export class OrganizationUserUserDetailsResponse extends OrganizationUserRespons
   twoFactorEnabled: boolean;
   usesKeyConnector: boolean;
   claimedByOrganization: boolean;
+  /**
+   * Keykeeper: provisioning (Microsoft Entra ID) manages this member, so the
+   * admin console says to change them there. False from a server without it.
+   */
+  keykeeperProvisioned: boolean;
 
   constructor(response: any) {
     super(response);
@@ -69,6 +74,7 @@ export class OrganizationUserUserDetailsResponse extends OrganizationUserRespons
     this.twoFactorEnabled = this.getResponseProperty("TwoFactorEnabled") ?? false;
     this.usesKeyConnector = this.getResponseProperty("UsesKeyConnector") ?? false;
     this.claimedByOrganization = this.getResponseProperty("ClaimedByOrganization") ?? false;
+    this.keykeeperProvisioned = this.getResponseProperty("KeykeeperProvisioned") === true;
 
     if (this.email == null) {
       throw new Error("Missing required property: email");

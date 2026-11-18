@@ -28,6 +28,8 @@ export class OrganizationUserView {
    */
   accessPam: boolean = false;
   claimedByOrganization: boolean = false;
+  /** Keykeeper: provisioning (Microsoft Entra ID) manages this member. */
+  keykeeperProvisioned: boolean = false;
 
   collections: CollectionAccessSelectionView[] = [];
   groups: string[] = [];
@@ -93,6 +95,7 @@ export class OrganizationUserView {
     view.hasMasterPassword = response.hasMasterPassword;
     view.accessSecretsManager = response.accessSecretsManager;
     view.accessPam = response.accessPam;
+    view.keykeeperProvisioned = response.keykeeperProvisioned ?? false;
 
     if (response.collections != undefined) {
       view.collections = response.collections.map((c) => new CollectionAccessSelectionView(c));

@@ -211,7 +211,10 @@ describe("Members' own passwords, in numbers", () => {
     );
 
     const running = watch.start();
-    await awaitAsync(40);
+    // However slow the machine: until the report is sent, up to 2 seconds.
+    for (let waited = 0; puts(api).length === 0 && waited < 2000; waited += 10) {
+      await awaitAsync(10);
+    }
     running.unsubscribe();
 
     expect(puts(api)).toHaveLength(1);

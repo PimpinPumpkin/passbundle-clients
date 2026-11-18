@@ -348,11 +348,18 @@ export type MspSiteFixes = {
 export type TwoStepNeeded = { organizationId: string; name: string };
 
 /**
- * Whether to show the nudge to set up two-step login: the person has none at
- * all and no rule requires it of them. See DESIGN.md, "A nudge for everyone
- * else".
+ * Which nudge about two-step login the vault page shows: "setUp" for someone
+ * with none at all, "stronger" for someone whose only second step is email
+ * codes. See DESIGN.md, "A nudge for everyone else".
  */
-export type TwoStepNudge = { show: boolean };
+export type TwoStepNudgeKind = "setUp" | "stronger";
+
+/**
+ * The server's answer: which nudge, if any (`nudge`, from servers that have
+ * the second one), and `show`, the first nudge only, as clients from before
+ * the second read it. No rule requires two-step login of whoever gets one.
+ */
+export type TwoStepNudge = { show: boolean; nudge?: string | null };
 
 /**
  * A role the server joined someone to without asking them (a server that
