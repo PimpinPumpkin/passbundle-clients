@@ -1,5 +1,5 @@
 import { mock } from "jest-mock-extended";
-import { BehaviorSubject, of, throwError } from "rxjs";
+import { BehaviorSubject, of } from "rxjs";
 
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import {
@@ -48,7 +48,10 @@ function setup() {
   const collectionService = mock<CollectionService>();
   collectionService.decryptedCollections$.mockReturnValue(of([]));
   const organizationUserService = mock<OrganizationUserService>();
-  organizationUserService.confirmUser.mockReturnValue(of(undefined));
+  organizationUserService.buildConfirmRequest.mockImplementation((organization) =>
+    of({ key: `org-key-of-${organization.id}`, defaultUserCollectionName: undefined }),
+  );
+  requests.confirmOnItsOwn.mockResolvedValue(undefined);
   const syncService = mock<SyncService>();
   // What the checks vouch for is join-checks.spec.ts's; here, whoever the server lets in automatically.
   const joinChecks = mock<KeykeeperJoinChecks>();
@@ -100,9 +103,11 @@ describe("MSP background work", () => {
       member("dental", "dee", false),
       member("unknown-org", "cy"),
     ]);
-    organizationUserService.confirmUser.mockImplementation((_org, memberId) =>
-      memberId === "ben" ? throwError(() => new Error("Already confirmed")) : of(undefined),
-    );
+    requests.confirmOnItsOwn.mockImplementation(async (_org, memberId) => {
+      if (memberId === "ben") {
+        throw new Error("Already confirmed");
+      }
+    });
     const updated = jest.fn();
     work.updated$.subscribe(updated);
 
@@ -112,13 +117,22 @@ describe("MSP background work", () => {
       confirmed: 1,
       failed: ["ben@example.test in Acme Dental: Already confirmed"],
     });
-    expect(organizationUserService.confirmUser).toHaveBeenCalledTimes(2);
-    expect(organizationUserService.confirmUser.mock.calls.map((c) => c[1])).toEqual(["ana", "ben"]);
+    expect(requests.confirmOnItsOwn).toHaveBeenCalledTimes(2);
+    expect(requests.confirmOnItsOwn.mock.calls.map((c) => c[1])).toEqual(["ana", "ben"]);
+    // Upstream's request, made with the client's key, to the member's own key.
+    expect(requests.confirmOnItsOwn.mock.calls[0]).toEqual([
+      "dental",
+      "ana",
+      { key: "org-key-of-dental", defaultUserCollectionName: undefined },
+    ]);
+    expect(organizationUserService.buildConfirmRequest.mock.calls[0][1]).toEqual(
+      new Uint8Array([0, 1, 2]),
+    );
     expect(updated).toHaveBeenCalledTimes(1);
   });
 
   it("confirms only those the checks let in, announces each on this device, and remembers the seal it used", async () => {
-    const { work, requests, organizationUserService, joinChecks } = setup();
+    const { work, requests, joinChecks } = setup();
     requests.pending.mockResolvedValue([member("dental", "ana"), member("dental", "ben")]);
     joinChecks.onItsOwn.mockImplementation(async (_userId, pending) =>
       pending.filter((p) => p.memberId === "ben"),
@@ -127,13 +141,13 @@ describe("MSP background work", () => {
     work.letIn$.subscribe((l) => letIn.push(l));
 
     expect(await work.confirmPending("msp-1")).toEqual({ confirmed: 1, failed: [] });
-    expect(organizationUserService.confirmUser.mock.calls.map((c) => c[1])).toEqual(["ben"]);
+    expect(requests.confirmOnItsOwn.mock.calls.map((c) => c[1])).toEqual(["ben"]);
     expect(letIn).toEqual([{ email: "ben@example.test", organizationName: "Acme Dental" }]);
     expect(joinChecks.markLetIn.mock.calls.map((c) => c[1].memberId)).toEqual(["ben"]);
   });
 
   it("never confirms in an organization where the person isn't an owner or admin, though they hold its key", async () => {
-    const { work, requests, organizationService, organizationUserService, joinChecks } = setup();
+    const { work, requests, organizationService, joinChecks } = setup();
     organizationService.organizations$.mockReturnValue(
       of([
         { id: "dental", name: "Acme Dental", isOwner: false, isAdmin: true } as Organization,
@@ -148,7 +162,7 @@ describe("MSP background work", () => {
 
     expect(await work.run()).toEqual([]);
     expect(joinChecks.onItsOwn.mock.calls[0][1].map((p) => p.memberId)).toEqual(["ana"]);
-    expect(organizationUserService.confirmUser.mock.calls.map((c) => c[1])).toEqual(["ana"]);
+    expect(requests.confirmOnItsOwn.mock.calls.map((c) => c[1])).toEqual(["ana"]);
   });
 
   it("does nothing while the vault is locked", async () => {
@@ -182,19 +196,19 @@ describe("MSP background work", () => {
   });
 
   it("in the background, confirms where the organization does so automatically and leaves the rest for an admin", async () => {
-    const { work, requests, organizationUserService } = setup();
+    const { work, requests } = setup();
     requests.organizationsWaiting.mockResolvedValue({
       pending: [member("dental", "ana"), member("dental", "ben", false)],
       joining: [],
     });
     requests.list.mockResolvedValue([]);
     expect(await work.run()).toEqual([]);
-    expect(organizationUserService.confirmUser).toHaveBeenCalledTimes(1);
-    expect(organizationUserService.confirmUser.mock.calls[0][1]).toBe("ana");
+    expect(requests.confirmOnItsOwn).toHaveBeenCalledTimes(1);
+    expect(requests.confirmOnItsOwn.mock.calls[0][1]).toBe("ana");
   });
 
   it("checks every organization's joining seal on each run, whether or not anyone is waiting", async () => {
-    const { work, requests, joinChecks, organizationUserService } = setup();
+    const { work, requests, joinChecks } = setup();
     const joining = [
       { organizationId: "dental", autoConfirm: false, domains: [], seal: "v3.own.1.seal" },
     ];
@@ -202,7 +216,7 @@ describe("MSP background work", () => {
     requests.list.mockResolvedValue([]);
     expect(await work.run()).toEqual([]);
     expect(joinChecks.learnJoining).toHaveBeenCalledWith(USER, joining);
-    expect(organizationUserService.confirmUser).not.toHaveBeenCalled();
+    expect(requests.confirmOnItsOwn).not.toHaveBeenCalled();
   });
 
   it("doesn't ask who's waiting when the person isn't an owner or admin anywhere", async () => {

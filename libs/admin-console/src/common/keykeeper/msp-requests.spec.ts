@@ -142,3 +142,25 @@ describe("the nudges about two-step login", () => {
     );
   });
 });
+
+describe("confirming someone on its own", () => {
+  it("is upstream's confirm with upstream's request, saying the app did it on its own", async () => {
+    const apiService = mock<ApiService>();
+    const requests = new KeykeeperMspRequests(apiService);
+    await requests.confirmOnItsOwn(ORG, "member-1", {
+      key: "4.org-key-for-member",
+      defaultUserCollectionName: undefined,
+    });
+    expect(apiService.send).toHaveBeenCalledWith(
+      "POST",
+      `/organizations/${ORG}/users/member-1/confirm`,
+      {
+        key: "4.org-key-for-member",
+        defaultUserCollectionName: undefined,
+        keykeeperAutomatic: true,
+      },
+      true,
+      false,
+    );
+  });
+});

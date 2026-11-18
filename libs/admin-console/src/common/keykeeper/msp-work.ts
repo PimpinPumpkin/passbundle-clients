@@ -194,8 +194,8 @@ export class KeykeeperMspWork {
 
   /**
    * Confirms, with upstream's confirm request, those of `pending` that this
-   * device may let in on its own (join-checks.ts). A member someone else
-   * confirmed in the meantime fails and is reported.
+   * device may let in on its own (join-checks.ts), saying so to the server.
+   * A member someone else confirmed in the meantime fails and is reported.
    */
   private async confirm(waiting: PendingMember[]): Promise<ConfirmResult> {
     if (waiting.length === 0) {
@@ -220,13 +220,15 @@ export class KeykeeperMspWork {
         continue;
       }
       try {
-        await firstValueFrom(
-          this.organizationUserService.confirmUser(
+        // Upstream's request, sent as letting them in on its own, which the
+        // MSP's activity log says (DESIGN.md, "Key fingerprints").
+        const request = await firstValueFrom(
+          this.organizationUserService.buildConfirmRequest(
             organization,
-            p.memberId,
             Utils.fromB64ToArray(p.publicKey),
           ),
         );
+        await this.requests.confirmOnItsOwn(organization.id, p.memberId, request);
         result.confirmed++;
         await this.joinChecks.markLetIn(userId, p);
         this.letIn.next({ email: p.email, organizationName: organization.name });

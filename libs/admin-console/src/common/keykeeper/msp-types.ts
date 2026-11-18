@@ -81,6 +81,12 @@ export type MspStaffMember = {
   access: TechnicianAccess | null;
   /** Clients that removed or revoked this person themselves. Older servers leave it out. */
   removedByClient?: { organizationId: string; revoked: boolean; at: string }[];
+  /**
+   * The public key the server holds for them (base64 SPKI), which clients'
+   * keys are encrypted to, for their fingerprint phrase. Older servers leave
+   * it out.
+   */
+  publicKey?: string | null;
 };
 
 export type MspInvite = {
