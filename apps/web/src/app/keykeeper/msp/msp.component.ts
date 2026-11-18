@@ -91,6 +91,7 @@ import {
   rememberMsp,
 } from "./msp-choice";
 import { KeykeeperMspJoiningComponent } from "./msp-joining.component";
+import { KeykeeperMspLinkCodesComponent } from "./msp-link-codes.component";
 import { getMspMemberHealth, MspMemberHealthClient, ownHealthLine } from "./msp-member-health";
 import { KeykeeperMspMemberHealthComponent } from "./msp-member-health.component";
 import { clientPolicySummary } from "./msp-policies";
@@ -132,6 +133,7 @@ const CLIENT_FEATURES = {
     HeaderModule,
     KeykeeperDefaultPoliciesComponent,
     KeykeeperMspJoiningComponent,
+    KeykeeperMspLinkCodesComponent,
     KeykeeperMspMemberHealthComponent,
     KeykeeperEventStreamingComponent,
     KeykeeperMspPlanComponent,
@@ -691,6 +693,7 @@ const CLIENT_FEATURES = {
               <button bitButton bitFormButton buttonType="primary" type="submit">Add client</button>
             </form>
           }
+          <app-keykeeper-msp-link-codes [msp]="m" />
         </section>
 
         @if (expiring(); as soon) {

@@ -39,6 +39,13 @@ export type MspClient = {
    * the token. Older servers leave it out.
    */
   removedSinceToken?: number;
+  /**
+   * The organization was one of its own and joined with a code its owner
+   * entered: its own owner confirms the MSP's first people there, and it
+   * keeps its own plan (DESIGN.md, "An organization that already uses
+   * PassBundle"). Older servers leave it out.
+   */
+  joinedWithCode?: boolean;
 };
 
 /** The custom role permissions the server enforces. */
@@ -177,8 +184,14 @@ export type MspRemoval = {
 /** One of the MSP's people in a client, and what they can do there. */
 export type ClientMspStaff = {
   memberId: string;
+  /** Their account, and the public key the server holds for it, for the fingerprint phrase. Older servers leave them out. */
+  userId?: string;
+  publicKey?: string | null;
   email: string;
   name: string | null;
+  /** Upstream's membership type (0 owner, 1 admin, 2 user) and status (1 waiting for the key, 2 confirmed). */
+  type?: number;
+  status?: number;
   /** Older servers leave out the role, its permissions, and vault items. */
   role?: "owner" | "admin" | "custom" | "member";
   /** A custom role's permissions, by upstream's names (manageUsers and the rest). */
@@ -671,3 +684,39 @@ export type MspTwoStep = {
  * two-step login for admins, or for an MSP's staff, on or off.
  */
 export type ChangeVerification = { masterPasswordHash?: string; otp?: string };
+
+/**
+ * A code an MSP admin made for an organization's owner to join it to the MSP
+ * (DESIGN.md, "An organization that already uses PassBundle"). The code
+ * itself comes only once, in the answer to making it.
+ */
+export type MspLinkCode = {
+  id: string;
+  /** Who it's for, as the admin said. */
+  label: string | null;
+  createdBy: string;
+  createdAt: string;
+  expiresAt: string;
+  /** Only when it's made: in groups of four, with dashes. */
+  code?: string;
+};
+
+/** Someone of the MSP's who joins, as what: "owner", "admin", "custom", or "custom items". */
+export type LinkPerson = { email: string; name: string | null; role?: string };
+
+/** What a code would do for an organization, before anything changes. */
+export type LinkPreview = {
+  msp: { id: string; name: string };
+  /** Its MSP now, which a move takes out first; null when it has none. */
+  current: { id: string; name: string } | null;
+  adding: LinkPerson[];
+  /** People of the MSP's the organization removed or revoked itself: they stay out. */
+  stayingOut: LinkPerson[];
+};
+
+/** What joining did: the MSP, how many of its people were added, and, for a move, what went with the old one. */
+export type LinkResult = {
+  msp: { id: string; name: string };
+  added: number;
+  moved: MspRemoval | null;
+};
