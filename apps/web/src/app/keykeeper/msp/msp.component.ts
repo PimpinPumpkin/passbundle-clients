@@ -78,10 +78,18 @@ import {
   MspDetails,
   MspPolicies,
   MspRole,
+  MspSummary,
   MspTemplates,
   MspStaffMember,
   TechnicianAccess,
 } from "./msp-api.service";
+import {
+  browserStorage,
+  chosenMsp,
+  mspChoiceLabel,
+  rememberedMsp,
+  rememberMsp,
+} from "./msp-choice";
 import { KeykeeperMspJoiningComponent } from "./msp-joining.component";
 import { getMspMemberHealth, MspMemberHealthClient, ownHealthLine } from "./msp-member-health";
 import { KeykeeperMspMemberHealthComponent } from "./msp-member-health.component";
@@ -174,6 +182,19 @@ const CLIENT_FEATURES = {
           <button bitButton buttonType="primary" type="button" [bitAction]="load">Try again</button>
         </bit-callout>
       } @else if (msp(); as m) {
+        <!-- Keykeeper: someone on several MSPs' staff chooses which one (DESIGN.md, "Several MSPs"). -->
+        @if (msps().length > 1) {
+          <bit-form-field class="tw-mb-4 tw-max-w-md" data-testid="msp-choice">
+            <bit-label>MSP</bit-label>
+            <select bitInput (change)="chooseMsp($any($event.target).value)">
+              @for (option of msps(); track option.id) {
+                <option [value]="option.id" [selected]="option.id === m.id">
+                  {{ choiceLabel(option) }}
+                </option>
+              }
+            </select>
+          </bit-form-field>
+        }
         <p class="tw-mb-6" data-testid="msp-name">
           <span bitTypography="h2" class="tw-mr-2">{{ m.name }}</span>
           <span bitBadge variant="secondary">{{
@@ -1034,7 +1055,10 @@ export class KeykeeperMspComponent implements OnInit {
   /** Keykeeper: why the console couldn't open, with Try again (never the Create MSP form). */
   protected readonly loadError = signal<string | null>(null);
   protected readonly msp = signal<MspDetails | null>(null);
-  /** Keykeeper: the signed-in account, for their own row on the Staff list. */
+  /** Keykeeper: every MSP the person is staff of; the console shows one (msp-choice.ts). */
+  protected readonly msps = signal<MspSummary[]>([]);
+  protected readonly choiceLabel = mspChoiceLabel;
+  /** Keykeeper: the signed-in account, for which MSP this browser remembers and their own Staff row. */
   protected readonly myUserId = signal<string | null>(null);
   /** Keykeeper: each staff member's fingerprint phrase, by account id (staff-fingerprint.ts). */
   protected readonly phrases = signal(new Map<string, string>());
@@ -1198,11 +1222,15 @@ export class KeykeeperMspComponent implements OnInit {
     this.loading.set(true);
     this.loadError.set(null);
     try {
-      this.myUserId.set(await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId)));
-      const [first] = await this.mspApi.list();
-      if (first) {
-        await this.confirmWaiting(first.id);
-        await this.reload(first.id);
+      const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
+      this.myUserId.set(userId);
+      const msps = await this.mspApi.list();
+      this.msps.set(msps);
+      // Keykeeper: the MSP chosen in this browser, if they're still on its staff.
+      const chosen = chosenMsp(msps, rememberedMsp(browserStorage(), userId));
+      if (chosen) {
+        await this.confirmWaiting(chosen.id);
+        await this.reload(chosen.id);
         // Brings clients' templates up to date; the section reloads if anything changed.
         void this.work.run();
       }
@@ -1216,6 +1244,46 @@ export class KeykeeperMspComponent implements OnInit {
       this.loading.set(false);
     }
   };
+
+  /**
+   * Keykeeper: shows another MSP the person is staff of, and remembers it in
+   * this browser. Everything on the page is that MSP's from then on: the
+   * sections start over with its id.
+   */
+  protected async chooseMsp(mspId: string) {
+    if (mspId === this.msp()?.id || !this.msps().some((m) => m.id === mspId)) {
+      return;
+    }
+    const userId = this.myUserId();
+    if (userId != null) {
+      rememberMsp(browserStorage(), userId, mspId);
+    }
+    this.loading.set(true);
+    this.msp.set(null);
+    this.trusted.set(null);
+    this.installFor.set(null);
+    this.detailsFor.set(null);
+    this.ownHealthFor.set(null);
+    this.accessFor.set(null);
+    this.lastInvite.set(null);
+    this.newStaffAccess.set(null);
+    this.health.set(null);
+    this.expiring.set(null);
+    this.exposedCheck.set(null);
+    this.ownHealth.set(null);
+    this.events.set([]);
+    this.phrases.set(new Map());
+    this.templates.set(null);
+    this.policies.set(null);
+    try {
+      await this.confirmWaiting(mspId);
+      await this.reload(mspId);
+    } catch (e) {
+      this.loadError.set(plainErrorMessage(e));
+    } finally {
+      this.loading.set(false);
+    }
+  }
 
   /** Keykeeper: to the Two-step login page, with a way back here that keeps the name. */
   protected async setUpTwoStep() {
@@ -1258,9 +1326,19 @@ export class KeykeeperMspComponent implements OnInit {
     }
     await this.attempt(async () => {
       const created = await this.mspApi.create(this.mspForm.value.name!.trim());
+      this.remember(created.id);
+      this.msps.set(await this.mspApi.list());
       await this.reload(created.id);
     });
   };
+
+  /** Keykeeper: the MSP this browser shows the signed-in person next time. */
+  private remember(mspId: string) {
+    const userId = this.myUserId();
+    if (userId != null) {
+      rememberMsp(browserStorage(), userId, mspId);
+    }
+  }
 
   protected readonly addClient = async () => {
     const msp = this.msp();
@@ -1419,6 +1497,9 @@ export class KeykeeperMspComponent implements OnInit {
       const { mspId } = await this.mspApi.acceptInvitation(token);
       this.invitation.set(null);
       await this.router.navigate([], { queryParams: { invite: null }, replaceUrl: true });
+      // Keykeeper: the MSP they just joined, here and next time.
+      this.remember(mspId);
+      this.msps.set(await this.mspApi.list());
       await this.reload(mspId);
       this.toast(`You joined ${this.msp()?.name}`);
     });
