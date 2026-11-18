@@ -2,18 +2,9 @@
 // @ts-strict-ignore
 import { CommonModule } from "@angular/common";
 import { Component, computed, inject, OnInit, Signal } from "@angular/core";
-import { takeUntilDestroyed, toSignal } from "@angular/core/rxjs-interop";
-import { NavigationEnd, Router, RouterModule } from "@angular/router";
-import {
-  catchError,
-  distinctUntilChanged,
-  filter,
-  from,
-  map,
-  Observable,
-  of,
-  switchMap,
-} from "rxjs";
+import { toSignal } from "@angular/core/rxjs-interop";
+import { RouterModule } from "@angular/router";
+import { catchError, from, map, Observable, of, switchMap } from "rxjs";
 
 import { PasswordManagerLogo } from "@bitwarden/assets/svg";
 import {
@@ -35,7 +26,10 @@ import { CoachmarkComponent, CoachmarkService } from "@bitwarden/vault";
 
 import { BillingFreeFamiliesNavItemComponent } from "../billing/shared/billing-free-families-nav-item.component";
 import { KeykeeperMspApiService } from "../keykeeper/msp/msp-api.service";
-import { KEYKEEPER_MENU_BUTTON } from "../keykeeper/vault-menu/menu-button";
+import {
+  closeMenuOverPageOnNewPage,
+  KEYKEEPER_MENU_BUTTON,
+} from "../keykeeper/vault-menu/menu-button";
 import { KeykeeperVaultMenuComponent } from "../keykeeper/vault-menu/vault-menu.component";
 
 import { WebLayoutModule } from "./web-layout.module";
@@ -133,19 +127,7 @@ export class UserLayoutComponent implements OnInit {
     // Keykeeper: where the menu covers the page (a phone), going to another
     // page closes it. Picking a filter closes it too (the menu does that);
     // typing a search doesn't.
-    const router = inject(Router);
-    router.events
-      .pipe(
-        filter((event) => event instanceof NavigationEnd),
-        map(() => router.url.split(/[?#]/)[0]),
-        distinctUntilChanged(),
-        takeUntilDestroyed(),
-      )
-      .subscribe(() => {
-        if (this.sideNavService.isOverlay()) {
-          this.sideNavService.open.set(false);
-        }
-      });
+    closeMenuOverPageOnNewPage();
   }
 
   async ngOnInit() {

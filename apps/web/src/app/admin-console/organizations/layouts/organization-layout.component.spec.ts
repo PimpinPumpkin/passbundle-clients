@@ -1,6 +1,12 @@
-import { NO_ERRORS_SCHEMA } from "@angular/core";
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  NO_ERRORS_SCHEMA,
+  signal,
+} from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
-import { ActivatedRoute } from "@angular/router";
+import { ActivatedRoute, Router } from "@angular/router";
 import { mock, MockProxy } from "jest-mock-extended";
 import { BehaviorSubject, firstValueFrom, of } from "rxjs";
 
@@ -14,12 +20,17 @@ import { AccountService } from "@bitwarden/common/auth/abstractions/account.serv
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { mockAccountServiceWith } from "@bitwarden/common/spec";
 import { OrganizationId, UserId } from "@bitwarden/common/types/guid";
+import { SideNavService } from "@bitwarden/components";
 
 import { OrganizationWarningsService } from "../../../billing/organizations/warnings/services/organization-warnings.service";
 import { FreeFamiliesPolicyService } from "../../../billing/services/free-families-policy.service";
+import { KEYKEEPER_MENU_BUTTON } from "../../../keykeeper/vault-menu/menu-button";
 import { InviteLinkCalloutService } from "../members/services/invite-link-callout/invite-link-callout.service";
 
 import { OrganizationLayoutComponent } from "./organization-layout.component";
+
+@Component({ template: "", changeDetection: ChangeDetectionStrategy.OnPush })
+class PageComponent {}
 
 describe("OrganizationLayoutComponent", () => {
   let fixture: ComponentFixture<OrganizationLayoutComponent>;
@@ -35,6 +46,11 @@ describe("OrganizationLayoutComponent", () => {
   let mockAccountService: ReturnType<typeof mockAccountServiceWith>;
 
   let routeParamsSubject: BehaviorSubject<{ organizationId: OrganizationId }>;
+
+  // Keykeeper: the side nav, open, beside the page or over it (a phone).
+  const navOpen = signal(true);
+  const navPushMode = signal(true);
+  const sideNav = { open: navOpen, isOverlay: computed(() => navOpen() && !navPushMode()) };
 
   const userId = "test-user-id" as UserId;
   const orgId = "org-1" as OrganizationId;
@@ -79,6 +95,8 @@ describe("OrganizationLayoutComponent", () => {
 
   beforeEach(async () => {
     routeParamsSubject = new BehaviorSubject({ organizationId: orgId });
+    navOpen.set(true);
+    navPushMode.set(true);
 
     mockOrganizationService = mock<OrganizationService>();
     mockPlatformUtilsService = mock<PlatformUtilsService>();
@@ -109,6 +127,7 @@ describe("OrganizationLayoutComponent", () => {
         { provide: FreeFamiliesPolicyService, useValue: mockFreeFamiliesPolicyService },
         { provide: OrganizationWarningsService, useValue: mockOrganizationWarningsService },
         { provide: InviteLinkCalloutService, useValue: mockInviteLinkCalloutService },
+        { provide: SideNavService, useValue: sideNav },
       ],
       schemas: [NO_ERRORS_SCHEMA],
     })
@@ -119,6 +138,37 @@ describe("OrganizationLayoutComponent", () => {
 
     fixture = TestBed.createComponent(OrganizationLayoutComponent);
     component = fixture.componentInstance;
+  });
+
+  describe("on a phone (Keykeeper)", () => {
+    it("asks its pages for a menu button, as the vault's do", () => {
+      expect(fixture.debugElement.injector.get(KEYKEEPER_MENU_BUTTON)).toBe(true);
+    });
+
+    it("closes the menu covering the page when another page opens", async () => {
+      const router = TestBed.inject(Router);
+      router.resetConfig([
+        { path: "members", component: PageComponent },
+        { path: "groups", component: PageComponent },
+      ]);
+      await router.navigateByUrl("/members");
+      navPushMode.set(false);
+      expect(navOpen()).toBe(true);
+
+      await router.navigateByUrl("/groups");
+      expect(navOpen()).toBe(false);
+    });
+
+    it("leaves the menu beside the page open", async () => {
+      const router = TestBed.inject(Router);
+      router.resetConfig([
+        { path: "members", component: PageComponent },
+        { path: "groups", component: PageComponent },
+      ]);
+      await router.navigateByUrl("/members");
+      await router.navigateByUrl("/groups");
+      expect(navOpen()).toBe(true);
+    });
   });
 
   describe("organization$", () => {

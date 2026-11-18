@@ -37,6 +37,10 @@ import { TaxIdWarningType } from "@bitwarden/web-vault/app/billing/warnings/type
 import { FreeFamiliesPolicyService } from "../../../billing/services/free-families-policy.service";
 import { hasCompanyFeatures } from "../../../keykeeper/plan/company-features";
 import { hasOrganizationPlanPage } from "../../../keykeeper/plan/plan-pages";
+import {
+  closeMenuOverPageOnNewPage,
+  KEYKEEPER_MENU_BUTTON,
+} from "../../../keykeeper/vault-menu/menu-button";
 import { OrgSwitcherComponent } from "../../../layouts/org-switcher/org-switcher.component";
 import { WebLayoutModule } from "../../../layouts/web-layout.module";
 import { PamOrgNavSlotComponent } from "../../../pam/org-nav-slot/pam-org-nav-slot.component";
@@ -60,6 +64,8 @@ import { InviteLinkCalloutService } from "../members/services/invite-link-callou
     Vfo1I18nPipe,
     PamOrgNavSlotComponent,
   ],
+  // Keykeeper: pages here show a button that opens the menu where it's hidden (a phone).
+  providers: [{ provide: KEYKEEPER_MENU_BUTTON, useValue: true }],
 })
 export class OrganizationLayoutComponent {
   private readonly route = inject(ActivatedRoute);
@@ -143,6 +149,8 @@ export class OrganizationLayoutComponent {
 
   constructor() {
     document.body.classList.remove("layout_frontend");
+    // Keykeeper: where the menu covers the page (a phone), going to another page closes it.
+    closeMenuOverPageOnNewPage();
 
     this.organization$
       .pipe(

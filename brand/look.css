@@ -579,7 +579,15 @@ html.pb-web,
   right: 0.25rem;
   transform: none !important;
 }
-.pb-web bit-side-nav bit-nav-group > bit-nav-item [data-testid="nav-item-interactive"] {
+/* Room for the arrow, only where there is one: the closed menu (the icon
+   rail) has none, and there the room pushed a group's icon (the
+   organization's, Reporting's, Settings', Import and export's) left of the
+   others. */
+.pb-web
+  bit-side-nav
+  bit-nav-group
+  > bit-nav-item:has([data-testid="nav-group-collapse-arrow"])
+  [data-testid="nav-item-interactive"] {
   padding-inline-end: 1.75rem !important;
 }
 .pb-web bit-side-nav bit-nav-item {
@@ -685,6 +693,26 @@ html.pb-web,
 }
 .pb-web bit-header > header {
   margin-bottom: 0.5rem;
+}
+/* On a phone, where a page's buttons don't fit beside its title (Members'
+   search and Invite member, say), they go under it, as upstream's newer
+   header puts them, rather than squeezing the title to nothing; and they
+   wrap among themselves rather than run off the screen. A header that fits
+   stays as it is. */
+@media not all and (min-width: 28rem) {
+  .pb-web bit-header > header > div:first-child {
+    flex-wrap: wrap;
+    row-gap: 0.75rem;
+  }
+  .pb-web bit-header > header > div:first-child > .tw-flex-1 {
+    min-width: 7.5rem;
+  }
+  .pb-web bit-header > header > div:first-child > .tw-ml-auto,
+  .pb-web bit-header > header > div:first-child > .tw-ml-auto > .tw-min-w-max {
+    min-width: 0;
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
 }
 
 /* Cards, panels, and tables rest on the ground. */
