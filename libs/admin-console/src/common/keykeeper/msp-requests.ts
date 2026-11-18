@@ -21,6 +21,7 @@ import {
   TemplateCopy,
   TwoStepNeeded,
   TwoStepNudge,
+  TwoStepNudgeKind,
 } from "./msp-types";
 
 /**
@@ -97,11 +98,12 @@ export class KeykeeperMspRequests {
   }
 
   /**
-   * Whether to nudge the person to set up two-step login. Never from a server
-   * that doesn't say, or one that can't be reached: the nudge never holds
-   * anything up.
+   * Which nudge about two-step login to show, if any. A server from before
+   * the second nudge says only `show`, the first. Nothing from a server that
+   * doesn't say, one that names a nudge this doesn't know, or one that can't
+   * be reached: the nudge never holds anything up.
    */
-  async twoStepNudge(): Promise<boolean> {
+  async twoStepNudge(): Promise<TwoStepNudgeKind | null> {
     try {
       const answer: TwoStepNudge = await this.apiService.send(
         "GET",
@@ -110,13 +112,16 @@ export class KeykeeperMspRequests {
         true,
         true,
       );
-      return answer?.show === true;
+      if (answer?.nudge === undefined) {
+        return answer?.show === true ? "setUp" : null;
+      }
+      return answer.nudge === "setUp" || answer.nudge === "stronger" ? answer.nudge : null;
     } catch {
-      return false;
+      return null;
     }
   }
 
-  /** "Not now": the server hides the nudge for 90 days, on every device. */
+  /** "Not now", to either nudge: the server hides both for 90 days, on every device. */
   async dismissTwoStepNudge(): Promise<void> {
     await this.apiService.send("POST", "/keykeeper/two-step-nudge/dismiss", null, true, true);
   }
