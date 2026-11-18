@@ -16,6 +16,14 @@ export class PermissionsApi extends BaseResponse {
   manageUsers: boolean;
   manageResetPassword: boolean;
   manageScim: boolean;
+  /**
+   * Keykeeper: a custom role that makes shared folders, and renames, deletes,
+   * and sets who reaches the ones it reaches (DESIGN.md, "Roles and
+   * permissions"). Not upstream's "edit any collection", which reaches them all.
+   */
+  keykeeperManageCollections: boolean;
+  /** Keykeeper: a custom role with access to all items, which owners and admins give. */
+  keykeeperAccessAllItems: boolean;
 
   constructor(data: any = null) {
     super(data);
@@ -37,5 +45,8 @@ export class PermissionsApi extends BaseResponse {
     this.manageUsers = this.getResponseProperty("ManageUsers");
     this.manageResetPassword = this.getResponseProperty("ManageResetPassword");
     this.manageScim = this.getResponseProperty("ManageScim");
+    this.keykeeperManageCollections =
+      this.getResponseProperty("KeykeeperManageCollections") === true;
+    this.keykeeperAccessAllItems = this.getResponseProperty("KeykeeperAccessAllItems") === true;
   }
 }

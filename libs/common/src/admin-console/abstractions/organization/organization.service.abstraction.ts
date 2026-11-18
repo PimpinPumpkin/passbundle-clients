@@ -7,7 +7,8 @@ import { Organization } from "../../models/domain/organization";
 import { PolicyService } from "../policy/policy.service.abstraction";
 
 export function canAccessVaultTab(org: Organization): boolean {
-  return org.canViewAllCollections;
+  // Keykeeper: and a custom role that manages the shared folders it reaches.
+  return org.canViewAllCollections || org.keykeeperManagesCollections === true;
 }
 
 export function canAccessSettingsTab(org: Organization): boolean {
