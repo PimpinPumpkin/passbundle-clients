@@ -46,6 +46,8 @@ describe("secrets on the command line", () => {
         envPrefix: "PASSBUNDLE_",
         version: "",
         releases: "",
+        releaseRepository: "",
+        releaseKeys: [],
         server: "",
       }),
     ).toContain("Set PASSBUNDLE_SESSION instead");

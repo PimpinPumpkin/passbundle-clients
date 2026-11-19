@@ -47,6 +47,11 @@ import {
 } from "@bitwarden/components";
 import { I18nPipe } from "@bitwarden/ui-common";
 import { Vfo1I18nPipe } from "@bitwarden/vault";
+import {
+  customRoleForm,
+  customRolePermissions,
+} from "@bitwarden/web-vault/app/keykeeper/organizations/custom-role";
+import { KeykeeperCustomRolePermissionsComponent } from "@bitwarden/web-vault/app/keykeeper/organizations/custom-role-permissions.component";
 
 import { GroupApiService, GroupDetailsView } from "../../../core";
 import { OrganizationUserView } from "../../../core/views/organization-user.view";
@@ -60,7 +65,6 @@ import {
 } from "../../../shared/components/access-selector";
 import { MemberActionsService } from "../../services";
 import { MemberDialogResult } from "../member-dialog/member-dialog.types";
-import { NestedCheckboxComponent } from "../member-dialog/nested-checkbox.component";
 import { commaSeparatedEmails } from "../member-dialog/validators/comma-separated-emails.validator";
 import {
   getEmailBatchLimit,
@@ -108,7 +112,6 @@ export interface InviteMembersDialogParams {
     FormFieldModule,
     I18nPipe,
     LinkModule,
-    NestedCheckboxComponent,
     NgTemplateOutlet,
     RadioButtonModule,
     ReactiveFormsModule,
@@ -116,6 +119,8 @@ export interface InviteMembersDialogParams {
     TabsModule,
     IconModule,
     Vfo1I18nPipe,
+    // Keykeeper
+    KeykeeperCustomRolePermissionsComponent,
   ],
 })
 export class InviteMembersDialogComponent {
@@ -171,22 +176,11 @@ export class InviteMembersDialogComponent {
     groups: [[] as AccessItemValue[]],
   });
 
-  protected readonly permissionsGroup = this.formBuilder.group({
-    manageAllCollectionsGroup: this.formBuilder.group<Record<string, boolean>>({
-      manageAllCollections: false,
-      createNewCollections: false,
-      editAnyCollection: false,
-      deleteAnyCollection: false,
-    }),
-    accessEventLogs: false,
-    accessImportExport: false,
-    accessReports: false,
-    manageGroups: false,
-    manageSso: false,
-    managePolicies: false,
-    manageUsers: false,
-    manageResetPassword: false,
-  });
+  /**
+   * Keykeeper: the custom role's permissions, every one our server enforces,
+   * offered together (custom-role.ts).
+   */
+  protected readonly permissionsGroup = customRoleForm(this.formBuilder);
 
   protected readonly organization$: Observable<Organization> =
     this.accountService.activeAccount$.pipe(
@@ -263,22 +257,6 @@ export class InviteMembersDialogComponent {
   private readonly formTypeValue = toSignal(this.formGroup.controls.type.valueChanges, {
     initialValue: this.formGroup.value.type ?? OrganizationUserType.User,
   });
-  /**
-   * Keykeeper: whether a permission our server enforces for custom roles is
-   * checked. Those roles can't also manage all collections yet (the server
-   * refuses it), so the dialog doesn't offer both.
-   */
-  protected get keykeeperPermissionChecked(): boolean {
-    const p = this.permissionsGroup.value;
-    return !!(
-      p.manageUsers ||
-      p.manageResetPassword ||
-      p.managePolicies ||
-      p.accessEventLogs ||
-      p.accessImportExport
-    );
-  }
-
   protected readonly customUserTypeSelected = computed(
     () => this.formTypeValue() === OrganizationUserType.Custom,
   );
@@ -323,17 +301,9 @@ export class InviteMembersDialogComponent {
     if (clearPermissions) {
       return new PermissionsApi();
     }
-    const { manageAllCollectionsGroup: chosen, ...permissionFields } = this.permissionsGroup.value;
-    // Keykeeper: never ask for both (see keykeeperPermissionChecked).
-    const manageAllCollectionsGroup = this.keykeeperPermissionChecked
-      ? { createNewCollections: false, editAnyCollection: false, deleteAnyCollection: false }
-      : chosen;
-    return Object.assign(new PermissionsApi(), {
-      ...permissionFields,
-      createNewCollections: manageAllCollectionsGroup?.createNewCollections,
-      editAnyCollection: manageAllCollectionsGroup?.editAnyCollection,
-      deleteAnyCollection: manageAllCollectionsGroup?.deleteAnyCollection,
-    });
+    // Keykeeper: our permissions as checked, never upstream's "Manage all
+    // collections" (custom-role.ts).
+    return customRolePermissions(this.permissionsGroup.getRawValue());
   }
 
   private async handleInviteUsers(organizationId: OrganizationId) {
