@@ -8,11 +8,21 @@
       <dd class="tw-mb-2" data-testid="keykeeper-new-device-approval-device">
         {{ data.request.device }}
       </dd>
-      <dt class="tw-font-medium">{{ "keykeeperApproveSignInWhere" | i18n }}</dt>
-      <dd class="tw-mb-2" data-testid="keykeeper-new-device-approval-where">
-        {{ data.request.location ?? ("keykeeperApproveSignInUnknownLocation" | i18n) }}
-        <span class="tw-text-muted">({{ data.request.ipAddress }})</span>
-      </dd>
+      <!-- Where it comes from only when the server has a location database
+           (DESIGN.md, "Where a sign-in comes from"); without one, the
+           address alone. -->
+      @if (data.request.location != null || data.source != null) {
+        <dt class="tw-font-medium">{{ "keykeeperApproveSignInWhere" | i18n }}</dt>
+        <dd class="tw-mb-2" data-testid="keykeeper-new-device-approval-where">
+          {{ data.request.location ?? ("keykeeperApproveSignInUnknownLocation" | i18n) }}
+          <span class="tw-text-muted">({{ data.request.ipAddress }})</span>
+        </dd>
+      } @else {
+        <dt class="tw-font-medium">{{ "keykeeperApproveSignInAddress" | i18n }}</dt>
+        <dd class="tw-mb-2" data-testid="keykeeper-new-device-approval-address">
+          {{ data.request.ipAddress }}
+        </dd>
+      }
       <dt class="tw-font-medium">{{ "keykeeperApproveSignInWhen" | i18n }}</dt>
       <dd class="tw-mb-2">{{ when(data.request.creationDate) }}</dd>
     </dl>
@@ -47,7 +57,9 @@
     @if (data.source && data.request.location) {
       <p class="tw-text-xs tw-text-muted tw-mb-0">
         @if (data.source.url) {
-          <a bitLink [href]="data.source.url" target="_blank" rel="noreferrer">{{ data.source.name }}</a>
+          <a bitLink [href]="data.source.url" target="_blank" rel="noreferrer">{{
+            data.source.name
+          }}</a>
         } @else {
           {{ data.source.name }}
         }
