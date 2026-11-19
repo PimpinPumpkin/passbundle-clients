@@ -104,9 +104,9 @@ export class KeykeeperFamilyLinkService {
   }
 
   /**
-   * The family's link, or null when the server says "not found": the
-   * organization isn't a family, or the person isn't one of its owners or
-   * admins. The card stays hidden then.
+   * The family's link, or null: the server says null to an owner or admin of
+   * an organization that isn't a family, and "not found" to anyone else. The
+   * card stays hidden then.
    */
   async get(organizationId: string): Promise<FamilyLinkView | null> {
     try {
