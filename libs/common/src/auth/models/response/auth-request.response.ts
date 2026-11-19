@@ -18,6 +18,14 @@ export class AuthRequestResponse extends BaseResponse {
   isAnswered: boolean;
   isExpired: boolean;
   deviceId?: string; // could be null or empty
+  /**
+   * Keykeeper: roughly where the request comes from ("Berlin, Germany"), from
+   * the server's own location database, or null when it can't place the
+   * address; and who to credit beside it, null when the server has no
+   * database. Both null: nothing more is shown than upstream shows.
+   */
+  keykeeperLocation: string | null;
+  keykeeperLocationSource: { name: string; url: string | null } | null;
 
   constructor(response: any) {
     super(response);
@@ -33,6 +41,17 @@ export class AuthRequestResponse extends BaseResponse {
     this.requestApproved = this.getResponseProperty("RequestApproved");
     this.responseDate = this.getResponseProperty("ResponseDate");
     this.deviceId = this.getResponseProperty("RequestDeviceId");
+    const location = this.getResponseProperty("Location");
+    this.keykeeperLocation = typeof location === "string" ? location : null;
+    const source = this.getResponseProperty("LocationSource");
+    const url = source?.url;
+    this.keykeeperLocationSource =
+      typeof source?.name === "string"
+        ? {
+            name: source.name,
+            url: typeof url === "string" && url.startsWith("https://") ? url : null,
+          }
+        : null;
 
     const requestDate = new Date(this.creationDate);
     const requestDateUTC = Date.UTC(

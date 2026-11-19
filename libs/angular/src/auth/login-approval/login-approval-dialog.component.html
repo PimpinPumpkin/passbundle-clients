@@ -24,10 +24,43 @@
       </div>
       <div>
         <span class="tw-font-medium">{{ "location" | i18n }}</span>
-        <p>
-          <span class="tw-capitalize">{{ authRequestResponse?.requestCountryName }} </span>
-          ({{ authRequestResponse?.requestIpAddress }})
-        </p>
+        <!-- Keykeeper: where it comes from, from the server's own location
+             database, with the database's credit beside it (DESIGN.md,
+             "New-device check", "Where a sign-in comes from"). -->
+        @if (keykeeperShowsLocation) {
+          <p
+            [class.tw-mb-0]="authRequestResponse?.keykeeperLocation"
+            data-testid="keykeeper-login-approval-location"
+          >
+            {{
+              authRequestResponse?.keykeeperLocation ??
+                ("keykeeperApproveSignInUnknownLocation" | i18n)
+            }}
+            ({{ authRequestResponse?.requestIpAddress }})
+          </p>
+          @if (
+            authRequestResponse?.keykeeperLocation && authRequestResponse?.keykeeperLocationSource;
+            as source
+          ) {
+            <p
+              class="tw-text-xs tw-text-muted"
+              data-testid="keykeeper-login-approval-location-source"
+            >
+              @if (source.url) {
+                <a bitLink [href]="source.url" target="_blank" rel="noreferrer">{{
+                  source.name
+                }}</a>
+              } @else {
+                {{ source.name }}
+              }
+            </p>
+          }
+        } @else {
+          <p>
+            <span class="tw-capitalize">{{ authRequestResponse?.requestCountryName }} </span>
+            ({{ authRequestResponse?.requestIpAddress }})
+          </p>
+        }
       </div>
       <div>
         <span class="tw-font-medium">{{ "time" | i18n }}</span>
