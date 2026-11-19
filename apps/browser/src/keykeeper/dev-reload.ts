@@ -4,7 +4,10 @@
 // it from and writes pb-build.txt, naming the build. Chrome doesn't reload an
 // unpacked extension by itself, so this notices the file changed and reloads.
 // Only installs Chrome reports as "development" (loaded unpacked) check; a
-// store or policy install never does.
+// store or policy install never does. Firefox never checks: its `chrome`
+// namespace answers through callbacks only, so getSelf() there returns
+// nothing to await, and a Firefox build loaded by hand is a temporary add-on,
+// reloaded from about:debugging.
 
 import { BrowserApi } from "../platform/browser/browser-api";
 
@@ -37,7 +40,7 @@ export class KeykeeperDevReload {
       return;
     }
     const self = await chrome.management.getSelf();
-    if (self.installType !== "development") {
+    if (self?.installType !== "development") {
       return;
     }
     BrowserApi.addListener(chrome.alarms.onAlarm, (alarm: chrome.alarms.Alarm) => {
