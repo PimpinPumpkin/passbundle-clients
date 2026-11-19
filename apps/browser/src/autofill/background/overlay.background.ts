@@ -1561,6 +1561,9 @@ export class OverlayBackground implements OverlayBackgroundInterface {
       focusedFieldForm: this.focusedFieldData?.focusedFieldForm,
       focusedFieldOpid: this.focusedFieldData?.focusedFieldOpid,
       inlineMenuFillType: this.focusedFieldData?.inlineMenuFillType,
+      // Keykeeper: the frame of the field whose menu the person chose in,
+      // which a card may fill (keykeeper/card-frames.ts).
+      keykeeperStartFrameId: this.focusedFieldData?.frameId,
     });
 
     // A denial terminates the request.
