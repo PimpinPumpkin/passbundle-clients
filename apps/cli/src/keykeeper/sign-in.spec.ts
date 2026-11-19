@@ -38,6 +38,7 @@ describe("the tool's version", () => {
     envPrefix: "PASSBUNDLE_",
     version: "0.1.7",
     releases: "https://github.com/example/releases",
+    server: "https://vault.example.com",
   };
 
   it("is its own when it has one, and the app's otherwise", () => {

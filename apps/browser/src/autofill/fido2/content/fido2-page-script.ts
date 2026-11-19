@@ -233,19 +233,33 @@ import { Messenger } from "./messaging/messenger";
    * Errors thrown from the content-script messenger handler cross the page/isolated
    * world boundary as JSON, which strips DOMException's prototype. Reconstruct a
    * real DOMException so callers that check `instanceof DOMException` or `.code`
-   * see what the native browser API would throw. Scoped to `NotAllowedError` —
-   * the only DOMException name our gate produces.
+   * see what the native browser API would throw.
+   *
+   * Keykeeper: scoped to the DOMException names WebAuthn gives a site, which our gate
+   * and the extension's WebAuthn client produce: a site's library tells a passkey it
+   * already has (InvalidStateError) from someone cancelling (NotAllowedError) by name.
    */
+  const webAuthnErrorNames = new Set([
+    "NotAllowedError",
+    "InvalidStateError",
+    "SecurityError",
+    "NotSupportedError",
+    "AbortError",
+  ]);
   function rehydrateDOMException(error: unknown): unknown {
     if (
       error != null &&
       typeof error === "object" &&
       "name" in error &&
-      (error as { name: unknown }).name === "NotAllowedError" &&
+      typeof (error as { name: unknown }).name === "string" &&
+      webAuthnErrorNames.has((error as { name: string }).name) &&
       "message" in error &&
       typeof (error as { message: unknown }).message === "string"
     ) {
-      return new DOMException((error as { message: string }).message, "NotAllowedError");
+      return new DOMException(
+        (error as { message: string }).message,
+        (error as { name: string }).name,
+      );
     }
     return error;
   }

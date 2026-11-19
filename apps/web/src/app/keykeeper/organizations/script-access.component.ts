@@ -37,8 +37,9 @@ type Made = { name: string; tokenString: string; firstItem: { id: string; name: 
 
 /**
  * Keykeeper: script access on an organization's Settings page, for its owners
- * and admins and its MSP's admins (the server answers no one else, and the
- * section stays hidden). Tokens are made here: the seed and token key never
+ * and admins, its MSP's admins, and its MSP's technicians with script access
+ * who are admins there (the server answers no one else, and the section
+ * stays hidden). Tokens are made here: the seed and token key never
  * leave this browser except in the token string shown once. Making one asks
  * the person to confirm it's them first. See docs/script-access.md in the
  * meta repo.

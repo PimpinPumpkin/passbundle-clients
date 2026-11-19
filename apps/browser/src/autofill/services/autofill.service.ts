@@ -56,6 +56,7 @@ import { openVaultItemPasswordRepromptPopout } from "../../vault/popup/utils/vau
 import { AutofillMessageCommand, AutofillMessageSender } from "../enums/autofill-message.enums";
 import { AutofillOutcome } from "../enums/autofill-outcome.enum";
 import { InlineMenuFillTypes, type InlineMenuFillType } from "../enums/autofill-overlay.enum";
+import { countryOption, countryText, stateOption } from "../keykeeper/address-names";
 import {
   cardFieldsByHint,
   hasOptionValue,
@@ -64,6 +65,7 @@ import {
   nameParts,
   yearOption,
 } from "../keykeeper/card-fields";
+import { cardMayFillFrame, isPaymentServiceFrame } from "../keykeeper/card-frames";
 import {
   applyFillRules,
   FillSource,
@@ -525,13 +527,38 @@ export default class AutofillService implements AutofillServiceInterface {
           return AutofillOutcome.Denied;
         }
 
+        // Keykeeper: a card fills only the page's own site, the frame the
+        // person started the fill from, and payment services' frames; any
+        // other frame is refused before a value leaves the extension
+        // (keykeeper/card-frames.ts).
+        const keykeeperCard = options.cipher.type === CipherType.Card;
+        if (
+          keykeeperCard &&
+          !cardMayFillFrame({
+            frameId: pd.frameId,
+            frameUrl: pd.details?.url,
+            tabUrl,
+            startedInFrameId: options.keykeeperStartFrameId,
+          })
+        ) {
+          return pd.details?.fields?.length ? AutofillOutcome.Denied : AutofillOutcome.Absent;
+        }
+        // Keykeeper: and a payment service's frame holds only the payment's
+        // fields, so the form the person is in, which belongs to another
+        // frame, doesn't narrow it.
+        const keykeeperPaymentFrame =
+          keykeeperCard &&
+          pd.frameId !== options.keykeeperStartFrameId &&
+          isPaymentServiceFrame(pd.details?.url);
+
         // If we have a focused form, filter the page details to only include fields from that form
-        const details = options.focusedFieldForm
-          ? {
-              ...pd.details,
-              fields: pd.details.fields.filter((f) => f.form === options.focusedFieldForm),
-            }
-          : pd.details;
+        const details =
+          options.focusedFieldForm && !keykeeperPaymentFrame
+            ? {
+                ...pd.details,
+                fields: pd.details.fields.filter((f) => f.form === options.focusedFieldForm),
+              }
+            : pd.details;
 
         const fillScript = await this.generateFillScript(details, {
           skipUsernameOnlyFill: options.skipUsernameOnlyFill || false,
@@ -2641,6 +2668,18 @@ export default class AutofillService implements AutofillServiceInterface {
       return;
     }
 
+    // Keykeeper: a list by its options' codes and names, whether the identity
+    // has a code or a name, and left alone when none is its state
+    // (keykeeper/address-names.ts).
+    if (field.selectInfo?.options != null) {
+      const option = stateOption(field.selectInfo.options, identity.state, identity.country);
+      if (option != null && field.opid != null) {
+        filledFields[field.opid] = field;
+        AutofillService.fillByOpid(fillScript, field, option);
+      }
+      return;
+    }
+
     if (identity.state.length <= 2) {
       this.makeScriptActionWithValue(fillScript, identity.state, field, filledFields);
       return;
@@ -2652,6 +2691,9 @@ export default class AutofillService implements AutofillServiceInterface {
       IdentityAutoFillConstants.IsoProvinces[stateLower];
     if (isoState) {
       this.makeScriptActionWithValue(fillScript, isoState, field, filledFields);
+    } else {
+      // Keykeeper: a state elsewhere, written as a name, as the identity has it.
+      this.makeScriptActionWithValue(fillScript, identity.state, field, filledFields);
     }
   }
 
@@ -2675,6 +2717,18 @@ export default class AutofillService implements AutofillServiceInterface {
       return;
     }
 
+    // Keykeeper: a list by its options' codes and names, whether the identity
+    // has a code or a name, and left alone when none is its country
+    // (keykeeper/address-names.ts).
+    if (field.selectInfo?.options != null) {
+      const option = countryOption(field.selectInfo.options, identity.country);
+      if (option != null && field.opid != null) {
+        filledFields[field.opid] = field;
+        AutofillService.fillByOpid(fillScript, field, option);
+      }
+      return;
+    }
+
     if (identity.country.length <= 2) {
       this.makeScriptActionWithValue(fillScript, identity.country, field, filledFields);
       return;
@@ -2684,6 +2738,15 @@ export default class AutofillService implements AutofillServiceInterface {
     const isoCountry = IdentityAutoFillConstants.IsoCountries[countryLower];
     if (isoCountry) {
       this.makeScriptActionWithValue(fillScript, isoCountry, field, filledFields);
+    } else {
+      // Keykeeper: a name upstream's table doesn't have ("Deutschland"): its
+      // code where ours knows it, as above, or the country as the identity has it.
+      this.makeScriptActionWithValue(
+        fillScript,
+        countryText(identity.country),
+        field,
+        filledFields,
+      );
     }
   }
 

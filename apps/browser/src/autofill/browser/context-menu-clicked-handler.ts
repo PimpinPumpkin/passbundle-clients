@@ -71,7 +71,13 @@ import { ParsedUrl, parseUrl } from "../webmapper/url";
 
 export type CopyToClipboardOptions = { text: string; tab: chrome.tabs.Tab };
 export type CopyToClipboardAction = (options: CopyToClipboardOptions) => void;
-export type AutofillAction = (tab: chrome.tabs.Tab, cipher: CipherView) => Promise<void>;
+// Keykeeper: and the frame the person opened the menu in, which a card may
+// fill (keykeeper/card-frames.ts).
+export type AutofillAction = (
+  tab: chrome.tabs.Tab,
+  cipher: CipherView,
+  frameId?: number,
+) => Promise<void>;
 
 export type GeneratePasswordToClipboardAction = (tab: chrome.tabs.Tab) => Promise<void>;
 
@@ -259,6 +265,9 @@ export class ContextMenuClickedHandler {
             // The action here is passed on to the single-use reprompt window and doesn't change based on cipher type
             action: AUTOFILL_ID,
           });
+        } else if (info.frameId != null) {
+          // Keykeeper: see AutofillAction.
+          await this.autofillAction(tab, cipher, info.frameId);
         } else {
           await this.autofillAction(tab, cipher);
         }

@@ -19,9 +19,9 @@ import { DEFAULT_ACCESS, NO_PERMISSIONS, PERMISSIONS } from "./technician-access
 /**
  * Keykeeper: what an MSP technician gets in the MSP's clients. Every client or
  * chosen ones, admin or a custom role inside them (with or without vault
- * items), a different role in some of those clients, and whether they see
- * install commands. Emits the access on every change, starting from the one
- * it was given; the parent saves it.
+ * items), a different role in some of those clients, whether they see
+ * install commands, and script access. Emits the access on every change,
+ * starting from the one it was given; the parent saves it.
  */
 @Component({
   selector: "app-keykeeper-technician-access",
@@ -144,6 +144,15 @@ import { DEFAULT_ACCESS, NO_PERMISSIONS, PERMISSIONS } from "./technician-access
           The RMM install command of each client they reach. Anyone who has one can ask to join.
         </bit-hint>
       </bit-form-control>
+
+      <bit-form-control>
+        <input type="checkbox" bitCheckbox formControlName="scriptAccess" />
+        <bit-label>Script access</bit-label>
+        <bit-hint>
+          Makes, sees, and revokes script tokens in the clients they reach where they're an admin. A
+          token they made stops working when they lose this, stop being an admin there, or leave.
+        </bit-hint>
+      </bit-form-control>
     </div>
   `,
 })
@@ -166,6 +175,7 @@ export class KeykeeperTechnicianAccessEditorComponent implements OnInit {
     permissions: this.formBuilder.nonNullable.group({ ...NO_PERMISSIONS }),
     vaultItems: [false],
     installCommands: [true],
+    scriptAccess: [false],
     clientRoles: this.formBuilder.nonNullable.array([this.clientRoleGroup()]),
   });
 
@@ -250,6 +260,7 @@ export class KeykeeperTechnicianAccessEditorComponent implements OnInit {
       permissions: access.custom?.permissions ?? NO_PERMISSIONS,
       vaultItems: access.custom?.vaultItems ?? false,
       installCommands: access.installCommands,
+      scriptAccess: access.scriptAccess ?? false,
     });
     this.pruneClientRoles();
     this.form.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
@@ -276,6 +287,7 @@ export class KeykeeperTechnicianAccessEditorComponent implements OnInit {
           ? { permissions: { ...NO_PERMISSIONS, ...v.permissions }, vaultItems: v.vaultItems }
           : null,
       installCommands: v.installCommands,
+      scriptAccess: v.scriptAccess,
       // Only clients they still reach, each once (the first row wins).
       clientRoles: v.clientRoles
         .filter((r) => reached.has(r.client) && !seen.has(r.client) && seen.add(r.client))

@@ -72,6 +72,11 @@ export type TechnicianAccess = {
   custom: TechnicianCustomRole | null;
   installCommands: boolean;
   /**
+   * Script access: they make, see, and revoke script tokens in each client
+   * they reach where they're an admin. Older servers leave it out (none).
+   */
+  scriptAccess?: boolean;
+  /**
    * Clients where their role differs from `custom`: a custom role there, or
    * null for admin. Each client once, and only clients they reach. Older
    * servers leave it out.
@@ -198,6 +203,8 @@ export type ClientMspStaff = {
   permissions?: string[];
   /** Whether they see every vault item in the organization. */
   vaultItems?: boolean;
+  /** Whether they make, see, and revoke the organization's script tokens. Older servers leave it out. */
+  scriptAccess?: boolean;
 };
 
 export type ClientMsp = {

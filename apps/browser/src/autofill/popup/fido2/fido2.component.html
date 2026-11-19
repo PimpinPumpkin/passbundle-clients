@@ -88,6 +88,10 @@
                 }
               </div>
             </div>
+            <!-- Keykeeper: a way to answer, so the site hears it's already saved (InvalidStateError) -->
+            <button bitButton block buttonType="primary" type="button" (click)="abort(false)">
+              {{ "close" | i18n }}
+            </button>
           </bit-section>
         }
         @case (BrowserFido2MessageTypes.PickCredentialRequest) {
