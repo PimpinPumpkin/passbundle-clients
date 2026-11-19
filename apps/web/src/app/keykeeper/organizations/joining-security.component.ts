@@ -24,7 +24,8 @@ import { KeykeeperScriptAccessComponent } from "./script-access.component";
  * there. Each card asks the server for its own part and stays hidden when the
  * server says "not found", so this page shows a person exactly what the
  * server lets them have: for an MSP's technician who is an admin in a client,
- * Joining and which IT provider manages the install command, not the rest.
+ * Joining and which IT provider manages the install command, and Script
+ * access when the MSP gave them that, not the rest.
  * See DESIGN.md, "A company's own IT".
  */
 @Component({

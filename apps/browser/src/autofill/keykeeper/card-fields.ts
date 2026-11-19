@@ -106,7 +106,8 @@ const HINT_PREFIXES = /^(section-.*|shipping|billing|home|work|mobile|fax|pager|
  * none, "on", "off", or anything the standard doesn't name.
  */
 export function autofillHint(field: Pick<AutofillField, "autoCompleteType">): string | null {
-  const tokens = (field.autoCompleteType ?? "").toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const value = typeof field.autoCompleteType === "string" ? field.autoCompleteType : "";
+  const tokens = value.toLowerCase().trim().split(/\s+/).filter(Boolean);
   const name = tokens.filter((t) => !HINT_PREFIXES.test(t)).pop();
   return name != null && AUTOFILL_FIELD_NAMES.has(name) ? name : null;
 }

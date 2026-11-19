@@ -243,6 +243,19 @@ describe("ContextMenuClickedHandler", () => {
       expect(autofill).toHaveBeenCalledWith({ id: 5 }, cipher);
     });
 
+    // Keykeeper: a card may fill the frame the person opened the menu in
+    // (keykeeper/card-frames.ts).
+    it("Keykeeper: tells the fill which frame the menu was opened in", async () => {
+      const cipher = createCipher();
+      cipherService.getAllDecrypted.mockResolvedValue([cipher]);
+
+      await sut.run({ ...createData(`${AUTOFILL_ID}_1`, AUTOFILL_ID), frameId: 3 }, {
+        id: 5,
+      } as any);
+
+      expect(autofill).toHaveBeenCalledWith({ id: 5 }, cipher, 3);
+    });
+
     it("copies username to clipboard", async () => {
       cipherService.getAllDecrypted.mockResolvedValue([
         createCipher({ username: "TEST_USERNAME" }),

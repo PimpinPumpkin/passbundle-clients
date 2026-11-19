@@ -1752,14 +1752,19 @@ export default class MainBackground {
         // Keykeeper: the page's site, for its password rules.
         await firstValueFrom(this.generatePasswordToClipboard(tab), { defaultValue: undefined });
       },
-      async (tab, cipher) => {
+      async (tab, cipher, frameId) => {
         if (tab == null) {
           return;
         }
 
         // The user chose this cipher from the context menu, so a fill that placed nothing is
         // mitigated by copying its code. See `autofill.design.md`, "Outcomes".
-        const result = await this.autofillOrchestrator.autofillTabWithCipher(tab, cipher);
+        // Keykeeper: a card may fill the frame the menu was opened in (keykeeper/card-frames.ts).
+        const result = await this.autofillOrchestrator.autofillTabWithCipher(
+          tab,
+          cipher,
+          frameId != null ? { keykeeperStartFrameId: frameId } : undefined,
+        );
         if (shouldAutoCopyTotp(result)) {
           this.platformUtilsService.copyToClipboard(result.totp);
         }

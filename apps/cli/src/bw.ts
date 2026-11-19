@@ -4,6 +4,7 @@ import { program } from "commander";
 
 import { CLI_BRAND } from "./keykeeper/brand";
 import { applyBrandEnvironment } from "./keykeeper/env";
+import { isScriptCommand, registerScriptProgram } from "./keykeeper/script-program";
 import { OssServeConfigurator } from "./oss-serve-configurator";
 import { registerOssPrograms } from "./register-oss-programs";
 import { ServeProgram } from "./serve.program";
@@ -14,6 +15,15 @@ async function main() {
   // (keykeeper/env.ts), before anything reads either.
   applyBrandEnvironment();
   program.name(CLI_BRAND.command);
+
+  // Keykeeper: `script get` needs only a script token: no account, session,
+  // or data folder, which the service container would make, so it runs
+  // without one (keykeeper/script-program.ts).
+  if (isScriptCommand(process.argv)) {
+    registerScriptProgram(program);
+    await program.parseAsync(process.argv);
+    return;
+  }
 
   const serviceContainer = new ServiceContainer();
   let disposed = false;

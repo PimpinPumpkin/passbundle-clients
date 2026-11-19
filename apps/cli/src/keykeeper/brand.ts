@@ -14,6 +14,11 @@ export type CliBrand = {
   version: string;
   /** Where to get the newest version; empty to check upstream's releases. */
   releases: string;
+  /**
+   * The server `script get` asks unless told another (the product's own
+   * service); empty to need one named, as an unbranded build does.
+   */
+  server: string;
 };
 
 export const CLI_BRAND: CliBrand = {
@@ -22,4 +27,5 @@ export const CLI_BRAND: CliBrand = {
   envPrefix: "BW_",
   version: "",
   releases: "",
+  server: "",
 };
