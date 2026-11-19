@@ -51,6 +51,7 @@ import { OrganizationResponse } from "../admin-console/models/response/organizat
 import { SelectionReadOnly } from "../admin-console/models/selection-read-only";
 import { HIDDEN_SECRETS_MESSAGE } from "../keykeeper/hidden-items";
 import { itemHistory } from "../keykeeper/item-history";
+import { reprompt } from "../keykeeper/reprompt";
 import { findTemplate, itemFromTemplate, templatesFor } from "../keykeeper/templates";
 import { Response } from "../models/response";
 import { ListResponse } from "../models/response/list.response";
@@ -93,7 +94,9 @@ export class GetCommand extends DownloadCommand {
     const normalizedOptions = new Options(cmdOptions);
     switch (object.toLowerCase()) {
       case "item":
-        return await this.getCipher(id);
+        // Keykeeper: all of it, so an item that asks for the master password
+        // again asks first (keykeeper/reprompt.ts).
+        return await this.getCipher(id, undefined, false, true);
       case "username":
         return await this.getUsername(id);
       case "password":
@@ -155,9 +158,16 @@ export class GetCommand extends DownloadCommand {
    * Keykeeper: `secret` is for a command that prints one of the item's
    * secrets (its password or one-time code), which is refused for an item
    * whose secrets the person can't see (keykeeper/hidden-items.ts), rather
-   * than answered as if the item had none.
+   * than answered as if the item had none. `reveal` is for one that shows
+   * them, or the item's notes or attachments: an item that asks for the
+   * master password again asks first (keykeeper/reprompt.ts).
    */
-  private async getCipher(id: string, filter?: (c: CipherView) => boolean, secret = false) {
+  private async getCipher(
+    id: string,
+    filter?: (c: CipherView) => boolean,
+    secret = false,
+    reveal = secret,
+  ) {
     const activeUserId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
 
     let decCipher = await this.getCipherView(id, activeUserId);
@@ -201,6 +211,12 @@ export class GetCommand extends DownloadCommand {
 
     if (secret && !maySeeSecrets(decCipher)) {
       return Response.error(HIDDEN_SECRETS_MESSAGE);
+    }
+    if (reveal) {
+      const refused = await reprompt([decCipher]);
+      if (refused != null) {
+        return Response.error(refused);
+      }
     }
 
     await this.eventCollectionService.collect(
@@ -335,7 +351,12 @@ export class GetCommand extends DownloadCommand {
   }
 
   private async getNotes(id: string) {
-    const cipherResponse = await this.getCipher(id, (c) => !Utils.isNullOrWhitespace(c.notes));
+    const cipherResponse = await this.getCipher(
+      id,
+      (c) => !Utils.isNullOrWhitespace(c.notes),
+      false,
+      true,
+    );
     if (!cipherResponse.success) {
       return cipherResponse;
     }
@@ -368,7 +389,7 @@ export class GetCommand extends DownloadCommand {
     }
 
     const itemId = options.itemId.toLowerCase();
-    const cipherResponse = await this.getCipher(itemId);
+    const cipherResponse = await this.getCipher(itemId, undefined, false, true);
     if (!cipherResponse.success) {
       return cipherResponse;
     }

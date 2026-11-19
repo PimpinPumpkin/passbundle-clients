@@ -1,5 +1,6 @@
 // FIXME: Update this file to be type safe and remove this and next line
 // @ts-strict-ignore
+import { randomInt } from "crypto";
 import * as http from "http";
 
 import { OptionValues } from "commander";
@@ -8,6 +9,8 @@ import Separator from "inquirer/lib/objects/separator";
 import { filter, firstValueFrom } from "rxjs";
 
 import {
+  AuthRequestLoginCredentials,
+  AuthRequestServiceAbstraction,
   LoginStrategyServiceAbstraction,
   PasswordLoginCredentials,
   SsoLoginCredentials,
@@ -18,6 +21,7 @@ import {
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { AuthService } from "@bitwarden/common/auth/abstractions/auth.service";
+import { AuthRequestType } from "@bitwarden/common/auth/enums/auth-request-type";
 import { AuthenticationStatus } from "@bitwarden/common/auth/enums/authentication-status";
 import {
   isTwoFactorProviderType,
@@ -29,7 +33,9 @@ import {
 } from "@bitwarden/common/auth/keykeeper/new-device-check";
 import { AuthResult } from "@bitwarden/common/auth/models/domain/auth-result";
 import { ForceSetPasswordReason } from "@bitwarden/common/auth/models/domain/force-set-password-reason";
+import { AuthRequest } from "@bitwarden/common/auth/models/request/auth.request";
 import { TokenTwoFactorRequest } from "@bitwarden/common/auth/models/request/identity-token/token-two-factor.request";
+import { AuthRequestResponse } from "@bitwarden/common/auth/models/response/auth-request.response";
 import { TwoFactorService, TwoFactorApiService } from "@bitwarden/common/auth/two-factor";
 import { TwoFactorEmailLoginRequest } from "@bitwarden/common/auth/two-factor/request/two-factor-email-login.request";
 import { ClientType } from "@bitwarden/common/enums";
@@ -37,6 +43,7 @@ import { EncryptedMigrator } from "@bitwarden/common/key-management/encrypted-mi
 import { KeyConnectorService } from "@bitwarden/common/key-management/key-connector/abstractions/key-connector.service";
 import { MasterPasswordServiceAbstraction } from "@bitwarden/common/key-management/master-password/abstractions/master-password.service.abstraction";
 import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
+import { AppIdService } from "@bitwarden/common/platform/abstractions/app-id.service";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
@@ -51,6 +58,16 @@ import { NodeUtils } from "@bitwarden/node/node-utils";
 import { PureCrypto } from "@bitwarden/sdk-internal";
 
 import { ConfirmKeyConnectorDomainCommand } from "../../key-management/confirm-key-connector-domain.command";
+import {
+  deviceSsoRequired,
+  forget,
+  phraseLines,
+  serverMessage,
+  stoppableSleep,
+  TooManyRequests,
+  UNKNOWN_DEVICE,
+  waitForApproval,
+} from "../../keykeeper/device-sign-in";
 import { keykeeperWaitForNewDevice } from "../../keykeeper/new-device";
 import { ssoPromptMessage, ssoRequiredRefusal } from "../../keykeeper/sign-in";
 import { Response } from "../../models/response";
@@ -85,6 +102,9 @@ export class LoginCommand {
     protected encryptedMigrator: EncryptedMigrator,
     // Keykeeper: the new-device check's calls (keykeeper/new-device.ts).
     protected apiService?: ApiService,
+    // Keykeeper: signing in with a device's approval (keykeeper/device-sign-in.ts).
+    protected authRequestService?: AuthRequestServiceAbstraction,
+    protected appIdService?: AppIdService,
   ) {}
 
   async run(email: string, password: string, options: OptionValues) {
@@ -128,6 +148,23 @@ export class LoginCommand {
       } catch {
         return Response.badRequest("Something went wrong. Try again.");
       }
+    } else if (options.device != null) {
+      // Keykeeper: signing in with a device's approval needs only the email
+      // (keykeeper/device-sign-in.ts).
+      if ((email == null || email === "") && this.canInteract) {
+        const answer: inquirer.Answers = await inquirer.createPromptModule({
+          output: process.stderr,
+        })({
+          type: "input",
+          name: "email",
+          message: "Email address:",
+        });
+        email = answer.email;
+      }
+      if (email == null || email.trim() === "" || email.indexOf("@") === -1) {
+        return Response.badRequest("Email address is required, and must be valid.");
+      }
+      this.email = email = email.trim();
     } else {
       if ((email == null || email === "") && this.canInteract) {
         const answer: inquirer.Answers = await inquirer.createPromptModule({
@@ -195,6 +232,7 @@ export class LoginCommand {
       await this.validatedParams();
 
       let response: AuthResult = null;
+      let deviceSignIn: AuthRequestLoginCredentials | null = null;
       if (clientId != null && clientSecret != null) {
         if (!clientId.startsWith("user")) {
           return Response.error("Invalid API Key; Organization API Key currently not supported");
@@ -227,6 +265,23 @@ export class LoginCommand {
             twoFactor,
           ),
         );
+      } else if (options.device != null) {
+        // Keykeeper: ask, print the phrase, wait for another device's
+        // approval, and sign in with it (keykeeper/device-sign-in.ts).
+        const asked = await this.keykeeperAskDevice(email);
+        if ("error" in asked) {
+          return Response.error(asked.error);
+        }
+        deviceSignIn = asked.credentials;
+        response = await this.loginStrategyService.logIn(
+          new AuthRequestLoginCredentials(
+            email,
+            asked.credentials.accessCode,
+            asked.credentials.authRequestId,
+            asked.credentials.decryptedUserKey,
+            twoFactor,
+          ),
+        );
       } else {
         response = await this.loginStrategyService.logIn(
           new PasswordLoginCredentials(email, password, twoFactor),
@@ -242,6 +297,11 @@ export class LoginCommand {
       // Keykeeper: an organization requires single sign-on (DESIGN.md, "Require
       // single sign-on"), and this account isn't linked to it yet, which only
       // the web vault does; or the tool can't open a browser for it.
+      // A device's approval proves no password, and doesn't stand in for
+      // single sign-on: the tool says how to sign in, and opens nothing.
+      if (response.requiresSso && deviceSignIn != null) {
+        return Response.error(deviceSsoRequired(response.ssoOrganizationIdentifier));
+      }
       if (response.requiresSso) {
         const refused = ssoRequiredRefusal(response, this.canInteract);
         if (refused != null) {
@@ -329,6 +389,13 @@ export class LoginCommand {
             emailReq.ssoEmail2FaSessionToken = response.ssoEmail2FaSessionToken;
           }
           emailReq.masterPasswordHash = await this.loginStrategyService.getMasterPasswordHash();
+          // Keykeeper: a device's approval has no password; its request and
+          // access code stand in, as in the web vault.
+          if (deviceSignIn != null) {
+            emailReq.deviceIdentifier = await this.appIdService.getAppId();
+            emailReq.authRequestId = deviceSignIn.authRequestId;
+            emailReq.authRequestAccessCode = deviceSignIn.accessCode;
+          }
           await this.twoFactorApiService.postTwoFactorEmail(emailReq);
         }
 
@@ -496,6 +563,109 @@ export class LoginCommand {
       }
 
       return Response.error(e);
+    }
+  }
+
+  /**
+   * Keykeeper: the asking side of signing in with a device's approval
+   * (keykeeper/device-sign-in.ts): a key pair and an access code, the
+   * request, the phrase first, then the wait. Approved, the user key opened
+   * with the private key, which is then overwritten.
+   */
+  private async keykeeperAskDevice(
+    email: string,
+  ): Promise<{ credentials: AuthRequestLoginCredentials } | { error: string }> {
+    const [publicKey, privateKey] = await this.cryptoFunctionService.rsaGenerateKeyPair(2048);
+    const fingerprint = await this.authRequestService.getFingerprintPhrase(email, publicKey);
+    // 25 letters and digits, as the web vault's: it goes into the answer's
+    // address unencoded.
+    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    const accessCode = Array.from({ length: 25 }, () => letters[randomInt(letters.length)]).join(
+      "",
+    );
+    const deviceIdentifier = await this.appIdService.getAppId();
+    const request = new AuthRequest(
+      email,
+      deviceIdentifier,
+      Utils.fromBufferToB64(publicKey),
+      AuthRequestType.AuthenticateAndUnlock,
+      accessCode,
+    );
+    let id: string;
+    try {
+      // As upstream's AuthRequestApiService sends it, without its error log.
+      const sent = await this.apiService.send(
+        "POST",
+        "/auth-requests/",
+        request,
+        false,
+        true,
+        null,
+        (headers) => headers.set("Device-Identifier", deviceIdentifier),
+      );
+      id = new AuthRequestResponse(sent).id;
+    } catch (e) {
+      forget(privateKey);
+      if (e instanceof ErrorResponse) {
+        const said = serverMessage(e);
+        return { error: said === "AuthRequest doesn't exist" ? UNKNOWN_DEVICE : said };
+      }
+      throw e;
+    }
+
+    for (const line of phraseLines(fingerprint)) {
+      CliUtils.writeLn(line, false, true);
+    }
+    // Ctrl-C ends the wait, and the private key is overwritten.
+    const stop = new AbortController();
+    const interrupted = () => stop.abort();
+    process.on("SIGINT", interrupted);
+    let waited: { key: string } | { error: string };
+    try {
+      waited = await waitForApproval(Date.now(), privateKey, {
+        answer: async () => {
+          try {
+            const answer = await this.apiService.send(
+              "GET",
+              `/auth-requests/${id}/response?code=${accessCode}`,
+              null,
+              false,
+              true,
+            );
+            return new AuthRequestResponse(answer);
+          } catch (e) {
+            if (e instanceof ErrorResponse && e.statusCode === 429) {
+              throw new TooManyRequests();
+            }
+            if (e instanceof ErrorResponse && e.statusCode >= 400 && e.statusCode < 500) {
+              return null;
+            }
+            throw e;
+          }
+        },
+        write: (line) => CliUtils.writeLn(line, false, true),
+        sleep: stoppableSleep(stop.signal),
+        now: () => Date.now(),
+        stopped: stop.signal,
+      });
+    } finally {
+      process.removeListener("SIGINT", interrupted);
+    }
+    if ("error" in waited) {
+      return waited;
+    }
+    try {
+      const userKey = await this.authRequestService.decryptPubKeyEncryptedUserKey(
+        waited.key,
+        privateKey,
+      );
+      return { credentials: new AuthRequestLoginCredentials(email, accessCode, id, userKey) };
+    } catch {
+      return {
+        error: "The approval's key didn't open with this request's key. Nothing was signed in.",
+      };
+    } finally {
+      forget(privateKey);
     }
   }
 
