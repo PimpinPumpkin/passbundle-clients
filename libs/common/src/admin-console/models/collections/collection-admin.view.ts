@@ -3,6 +3,7 @@ import { DECRYPT_ERROR, EncryptService, EncString } from "@bitwarden/legacy-cryp
 
 import { OrgKey } from "../../../types/key";
 import { decryptFolderLook } from "../../../vault/keykeeper/folder-looks";
+import { gridOf } from "../../keykeeper/folder-permissions";
 import { Organization } from "../domain/organization";
 
 import { CollectionAccessDetailsResponse, CollectionResponse } from "./collection.response";
@@ -41,6 +42,8 @@ export class CollectionAdminView extends CollectionView {
     return (
       org?.canEditAnyCollection ||
       (this.unmanaged && org?.canEditUnmanagedCollections) ||
+      // Keykeeper: a custom role that manages shared folders, in one it reaches.
+      (!!org?.keykeeperManagesCollections && this.assigned) ||
       super.canEdit(org)
     );
   }
@@ -53,7 +56,13 @@ export class CollectionAdminView extends CollectionView {
       return false;
     }
 
-    return org?.canDeleteAnyCollection || super.canDelete(org);
+    return (
+      org?.canDeleteAnyCollection ||
+      // Keykeeper: a custom role that manages shared folders, in one it reaches
+      // and can delete items in (the server's rule).
+      (!!org?.keykeeperManagesCollections && this.assigned && gridOf(this).delete) ||
+      super.canDelete(org)
+    );
   }
 
   /**
@@ -92,8 +101,10 @@ export class CollectionAdminView extends CollectionView {
     }
     const isAdmin = org?.isAdmin ?? false;
     const permissions = org?.permissions.editAnyCollection ?? false;
+    // Keykeeper: a custom role that manages shared folders, in one it reaches.
+    const keykeeper = (org?.keykeeperManagesCollections ?? false) && this.assigned;
 
-    return this.manage || isAdmin || permissions;
+    return this.manage || isAdmin || permissions || keykeeper;
   }
 
   /**

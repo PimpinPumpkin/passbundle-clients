@@ -63,6 +63,12 @@ import { Vfo1I18nPipe, Vfo1TerminologyService } from "@bitwarden/vault";
 import { BillingConstraintService } from "@bitwarden/web-vault/app/billing/members/billing-constraint/billing-constraint.service";
 import { KeykeeperOffboardingService } from "@bitwarden/web-vault/app/keykeeper/access/offboarding.service";
 import {
+  customRoleForm,
+  customRolePermissions,
+  customRoleValue,
+} from "@bitwarden/web-vault/app/keykeeper/organizations/custom-role";
+import { KeykeeperCustomRolePermissionsComponent } from "@bitwarden/web-vault/app/keykeeper/organizations/custom-role-permissions.component";
+import {
   KeykeeperFromEntraBadgeComponent,
   KeykeeperFromEntraNoteComponent,
 } from "@bitwarden/web-vault/app/keykeeper/organizations/from-entra.component";
@@ -94,7 +100,6 @@ import {
   MemberDialogResult,
   MemberDialogTab,
 } from "../member-dialog/member-dialog.types";
-import { NestedCheckboxComponent } from "../member-dialog/nested-checkbox.component";
 
 @Component({
   standalone: true,
@@ -122,9 +127,9 @@ import { NestedCheckboxComponent } from "../member-dialog/nested-checkbox.compon
     SelectModule,
     TabsModule,
     AccessSelectorModule,
-    NestedCheckboxComponent,
     Vfo1I18nPipe,
     // Keykeeper
+    KeykeeperCustomRolePermissionsComponent,
     KeykeeperFromEntraBadgeComponent,
     KeykeeperFromEntraNoteComponent,
   ],
@@ -205,22 +210,11 @@ export class EditMemberDialogComponent {
     },
   };
 
-  protected readonly permissionsGroup = this.formBuilder.group({
-    manageAllCollectionsGroup: this.formBuilder.group<Record<string, boolean>>({
-      manageAllCollections: false,
-      createNewCollections: false,
-      editAnyCollection: false,
-      deleteAnyCollection: false,
-    }),
-    accessEventLogs: false,
-    accessImportExport: false,
-    accessReports: false,
-    manageGroups: false,
-    manageSso: false,
-    managePolicies: false,
-    manageUsers: false,
-    manageResetPassword: false,
-  });
+  /**
+   * Keykeeper: the custom role's permissions, every one our server enforces,
+   * offered together (custom-role.ts).
+   */
+  protected readonly permissionsGroup = customRoleForm(this.formBuilder);
 
   private readonly formTypeValue = toSignal(this.formGroup.controls.type.valueChanges, {
     initialValue: this.formGroup.controls.type.value,
@@ -235,22 +229,6 @@ export class EditMemberDialogComponent {
     this.formGroup.controls.ssoExternalId.valueChanges.pipe(map((v) => v || undefined)),
     { initialValue: this.formGroup.controls.ssoExternalId.value || undefined },
   );
-
-  /**
-   * Keykeeper: whether a permission our server enforces for custom roles is
-   * checked. Those roles can't also manage all collections yet (the server
-   * refuses it), so the dialog doesn't offer both.
-   */
-  protected get keykeeperPermissionChecked(): boolean {
-    const p = this.permissionsGroup.value;
-    return !!(
-      p.manageUsers ||
-      p.manageResetPassword ||
-      p.managePolicies ||
-      p.accessEventLogs ||
-      p.accessImportExport
-    );
-  }
 
   protected readonly customUserTypeSelected = computed(
     () => this.formTypeValue() === OrganizationUserType.Custom,
@@ -395,27 +373,10 @@ export class EditMemberDialogComponent {
         userDetails.status,
       ) && userDetails.hasMasterPassword === false,
     );
-    const allCollectionsPermissions = {
-      createNewCollections: userDetails.permissions.createNewCollections,
-      editAnyCollection: userDetails.permissions.editAnyCollection,
-      deleteAnyCollection: userDetails.permissions.deleteAnyCollection,
-      manageAllCollections:
-        userDetails.permissions.createNewCollections &&
-        userDetails.permissions.editAnyCollection &&
-        userDetails.permissions.deleteAnyCollection,
-    };
+    // Keykeeper: our permissions, and upstream's "Manage all collections" as
+    // what's closest to it (custom-role.ts).
     if (userDetails.type === OrganizationUserType.Custom) {
-      this.permissionsGroup.patchValue({
-        accessEventLogs: userDetails.permissions.accessEventLogs,
-        accessImportExport: userDetails.permissions.accessImportExport,
-        accessReports: userDetails.permissions.accessReports,
-        manageGroups: userDetails.permissions.manageGroups,
-        manageSso: userDetails.permissions.manageSso,
-        managePolicies: userDetails.permissions.managePolicies,
-        manageUsers: userDetails.permissions.manageUsers,
-        manageResetPassword: userDetails.permissions.manageResetPassword,
-        manageAllCollectionsGroup: allCollectionsPermissions,
-      });
+      this.permissionsGroup.patchValue(customRoleValue(userDetails.permissions));
     }
 
     const collectionsFromGroups = groups
@@ -470,25 +431,9 @@ export class EditMemberDialogComponent {
     if (clearPermissions) {
       return new PermissionsApi();
     }
-    // Keykeeper: never ask for both (see keykeeperPermissionChecked).
-    const collections = this.keykeeperPermissionChecked
-      ? { createNewCollections: false, editAnyCollection: false, deleteAnyCollection: false }
-      : this.permissionsGroup.value.manageAllCollectionsGroup;
-    const partialPermissions: Partial<PermissionsApi> = {
-      accessEventLogs: this.permissionsGroup.value.accessEventLogs ?? undefined,
-      accessImportExport: this.permissionsGroup.value.accessImportExport ?? undefined,
-      accessReports: this.permissionsGroup.value.accessReports ?? undefined,
-      manageGroups: this.permissionsGroup.value.manageGroups ?? undefined,
-      manageSso: this.permissionsGroup.value.manageSso ?? undefined,
-      managePolicies: this.permissionsGroup.value.managePolicies ?? undefined,
-      manageUsers: this.permissionsGroup.value.manageUsers ?? undefined,
-      manageResetPassword: this.permissionsGroup.value.manageResetPassword ?? undefined,
-      createNewCollections: collections?.createNewCollections ?? undefined,
-      editAnyCollection: collections?.editAnyCollection ?? undefined,
-      deleteAnyCollection: collections?.deleteAnyCollection ?? undefined,
-    };
-
-    return Object.assign(p, partialPermissions);
+    // Keykeeper: our permissions as checked, never upstream's "Manage all
+    // collections" (custom-role.ts).
+    return Object.assign(p, customRolePermissions(this.permissionsGroup.getRawValue()));
   }
 
   private async handleEditUser(organization: Organization) {

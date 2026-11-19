@@ -339,10 +339,28 @@
     "message": "Can reset the master password of members in account recovery, and so sign in as them and see everything they can."
   },
   "keykeeperImportExportHint": {
-    "message": "Covers import. Exporting the organization's items takes access to all of them, which owners and admins have and custom roles don't, so an owner or admin exports."
+    "message": "Covers import. Exporting the organization's items also takes access to all items, since the export holds every one of them."
   },
-  "keykeeperCustomRoleNoCollections": {
-    "message": "A custom role with these permissions gets its shared folders one by one: choose them on the Shared folders tab. To reach every shared folder, make them an admin instead."
+  "keykeeperManageGroupsHint": {
+    "message": "Can make groups, change them, and choose who's in them, using only shared folders they reach, with no more access than their own."
+  },
+  "keykeeperManageSharedFoldersHint": {
+    "message": "Can make shared folders, and rename, delete, and choose who reaches the ones they reach, giving no more access than their own."
+  },
+  "keykeeperManageSharedFolders": {
+    "message": "Manage shared folders"
+  },
+  "keykeeperAccessReportsHint": {
+    "message": "The organization's reports, over the items they reach, or every item with access to all items."
+  },
+  "keykeeperAccessAllItems": {
+    "message": "Access to all items"
+  },
+  "keykeeperAccessAllItemsHint": {
+    "message": "Can see and use every item in the organization, in every shared folder, without managing them."
+  },
+  "keykeeperCantDoThatHere": {
+    "message": "You can't do that here."
   },
   "keykeeperBiometricsNotEnrolled": {
     "message": "Unlock with biometrics is still off. It wasn't confirmed, or the desktop app isn't running."
@@ -1046,7 +1064,7 @@
     "message": "Two-step login for admins"
   },
   "keykeeperAdminTwoStepPolicyDesc": {
-    "message": "Owners, admins, and custom roles that manage members, policies, or account recovery must use an authenticator app, a security key or passkey, or Duo. Email codes don't count. Admins who sign in with the organization's own single sign-on are covered by it there."
+    "message": "Owners, admins, and custom roles that manage members, groups, shared folders, policies, or account recovery must use an authenticator app, a security key or passkey, or Duo. Email codes don't count. Admins who sign in with the organization's own single sign-on are covered by it there."
   },
   "keykeeperMemberHealthPolicy": {
     "message": "Members' own passwords"

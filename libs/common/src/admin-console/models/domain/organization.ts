@@ -325,6 +325,19 @@ export class Organization {
     );
   }
 
+  /**
+   * Keykeeper: a custom role that makes shared folders, and renames, deletes,
+   * and sets who reaches the ones it reaches (DESIGN.md, "Roles and
+   * permissions"). Unlike upstream's "edit any collection", it never reaches
+   * the rest, so it opens the Collections page without loading every item.
+   */
+  get keykeeperManagesCollections() {
+    return (
+      this.type === OrganizationUserType.Custom &&
+      this.permissions?.keykeeperManageCollections === true
+    );
+  }
+
   get canManageGroups() {
     return (this.isAdmin || this.permissions.manageGroups) && this.useGroups;
   }

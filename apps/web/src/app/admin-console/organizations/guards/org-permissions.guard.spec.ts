@@ -8,8 +8,13 @@ import {
 import { mock, MockProxy } from "jest-mock-extended";
 import { of } from "rxjs";
 
-import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
+import {
+  canAccessGroupsTab,
+  canAccessVaultTab,
+  OrganizationService,
+} from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { OrganizationUserType } from "@bitwarden/common/admin-console/enums";
+import { PermissionsApi } from "@bitwarden/common/admin-console/models/api/permissions.api";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
@@ -43,6 +48,7 @@ const orgStateFactory = (targetOrgProps: Partial<Organization> = {}) => [
 ];
 
 describe("Organization Permissions Guard", () => {
+  let toastService: MockProxy<ToastService>;
   let router: MockProxy<Router>;
   let organizationService: MockProxy<OrganizationService>;
   let state: MockProxy<RouterStateSnapshot>;
@@ -52,6 +58,7 @@ describe("Organization Permissions Guard", () => {
 
   beforeEach(() => {
     router = mock<Router>();
+    toastService = mock<ToastService>();
     organizationService = mock<OrganizationService>();
     accountService = mockAccountServiceWith(userId);
     state = mock<RouterStateSnapshot>();
@@ -66,8 +73,8 @@ describe("Organization Permissions Guard", () => {
         { provide: Router, useValue: router },
         { provide: AccountService, useValue: accountService },
         { provide: OrganizationService, useValue: organizationService },
-        { provide: ToastService, useValue: mock<ToastService>() },
-        { provide: I18nService, useValue: mock<I18nService>() },
+        { provide: ToastService, useValue: toastService },
+        { provide: I18nService, useValue: { t: (key: string) => key } },
         { provide: SyncService, useValue: mock<SyncService>() },
       ],
     });
@@ -198,6 +205,62 @@ describe("Organization Permissions Guard", () => {
 
       const actual = await TestBed.runInInjectionContext(
         async () => await organizationPermissionsGuard()(route, state),
+      );
+
+      expect(actual).toBe(true);
+    });
+  });
+
+  // Keykeeper: a custom role opening a page its permissions don't cover, by
+  // its address: turned away with the server's words, to a page it has,
+  // never signed out (DESIGN.md, "Roles and permissions", B30).
+  describe("a custom role on a page its role doesn't open", () => {
+    const custom = (permissions: Record<string, boolean>) =>
+      orgStateFactory({
+        type: OrganizationUserType.Custom,
+        permissions: Object.assign(new PermissionsApi(), permissions),
+      });
+
+    it("says it can't do that here and goes to the admin console it has", async () => {
+      organizationService.organizations$
+        .calledWith(userId)
+        .mockReturnValue(of(custom({ manageUsers: true })));
+      state = mock<RouterStateSnapshot>({
+        root: mock<ActivatedRouteSnapshot>({ queryParamMap: convertToParamMap({}) }),
+      });
+
+      const actual = await TestBed.runInInjectionContext(
+        async () => await organizationPermissionsGuard(canAccessVaultTab)(route, state),
+      );
+
+      expect(actual).not.toBe(true);
+      expect(toastService.showToast).toHaveBeenCalledWith({
+        variant: "error",
+        message: "keykeeperCantDoThatHere",
+      });
+      expect(router.createUrlTree).toHaveBeenCalledWith(["/organizations", targetOrgId]);
+    });
+
+    it("opens the Collections page for one that manages shared folders", async () => {
+      organizationService.organizations$
+        .calledWith(userId)
+        .mockReturnValue(of(custom({ keykeeperManageCollections: true })));
+
+      const actual = await TestBed.runInInjectionContext(
+        async () => await organizationPermissionsGuard(canAccessVaultTab)(route, state),
+      );
+
+      expect(actual).toBe(true);
+      expect(toastService.showToast).not.toHaveBeenCalled();
+    });
+
+    it("opens the Groups page for one that manages groups", async () => {
+      const orgs = custom({ manageGroups: true });
+      orgs.forEach((org) => (org.useGroups = true));
+      organizationService.organizations$.calledWith(userId).mockReturnValue(of(orgs));
+
+      const actual = await TestBed.runInInjectionContext(
+        async () => await organizationPermissionsGuard(canAccessGroupsTab)(route, state),
       );
 
       expect(actual).toBe(true);
