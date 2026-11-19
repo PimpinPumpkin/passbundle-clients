@@ -449,7 +449,27 @@ describe("Fido2Background", () => {
       sendMockExtensionMessage(message, sender, sendResponse);
       await flushPromises();
 
-      expect(sendResponse).toHaveBeenCalledWith({ error: { message: "error" } });
+      expect(sendResponse).toHaveBeenCalledWith({ error: { name: "Error", message: "error" } });
+    });
+
+    // Keykeeper: a DOMException's name is on its prototype, which a spread doesn't copy.
+    it("keeps a DOMException's name in the response for rejected promises", async () => {
+      const message = mock<Fido2ExtensionMessage>({ command: "fido2RegisterCredentialRequest" });
+      const sender = mock<chrome.runtime.MessageSender>();
+      const sendResponse = jest.fn();
+      fido2ClientService.createCredential.mockRejectedValue(
+        new DOMException("A passkey the site named is already saved.", "InvalidStateError"),
+      );
+
+      sendMockExtensionMessage(message, sender, sendResponse);
+      await flushPromises();
+
+      expect(sendResponse).toHaveBeenCalledWith({
+        error: expect.objectContaining({
+          name: "InvalidStateError",
+          message: "A passkey the site named is already saved.",
+        }),
+      });
     });
 
     describe("fido2AbortRequest message", () => {
