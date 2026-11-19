@@ -388,6 +388,7 @@ const BRAND: CliBrand = {
   releases: "https://github.com/PimpinPumpkin/Passbundle/releases?q=cli-v&expanded=true",
   releaseRepository: REPO,
   releaseKeys: [KEY],
+  server: "",
 };
 
 describe("passbundle update", () => {

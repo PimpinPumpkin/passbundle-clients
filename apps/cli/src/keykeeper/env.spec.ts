@@ -1,5 +1,6 @@
 // Keykeeper: see env.ts.
-import { applyBrandEnvironment } from "./env";
+import { applyBrandEnvironment, SCRIPT_VARIABLES } from "./env";
+import { scriptTokenVariable } from "./script-access";
 
 describe("applyBrandEnvironment", () => {
   it("copies the brand's variables to the names upstream's code reads", () => {
@@ -44,6 +45,27 @@ describe("applyBrandEnvironment", () => {
     };
     applyBrandEnvironment(env, "PASSBUNDLE_");
     expect(env).toEqual({ BW_PASSWORD: "a script's own name, for --passwordenv" });
+  });
+
+  it("leaves a script token's variable as it is, copied to no name upstream's code reads", () => {
+    const brand = {
+      name: "PassBundle",
+      command: "passbundle",
+      envPrefix: "PASSBUNDLE_",
+      version: "",
+      releases: "",
+      releaseRepository: "",
+      releaseKeys: [] as string[],
+      server: "",
+    };
+    // `script get` reads PASSBUNDLE_TOKEN, the PowerShell module's name.
+    const variable = scriptTokenVariable(brand);
+    expect(variable).toBe("PASSBUNDLE_TOKEN");
+    expect(SCRIPT_VARIABLES).not.toContain("TOKEN");
+    const env: NodeJS.ProcessEnv = { [variable]: "pbs1_token", PATH: "/usr/bin" };
+    applyBrandEnvironment(env, "PASSBUNDLE_");
+    // Nothing new: no BW_TOKEN, nor any other name, for upstream's code to pick up.
+    expect(env).toEqual({ PASSBUNDLE_TOKEN: "pbs1_token", PATH: "/usr/bin" });
   });
 
   it("takes the brand's value over upstream's", () => {

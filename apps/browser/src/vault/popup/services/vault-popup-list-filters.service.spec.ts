@@ -639,6 +639,45 @@ describe("VaultPopupListFiltersService", () => {
       service.filterForm.patchValue({ keykeeperExpiring: true });
     });
 
+    // Keykeeper: Item templates, the category chips' last (DESIGN.md, "The Item templates view").
+    describe("someone's own template", () => {
+      const definition = {
+        name: "keykeeper.template-definition",
+        value: JSON.stringify({ id: "laptop-1", base: "login", v: 1 }),
+        type: 0,
+      };
+      const template = {
+        type: CipherType.SecureNote,
+        collectionIds: [],
+        organizationId: null,
+        folderId: "5432",
+        fields: [definition],
+      } as unknown as CipherView;
+
+      it("stays out of the list until Item templates is picked, which shows only templates", (done) => {
+        const results: CipherView[][] = [];
+        service.filterFunction$.subscribe((filterFunction) => {
+          results.push(filterFunction([...ciphers, template]) as CipherView[]);
+          if (results.length === 2) {
+            expect(results[0]).not.toContain(template);
+            expect(results[1]).toEqual([template]);
+            done();
+          }
+        });
+
+        service.filterForm.patchValue({ keykeeperTemplates: true });
+      });
+
+      it("shows in its own folder", (done) => {
+        service.filterFunction$.subscribe((filterFunction) => {
+          expect(filterFunction([...ciphers, template])).toContain(template);
+          done();
+        });
+
+        service.filterForm.patchValue({ folder: { id: "5432" } as FolderView });
+      });
+    });
+
     it("filters by folder", (done) => {
       const folder = { id: "5432" } as FolderView;
 
@@ -760,8 +799,9 @@ describe("VaultPopupListFiltersService", () => {
         },
         folder: { id: "test-folder-id", name: "Test Folder" },
         cipherType: CipherType.Login,
-        // Keykeeper: Expiring soon, off unless it was picked.
+        // Keykeeper: Expiring soon and Item templates, off unless they were picked.
         keykeeperExpiring: false,
+        keykeeperTemplates: false,
       });
       discardPeriodicTasks();
     }));
@@ -819,8 +859,9 @@ describe("VaultPopupListFiltersService", () => {
         collectionId: "test-collection-id",
         folderId: "test-folder-id",
         cipherType: CipherType.Card,
-        // Keykeeper: Expiring soon, kept with the rest.
+        // Keykeeper: Expiring soon and Item templates, kept with the rest.
         keykeeperExpiring: false,
+        keykeeperTemplates: false,
       });
       discardPeriodicTasks();
     }));

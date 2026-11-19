@@ -134,3 +134,103 @@ describe("AddEditCustomFieldDialogComponent", () => {
     );
   });
 });
+
+// Keykeeper: a template's fields have kinds (DESIGN.md, "In the editors").
+describe("AddEditCustomFieldDialogComponent for a template", () => {
+  const addField = jest.fn();
+  const updateLabel = jest.fn();
+
+  async function open(data: Partial<AddEditCustomFieldDialogData>) {
+    addField.mockClear();
+    updateLabel.mockClear();
+    await TestBed.configureTestingModule({
+      imports: [AddEditCustomFieldDialogComponent],
+      providers: [
+        { provide: I18nService, useValue: { t: (key: string) => key } },
+        {
+          provide: DIALOG_DATA,
+          useValue: {
+            addField,
+            updateLabel,
+            removeField: jest.fn(),
+            cipherType: CipherType.SecureNote,
+            template: true,
+            ...data,
+          },
+        },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(AddEditCustomFieldDialogComponent);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it("offers every kind, and adds a field with its kind and whether it's the expiration date", async () => {
+    const fixture = await open({});
+    const component = fixture.componentInstance;
+
+    expect(component.kindOptions.map((o) => [o.value, o.name])).toEqual([
+      ["text", "Text"],
+      ["hidden", "Hidden"],
+      ["boolean", "Checkbox"],
+      ["date", "Date"],
+      ["url", "Website"],
+      ["email", "Email"],
+      ["phone", "Phone"],
+      ["number", "Number"],
+      ["totp", "One-time code"],
+    ]);
+    component.customFieldForm.patchValue({ label: "Renews" });
+    component.kindForm.setValue({ kind: "date", expires: true });
+    fixture.detectChanges();
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="keykeeper-field-expires"]'),
+    ).not.toBeNull();
+
+    component.submit();
+
+    expect(addField).toHaveBeenCalledWith(FieldType.Text, "Renews", "date", true);
+  });
+
+  it("keeps a one-time code's key in a hidden field, and only a date can be the expiration date", async () => {
+    const component = (await open({})).componentInstance;
+    component.customFieldForm.patchValue({ label: "Console code" });
+    component.kindForm.setValue({ kind: "totp", expires: true });
+
+    component.submit();
+
+    expect(addField).toHaveBeenCalledWith(FieldType.Hidden, "Console code", "totp", false);
+  });
+
+  it("changes a field's kind only among those kept the same way", async () => {
+    const component = (
+      await open({
+        editLabelConfig: { index: 2, label: "Renews" },
+        editKind: { kind: "date", expires: true },
+      })
+    ).componentInstance;
+    component.variant = "edit";
+
+    expect(component.kindOptions.map((o) => o.value)).toEqual([
+      "text",
+      "date",
+      "url",
+      "email",
+      "phone",
+      "number",
+    ]);
+    expect(component.kindForm.value).toEqual({ kind: "date", expires: true });
+
+    component.kindForm.patchValue({ kind: "url" });
+    component.submit();
+
+    expect(updateLabel).toHaveBeenCalledWith(2, "Renews", "url", false);
+  });
+
+  it("offers no hidden kinds where hidden fields aren't allowed", async () => {
+    const component = (await open({ disallowHiddenField: true })).componentInstance;
+
+    expect(component.kindOptions.map((o) => o.value)).not.toContain("hidden");
+    expect(component.kindOptions.map((o) => o.value)).not.toContain("totp");
+  });
+});

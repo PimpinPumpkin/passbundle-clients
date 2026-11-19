@@ -794,6 +794,8 @@ function brandCli() {
           releases: cli.releases,
           releaseRepository: cli.releaseRepository,
           releaseKeys: cli.releaseKeys,
+          // The server `script get` asks by default: the product's own service.
+          server: BRAND.urls.webVault,
         },
         null,
         2,

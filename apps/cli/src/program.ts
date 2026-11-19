@@ -17,6 +17,7 @@ import { UpdateCommand } from "./commands/update.command";
 import { UnlockCommand } from "./key-management/commands/unlock.command";
 import { passwordOnCommandLine, sessionOnCommandLine, warn } from "./keykeeper/command-line";
 import { approveReprompted } from "./keykeeper/reprompt";
+import { registerScriptCommand } from "./keykeeper/script-program";
 import { cliVersion } from "./keykeeper/version";
 import { Response } from "./models/response";
 import { MessageResponse } from "./models/response/message.response";
@@ -116,6 +117,10 @@ export class Program extends BaseProgram {
       );
       writeLn("", true);
     });
+
+    // Keykeeper: script access with a token alone (keykeeper/script-program.ts),
+    // listed here for help; bw.ts runs it before anything makes a data folder.
+    registerScriptCommand(program);
 
     program
       .command("sdk-version")

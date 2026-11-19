@@ -40,6 +40,7 @@ describe("the tool's version", () => {
     releases: "https://github.com/example/releases",
     releaseRepository: "example/releases",
     releaseKeys: [],
+    server: "https://vault.example.com",
   };
 
   it("is its own when it has one, and the app's otherwise", () => {

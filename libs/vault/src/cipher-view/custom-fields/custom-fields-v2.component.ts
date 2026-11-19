@@ -1,11 +1,22 @@
 import { CommonModule } from "@angular/common";
-import { Component, Input, OnChanges, OnInit, SimpleChanges } from "@angular/core";
+import { Component, inject, Input, OnChanges, OnInit, signal, SimpleChanges } from "@angular/core";
+import { Observable, switchMap } from "rxjs";
 
 import { JslibModule } from "@bitwarden/angular/jslib.module";
+import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import { getUserId } from "@bitwarden/common/auth/services/account.service";
+import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions";
 import { EventCollectionService, EventType } from "@bitwarden/common/dirt/event-logs";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { CipherType, FieldType, LinkedIdType } from "@bitwarden/common/vault/enums";
 import { HIDDEN_VALUE_MASK } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
+import {
+  FieldTyping,
+  fieldKind,
+  itemTyping,
+  TemplateFieldKind,
+} from "@bitwarden/common/vault/keykeeper/templates";
+import { showsTwoStepCode } from "@bitwarden/common/vault/keykeeper/two-step-codes";
 import { LinkedMetadata } from "@bitwarden/common/vault/linked-field-option.decorator";
 import { CardView } from "@bitwarden/common/vault/models/view/card.view";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
@@ -23,8 +34,12 @@ import {
   ColorPasswordModule,
 } from "@bitwarden/components";
 
+import { BitTotpCountdownComponent } from "../../components/totp-countdown/totp-countdown.component";
 import { VaultAutosizeReadOnlyTextArea } from "../../directives/readonly-textarea.directive";
 import { visibleCustomFields } from "../../keykeeper/reserved-fields";
+
+/** Keykeeper: a one-time code field's current code, as login codes have theirs. */
+type FieldCode = { totpCode: string; totpCodeFormatted?: string };
 
 // FIXME(https://bitwarden.atlassian.net/browse/CL-764): Migrate to OnPush
 // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
@@ -43,6 +58,7 @@ import { visibleCustomFields } from "../../keykeeper/reserved-fields";
     CheckboxModule,
     ColorPasswordModule,
     VaultAutosizeReadOnlyTextArea,
+    BitTotpCountdownComponent,
   ],
 })
 export class CustomFieldV2Component implements OnInit, OnChanges {
@@ -55,6 +71,54 @@ export class CustomFieldV2Component implements OnInit, OnChanges {
   /** Keykeeper: the custom fields to show, without Keykeeper's own fields. */
   get visibleFields() {
     return visibleCustomFields(this.cipher.fields);
+  }
+
+  /** Keykeeper: the kinds of the item's fields, from its template (DESIGN.md, "Typed fields"). */
+  private typing: FieldTyping = { types: {} };
+
+  /**
+   * Keykeeper: one-time code fields' current codes, by the field's place. A
+   * signal, since the countdown sends each code while the view is drawn.
+   */
+  protected readonly codes = signal<ReadonlyMap<number, FieldCode>>(new Map());
+  private readonly codeItems = new Map<string, CipherView>();
+
+  private readonly billingAccountProfileStateService = inject(BillingAccountProfileStateService);
+
+  /** Keykeeper: whether the person has Premium, which two-step codes need (two-step-codes.ts). */
+  protected readonly isPremium$: Observable<boolean> = inject(AccountService).activeAccount$.pipe(
+    getUserId,
+    switchMap((userId) => this.billingAccountProfileStateService.hasPremiumFromAnySource$(userId)),
+  );
+
+  /** Keykeeper: a field's kind: its template's, else its own type's. */
+  kindOf(field: FieldView): TemplateFieldKind | null {
+    return fieldKind(field, this.typing);
+  }
+
+  /** Keykeeper: whether a one-time code field's code shows: with Premium, or an organization that gives codes. */
+  codeShows(isPremium: boolean | null): boolean {
+    return showsTwoStepCode(this.cipher, isPremium === true);
+  }
+
+  /**
+   * Keykeeper: the countdown reads a login's key, so a one-time code field's
+   * key goes to it as one, the same object for the same key.
+   */
+  codeItem(key: string): CipherView {
+    let item = this.codeItems.get(key);
+    if (item == null) {
+      item = { login: { totp: key } } as CipherView;
+      this.codeItems.set(key, item);
+    }
+    return item;
+  }
+
+  setCode(index: number, code: FieldCode) {
+    // Never for someone who can't see the item's passwords.
+    if (this.canViewPassword) {
+      this.codes.update((codes) => new Map(codes).set(index, code));
+    }
   }
 
   /** Indexes of hidden fields that are revealed */
@@ -72,12 +136,16 @@ export class CustomFieldV2Component implements OnInit, OnChanges {
 
   ngOnInit(): void {
     this.fieldOptions = this.getLinkedFieldsOptionsForCipher();
+    this.typing = itemTyping(this.cipher);
   }
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes["cipher"]) {
       this.revealedHiddenFields = [];
       this.fieldOptions = this.getLinkedFieldsOptionsForCipher();
+      this.typing = itemTyping(this.cipher);
+      this.codes.set(new Map());
+      this.codeItems.clear();
     }
   }
 

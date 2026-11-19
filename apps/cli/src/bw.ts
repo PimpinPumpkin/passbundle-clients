@@ -7,6 +7,7 @@ import { VerificationType } from "@bitwarden/common/auth/enums/verification-type
 import { CLI_BRAND } from "./keykeeper/brand";
 import { applyBrandEnvironment } from "./keykeeper/env";
 import { useMasterPasswordCheck } from "./keykeeper/reprompt";
+import { isScriptCommand, registerScriptProgram } from "./keykeeper/script-program";
 import { removeLeftover } from "./keykeeper/self-update-install";
 import { OssServeConfigurator } from "./oss-serve-configurator";
 import { registerOssPrograms } from "./register-oss-programs";
@@ -21,6 +22,15 @@ async function main() {
   // Keykeeper: on Windows, the program an update renamed away, once nothing
   // runs it (keykeeper/self-update-install.ts).
   removeLeftover();
+
+  // Keykeeper: `script get` needs only a script token: no account, session,
+  // or data folder, which the service container would make, so it runs
+  // without one (keykeeper/script-program.ts).
+  if (isScriptCommand(process.argv)) {
+    registerScriptProgram(program);
+    await program.parseAsync(process.argv);
+    return;
+  }
 
   const serviceContainer = new ServiceContainer();
   let disposed = false;

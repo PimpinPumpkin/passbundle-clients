@@ -22,6 +22,11 @@ export type CliBrand = {
    * Empty until the key is made, and then `update` installs nothing.
    */
   releaseKeys: string[];
+  /**
+   * The server `script get` asks unless told another (the product's own
+   * service); empty to need one named, as an unbranded build does.
+   */
+  server: string;
 };
 
 export const CLI_BRAND: CliBrand = {
@@ -32,4 +37,5 @@ export const CLI_BRAND: CliBrand = {
   releases: "",
   releaseRepository: "",
   releaseKeys: [],
+  server: "",
 };
