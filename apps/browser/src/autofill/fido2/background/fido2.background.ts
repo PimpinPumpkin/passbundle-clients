@@ -465,7 +465,10 @@ export class Fido2Background implements Fido2BackgroundInterface {
     Promise.resolve(messageResponse)
       .then(
         (response) => sendResponse(response),
-        (error) => sendResponse({ error: { ...error, message: error.message } }),
+        // Keykeeper: with the error's name too, which a DOMException keeps on its prototype, where
+        // the spread doesn't reach, so the page gives the site WebAuthn's error by its name
+        // (InvalidStateError, NotAllowedError) instead of a plain Error.
+        (error) => sendResponse({ error: { ...error, name: error.name, message: error.message } }),
       )
       .catch(this.logService.error);
 

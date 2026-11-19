@@ -5,12 +5,13 @@ import { ClientMspStaff } from "@bitwarden/admin-console/common";
 
 import { CustomPermissions, TechnicianAccess } from "./msp-api.service";
 
-/** Every client, as admin, with install commands: what a technician gets unless limited. */
+/** Every client, as admin, with install commands, without script access: what a technician gets unless limited. */
 export const DEFAULT_ACCESS: TechnicianAccess = {
   allClients: true,
   clients: [],
   custom: null,
   installCommands: true,
+  scriptAccess: false,
 };
 
 /** The custom role permissions the server enforces, with upstream's labels (i18n keys). */
@@ -51,6 +52,8 @@ export function describeAccess(
         ? "Custom role with every item"
         : "Custom role";
   const install = access.installCommands ? "Install commands" : "No install commands";
+  // Named only when on, as the audit log does.
+  const script = access.scriptAccess ? ["Script access"] : [];
   const differing = (access.clientRoles ?? [])
     .map((r) => {
       const name = clients.find((c) => c.id === r.client)?.name;
@@ -67,7 +70,7 @@ export function describeAccess(
     })
     .filter((words): words is string => words != null)
     .sort((a, b) => a.localeCompare(b));
-  return [reach, role, install, ...differing].join(" · ");
+  return [reach, role, install, ...script, ...differing].join(" · ");
 }
 
 /** Whether access reaches every client, for the toast after adding someone. */
@@ -89,7 +92,9 @@ export function describeStaffRole(
     case "owner":
       return "Owner, with every item";
     case "admin":
-      return "Admin, with every item";
+      return staff.scriptAccess
+        ? "Admin, with every item and script access"
+        : "Admin, with every item";
     case "custom": {
       const permissions = PERMISSIONS.filter((p) => staff.permissions?.includes(p.key))
         .map((p) => t(p.label))

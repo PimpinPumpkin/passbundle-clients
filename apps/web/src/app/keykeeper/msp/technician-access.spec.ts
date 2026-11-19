@@ -1,3 +1,4 @@
+import { TechnicianAccess } from "./msp-api.service";
 import {
   describeAccess,
   describeStaffRole,
@@ -48,6 +49,29 @@ describe("technician access in words", () => {
     );
   });
 
+  it("names script access when they have it, and only then", () => {
+    expect(DEFAULT_ACCESS.scriptAccess).toBe(false);
+    expect(describeAccess({ ...DEFAULT_ACCESS, scriptAccess: true }, clients)).toBe(
+      "Every client · Admin · Install commands · Script access",
+    );
+    const access: TechnicianAccess = {
+      ...DEFAULT_ACCESS,
+      scriptAccess: true,
+      clientRoles: [{ client: "acme", custom: null }],
+    };
+    expect(describeAccess(access, clients)).toBe(
+      "Every client · Admin · Install commands · Script access · Admin in Acme Dental",
+    );
+    // What older servers send: no word for it.
+    const older: TechnicianAccess = {
+      allClients: true,
+      clients: [],
+      custom: null,
+      installCommands: true,
+    };
+    expect(describeAccess(older, clients)).toBe("Every client · Admin · Install commands");
+  });
+
   it("says when no client is chosen, and skips clients that are gone", () => {
     const access = { ...DEFAULT_ACCESS, allClients: false, clients: ["gone"] };
     expect(describeAccess(access, clients)).toBe("No clients · Admin · Install commands");
@@ -64,6 +88,15 @@ describe("an MSP's people in a client, in words", () => {
     expect(describeStaffRole({ ...person, role: "admin", vaultItems: true }, t)).toBe(
       "Admin, with every item",
     );
+  });
+
+  it("says when one of the MSP's admins in the client makes its script tokens", () => {
+    expect(
+      describeStaffRole({ ...person, role: "admin", vaultItems: true, scriptAccess: true }, t),
+    ).toBe("Admin, with every item and script access");
+    expect(
+      describeStaffRole({ ...person, role: "admin", vaultItems: true, scriptAccess: false }, t),
+    ).toBe("Admin, with every item");
   });
 
   it("names a custom role's permissions in the console's order, with or without vault items", () => {
