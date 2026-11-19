@@ -108,9 +108,12 @@ export function organizationPermissionsGuard(
         });
       }
 
+      // Keykeeper: in the words the server uses for what someone's role doesn't
+      // cover, so a page a custom role can't open says so the same way, and
+      // they stay signed in (DESIGN.md, "Roles and permissions").
       toastService.showToast({
         variant: "error",
-        message: i18nService.t("accessDenied"),
+        message: i18nService.t("keykeeperCantDoThatHere"),
       });
       return canAccessOrgAdmin(org)
         ? router.createUrlTree(["/organizations", org.id])

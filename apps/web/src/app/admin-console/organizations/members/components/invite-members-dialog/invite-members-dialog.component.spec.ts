@@ -4,6 +4,7 @@ import { of } from "rxjs";
 
 import { CollectionAdminService } from "@bitwarden/admin-console/common";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
+import { OrganizationUserType } from "@bitwarden/common/admin-console/enums";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { ProductTierType } from "@bitwarden/common/billing/enums";
@@ -126,6 +127,33 @@ describe("InviteMembersDialogComponent", () => {
         "user@bitwarden.com",
         "user1@bitwarden.com",
       ]);
+    });
+
+    // Keykeeper: every permission our server enforces, together, and never
+    // upstream's "Manage all collections" (DESIGN.md, "Roles and permissions").
+    it("sends a custom role's permissions as checked", async () => {
+      const { component, memberActionsService } = await createComponent();
+
+      setEmails(component, "poc@example.test");
+      (component as any).formGroup.controls.type.setValue(OrganizationUserType.Custom);
+      (component as any).permissionsGroup.patchValue({
+        manageUsers: true,
+        manageGroups: true,
+        keykeeperManageCollections: true,
+      });
+      await component.submit();
+
+      const request = memberActionsService.invite.mock.calls[0][1];
+      expect(request.type).toBe(OrganizationUserType.Custom);
+      expect(request.permissions).toMatchObject({
+        manageUsers: true,
+        manageGroups: true,
+        keykeeperManageCollections: true,
+        createNewCollections: true,
+        editAnyCollection: false,
+        deleteAnyCollection: false,
+        keykeeperAccessAllItems: false,
+      });
     });
 
     it("does not invite when the input holds nothing but commas", async () => {
