@@ -1281,6 +1281,19 @@ export class AutofillOverlayContentService implements AutofillOverlayContentServ
       return false;
     }
 
+    // Keykeeper: a sign-in form's other text field, known by its label, gets
+    // the logins' menu too, where a login's custom field of that name is
+    // offered with one tap (keykeeper/label-match.ts).
+    if (
+      this.inlineMenuFieldQualificationService.isLabelFieldForLoginForm(
+        autofillFieldData,
+        pageDetails,
+      )
+    ) {
+      autofillFieldData.inlineMenuFillType = CipherType.Login;
+      return false;
+    }
+
     if (
       this.showInlineMenuCards &&
       this.inlineMenuFieldQualificationService.isFieldForCreditCardForm(
