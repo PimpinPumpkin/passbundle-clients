@@ -122,59 +122,8 @@
             </bit-form-control>
           }
           @if (customUserTypeSelected()) {
-            <div class="tw-grid tw-grid-cols-12 tw-gap-4" [formGroup]="permissionsGroup">
-              <div class="tw-col-span-4">
-                <bit-form-control>
-                  <input type="checkbox" bitCheckbox formControlName="accessEventLogs" />
-                  <bit-label>{{ "accessEventLogs" | i18n }}</bit-label>
-                </bit-form-control>
-                <bit-form-control>
-                  <input type="checkbox" bitCheckbox formControlName="accessImportExport" />
-                  <bit-label>{{ "accessImportExport" | i18n }}</bit-label>
-                  <!-- Keykeeper: what the permission covers here. -->
-                  <bit-hint>{{ "keykeeperImportExportHint" | i18n }}</bit-hint>
-                </bit-form-control>
-                <!-- Keykeeper: our server doesn't support the reports, groups, and SSO
-                     permissions yet, so they aren't offered. -->
-              </div>
-              <div class="tw-col-span-4">
-                <!-- Keykeeper: custom roles with the permissions our server enforces
-                     can't also manage all collections yet, so they aren't offered together. -->
-                @if (keykeeperPermissionChecked) {
-                  <p class="tw-text-muted" data-testid="custom-role-no-collections">
-                    {{ "keykeeperCustomRoleNoCollections" | i18n }}
-                  </p>
-                } @else {
-                  <app-nested-checkbox
-                    parentId="manageAllCollections"
-                    [checkboxes]="permissionsGroup.controls.manageAllCollectionsGroup"
-                  ></app-nested-checkbox>
-                }
-              </div>
-              <div class="tw-col-span-4">
-                <div class="tw-mb-3">
-                  <bit-form-control>
-                    <input type="checkbox" bitCheckbox formControlName="managePolicies" />
-                    <bit-label>{{ "managePolicies" | i18n }}</bit-label>
-                  </bit-form-control>
-                  <bit-form-control>
-                    <input
-                      id="manageUsers"
-                      type="checkbox"
-                      bitCheckbox
-                      formControlName="manageUsers"
-                    />
-                    <bit-label>{{ "manageUsers" | i18n }}</bit-label>
-                  </bit-form-control>
-                  <bit-form-control>
-                    <input type="checkbox" bitCheckbox formControlName="manageResetPassword" />
-                    <bit-label>{{ "manageAccountRecovery" | i18n }}</bit-label>
-                    <!-- Keykeeper: what the permission lets someone do. -->
-                    <bit-hint>{{ "keykeeperManageAccountRecoveryHint" | i18n }}</bit-hint>
-                  </bit-form-control>
-                </div>
-              </div>
-            </div>
+            <!-- Keykeeper: every permission our server enforces for custom roles, together. -->
+            <app-keykeeper-custom-role-permissions [form]="permissionsGroup" />
           }
           @if (externalId(); as externalIdValue) {
             <bit-form-field>
