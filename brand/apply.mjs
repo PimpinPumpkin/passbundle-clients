@@ -762,10 +762,15 @@ function brandCli() {
     !/^[a-z][a-z0-9-]*$/.test(cli.command ?? "") ||
     !/^[A-Z][A-Z0-9]*_$/.test(cli.envPrefix ?? "") ||
     cli.envPrefix === "BW_" ||
-    !/^https:\/\//.test(cli.releases ?? "")
+    !/^https:\/\//.test(cli.releases ?? "") ||
+    !/^[\w.-]+\/[\w.-]+$/.test(cli.releaseRepository ?? "") ||
+    !Array.isArray(cli.releaseKeys) ||
+    !cli.releaseKeys.every((key) => /^[0-9a-f]{64}$/.test(key))
   ) {
     fail(
-      'brand.json needs "cli": {"command", "envPrefix" (such as "EXAMPLE_"), "releases" (an https address)}.',
+      'brand.json needs "cli": {"command", "envPrefix" (such as "EXAMPLE_"), "releases" (an https address), ' +
+        '"releaseRepository" (owner/name on GitHub), "releaseKeys" (the CLI release key\'s public halves, ' +
+        "64 lowercase hex digits each; empty until it's made)}.",
     );
   }
   // The tool's own version: the release's, or a development build's.
@@ -787,6 +792,8 @@ function brandCli() {
           envPrefix: prefix,
           version,
           releases: cli.releases,
+          releaseRepository: cli.releaseRepository,
+          releaseKeys: cli.releaseKeys,
           // The server `script get` asks by default: the product's own service.
           server: BRAND.urls.webVault,
         },

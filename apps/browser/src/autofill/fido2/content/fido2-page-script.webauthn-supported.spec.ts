@@ -181,9 +181,10 @@ describe("Fido2 page script with native WebAuthn support", () => {
       );
     });
 
+    // Keykeeper: InvalidStateError is one of WebAuthn's names now, so this uses another.
     it("does not touch rejections with other names", async () => {
       const otherError = Object.assign(new Error(), {
-        name: "InvalidStateError",
+        name: "TypeError",
         message: "Something else went wrong.",
       });
       messenger.request = jest.fn().mockRejectedValue(otherError);
@@ -191,6 +192,22 @@ describe("Fido2 page script with native WebAuthn support", () => {
       await expect(navigator.credentials.get(mockCredentialRequestOptions)).rejects.toBe(
         otherError,
       );
+    });
+
+    // Keykeeper: a site that names a passkey the vault has hears WebAuthn's InvalidStateError.
+    it("rehydrates a serialized InvalidStateError rejection into a real DOMException on create", async () => {
+      const serializedRejection = Object.assign(new Error(), {
+        name: "InvalidStateError",
+        message: "A passkey the site named is already saved for this account.",
+      });
+      messenger.request = jest.fn().mockRejectedValue(serializedRejection);
+
+      const rejected = navigator.credentials.create(mockCredentialCreationOptions);
+      await expect(rejected).rejects.toBeInstanceOf(DOMException);
+      await expect(rejected).rejects.toMatchObject({
+        name: "InvalidStateError",
+        message: "A passkey the site named is already saved for this account.",
+      });
     });
   });
 

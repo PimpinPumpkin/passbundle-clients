@@ -168,6 +168,11 @@ export class VaultProgram extends BaseProgram {
         writeLn("  An item in a shared folder that lets you use its passwords but not see them");
         writeLn("  shows its plain values only, and `get password` and `get totp` refuse it.");
         writeLn("");
+        writeLn('  An item marked "Master password re-prompt" asks for the master password');
+        writeLn("  before `get item`, `password`, `totp`, `notes`, `exposed`, or `attachment`");
+        writeLn("  shows it. A script that can't be asked is refused, unless it says");
+        writeLn("  `--reprompt-ok` because it was approved to read such items.");
+        writeLn("");
         writeLn(
           "  `get template` also takes an item template's id or name (see `list templates`).",
         );
@@ -582,6 +587,7 @@ export class VaultProgram extends BaseProgram {
           this.serviceContainer.policyService,
           this.serviceContainer.eventCollectionService,
           this.serviceContainer.accountService,
+          this.serviceContainer.cipherService,
         );
         const response = await command.run(options);
         this.processResponse(response);

@@ -14,6 +14,14 @@ export type CliBrand = {
   version: string;
   /** Where to get the newest version; empty to check upstream's releases. */
   releases: string;
+  /** The GitHub repository whose `cli-v*` releases `update` installs, as `owner/name`. */
+  releaseRepository: string;
+  /**
+   * The CLI release key's public halves, as 64 hex digits each (Ed25519):
+   * `update` installs only a release whose manifest one of them signed.
+   * Empty until the key is made, and then `update` installs nothing.
+   */
+  releaseKeys: string[];
   /**
    * The server `script get` asks unless told another (the product's own
    * service); empty to need one named, as an unbranded build does.
@@ -27,5 +35,7 @@ export const CLI_BRAND: CliBrand = {
   envPrefix: "BW_",
   version: "",
   releases: "",
+  releaseRepository: "",
+  releaseKeys: [],
   server: "",
 };

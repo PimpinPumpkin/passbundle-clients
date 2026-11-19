@@ -260,6 +260,15 @@ describe("OrganizationLayoutComponent", () => {
       it("returns false when canViewAllCollections is false", () => {
         expect(component.canShowVaultTab(makeOrg({ canViewAllCollections: false }))).toBe(false);
       });
+
+      // Keykeeper: a custom role that manages the shared folders it reaches.
+      it("returns true for a custom role that manages shared folders", () => {
+        expect(
+          component.canShowVaultTab(
+            makeOrg({ canViewAllCollections: false, keykeeperManagesCollections: true }),
+          ),
+        ).toBe(true);
+      });
     });
 
     describe("canShowSettingsTab", () => {

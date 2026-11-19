@@ -44,6 +44,10 @@ export class ServeProgram extends BaseProgram {
         writeLn("    Only this computer can reach it, unless you add `--unsafe-network`:");
         writeLn("    then anything that reaches it can read and change your vault.");
         writeLn("");
+        writeLn('    It never asks for the master password: an item marked "Master password');
+        writeLn('    re-prompt" gives its plain values only, and its secrets are refused,');
+        writeLn("    unless you start it with `--reprompt-ok`.");
+        writeLn("");
         writeLn("  Examples:");
         writeLn("");
         writeLn("    bw serve");
