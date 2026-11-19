@@ -3,7 +3,7 @@ import { mock, MockProxy } from "jest-mock-extended";
 import AutofillField from "../models/autofill-field";
 import AutofillForm from "../models/autofill-form";
 import AutofillPageDetails from "../models/autofill-page-details";
-import { createAutofillFormMock } from "../spec/autofill-mocks";
+import { createAutofillFieldMock, createAutofillFormMock } from "../spec/autofill-mocks";
 
 import { AutoFillConstants } from "./autofill-constants";
 import { InlineMenuFieldQualificationService } from "./inline-menu-field-qualification.service";
@@ -1521,6 +1521,63 @@ describe("InlineMenuFieldQualificationService", () => {
       });
 
       expect(inlineMenuFieldQualificationService.hasCurrentPasswordAutocomplete(field)).toBe(false);
+    });
+  });
+
+  // Keykeeper: address fields known only by name or label get the identities'
+  // menu, in a form that asks for an address (keykeeper/address-fields.ts).
+  describe("Keykeeper: isFieldForIdentityForm, for address fields with no autocomplete hint", () => {
+    const field = (id: string, label: string, custom: Partial<AutofillField> = {}) =>
+      createAutofillFieldMock({
+        opid: id,
+        htmlID: id,
+        htmlName: id,
+        htmlClass: "",
+        title: "",
+        "label-tag": label,
+        "label-aria": "",
+        "label-left": "",
+        "label-top": "",
+        placeholder: "",
+        autoCompleteType: "",
+        form: "checkout",
+        ...custom,
+      });
+    const fields = [
+      field("street", "Street address", { tagName: "textarea", type: "textarea" }),
+      field("city", "City"),
+      field("state", "State", { tagName: "select", type: "select-one" }),
+      field("zip", "ZIP code"),
+      field("country", "Country", { tagName: "select", type: "select-one" }),
+      field("fullname", "Full name"),
+    ];
+
+    it("qualifies each field of a form that asks for an address", () => {
+      pageDetails.fields = fields;
+      for (const f of fields) {
+        expect([
+          f.opid,
+          inlineMenuFieldQualificationService.isFieldForIdentityForm(f, pageDetails),
+        ]).toEqual([f.opid, true]);
+      }
+    });
+
+    it("never qualifies a search box or a comment field there, or a lone city box", () => {
+      const search = field("q", "Search");
+      const comments = field("comments", "Comments", { tagName: "textarea", type: "textarea" });
+      pageDetails.fields = [...fields, search, comments];
+      expect(inlineMenuFieldQualificationService.isFieldForIdentityForm(search, pageDetails)).toBe(
+        false,
+      );
+      expect(
+        inlineMenuFieldQualificationService.isFieldForIdentityForm(comments, pageDetails),
+      ).toBe(false);
+
+      const city = field("city", "City", { form: null });
+      pageDetails.fields = [city];
+      expect(inlineMenuFieldQualificationService.isFieldForIdentityForm(city, pageDetails)).toBe(
+        false,
+      );
     });
   });
 });

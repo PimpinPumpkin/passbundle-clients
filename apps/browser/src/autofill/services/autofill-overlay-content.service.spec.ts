@@ -3204,4 +3204,141 @@ describe("AutofillOverlayContentService", () => {
       expect(autofillOverlayContentService["userFilledFields"]).toEqual(null);
     });
   });
+
+  // Keykeeper: the identities' menu on an address list and a street's text
+  // area, which upstream never sets up (keykeeper/address-fields.ts).
+  describe("Keykeeper: the menu on an address list and a street's text area", () => {
+    const field = (opid: string, label: string, custom: Partial<AutofillField> = {}) =>
+      createAutofillFieldMock({
+        opid,
+        htmlID: opid,
+        htmlName: opid,
+        htmlClass: "",
+        title: "",
+        "label-tag": label,
+        "label-aria": "",
+        "label-left": "",
+        "label-top": "",
+        placeholder: "",
+        autoCompleteType: "",
+        form: "checkout",
+        ...custom,
+      });
+    let pageDetails: AutofillPageDetails;
+    let fields: Record<string, AutofillField>;
+    const element = (id: string) => {
+      const el = document.getElementById(id) as ElementWithOpId<FormFieldElement>;
+      el.opid = `op-${id}`;
+      jest.spyOn(el, "addEventListener");
+      return el;
+    };
+
+    beforeEach(() => {
+      autofillInit.startMonitoring();
+      document.body.innerHTML = `
+      <form id="checkout">
+        <textarea id="street"></textarea>
+        <input type="text" id="city" />
+        <select id="state"><option value=""></option><option value="CA">California</option></select>
+        <input type="text" id="zip" />
+        <select id="ccmonth"><option value="03">03</option></select>
+        <textarea id="comments"></textarea>
+      </form>
+      `;
+      fields = {
+        street: field("street", "Street address", { tagName: "textarea", type: "textarea" }),
+        city: field("city", "City"),
+        state: field("state", "State", { tagName: "select", type: "select-one" }),
+        zip: field("zip", "ZIP code"),
+        ccmonth: field("ccmonth", "", {
+          tagName: "select",
+          type: "select-one",
+          autoCompleteType: "cc-exp-month",
+        }),
+        comments: field("comments", "Comments", { tagName: "textarea", type: "textarea" }),
+      };
+      pageDetails = mock<AutofillPageDetails>({
+        forms: { checkout: mock<AutofillForm>() },
+        fields: Object.values(fields),
+      });
+    });
+
+    it("sets up a street's text area for identities, and never a comment field", async () => {
+      const street = element("street");
+      const comments = element("comments");
+
+      await autofillOverlayContentService.setupOverlayListeners(street, fields.street, pageDetails);
+      await autofillOverlayContentService.setupOverlayListeners(
+        comments,
+        fields.comments,
+        pageDetails,
+      );
+
+      expect(fields.street.inlineMenuFillType).toBe(CipherType.Identity);
+      expect(street.addEventListener).toHaveBeenCalledWith(EVENTS.FOCUS, expect.any(Function));
+      expect(street.addEventListener).toHaveBeenCalledWith(EVENTS.BLUR, expect.any(Function));
+      expect(comments.addEventListener).not.toHaveBeenCalled();
+    });
+
+    it("opens the identities' menu when an address list gets focus, with its button beside the list's arrow", async () => {
+      const state = element("state");
+      await autofillOverlayContentService.setupOverlayListeners(state, fields.state, pageDetails);
+      sendExtensionMessageSpy.mockClear();
+
+      state.dispatchEvent(new Event("focus"));
+      await flushPromises();
+
+      expect(fields.state.inlineMenuFillType).toBe(CipherType.Identity);
+      expect(sendExtensionMessageSpy).toHaveBeenCalledWith("openAutofillInlineMenu");
+      expect(sendExtensionMessageSpy).not.toHaveBeenCalledWith("closeAutofillInlineMenu", {
+        forceCloseInlineMenu: true,
+      });
+      expect(sendExtensionMessageSpy).toHaveBeenCalledWith(
+        "updateFocusedFieldData",
+        expect.objectContaining({
+          focusedFieldData: expect.objectContaining({
+            inlineMenuFillType: CipherType.Identity,
+            focusedFieldOpid: "state",
+            focusedFieldStyles: expect.objectContaining({ paddingRight: "20px" }),
+          }),
+        }),
+      );
+    });
+
+    it("closes an address list's menu when the person chooses an option or leaves the list", async () => {
+      const state = element("state");
+      await autofillOverlayContentService.setupOverlayListeners(state, fields.state, pageDetails);
+      expect(state.addEventListener).toHaveBeenCalledWith(EVENTS.BLUR, expect.any(Function));
+      expect(state.addEventListener).not.toHaveBeenCalledWith(EVENTS.KEYUP, expect.any(Function));
+      expect(state.addEventListener).not.toHaveBeenCalledWith(EVENTS.CLICK, expect.any(Function));
+      sendExtensionMessageSpy.mockClear();
+
+      (state as HTMLSelectElement).value = "CA";
+      state.dispatchEvent(new Event("input"));
+      await flushPromises();
+      expect(sendExtensionMessageSpy).toHaveBeenCalledWith("closeAutofillInlineMenu", {
+        forceCloseInlineMenu: true,
+      });
+
+      state.dispatchEvent(new Event("blur"));
+      await flushPromises();
+      expect(sendExtensionMessageSpy).toHaveBeenCalledWith("checkAutofillInlineMenuFocused");
+    });
+
+    it("still closes the menu on a card's list, as upstream has it", async () => {
+      const month = element("ccmonth");
+      await autofillOverlayContentService.setupOverlayListeners(month, fields.ccmonth, pageDetails);
+      sendExtensionMessageSpy.mockClear();
+
+      month.dispatchEvent(new Event("focus"));
+      await flushPromises();
+
+      expect(fields.ccmonth.inlineMenuFillType).toBe(CipherType.Card);
+      expect(sendExtensionMessageSpy).toHaveBeenCalledWith("closeAutofillInlineMenu", {
+        forceCloseInlineMenu: true,
+      });
+      expect(sendExtensionMessageSpy).not.toHaveBeenCalledWith("openAutofillInlineMenu");
+      expect(month.addEventListener).not.toHaveBeenCalledWith(EVENTS.BLUR, expect.any(Function));
+    });
+  });
 });

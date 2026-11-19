@@ -67,6 +67,8 @@ export interface VaultMenu {
   favorites?: VaultMenuEntry;
   /** Items expired or expiring within 30 days, while there are any (or it's picked). */
   expiring?: VaultMenuEntry;
+  /** The person's own templates and their organizations', while there are any (or it's picked). */
+  templates?: VaultMenuEntry;
   categories: VaultMenuEntry[];
   /**
    * Personal with the person's own folders right after it, a level in, then
@@ -86,6 +88,7 @@ export interface VaultMenuState {
   ciphers?: CipherViewLike[];
   allItemsLabel: string;
   expiringLabel: string;
+  templatesLabel: string;
   /** All items, with the categories that have items (and the one showing). */
   typeTree?: TreeNode<CipherTypeFilter>;
   organizationTree?: TreeNode<OrganizationFilter>;
@@ -107,11 +110,18 @@ export interface VaultMenuActions {
   archive: (node: TreeNode<CipherTypeFilter>) => Promise<void>;
   /** Expiring soon, in Personal or the organization showing, as a category is. */
   expiring: () => Promise<void>;
+  /** Item templates, in Personal or the organization showing, as a category is. */
+  templates: () => Promise<void>;
 }
 
 /** Where picking Expiring soon goes: like a category, inside the place showing. */
 export function expiringPick(routed: RoutedVaultFilterModel): RoutedVaultFilterModel {
   return { ...routed, type: "expiring", folderId: undefined, collectionId: undefined };
+}
+
+/** Where picking Item templates goes: like a category, inside the place showing. */
+export function templatesPick(routed: RoutedVaultFilterModel): RoutedVaultFilterModel {
+  return { ...routed, type: "templates", folderId: undefined, collectionId: undefined };
 }
 
 /**
@@ -234,6 +244,26 @@ export function buildVaultMenu(state: VaultMenuState, actions: VaultMenuActions)
         }
       : undefined;
 
+  // Keykeeper: Item templates, while the person has any (DESIGN.md, "Item templates").
+  const templatesNow = ciphers?.filter(createFilterFunction({ type: "templates" })).length ?? 0;
+  const templates: VaultMenuEntry | undefined =
+    templatesNow > 0 || (state.onVault && routed.type === "templates")
+      ? {
+          key: "templates",
+          label: state.templatesLabel,
+          icon: "bwi-file-text",
+          tile: "templates",
+          count:
+            ciphers == null
+              ? undefined
+              : ciphers.filter(createFilterFunction(templatesPick(routed))).length,
+          depth: 0,
+          active: picked(routed.type === "templates"),
+          scope: false,
+          select: () => actions.templates(),
+        }
+      : undefined;
+
   const types = state.typeTree?.children ?? [];
   const favorites = types.find((t) => t.node.type === "favorites");
   const categories = types
@@ -306,6 +336,7 @@ export function buildVaultMenu(state: VaultMenuState, actions: VaultMenuActions)
     all,
     favorites: favorites ? typeEntry(favorites, actions.type) : undefined,
     expiring,
+    templates,
     categories,
     places,
     archive: state.archive
@@ -327,6 +358,7 @@ export function pickedLabel(menu: VaultMenu): string | undefined {
     menu.all,
     menu.favorites,
     menu.expiring,
+    menu.templates,
     ...menu.categories,
     ...menu.places,
     menu.archive,

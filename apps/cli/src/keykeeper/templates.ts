@@ -34,7 +34,10 @@ export class ItemTemplateResponse implements BaseResponse {
   group: string;
   /** A new item from it is a login (username, password, website) or a secure note. */
   base: "login" | "note";
-  /** Its fields, by name and kind (text, hidden, or yes/no); defaults aren't listed. */
+  /**
+   * Its fields, by name and kind (text, hidden, or yes/no, or a template's own:
+   * date, url, email, phone, number, or totp); defaults aren't listed.
+   */
   fields: { name: string; kind: TemplateFieldKind }[];
 
   constructor({ template, group }: ListedTemplate) {

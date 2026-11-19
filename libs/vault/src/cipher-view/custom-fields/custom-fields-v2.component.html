@@ -34,7 +34,49 @@
             }
           </bit-form-field>
         }
-        @if (field.type === fieldType.Hidden) {
+        <!-- Keykeeper: a template's one-time code field shows its current code,
+             as a login's does: for someone who can see the item's passwords,
+             with Premium or an organization that gives codes (two-step-codes.ts). -->
+        @if (field.type === fieldType.Hidden && field.value && kindOf(field) === "totp") {
+          @let showsCode = codeShows(isPremium$ | async);
+          <bit-form-field>
+            <bit-label>{{ field.name }}</bit-label>
+            <input
+              readonly
+              bitInput
+              [type]="showsCode && canViewPassword ? 'text' : 'password'"
+              [value]="
+                (showsCode && canViewPassword && codes().get(i)?.totpCodeFormatted) || '*** ***'
+              "
+              aria-readonly="true"
+              data-testid="keykeeper-field-code"
+              class="tw-font-mono"
+            />
+            @if (showsCode && canViewPassword) {
+              <div
+                bitTotpCountdown
+                [cipher]="codeItem(field.value)"
+                bitSuffix
+                (sendCopyCode)="setCode(i, $event)"
+              ></div>
+              <button
+                bitIconButton="bwi-clone"
+                bitSuffix
+                type="button"
+                [appCopyClick]="codes().get(i)?.totpCode"
+                [valueLabel]="field.name"
+                showToast
+                [label]="'copyCustomField' | i18n: field.name"
+                data-testid="keykeeper-copy-field-code"
+              ></button>
+            }
+            @if (!showsCode) {
+              <bit-hint data-testid="keykeeper-field-code-needs-premium">{{
+                "keykeeperPlanTwoStepCodes" | i18n
+              }}</bit-hint>
+            }
+          </bit-form-field>
+        } @else if (field.type === fieldType.Hidden) {
           <!-- Keykeeper: without see passwords, a mask (the value isn't in the
                page) and nothing to drag -->
           <bit-form-field>

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormBuilder, ReactiveFormsModule } from "@angular/forms";
 
@@ -8,6 +8,7 @@ import { FormFieldModule, SelectModule } from "@bitwarden/components";
 import { CipherFormContainer } from "../cipher-form/cipher-form-container";
 
 import {
+  parseIsoDate,
   parseRemindDays,
   remindValue,
   setStoredExpiration,
@@ -15,6 +16,7 @@ import {
   storedExpiration,
   storedRemind,
 } from "./expiration";
+import { KeykeeperExpiresLink } from "./expires-link";
 
 /** "30, 7, and 1 day before"; "60 and 14 days before". */
 export function remindLabel(days: number[]): string {
@@ -36,7 +38,9 @@ export const REMIND_CHOICES: { value: string; label: string }[] = [
  * Keykeeper: the "Expires" date in the item editor, and "Remind me", the days
  * before it to remind on (DESIGN.md, "Reminder days, per item"). Cards use
  * their own expiry month, so they get only "Remind me". Only
- * `keykeeper.expires` and `keykeeper.remind` are touched.
+ * `keykeeper.expires` and `keykeeper.remind` are touched. An item from a
+ * template with an expiration date field keeps that field and "Expires" the
+ * same (KeykeeperExpiresLink).
  */
 @Component({
   selector: "vault-keykeeper-expiration-field",
@@ -71,6 +75,7 @@ export const REMIND_CHOICES: { value: string; label: string }[] = [
 export class KeykeeperExpirationFieldComponent implements OnInit {
   protected readonly form = this.formBuilder.group({ expires: [""], remind: [""] });
   protected readonly choices = signal(REMIND_CHOICES);
+  private readonly link = inject(KeykeeperExpiresLink, { optional: true });
 
   constructor(
     private readonly cipherFormContainer: CipherFormContainer,
@@ -85,6 +90,18 @@ export class KeykeeperExpirationFieldComponent implements OnInit {
         setStoredRemind(cipher, this.isCard || expires ? remind || null : null);
         return cipher;
       });
+      if (!this.isCard) {
+        this.link?.expiresChanged(expires ?? "");
+      }
+    });
+    // The template's expiration date field changed: a date, or none.
+    this.link?.fromField$.pipe(takeUntilDestroyed()).subscribe((date) => {
+      if (this.isCard || (date !== "" && parseIsoDate(date) == null)) {
+        return;
+      }
+      if ((this.form.value.expires ?? "") !== date) {
+        this.form.patchValue({ expires: date });
+      }
     });
   }
 
@@ -93,7 +110,10 @@ export class KeykeeperExpirationFieldComponent implements OnInit {
   }
 
   ngOnInit() {
-    const initial = this.cipherFormContainer.getInitialCipherView() ?? {};
+    // A new item starts with what it was given, such as a template's fields.
+    const initial = this.cipherFormContainer.getInitialCipherView() ?? {
+      fields: this.cipherFormContainer.config.initialValues?.fields,
+    };
     const remind = storedRemind(initial) ?? "";
     // Days another app stored that "Remind me" doesn't offer stay, as they are.
     if (!REMIND_CHOICES.some((c) => c.value === remind)) {

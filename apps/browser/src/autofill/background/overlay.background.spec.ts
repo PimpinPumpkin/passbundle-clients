@@ -4066,6 +4066,32 @@ describe("OverlayBackground", () => {
         );
       });
 
+      // Keykeeper: a card may fill the frame the person started the fill in
+      // (keykeeper/card-frames.ts).
+      it("Keykeeper: tells the fill which frame the focused field is in", async () => {
+        const cipher = mock<CipherView>({ id: "inline-menu-cipher-1", type: CipherType.Card });
+        overlayBackground["inlineMenuCiphers"] = new Map([["inline-menu-cipher-1", cipher]]);
+        overlayBackground["pageDetailsForTab"][sender.tab.id] = new Map([
+          [7, { frameId: 7, tab: sender.tab, details: pageDetails }],
+        ]);
+        overlayBackground["focusedFieldData"] = createFocusedFieldDataMock({
+          tabId: sender.tab.id,
+          frameId: 7,
+        });
+        autofillService.isPasswordRepromptRequired.mockResolvedValue(false);
+
+        sendPortMessage(listMessageConnectorSpy, {
+          command: "fillAutofillInlineMenuCipher",
+          inlineMenuCipherId: "inline-menu-cipher-1",
+          portKey,
+        });
+        await flushPromises();
+
+        expect(autofillOrchestrator.fillCipher).toHaveBeenCalledWith(
+          expect.objectContaining({ cipher, keykeeperStartFrameId: 7 }),
+        );
+      });
+
       it("does not record last-used (reorder the ciphers map) when no fill occurs", async () => {
         const cipher1 = mock<CipherView>({ id: "inline-menu-cipher-1" });
         const cipher2 = mock<CipherView>({ id: "inline-menu-cipher-2" });

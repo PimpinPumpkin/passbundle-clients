@@ -294,8 +294,67 @@ describe("given a template copy an MSP keeps up to date", () => {
     expect(createFilterFunction({ collectionId: templates })(copy)).toBe(true);
   });
 
-  it("keeps someone's own templates in the lists, since they edit them there", () => {
-    expect(createFilterFunction({})(ownTemplate)).toBe(true);
+  it("leaves it out of Item templates too, which lists the person's own and their organizations'", () => {
+    expect(createFilterFunction({ type: "templates" })(copy)).toBe(false);
+    expect(createFilterFunction({ type: "templates" })(ownTemplate)).toBe(true);
+  });
+});
+
+describe('given someone\'s own template (DESIGN.md, "The Item templates view")', () => {
+  const folder = "folder-1";
+  const shared = "2bd2e94a-0d4a-4bd3-9d5c-5d5bb6d0b002" as CollectionId;
+  const definition = Object.assign(new FieldView(), {
+    name: TEMPLATE_DEFINITION_FIELD_NAME,
+    value: JSON.stringify({ id: "laptop-1", base: "login", v: 1 }),
+  });
+  const mine = createCipher({ type: CipherType.SecureNote, folderId: folder });
+  mine.fields = [definition];
+  const organizations = createCipher({
+    type: CipherType.SecureNote,
+    organizationId: "org" as OrganizationId,
+    collectionIds: [shared],
+  });
+  organizations.fields = [definition];
+  const note = createCipher({ type: CipherType.SecureNote });
+  // A login can't be a template, whatever its fields say.
+  const login = createCipher({ type: CipherType.Login });
+  login.fields = [definition];
+
+  it("lists it under Item templates, and nothing else there", () => {
+    const templates = createFilterFunction({ type: "templates" });
+    expect(templates(mine)).toBe(true);
+    expect(templates(organizations)).toBe(true);
+    expect(templates(note)).toBe(false);
+    expect(templates(login)).toBe(false);
+  });
+
+  it("leaves it out of All items, the categories, Favorites, Expiring soon, and Personal's and an organization's views", () => {
+    mine.favorite = true;
+    for (const filter of [
+      {},
+      { type: "note" as const },
+      { type: "favorites" as const },
+      { type: "expiring" as const },
+      { organizationId: Unassigned },
+      { organizationId: "org" as OrganizationId },
+    ]) {
+      expect(createFilterFunction(filter)(mine)).toBe(false);
+      expect(createFilterFunction(filter)(organizations)).toBe(false);
+    }
+    expect(createFilterFunction({})(note)).toBe(true);
+    expect(createFilterFunction({})(login)).toBe(true);
+  });
+
+  it("shows it in its own folder or shared folder", () => {
+    expect(createFilterFunction({ folderId: folder })(mine)).toBe(true);
+    expect(createFilterFunction({ collectionId: shared })(organizations)).toBe(true);
+  });
+
+  it("shows it in the trash and the archive", () => {
+    const trashed = createCipher({ type: CipherType.SecureNote, deletedDate: new Date() });
+    trashed.fields = [definition];
+    expect(createFilterFunction({ type: "trash" })(trashed)).toBe(true);
+    expect(createFilterFunction({ type: "templates" })(trashed)).toBe(false);
   });
 });
 

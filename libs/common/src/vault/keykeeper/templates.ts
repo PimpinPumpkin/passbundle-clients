@@ -16,6 +16,14 @@
 // write that, so nothing shown says who a template came from: templates are
 // offered by where they are, and identical copies of one template in several
 // organizations once. See DESIGN.md, "MSP templates", in the keykeeper repo.
+//
+// Typed fields (a date, a website, an email address, a phone number, a
+// number, a one-time code) are ordinary text or hidden custom fields too: the
+// template's definition says each one's type by its label ("types"), and
+// which date field is a new item's expiration date ("expires"). An item made
+// from a template gets the same in its marker, so its editor and view know
+// them without the template. Other clients see plain custom fields. See
+// DESIGN.md, "Item templates", "Typed fields".
 
 import { newGuid } from "@bitwarden/guid";
 
@@ -28,9 +36,44 @@ import { visibleCustomFields } from "./reserved-fields";
 export const TEMPLATE_FIELD_NAME = "keykeeper.template";
 export const TEMPLATE_DEFINITION_FIELD_NAME = "keykeeper.template-definition";
 
-export type TemplateFieldKind = "text" | "hidden" | "boolean";
+/** Upstream's three kinds of custom field, and the kinds a template can give one. */
+export type TemplateFieldKind = "text" | "hidden" | "boolean" | TypedKind;
 
-export type TemplateField = { label: string; kind: TemplateFieldKind; value?: string };
+/**
+ * The kinds a template gives a field beyond upstream's own. A one-time code
+ * is a hidden field holding the key; the rest are text fields.
+ */
+export type TypedKind = "date" | "url" | "email" | "phone" | "number" | "totp";
+
+export const TYPED_KINDS: readonly TypedKind[] = [
+  "date",
+  "url",
+  "email",
+  "phone",
+  "number",
+  "totp",
+];
+
+/** What editors call each kind. English until Keykeeper's own strings are translated. */
+export const FIELD_KIND_NAMES: Readonly<Record<TemplateFieldKind, string>> = {
+  text: "Text",
+  hidden: "Hidden",
+  boolean: "Checkbox",
+  date: "Date",
+  url: "Website",
+  email: "Email",
+  phone: "Phone",
+  number: "Number",
+  totp: "One-time code",
+};
+
+export type TemplateField = {
+  label: string;
+  kind: TemplateFieldKind;
+  value?: string;
+  /** A date field that is a new item's expiration date (DESIGN.md, "Expiration dates"). */
+  expires?: true;
+};
 
 export type TemplateBase = "login" | "note";
 
@@ -51,6 +94,7 @@ export type ItemTemplate = {
 const text = (label: string): TemplateField => ({ label, kind: "text" });
 const hidden = (label: string): TemplateField => ({ label, kind: "hidden" });
 const yesNo = (label: string): TemplateField => ({ label, kind: "boolean" });
+const typed = (label: string, kind: TypedKind): TemplateField => ({ label, kind });
 
 // English until Keykeeper's own strings are translated.
 export const BUILT_IN_TEMPLATES: readonly ItemTemplate[] = [
@@ -59,21 +103,21 @@ export const BUILT_IN_TEMPLATES: readonly ItemTemplate[] = [
     name: "API key",
     icon: "bwi-key",
     base: "note",
-    fields: [hidden("Key"), hidden("Secret"), text("Service URL"), text("Scopes")],
+    fields: [hidden("Key"), hidden("Secret"), typed("Service URL", "url"), text("Scopes")],
   },
   {
     id: "server",
     name: "Server",
     icon: "bwi-terminal",
     base: "login",
-    fields: [text("Hostname"), text("Port"), text("Operating system")],
+    fields: [text("Hostname"), typed("Port", "number"), text("Operating system")],
   },
   {
     id: "database",
     name: "Database",
     icon: "bwi-list-alt",
     base: "login",
-    fields: [text("Type"), text("Hostname"), text("Port"), text("Database name")],
+    fields: [text("Type"), text("Hostname"), typed("Port", "number"), text("Database name")],
   },
   {
     id: "wifi",
@@ -94,7 +138,12 @@ export const BUILT_IN_TEMPLATES: readonly ItemTemplate[] = [
     name: "Software license",
     icon: "bwi-file-text",
     base: "note",
-    fields: [hidden("License key"), text("Licensed to"), text("Version"), text("Purchase date")],
+    fields: [
+      hidden("License key"),
+      text("Licensed to"),
+      text("Version"),
+      typed("Purchase date", "date"),
+    ],
   },
   {
     id: "domain",
@@ -115,14 +164,14 @@ export const BUILT_IN_TEMPLATES: readonly ItemTemplate[] = [
     name: "Email account",
     icon: "bwi-envelope",
     base: "login",
-    fields: [text("Incoming server"), text("Outgoing server"), text("Port")],
+    fields: [text("Incoming server"), text("Outgoing server"), typed("Port", "number")],
   },
   {
     id: "membership",
     name: "Membership",
     icon: "bwi-id-card",
     base: "note",
-    fields: [text("Organization"), text("Member ID"), text("Phone")],
+    fields: [text("Organization"), text("Member ID"), typed("Phone", "phone")],
   },
 ];
 
@@ -130,21 +179,161 @@ export function templateCipherType(template: Pick<ItemTemplate, "base">): Cipher
   return template.base === "login" ? CipherType.Login : CipherType.SecureNote;
 }
 
+/** The custom field type a kind is kept as: a one-time code's key is hidden. */
+export function storedFieldType(kind: TemplateFieldKind): FieldType {
+  return kind === "hidden" || kind === "totp"
+    ? FieldType.Hidden
+    : kind === "boolean"
+      ? FieldType.Boolean
+      : FieldType.Text;
+}
+
+/**
+ * A template's typed fields, by label, as its definition and the markers of
+ * items made from it keep them: `types` (each typed field's kind) and
+ * `expires` (the date field that is the item's expiration date).
+ */
+export type FieldTyping = { types: Readonly<Record<string, TypedKind>>; expires?: string };
+
+const MAX_TYPED_FIELDS = 100;
+const MAX_LABEL_LENGTH = 200;
+
+const owns = (object: object, key: string) => Object.prototype.hasOwnProperty.call(object, key);
+
+/**
+ * The typing in a definition's or a marker's JSON, only what's well formed:
+ * a kind nobody knows is left out, so its field is what its own type says (a
+ * newer kind is a text field to older apps), and `expires` counts only when
+ * it names a date field.
+ */
+export function typingOf(json: Record<string, unknown> | null | undefined): FieldTyping {
+  const types: Record<string, TypedKind> = {};
+  const raw = json?.types;
+  if (raw != null && typeof raw === "object" && !Array.isArray(raw)) {
+    for (const [label, kind] of Object.entries(raw).slice(0, MAX_TYPED_FIELDS)) {
+      if (
+        label !== "" &&
+        label !== "__proto__" &&
+        label.length <= MAX_LABEL_LENGTH &&
+        TYPED_KINDS.includes(kind as TypedKind)
+      ) {
+        types[label] = kind as TypedKind;
+      }
+    }
+  }
+  const expires = json?.expires;
+  return typeof expires === "string" && owns(types, expires) && types[expires] === "date"
+    ? { types, expires }
+    : { types };
+}
+
+/** The typing of a template's fields: each typed one's kind, and the expiration date's. */
+export function typingOfFields(fields: readonly TemplateField[]): FieldTyping {
+  const types: Record<string, TypedKind> = {};
+  let expires: string | undefined;
+  for (const f of fields) {
+    if (f.kind !== "text" && f.kind !== "hidden" && f.kind !== "boolean") {
+      types[f.label] = f.kind;
+      if (f.kind === "date" && f.expires && expires == null) {
+        expires = f.label;
+      }
+    }
+  }
+  return typingOf(expires == null ? { types } : { types, expires });
+}
+
+/** The keys a definition or a marker keeps its typing in: none when there's nothing typed. */
+function typingKeys(typing: FieldTyping): { types?: Record<string, TypedKind>; expires?: string } {
+  const clean = typingOf(typing as unknown as Record<string, unknown>);
+  if (Object.keys(clean.types).length === 0) {
+    return {};
+  }
+  return clean.expires
+    ? { types: { ...clean.types }, expires: clean.expires }
+    : { types: { ...clean.types } };
+}
+
+/**
+ * A definition's or a marker's value with this typing in place of what it
+ * had, its other keys as they were; null when the value isn't one.
+ */
+export function withTyping(value: string | null | undefined, typing: FieldTyping): string | null {
+  const json = parseJson(value);
+  if (json == null) {
+    return null;
+  }
+  const rest = { ...json };
+  delete rest.types;
+  delete rest.expires;
+  return JSON.stringify({ ...rest, ...typingKeys(typing) });
+}
+
+/**
+ * A field's kind: its own type, or the template's kind for it where that
+ * fits its own type (a date, a website, an email address, a phone number, or
+ * a number in a text field, a one-time code's key in a hidden one). Null for
+ * a linked field.
+ */
+export function fieldKind(field: FieldLike, typing: FieldTyping): TemplateFieldKind | null {
+  const own: TemplateFieldKind | null =
+    field.type === FieldType.Hidden
+      ? "hidden"
+      : field.type === FieldType.Boolean
+        ? "boolean"
+        : field.type === FieldType.Text
+          ? "text"
+          : null;
+  const name = field.name ?? "";
+  const kind = own != null && owns(typing.types, name) ? typing.types[name] : undefined;
+  return kind != null && storedFieldType(kind) === field.type ? kind : own;
+}
+
+/**
+ * The typing that applies to an item's fields: a custom template's own
+ * definition's, or else the marker's of the template the item came from.
+ */
+export function itemTyping(item: ItemLike): FieldTyping {
+  const fields = item?.fields ?? [];
+  if (templateDefinition(item) != null) {
+    return typingOf(
+      parseJson(fields.find((f) => f.name === TEMPLATE_DEFINITION_FIELD_NAME)?.value),
+    );
+  }
+  const marker = parseJson(fields.find((f) => f.name === TEMPLATE_FIELD_NAME)?.value);
+  return typeof marker?.id === "string" ? typingOf(marker) : { types: {} };
+}
+
+/**
+ * The text field that holds an item's expiration date, as the template it
+ * came from marks it, if it has one. A template itself has none: its date is
+ * a default for new items. Expiration dates read it first ("Expiration
+ * dates", expiration.ts).
+ */
+export function expirationFieldOf<F extends FieldLike>(item: { fields?: F[] | null }): F | null {
+  if (templateDefinition(item) != null) {
+    return null;
+  }
+  const label = itemTyping(item).expires;
+  return label == null
+    ? null
+    : ((item.fields ?? []).find((f) => f.name === label && f.type === FieldType.Text) ?? null);
+}
+
 /** The starting custom fields for a new item from this template, marker included. */
 export function templateFields(template: ItemTemplate): FieldView[] {
   const marker = new FieldView();
   marker.name = TEMPLATE_FIELD_NAME;
   marker.type = FieldType.Text;
-  marker.value = JSON.stringify({ id: template.id, name: template.name, v: 1 });
+  marker.value = JSON.stringify({
+    id: template.id,
+    name: template.name,
+    v: 1,
+    ...typingKeys(typingOfFields(template.fields)),
+  });
   const fields = template.fields.map((f) => {
     const field = new FieldView();
     field.name = f.label;
-    field.type =
-      f.kind === "hidden"
-        ? FieldType.Hidden
-        : f.kind === "boolean"
-          ? FieldType.Boolean
-          : FieldType.Text;
+    field.type = storedFieldType(f.kind);
     field.value = f.value ?? (f.kind === "boolean" ? "false" : "");
     return field;
   });
@@ -163,19 +352,87 @@ function parseJson(value: string | null | undefined): Record<string, unknown> | 
   }
 }
 
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+function isIsoDate(value: string): boolean {
+  const match = ISO_DATE.exec(value);
+  if (!match) {
+    return false;
+  }
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const date = new Date(year, month - 1, day);
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+}
+
+function looksLikeWebAddress(value: string): boolean {
+  if (/\s/.test(value)) {
+    return false;
+  }
+  try {
+    const url = new URL(value);
+    return (url.protocol === "https:" || url.protocol === "http:") && url.hostname.includes(".");
+  } catch {
+    // A bare host, like example.com or example.com/login.
+    return /^[^/:@]+\.[a-z]{2,}(:\d+)?(\/.*)?$/i.test(value);
+  }
+}
+
+/**
+ * What's wrong with a typed field's value, said plainly, or null. Editors
+ * show it under the field as a warning: it never stops the item saving.
+ * An empty field is fine.
+ */
+export function typedFieldProblem(
+  kind: TemplateFieldKind | null | undefined,
+  value: string | null | undefined,
+): string | null {
+  const v = (value ?? "").trim();
+  if (v === "") {
+    return null;
+  }
+  switch (kind) {
+    case "date":
+      return isIsoDate(v) ? null : "Write the date as year, month, and day, such as 2027-03-31.";
+    case "url":
+      return looksLikeWebAddress(v) ? null : "This doesn't look like a web address.";
+    case "email":
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+        ? null
+        : "This doesn't look like an email address.";
+    case "phone":
+      return /^\+?[\d\s().\-/]+$/.test(v) && (v.match(/\d/g) ?? []).length >= 3
+        ? null
+        : "This doesn't look like a phone number.";
+    case "number":
+      return /^[+-]?(\d+|\d{1,3}(,\d{3})+)(\.\d+)?$/.test(v) ? null : "This isn't a number.";
+    default:
+      return null;
+  }
+}
+
 const TEMPLATE_ID = /^[A-Za-z0-9-]{1,64}$/;
 const BASE_ICONS: Record<TemplateBase, string> = { login: "bwi-globe", note: "bwi-sticky-note" };
 
-/** The definition field for a custom template; `from` names the MSP for a copy it sends. */
+/**
+ * The definition field for a custom template; `from` names the MSP for a copy
+ * it sends, and `typing` is its typed fields'.
+ */
 export function newTemplateDefinitionField(
   base: TemplateBase,
   id = newGuid(),
   from?: string,
+  typing: FieldTyping = { types: {} },
 ): FieldView {
   const field = new FieldView();
   field.name = TEMPLATE_DEFINITION_FIELD_NAME;
   field.type = FieldType.Text;
-  field.value = JSON.stringify(from ? { id, base, v: 1, from } : { id, base, v: 1 });
+  field.value = JSON.stringify({
+    id,
+    base,
+    v: 1,
+    ...(from ? { from } : {}),
+    ...typingKeys(typing),
+  });
   return field;
 }
 
@@ -216,12 +473,29 @@ export function isMspTemplateCopy(item: ItemLike): boolean {
 }
 
 /**
+ * Whether an item is one of the person's own templates or one of their
+ * organizations', not a copy an MSP keeps up to date: what the Item
+ * templates view lists, and the other lists leave out unless its folder or
+ * shared folder is open (DESIGN.md, "Item templates").
+ */
+export function isOwnTemplate(item: ItemLike & { type?: unknown }): boolean {
+  const definition = templateDefinition(item);
+  return definition != null && definition.from == null && isNote(item);
+}
+
+/** A note, by a full view's type or a list view's ("secureNote"). */
+function isNote(item: { type?: unknown }): boolean {
+  return item.type === CipherType.SecureNote || item.type === "secureNote";
+}
+
+/**
  * The starting fields for a new custom template made from an item ("Save as
  * template"): its definition (logins for a login, notes otherwise) and the
  * item's own custom fields by label and kind, never their values, which belong
- * to that item. The editor opens these as a new note, so nothing is saved
- * until the person saves it. Null for an item that's already a template, or a
- * kind of item templates don't cover.
+ * to that item. Kinds include the typed ones of the template the item came
+ * from, and which date is its expiration date. The editor opens these as a
+ * new note, so nothing is saved until the person saves it. Null for an item
+ * that's already a template, or a kind of item templates don't cover.
  */
 export function templateFieldsFromItem(item: {
   type?: CipherType | null;
@@ -233,17 +507,34 @@ export function templateFieldsFromItem(item: {
   ) {
     return null;
   }
+  const typing = itemTyping(item);
+  const kinds: TemplateField[] = [];
   const fields = visibleCustomFields(item.fields).flatMap((f): FieldView[] => {
-    if (f.type !== FieldType.Text && f.type !== FieldType.Hidden && f.type !== FieldType.Boolean) {
+    const kind = fieldKind(f, typing);
+    if (kind == null) {
       return [];
     }
+    const label = f.name ?? "";
+    kinds.push(
+      kind === "date" && typing.expires === label
+        ? { label, kind, expires: true }
+        : { label, kind },
+    );
     const field = new FieldView();
-    field.name = f.name ?? "";
-    field.type = f.type;
-    field.value = f.type === FieldType.Boolean ? "false" : "";
+    field.name = label;
+    field.type = storedFieldType(kind);
+    field.value = kind === "boolean" ? "false" : "";
     return [field];
   });
-  return [...fields, newTemplateDefinitionField(item.type === CipherType.Login ? "login" : "note")];
+  return [
+    ...fields,
+    newTemplateDefinitionField(
+      item.type === CipherType.Login ? "login" : "note",
+      undefined,
+      undefined,
+      typingOfFields(kinds),
+    ),
+  ];
 }
 
 type TemplateItem = {
@@ -268,17 +559,17 @@ export function customTemplate(item: TemplateItem): ItemTemplate | null {
     return null;
   }
   const seesSecrets = maySeeSecrets(item);
+  const typing = itemTyping(item);
   const fields = visibleCustomFields(item.fields).flatMap((f): TemplateField[] => {
-    const kind: TemplateFieldKind | null =
-      f.type === FieldType.Hidden
-        ? "hidden"
-        : f.type === FieldType.Boolean
-          ? "boolean"
-          : f.type === FieldType.Text
-            ? "text"
-            : null;
+    const kind = fieldKind(f, typing);
     const value = isSecretField(f.type) && !seesSecrets ? undefined : (f.value ?? undefined);
-    return kind == null ? [] : [{ label: f.name ?? "", kind, value }];
+    const label = f.name ?? "";
+    if (kind == null) {
+      return [];
+    }
+    return kind === "date" && typing.expires === label
+      ? [{ label, kind, value, expires: true }]
+      : [{ label, kind, value }];
   });
   return {
     id: definition.id,
