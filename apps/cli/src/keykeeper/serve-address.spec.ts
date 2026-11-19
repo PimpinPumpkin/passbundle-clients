@@ -46,6 +46,7 @@ describe("secrets on the command line", () => {
         envPrefix: "PASSBUNDLE_",
         version: "",
         releases: "",
+        server: "",
       }),
     ).toContain("Set PASSBUNDLE_SESSION instead");
     expect(passwordOnCommandLine()).toContain("--passwordenv or --passwordfile");
