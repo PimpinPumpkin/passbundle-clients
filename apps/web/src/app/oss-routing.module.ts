@@ -141,6 +141,19 @@ const routes: Routes = [
         data: { titleId: "joinOrganization", doNotSaveUrl: false } satisfies RouteDataProperties,
       },
       {
+        // Keykeeper: the page a family's invite link opens, for anyone with the
+        // link, signed in or not. deepLinkGuard keeps the address while they
+        // sign in or create an account, so they come back here to join. See
+        // DESIGN.md, "A family's invite link".
+        path: "family-join",
+        canActivate: [deepLinkGuard()],
+        loadComponent: () =>
+          import("./keykeeper/family/family-join.component").then(
+            (mod) => mod.KeykeeperFamilyJoinComponent,
+          ),
+        data: { titleId: "joinOrganization", doNotSaveUrl: false } satisfies RouteDataProperties,
+      },
+      {
         path: "accept-families-for-enterprise",
         component: AcceptFamilySponsorshipComponent,
         canActivate: [deepLinkGuard()],
@@ -736,6 +749,16 @@ const routes: Routes = [
         ],
       },
     ],
+  },
+  {
+    // Keykeeper: a family's sheet to print, on a page of its own without the
+    // menus (DESIGN.md, "A family's invite link").
+    path: "family-sheet/:organizationId",
+    canActivate: [deepLinkGuard(), authGuard],
+    loadComponent: () =>
+      import("./keykeeper/family/family-sheet.component").then(
+        (mod) => mod.KeykeeperFamilySheetComponent,
+      ),
   },
   {
     path: "",

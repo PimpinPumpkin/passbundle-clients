@@ -64,6 +64,7 @@ import {
   KeykeeperOffboardingService,
 } from "@bitwarden/web-vault/app/keykeeper/access/offboarding.service";
 
+import { KeykeeperFamilyWaitingComponent } from "../../../keykeeper/family/family-waiting.component";
 import { KeykeeperMembersJoiningComponent } from "../../../keykeeper/joining/members-joining.component";
 import { KeykeeperClientMspBannerComponent } from "../../../keykeeper/msp/client-msp-banner.component";
 import { KeykeeperInstallTokenPromptComponent } from "../../../keykeeper/offboarding/install-token-prompt.component";
@@ -122,6 +123,7 @@ interface BulkMemberFlags {
     KeykeeperClientMspBannerComponent,
     KeykeeperFromEntraBadgeComponent,
     KeykeeperInstallTokenPromptComponent,
+    KeykeeperFamilyWaitingComponent,
     KeykeeperMembersJoiningComponent,
   ],
 })

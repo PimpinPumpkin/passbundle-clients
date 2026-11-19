@@ -19,6 +19,7 @@ import { KeyService } from "@bitwarden/key-management";
 // eslint-disable-next-line no-restricted-imports
 import { EncryptService, EncString, SymmetricCryptoKey } from "@bitwarden/legacy-crypto";
 
+import { KeykeeperFamilyLinks } from "./family-link";
 import { KeykeeperJoinSeals, parseExpiringSeal } from "./join-seals";
 import { KeykeeperJoiningMemory } from "./joining-memory";
 import { OrganizationJoining, PendingMember } from "./msp-types";
@@ -54,6 +55,7 @@ const fromB64 = (value: string) => Uint8Array.from(atob(value), (c) => c.charCod
 
 export class KeykeeperJoinChecks {
   private readonly joiningMemory: KeykeeperJoiningMemory;
+  private readonly familyLinks: KeykeeperFamilyLinks;
 
   constructor(
     private readonly keyService: KeyService,
@@ -62,6 +64,7 @@ export class KeykeeperJoinChecks {
     private readonly seals = new KeykeeperJoinSeals(),
   ) {
     this.joiningMemory = new KeykeeperJoiningMemory(stateProvider, seals);
+    this.familyLinks = new KeykeeperFamilyLinks(encryptService, stateProvider, seals);
   }
 
   /**
@@ -71,6 +74,9 @@ export class KeykeeperJoinChecks {
    * approval off, and then a staff seal for MSP staff, an invitation's seal,
    * or, for an install command join with email domains set, a proof bound to
    * this public key. Invitation and staff seals vouch only until they end.
+   * Someone who joined a family with its invite link is vouched for by the
+   * link alone (KeykeeperFamilyLinks.vouches), never by the organization's
+   * joining setting or an invitation's seal.
    */
   async vouchedFor(
     userId: UserId,
@@ -78,6 +84,9 @@ export class KeykeeperJoinChecks {
     organizationKey: SymmetricCryptoKey,
     now: Date = new Date(),
   ): Promise<boolean> {
+    if (p.familyLink != null) {
+      return this.familyLinks.vouches(userId, p, organizationKey, now);
+    }
     const joining = p.joining;
     if (joining == null) {
       return false;
@@ -164,7 +173,8 @@ export class KeykeeperJoinChecks {
    * Checks the joining setting the server reports for each organization
    * this person holds the key of, whether or not anyone is waiting there,
    * so this device remembers the newest seal of each and never goes back to
-   * an older one. Says nothing; a seal that doesn't check out is skipped.
+   * an older one; and a family's invite link's settings, the same way. Says
+   * nothing; a seal or settings that don't check out are skipped.
    */
   async learnJoining(userId: UserId, organizations: OrganizationJoining[]): Promise<void> {
     if (organizations.length === 0) {
@@ -173,7 +183,13 @@ export class KeykeeperJoinChecks {
     const organizationKeys = (await firstValueFrom(this.keyService.orgKeys$(userId))) ?? {};
     for (const o of organizations) {
       const key = organizationKeys[o.organizationId as OrganizationId];
-      if (key == null || o.seal == null) {
+      if (key == null) {
+        continue;
+      }
+      if (o.familyLink != null) {
+        await this.familyLinks.learn(userId, o.organizationId, o.familyLink, key).catch(() => {});
+      }
+      if (o.seal == null) {
         continue;
       }
       const joinKey = await this.seals.joinKey(key.toEncoded());
@@ -229,8 +245,15 @@ export class KeykeeperJoinChecks {
   }
 }
 
-/** The seal that would let this person in: a staff seal for MSP staff, otherwise an invitation's. */
+/**
+ * The seal that would let this person in: a staff seal for MSP staff,
+ * otherwise an invitation's. None for a family's invite link join, which no
+ * seal lets in.
+ */
 function sealOf(p: PendingMember) {
+  if (p.familyLink != null) {
+    return null;
+  }
   return parseExpiringSeal(p.fromMsp ? p.staffSeal : p.inviteSeal);
 }
 
