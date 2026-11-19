@@ -2,9 +2,13 @@ import "core-js/proposals/explicit-resource-management";
 
 import { program } from "commander";
 
+import { VerificationType } from "@bitwarden/common/auth/enums/verification-type";
+
 import { CLI_BRAND } from "./keykeeper/brand";
 import { applyBrandEnvironment } from "./keykeeper/env";
+import { useMasterPasswordCheck } from "./keykeeper/reprompt";
 import { isScriptCommand, registerScriptProgram } from "./keykeeper/script-program";
+import { removeLeftover } from "./keykeeper/self-update-install";
 import { OssServeConfigurator } from "./oss-serve-configurator";
 import { registerOssPrograms } from "./register-oss-programs";
 import { ServeProgram } from "./serve.program";
@@ -15,6 +19,9 @@ async function main() {
   // (keykeeper/env.ts), before anything reads either.
   applyBrandEnvironment();
   program.name(CLI_BRAND.command);
+  // Keykeeper: on Windows, the program an update renamed away, once nothing
+  // runs it (keykeeper/self-update-install.ts).
+  removeLeftover();
 
   // Keykeeper: `script get` needs only a script token: no account, session,
   // or data folder, which the service container would make, so it runs
@@ -42,6 +49,16 @@ async function main() {
 
   try {
     await serviceContainer.init();
+    // Keykeeper: how an item that asks for the master password again checks
+    // it, as upstream's re-prompt does (keykeeper/reprompt.ts).
+    useMasterPasswordCheck({
+      hasMasterPassword: () => serviceContainer.userVerificationService.hasMasterPassword(),
+      verify: (secret) =>
+        serviceContainer.userVerificationService.verifyUser({
+          type: VerificationType.MasterPassword,
+          secret,
+        }),
+    });
 
     await registerOssPrograms(serviceContainer);
 

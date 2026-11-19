@@ -10,6 +10,7 @@ import { AccountService } from "@bitwarden/common/auth/abstractions/account.serv
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { EventCollectionService, EventType } from "@bitwarden/common/dirt/event-logs";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
+import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import {
   ExportFormat,
   EXPORT_FORMATS,
@@ -18,6 +19,7 @@ import {
   ExportedVaultAsBlob,
 } from "@bitwarden/vault-export-core";
 
+import { reprompt } from "../keykeeper/reprompt";
 import { Response } from "../models/response";
 import { CliUtils } from "../utils";
 
@@ -27,6 +29,9 @@ export class ExportCommand {
     private policyService: PolicyService,
     private eventCollectionService: EventCollectionService,
     private accountService: AccountService,
+    // Keykeeper: whether what it writes holds an item that asks for the
+    // master password again (keykeeper/reprompt.ts).
+    private cipherService?: CipherService,
   ) {}
 
   async run(options: OptionValues): Promise<Response> {
@@ -70,6 +75,24 @@ export class ExportCommand {
       }
 
       const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
+
+      // Keykeeper: an export that would write an item that asks for the
+      // master password again asks first, or needs --reprompt-ok in a
+      // script (keykeeper/reprompt.ts). A personal export holds the
+      // person's own items; an organization's, that organization's.
+      if (this.cipherService != null) {
+        const written = (await this.cipherService.getAllDecrypted(userId)).filter(
+          (c) =>
+            !c.isDeleted &&
+            (options.organizationid == null
+              ? c.organizationId == null
+              : c.organizationId === options.organizationid),
+        );
+        const refused = await reprompt(written, { what: "This export holds items that ask" });
+        if (refused != null) {
+          return Response.error(refused);
+        }
+      }
 
       exportContent =
         options.organizationid == null

@@ -4,7 +4,9 @@ import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 
 import { CLI_BRAND } from "../keykeeper/brand";
-import { cliVersion, updateMessage } from "../keykeeper/version";
+import { platformName } from "../keykeeper/self-update";
+import { nodeGetter, runSelfUpdate } from "../keykeeper/self-update-command";
+import { installRefusal, replaceProgram } from "../keykeeper/self-update-install";
 import { Response } from "../models/response";
 import { MessageResponse } from "../models/response/message.response";
 
@@ -22,16 +24,18 @@ export class UpdateCommand {
     this.inPkg = !!(process as any).pkg;
   }
 
-  async run(): Promise<Response> {
-    // Keykeeper: a branded tool doesn't update itself or ask anyone about
-    // updates; it says which version it is and where to get the newest.
-    if (CLI_BRAND.releases) {
-      const version = cliVersion(await this.platformUtilsService.getApplicationVersion());
-      const res = new MessageResponse(null, null);
-      res.title = updateMessage(version);
-      res.raw = CLI_BRAND.releases;
-      res.noColor = true;
-      return Response.success(res);
+  async run(options: { check?: boolean } = {}): Promise<Response> {
+    // Keykeeper: a branded tool updates itself from its own signed releases,
+    // only when someone runs `update` (keykeeper/self-update*.ts; DESIGN.md,
+    // "Updating itself", in the meta repo).
+    if (CLI_BRAND.releaseRepository) {
+      return await runSelfUpdate(options.check === true, {
+        brand: CLI_BRAND,
+        platform: platformName(process.platform, process.arch),
+        get: nodeGetter(`${CLI_BRAND.name}-CLI/${CLI_BRAND.version || "dev"}`),
+        installRefusal: () => installRefusal(),
+        replace: (program, version) => replaceProgram(program, version),
+      });
     }
 
     const response = await this.apiService.nativeFetch(new Request(CLIENTS_RELEASE_LIST_ENDPOINT));

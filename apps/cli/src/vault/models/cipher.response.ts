@@ -5,7 +5,8 @@ import { CipherType, FieldType } from "@bitwarden/common/vault/enums";
 import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 
-import { shownItem } from "../../keykeeper/hidden-items";
+import { itemWithoutSecrets } from "../../keykeeper/hidden-items";
+import { repromptPassed } from "../../keykeeper/reprompt";
 import { BaseResponse } from "../../models/response/base.response";
 import { LoginResponse } from "../../models/response/login.response";
 
@@ -25,8 +26,19 @@ export class CipherResponse extends CipherWithIdExport implements BaseResponse {
     this.object = "item";
     // Keykeeper: someone who can't see the item's secrets gets its plain
     // values only (keykeeper/hidden-items.ts); only an explicit yes shows them.
-    const o = shownItem(item);
+    // So does an item that asks for the master password again, until this
+    // run has asked for it or was approved for it, and without its notes
+    // either (keykeeper/reprompt.ts).
+    const reprompted = !repromptPassed(item);
+    const shown = maySeeSecrets(item) && !reprompted;
+    const o = shown ? item : itemWithoutSecrets(item);
+    if (reprompted) {
+      o.notes = null;
+    }
     this.build(o);
+    if (reprompted) {
+      this.notes = null;
+    }
     // Redact the decrypted item key to prevent logging it to the CLI output.
     this.key = undefined;
     if (o.attachments != null) {
@@ -41,7 +53,7 @@ export class CipherResponse extends CipherWithIdExport implements BaseResponse {
     // so they must be explicitly redacted here when the user doesn't have permission to view
     // passwords (matching how the web/browser/desktop clients gate hidden field reveal on the
     // same permission).
-    if (!maySeeSecrets(item)) {
+    if (!shown) {
       this.passwordHistory = undefined;
       this.fields?.forEach((field) => {
         if (field.type === FieldType.Hidden) {
@@ -52,7 +64,7 @@ export class CipherResponse extends CipherWithIdExport implements BaseResponse {
       this.passwordHistory = o.passwordHistory.map((h) => new PasswordHistoryResponse(h));
     }
     if (o.type === CipherType.Login && o.login != null) {
-      this.login = new LoginResponse(o.login, maySeeSecrets(item));
+      this.login = new LoginResponse(o.login, shown);
     }
   }
 }
