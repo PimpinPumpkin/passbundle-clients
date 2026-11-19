@@ -4,9 +4,16 @@
 // list views only carry text fields' values, so lists can show badges without
 // decrypting every item. Cards also expire on their own expiry month. The days
 // to remind on before the date sit beside it the same way (REMIND_FIELD_NAME).
+//
+// An item made from a template whose date field is marked as the expiration
+// date keeps that field and EXPIRES_FIELD_NAME the same; where another app
+// changed one and not the other, the field wins while it holds a date
+// (DESIGN.md, "Expiration dates").
 
 import { FieldType } from "../enums";
 import { FieldView } from "../models/view/field.view";
+
+import { expirationFieldOf } from "./templates";
 
 export const EXPIRES_FIELD_NAME = "keykeeper.expires";
 
@@ -27,7 +34,7 @@ export const MAX_REMIND_DAYS = 365;
 /** Items count as expiring soon this many days ahead. */
 export const EXPIRING_SOON_DAYS = 30;
 
-type FieldLike = { name?: string | null; value?: string | null };
+type FieldLike = { name?: string | null; value?: string | null; type?: FieldType | null };
 type CardLike = { expMonth?: string | null; expYear?: string | null };
 /**
  * An item, as a full view (`card`) or as the SDK's list view, whose card
@@ -95,8 +102,16 @@ export function parseIsoDate(value: string | null | undefined): Date | null {
     : null;
 }
 
-/** The date stored on the item, as "YYYY-MM-DD", when there is a valid one. */
+/**
+ * The date stored on the item, as "YYYY-MM-DD", when there is a valid one:
+ * its template's expiration date field's while that holds a date, else
+ * EXPIRES_FIELD_NAME's.
+ */
 export function storedExpiration(item: ItemWithExpiration): string | null {
+  const linked = expirationFieldOf(item)?.value?.trim() ?? null;
+  if (parseIsoDate(linked)) {
+    return linked;
+  }
   const value = (item.fields ?? []).find((f) => f.name === EXPIRES_FIELD_NAME)?.value ?? null;
   return parseIsoDate(value) ? value : null;
 }

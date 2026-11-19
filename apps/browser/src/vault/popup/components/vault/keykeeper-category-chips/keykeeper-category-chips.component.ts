@@ -14,8 +14,11 @@ import { VaultPopupListFiltersService } from "../../../services/vault-popup-list
 /** The chip for items expired or expiring within 30 days, after the kinds. */
 export const EXPIRING_CHIP = "expiring" as const;
 
+/** The chip for the person's own templates and their organizations', last. */
+export const TEMPLATES_CHIP = "templates" as const;
+
 export type KeykeeperCategoryChip = {
-  type: CipherType | null | typeof EXPIRING_CHIP;
+  type: CipherType | null | typeof EXPIRING_CHIP | typeof TEMPLATES_CHIP;
   category: KeykeeperCategory;
   label: string;
   selected: boolean;
@@ -34,8 +37,10 @@ const PLURAL_KEYS: Partial<Record<CipherType, string>> = {
  * Keykeeper: the row of category chips under the vault's search (DESIGN.md,
  * "The look"): All, then each kind of item the vault has, each with its tile.
  * Picking one filters the list by that kind, the same filter as upstream's
- * Type menu, which it replaces. Last, while anything has expired or expires
- * within 30 days, "Expiring soon" (DESIGN.md, "Expiration dates").
+ * Type menu, which it replaces. Then, while anything has expired or expires
+ * within 30 days, "Expiring soon" (DESIGN.md, "Expiration dates"), and last,
+ * while the person has templates, "Item templates", where templates are
+ * (DESIGN.md, "Item templates").
  */
 @Component({
   selector: "app-keykeeper-category-chips",
@@ -120,14 +125,18 @@ export class KeykeeperCategoryChipsComponent {
     this.filtersService.cipherTypes$,
     this.itemsService.keykeeperTypesWithItems$,
     this.itemsService.keykeeperExpiringCount$,
+    this.itemsService.keykeeperTemplatesCount$,
     this.filtersService.filters$,
   ]).pipe(
-    map(([options, present, expiring, filters]): KeykeeperCategoryChip[] => {
+    map(([options, present, expiring, templates, filters]): KeykeeperCategoryChip[] => {
       const picked = filters.cipherType ?? null;
       const expiringPicked = filters.keykeeperExpiring === true;
+      const templatesPicked = filters.keykeeperTemplates === true;
+      const special = expiringPicked || templatesPicked;
       const kinds = options.filter((o) => present.includes(o.value) || o.value === picked);
       const showExpiring = expiring > 0 || expiringPicked;
-      if (kinds.length < 2 && picked == null && !showExpiring) {
+      const showTemplates = templates > 0 || templatesPicked;
+      if (kinds.length < 2 && picked == null && !showExpiring && !showTemplates) {
         return [];
       }
       return [
@@ -135,7 +144,7 @@ export class KeykeeperCategoryChipsComponent {
           type: null,
           category: "all",
           label: this.i18nService.t("all"),
-          selected: picked == null && !expiringPicked,
+          selected: picked == null && !special,
         },
         ...kinds.map((option) => ({
           type: option.value,
@@ -143,9 +152,10 @@ export class KeykeeperCategoryChipsComponent {
           label: PLURAL_KEYS[option.value]
             ? this.i18nService.t(PLURAL_KEYS[option.value]!)
             : option.label,
-          selected: option.value === picked && !expiringPicked,
+          selected: option.value === picked && !special,
         })),
         ...(showExpiring ? [this.expiringChip(expiringPicked)] : []),
+        ...(showTemplates ? [this.templatesChip(templatesPicked)] : []),
       ];
     }),
   );
@@ -159,12 +169,23 @@ export class KeykeeperCategoryChipsComponent {
     };
   }
 
-  /** One chip at a time: a kind, All, or Expiring soon. */
+  private templatesChip(selected: boolean): KeykeeperCategoryChip {
+    return {
+      type: TEMPLATES_CHIP,
+      category: "templates",
+      label: this.i18nService.t("keykeeperItemTemplates"),
+      selected,
+    };
+  }
+
+  /** One chip at a time: a kind, All, Expiring soon, or Item templates. */
   protected pick(type: KeykeeperCategoryChip["type"]) {
     this.filtersService.filterForm.patchValue(
       type === EXPIRING_CHIP
-        ? { cipherType: null, keykeeperExpiring: true }
-        : { cipherType: type, keykeeperExpiring: false },
+        ? { cipherType: null, keykeeperExpiring: true, keykeeperTemplates: false }
+        : type === TEMPLATES_CHIP
+          ? { cipherType: null, keykeeperExpiring: false, keykeeperTemplates: true }
+          : { cipherType: type, keykeeperExpiring: false, keykeeperTemplates: false },
     );
   }
 }

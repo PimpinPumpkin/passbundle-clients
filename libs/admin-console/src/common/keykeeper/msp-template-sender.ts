@@ -22,6 +22,7 @@ import { CollectionId, OrganizationId, UserId } from "@bitwarden/common/types/gu
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { CipherType, SecureNoteType } from "@bitwarden/common/vault/enums";
 import {
+  itemTyping,
   newTemplateDefinitionField,
   TEMPLATE_DEFINITION_FIELD_NAME,
   templateDefinition,
@@ -169,7 +170,8 @@ export class KeykeeperTemplateSender {
               field.type = f.type;
               return field;
             }),
-          newTemplateDefinitionField(definition.base, definition.id, msp.name),
+          // With the source's typed fields and its expiration date field.
+          newTemplateDefinitionField(definition.base, definition.id, msp.name, itemTyping(source)),
         ];
         let saved: CipherView;
         if (live) {

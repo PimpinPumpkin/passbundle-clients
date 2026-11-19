@@ -30,6 +30,8 @@ import {
   TEMPLATE_DEFINITION_FIELD_NAME,
   TEMPLATE_FIELD_NAME,
   templateDefinition,
+  typingOf,
+  withTyping,
 } from "@bitwarden/common/vault/keykeeper/templates";
 import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
 
@@ -94,7 +96,7 @@ function wellFormedRule(value: string | null | undefined): FillRule | null {
   };
 }
 
-/** A template marker rewritten from its id and name, or null. */
+/** A template marker rewritten from its id, name, and typed fields, or null. */
 function wellFormedMarker(value: string | null | undefined): string | null {
   try {
     const marker = JSON.parse(value ?? "");
@@ -102,7 +104,7 @@ function wellFormedMarker(value: string | null | undefined): string | null {
     if (typeof marker?.id !== "string" || !TEMPLATE_ID.test(marker.id) || !name) {
       return null;
     }
-    return JSON.stringify({ id: marker.id, name, v: 1 });
+    return withTyping(JSON.stringify({ id: marker.id, name, v: 1 }), typingOf(marker));
   } catch {
     return null;
   }
@@ -128,7 +130,12 @@ function wellFormed(field: FieldView, seen: Set<string>): string | null {
     case TEMPLATE_DEFINITION_FIELD_NAME: {
       // Never as an MSP's copy: that comes only from the MSP keeping it current.
       const definition = !seen.has(name) ? templateDefinition({ fields: [field] }) : null;
-      return definition ? JSON.stringify({ id: definition.id, base: definition.base, v: 1 }) : null;
+      return definition
+        ? withTyping(
+            JSON.stringify({ id: definition.id, base: definition.base, v: 1 }),
+            typingOf(JSON.parse(field.value ?? "")),
+          )
+        : null;
     }
     default:
       return null;
