@@ -187,6 +187,22 @@ describe("LocalBackedSessionStorage", () => {
         },
       ]);
     });
+
+    it("sends each update once to each of several pages open at the same time", async () => {
+      const pages = [connectPage(), connectPage(), connectPage()];
+
+      await sut.save("key", "value");
+
+      for (const page of pages) {
+        expect(page.updatesPosted()).toEqual([
+          {
+            action: "subject_update",
+            data: { key: "key", updateType: "save" },
+            originator: "background",
+          },
+        ]);
+      }
+    });
   });
 
   describe("get", () => {
