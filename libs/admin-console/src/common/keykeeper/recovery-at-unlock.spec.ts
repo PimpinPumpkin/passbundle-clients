@@ -80,6 +80,7 @@ function setup(
   policyService.policies$.mockReturnValue(policies$);
   const syncService = mock<SyncService>();
   syncService.fullSync.mockResolvedValue(true);
+  syncService.syncInProgress = false;
   const keyService = mock<KeyService>();
   keyService.userKey$.mockReturnValue(of(USER_KEY));
   const enrollment = mock<PasswordResetEnrollmentServiceAbstraction>();
@@ -96,7 +97,7 @@ function setup(
     enrollment,
     stateProvider,
     logService,
-    { pin, settleMs: 0 },
+    { pin, settleMs: 0, syncWaitMs: 1000 },
   );
   /** What clearOn: ["lock"] does when the account locks, then unlocking again. */
   const lockAndUnlock = async () => {
@@ -129,9 +130,44 @@ describe("enrolling in account recovery at unlock", () => {
     expect(outcomes).toEqual([{ organizationId: "dental", enrolled: true }]);
     expect(enrollment.enroll).toHaveBeenCalledTimes(1);
     expect(enrollment.enroll).toHaveBeenCalledWith("dental", USER, USER_KEY);
-    // Synced first, for a policy turned on since, and again after, for the organization's options.
-    expect(syncService.fullSync).toHaveBeenNthCalledWith(1, false);
-    expect(syncService.fullSync).toHaveBeenNthCalledWith(2, true);
+    // No sync of its own first; one after, for the organization's options.
+    expect(syncService.fullSync).toHaveBeenCalledTimes(1);
+    expect(syncService.fullSync).toHaveBeenCalledWith(true);
+  });
+
+  it("starts no sync where nobody is due, so none lands in the middle of what the person is doing", async () => {
+    const { recovery, enrollment, syncService } = setup([membership("dental")], []);
+
+    expect(await recovery.run(USER)).toEqual([]);
+    expect(enrollment.enroll).not.toHaveBeenCalled();
+    expect(syncService.fullSync).not.toHaveBeenCalled();
+  });
+
+  it("waits for the sync the app has under way as it unlocks, and enrolls where it brought the policy", async () => {
+    const { recovery, enrollment, syncService, policies$ } = setup([membership("dental")], []);
+    syncService.syncInProgress = true;
+    // The policy was turned on since this device last synced; the app's sync brings it.
+    setTimeout(() => {
+      policies$.next([recoveryPolicy("dental")]);
+      syncService.syncInProgress = false;
+    }, 300);
+
+    expect(await recovery.run(USER)).toEqual([{ organizationId: "dental", enrolled: true }]);
+    expect(enrollment.enroll).toHaveBeenCalledTimes(1);
+    expect(syncService.fullSync).toHaveBeenCalledTimes(1);
+    expect(syncService.fullSync).toHaveBeenCalledWith(true);
+  });
+
+  it("goes by what the device has when the app's sync doesn't finish in time, without starting one", async () => {
+    const { recovery, enrollment, syncService } = setup(
+      [membership("dental")],
+      [recoveryPolicy("dental")],
+    );
+    syncService.syncInProgress = true;
+
+    expect(await recovery.run(USER)).toEqual([{ organizationId: "dental", enrolled: true }]);
+    expect(enrollment.enroll).toHaveBeenCalledTimes(1);
+    expect(syncService.fullSync).not.toHaveBeenCalledWith(false);
   });
 
   it("does nothing for someone already enrolled", async () => {

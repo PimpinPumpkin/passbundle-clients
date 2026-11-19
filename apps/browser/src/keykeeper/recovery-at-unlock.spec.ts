@@ -80,6 +80,7 @@ function setup(pin: string | null, served: Record<string, string>) {
   policyService.policies$.mockReturnValue(of(Object.keys(served).map(recoveryPolicy)));
   const syncService = mock<SyncService>();
   syncService.fullSync.mockResolvedValue(true);
+  syncService.syncInProgress = false;
   const keyService = mock<KeyService>();
   keyService.userKey$.mockReturnValue(of(USER_KEY));
   const encryptService = mock<EncryptService>();
@@ -129,7 +130,15 @@ function setup(pin: string | null, served: Record<string, string>) {
     await stateProvider.setUserState(KEYKEEPER_RECOVERY_TRIED, null, USER);
     authStatus.next(AuthenticationStatus.Unlocked);
   };
-  return { recovery, encryptService, logService, enrolledIn, keysFetched, lockAndUnlock };
+  return {
+    recovery,
+    encryptService,
+    logService,
+    syncService,
+    enrolledIn,
+    keysFetched,
+    lockAndUnlock,
+  };
 }
 
 describe("enrolling in account recovery at unlock, in the extension", () => {
@@ -179,10 +188,11 @@ describe("enrolling in account recovery at unlock, in the extension", () => {
     expect(logService.warning).toHaveBeenCalledWith(expect.stringContaining("Org law (law)"));
   });
 
-  it("sends nothing without an install command's fingerprint, not even a request for the key", async () => {
-    const { recovery, encryptService, logService, enrolledIn, keysFetched } = setup(null, {
-      dental: dentalKey,
-    });
+  it("sends nothing without an install command's fingerprint, not even a request for the key, and starts no sync", async () => {
+    const { recovery, encryptService, logService, syncService, enrolledIn, keysFetched } = setup(
+      null,
+      { dental: dentalKey },
+    );
 
     expect(await recovery.run(USER)).toEqual([
       { organizationId: "dental", enrolled: false, error: NO_RECOVERY_PIN },
@@ -191,6 +201,7 @@ describe("enrolling in account recovery at unlock, in the extension", () => {
     expect(encryptService.encapsulateKeyUnsigned).not.toHaveBeenCalled();
     expect(enrolledIn()).toEqual([]);
     expect(logService.info).toHaveBeenCalledWith(expect.stringContaining(NO_RECOVERY_PIN));
+    expect(syncService.fullSync).not.toHaveBeenCalled();
   });
 
   it("checks again at the next unlock, and enrolls once the server serves the named key", async () => {

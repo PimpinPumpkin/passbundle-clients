@@ -69,6 +69,10 @@ export const KEYKEEPER_RECOVERY_TRIED = new UserKeyDefinition<boolean>(
 /** Lets the sync an app starts as it unlocks finish first. */
 const SETTLE_MS = 3000;
 
+/** How long it waits for that sync when it's still under way after SETTLE_MS. */
+const SYNC_WAIT_MS = 30_000;
+const SYNC_POLL_MS = 250;
+
 /**
  * For an app whose code doesn't come from the server: the one organization
  * key it may enroll to, as a fingerprint from outside the server (the
@@ -140,6 +144,7 @@ export class KeykeeperRecoveryAtUnlock {
       /** Only for an app whose code doesn't come from the server; see RecoveryKeyPin. */
       pin?: RecoveryKeyPin;
       settleMs?: number;
+      syncWaitMs?: number;
     } = {},
   ) {}
 
@@ -200,9 +205,14 @@ export class KeykeeperRecoveryAtUnlock {
     // Marked first, so nothing can make this unlock try twice.
     await tried.update(() => true);
 
-    // The policy may have changed since this device last synced; turning it
-    // on changes every member's account, so this syncs only then.
-    await this.syncService.fullSync(false);
+    // What the device has, once the sync the app makes as it unlocks is in:
+    // signing in and the lock screen sync, and turning the policy on
+    // changes every member's account, so a policy turned on since the last
+    // sync counts. This starts no sync of its own: one landing in the
+    // middle of something else (an item saved twice in a row, a selection
+    // in the admin console) would put back what the server had a moment
+    // before.
+    await this.appSyncDone(userId);
     const [organizations, policies, userKey] = await Promise.all([
       firstValueFrom(this.organizationService.organizations$(userId)),
       firstValueFrom(this.policyService.policies$(userId)),
@@ -246,5 +256,22 @@ export class KeykeeperRecoveryAtUnlock {
       await this.syncService.fullSync(true);
     }
     return outcomes;
+  }
+
+  /**
+   * Waits for a sync the app still has under way, up to SYNC_WAIT_MS and
+   * while the account stays unlocked, so what the device has includes it.
+   * Never starts one.
+   */
+  private async appSyncDone(userId: UserId): Promise<void> {
+    const until = Date.now() + (this.options.syncWaitMs ?? SYNC_WAIT_MS);
+    while (
+      this.syncService.syncInProgress === true &&
+      Date.now() < until &&
+      (await firstValueFrom(this.authService.authStatusFor$(userId))) ===
+        AuthenticationStatus.Unlocked
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, SYNC_POLL_MS));
+    }
   }
 }
