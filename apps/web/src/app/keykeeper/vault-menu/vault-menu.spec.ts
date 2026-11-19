@@ -18,6 +18,7 @@ import {
   filterAfter,
   folderPick,
   pickedLabel,
+  templatesPick,
   VaultMenuActions,
   VaultMenuState,
 } from "./vault-menu";
@@ -163,6 +164,7 @@ function state(
     ciphers,
     allItemsLabel: "All items",
     expiringLabel: "Expiring soon",
+    templatesLabel: "Item templates",
     typeTree: typeTree(favorites, login, card),
     organizationTree: organizations(),
     collectionTree: collections(),
@@ -183,6 +185,7 @@ function actions(): jest.Mocked<VaultMenuActions> {
     folder: jest.fn(),
     archive: jest.fn(),
     expiring: jest.fn(),
+    templates: jest.fn(),
   };
 }
 
@@ -240,6 +243,72 @@ describe("Keykeeper: Expiring soon", () => {
       collectionId: undefined,
       folderId: undefined,
       type: "expiring",
+    });
+  });
+});
+
+describe("Keykeeper: Item templates", () => {
+  const definition = (extra: object = {}) => [
+    {
+      name: "keykeeper.template-definition",
+      value: JSON.stringify({ id: "t-1", base: "login", v: 1, ...extra }),
+    },
+  ];
+  const withTemplates = [
+    ...ciphers,
+    item(CipherType.SecureNote, { fields: definition() }),
+    item(CipherType.SecureNote, {
+      organizationId: ORG,
+      collectionIds: ["c-office"],
+      fields: definition(),
+    }),
+    // An MSP's copy stays in its collection, not here.
+    item(CipherType.SecureNote, {
+      organizationId: ORG,
+      collectionIds: ["c-office"],
+      fields: definition({ from: "Northwind IT" }),
+    }),
+    item(CipherType.SecureNote, { fields: definition(), isDeleted: true }),
+  ];
+
+  it("shows only while the person has a template, with its count, and keeps templates out of All items", () => {
+    expect(buildVaultMenu(state(), actions()).templates).toBeUndefined();
+
+    const menu = buildVaultMenu(state({}, { ciphers: withTemplates }), actions());
+    expect(menu.templates).toMatchObject({ label: "Item templates", tile: "templates", count: 2 });
+    expect(menu.templates!.active).toBe(false);
+    // All items counts what it did without them.
+    expect(menu.all.count).toBe(buildVaultMenu(state(), actions()).all.count);
+  });
+
+  it("counts inside the place showing, and stays while picked", () => {
+    const inOrg = buildVaultMenu(
+      state({ organizationId: ORG, type: "templates" }, { ciphers: withTemplates }),
+      actions(),
+    );
+    expect(inOrg.templates).toMatchObject({ count: 1, active: true });
+    expect(pickedLabel(inOrg)).toBe("Item templates");
+
+    const nothingLeft = buildVaultMenu(state({ type: "templates" }), actions());
+    expect(nothingLeft.templates).toMatchObject({ count: 0, active: true });
+  });
+
+  it("picks like a category: inside the place showing, out of any folder", async () => {
+    const acts = actions();
+    await buildVaultMenu(state({}, { ciphers: withTemplates }), acts).templates!.select();
+    expect(acts.templates).toHaveBeenCalled();
+
+    expect(
+      templatesPick({
+        organizationId: ORG,
+        collectionId: "c-office" as CollectionId,
+        type: "login",
+      }),
+    ).toEqual({
+      organizationId: ORG,
+      collectionId: undefined,
+      folderId: undefined,
+      type: "templates",
     });
   });
 });

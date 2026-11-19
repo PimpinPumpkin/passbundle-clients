@@ -76,6 +76,7 @@ import { KeykeeperPickedLabelService } from "./picked-label.service";
 import {
   buildVaultMenu,
   expiringPick,
+  templatesPick,
   folderPick,
   pickedLabel,
   VaultMenuActions,
@@ -301,6 +302,7 @@ export class KeykeeperVaultMenuComponent extends VaultFilterComponent implements
       await this.pick(() => this.applyTypeFilter(node));
     },
     expiring: () => this.pick(() => this.bridgeService.navigate(expiringPick(this.routed()))),
+    templates: () => this.pick(() => this.bridgeService.navigate(templatesPick(this.routed()))),
   };
 
   protected readonly menu = computed(() => {
@@ -312,6 +314,7 @@ export class KeykeeperVaultMenuComponent extends VaultFilterComponent implements
         ciphers: this.ciphers(),
         allItemsLabel: this.i18nService.t("allItems"),
         expiringLabel: this.i18nService.t("keykeeperExpiringSoon"),
+        templatesLabel: this.i18nService.t("keykeeperItemTemplates"),
         typeTree: this.typeTree(),
         organizationTree: this.organizationTree(),
         collectionTree: this.collectionTree(),

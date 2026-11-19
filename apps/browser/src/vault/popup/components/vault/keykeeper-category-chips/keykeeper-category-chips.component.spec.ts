@@ -19,6 +19,7 @@ describe("KeykeeperCategoryChipsComponent", () => {
   let filters$: BehaviorSubject<PopupListFilter>;
   let typesWithItems$: BehaviorSubject<CipherType[]>;
   let expiringCount$: BehaviorSubject<number>;
+  let templatesCount$: BehaviorSubject<number>;
 
   const emptyFilters: PopupListFilter = {
     organization: null,
@@ -26,6 +27,7 @@ describe("KeykeeperCategoryChipsComponent", () => {
     folder: null,
     cipherType: null,
     keykeeperExpiring: false,
+    keykeeperTemplates: false,
   };
 
   const chips = () =>
@@ -40,6 +42,7 @@ describe("KeykeeperCategoryChipsComponent", () => {
   beforeEach(async () => {
     filters$ = new BehaviorSubject(emptyFilters);
     expiringCount$ = new BehaviorSubject(0);
+    templatesCount$ = new BehaviorSubject(0);
     typesWithItems$ = new BehaviorSubject([
       CipherType.Login,
       CipherType.SecureNote,
@@ -73,6 +76,7 @@ describe("KeykeeperCategoryChipsComponent", () => {
           useValue: {
             keykeeperTypesWithItems$: typesWithItems$,
             keykeeperExpiringCount$: expiringCount$,
+            keykeeperTemplatesCount$: templatesCount$,
           },
         },
       ],
@@ -163,6 +167,50 @@ describe("KeykeeperCategoryChipsComponent", () => {
       cipherType: CipherType.Login,
       keykeeperExpiring: false,
     });
+  });
+
+  it("offers Item templates last while there are templates, one chip at a time", () => {
+    const button = (label: string) =>
+      [...(fixture.nativeElement as HTMLElement).querySelectorAll("button")].find(
+        (b) => b.textContent?.trim() === label,
+      )!;
+    expect(chips().map((c) => c.label)).not.toContain("keykeeperItemTemplates");
+
+    expiringCount$.next(1);
+    templatesCount$.next(2);
+    fixture.detectChanges();
+    expect(chips().slice(-2)).toEqual([
+      { label: "keykeeperExpiringSoon", category: "expiring", pressed: "false" },
+      { label: "keykeeperItemTemplates", category: "templates", pressed: "false" },
+    ]);
+
+    button("keykeeperExpiringSoon").click();
+    button("keykeeperItemTemplates").click();
+    fixture.detectChanges();
+    expect(filterForm.value).toMatchObject({
+      cipherType: null,
+      keykeeperExpiring: false,
+      keykeeperTemplates: true,
+    });
+    expect(
+      chips()
+        .filter((c) => c.pressed === "true")
+        .map((c) => c.label),
+    ).toEqual(["keykeeperItemTemplates"]);
+
+    // Still there once none are left, while it's picked.
+    templatesCount$.next(0);
+    fixture.detectChanges();
+    expect(chips().at(-1)?.label).toBe("keykeeperItemTemplates");
+
+    button("all").click();
+    fixture.detectChanges();
+    expect(filterForm.value).toMatchObject({
+      cipherType: null,
+      keykeeperExpiring: false,
+      keykeeperTemplates: false,
+    });
+    expect(chips().find((c) => c.label === "all")?.pressed).toBe("true");
   });
 
   it("shows Expiring soon even with only one kind of item", () => {
