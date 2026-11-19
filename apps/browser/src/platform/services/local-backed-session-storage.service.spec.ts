@@ -7,6 +7,9 @@ import { FakeStorageService, makeEncString, makeSymmetricCryptoKey } from "@bitw
 import { EncryptService, KeyGenerationService, SymmetricCryptoKey } from "@bitwarden/legacy-crypto";
 import { StorageService } from "@bitwarden/storage-core";
 
+import { MemoryStoragePortMessage } from "../storage/port-messages";
+import { portName } from "../storage/port-name";
+
 import BrowserLocalStorageService from "./browser-local-storage.service";
 import {
   LocalBackedSessionStorageService,
@@ -111,6 +114,79 @@ describe("LocalBackedSessionStorage", () => {
       platformUtilsService,
       logService,
     );
+  });
+
+  // Keykeeper: every extension page that connected (each popup open, popped-out
+  // windows, the passkey window) left an updates$ subscription behind, so each
+  // later update went out once more for every page ever opened.
+  describe("port connections", () => {
+    let onConnect: (port: chrome.runtime.Port) => void;
+    let subscribeSpy: jest.SpyInstance;
+
+    function connectPage() {
+      const disconnectListeners: (() => void)[] = [];
+      const postMessage = jest.fn();
+      const port = {
+        name: portName(chrome.storage.session),
+        sender: { origin: "chrome-extension://id", url: "chrome-extension://id/popup/index.html" },
+        postMessage,
+        onMessage: { addListener: jest.fn(), removeListener: jest.fn() },
+        onDisconnect: { addListener: jest.fn((cb: () => void) => disconnectListeners.push(cb)) },
+      } as unknown as chrome.runtime.Port;
+      onConnect(port);
+      return {
+        postMessage,
+        disconnect: () => disconnectListeners.forEach((cb) => cb()),
+        updatesPosted: () =>
+          postMessage.mock.calls
+            .map(([message]) => message as MemoryStoragePortMessage)
+            .filter((message) => message.action === "subject_update"),
+      };
+    }
+
+    beforeEach(() => {
+      onConnect = (chrome.runtime.onConnect.addListener as jest.Mock).mock.lastCall[0];
+      subscribeSpy = jest.spyOn(sut.updates$, "subscribe");
+      encryptService.encryptString.mockResolvedValue(makeEncString("encrypted"));
+    });
+
+    afterEach(() => {
+      subscribeSpy.mockRestore();
+    });
+
+    it("stops sending updates to a page once it disconnects, and drops its subscription", async () => {
+      const page = connectPage();
+      expect(page.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ action: "initialization", originator: "background" }),
+      );
+      expect(subscribeSpy).toHaveBeenCalledTimes(1);
+      const subscription = subscribeSpy.mock.results[0].value;
+
+      page.disconnect();
+      page.postMessage.mockClear();
+      await sut.save("key", "value");
+
+      expect(page.postMessage).not.toHaveBeenCalled();
+      expect(subscription.closed).toBe(true);
+      expect(sut["updatesSubject"].observed).toBe(false);
+    });
+
+    it("sends each update once to a page that's still open after other pages have closed", async () => {
+      const open = connectPage();
+      for (let i = 0; i < 3; i++) {
+        connectPage().disconnect();
+      }
+
+      await sut.save("key", "value");
+
+      expect(open.updatesPosted()).toEqual([
+        {
+          action: "subject_update",
+          data: { key: "key", updateType: "save" },
+          originator: "background",
+        },
+      ]);
+    });
   });
 
   describe("get", () => {

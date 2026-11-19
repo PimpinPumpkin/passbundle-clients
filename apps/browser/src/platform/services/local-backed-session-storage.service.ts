@@ -115,7 +115,16 @@ export class LocalBackedSessionStorageService
       this.ports.add(port);
 
       const listenerCallback = this.onMessageFromForeground.bind(this);
+      // Keykeeper: upstream's fix from bitwarden/clients#24277 (6b8ce54785), this hunk only.
+      // One per port, dropped on disconnect so each popup open doesn't leave a listener behind.
+      const updatesSubscription = this.updates$.subscribe((update) => {
+        this.broadcastMessage({
+          action: "subject_update",
+          data: update,
+        });
+      });
       port.onDisconnect.addListener(() => {
+        updatesSubscription.unsubscribe();
         this.ports.delete(port);
         port.onMessage.removeListener(listenerCallback);
       });
@@ -124,12 +133,6 @@ export class LocalBackedSessionStorageService
       this.sendMessageTo(port, {
         action: "initialization",
         data: Array.from(Object.keys(this.cache)),
-      });
-      this.updates$.subscribe((update) => {
-        this.broadcastMessage({
-          action: "subject_update",
-          data: update,
-        });
       });
     });
   }
