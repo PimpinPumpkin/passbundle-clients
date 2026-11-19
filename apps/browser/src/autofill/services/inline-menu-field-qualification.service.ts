@@ -1,3 +1,4 @@
+import { isAddressFieldByName } from "../keykeeper/address-fields";
 import AutofillField from "../models/autofill-field";
 import AutofillPageDetails from "../models/autofill-page-details";
 import { sendExtensionMessage } from "../utils";
@@ -353,9 +354,9 @@ export class InlineMenuFieldQualificationService implements InlineMenuFieldQuali
    * Validates the provided field as a field for an identity form.
    *
    * @param field - The field to validate
-   * @param _pageDetails - Currently unused, will likely be required in the future
+   * @param pageDetails - The details of the page that the field is on.
    */
-  isFieldForIdentityForm(field: AutofillField, _pageDetails: AutofillPageDetails): boolean {
+  isFieldForIdentityForm(field: AutofillField, pageDetails: AutofillPageDetails): boolean {
     if (this.isExcludedFieldType(field, this.excludedAutofillFieldTypesSet)) {
       return false;
     }
@@ -363,7 +364,10 @@ export class InlineMenuFieldQualificationService implements InlineMenuFieldQuali
     return (
       // Recognize explicit identity email fields (like id="new-email")
       this.isFieldForIdentityEmail(field) ||
-      this.fieldContainsAutocompleteValues(field, this.identityAutocompleteValues)
+      this.fieldContainsAutocompleteValues(field, this.identityAutocompleteValues) ||
+      // Keykeeper: and address fields known only by name or label, in a form
+      // that asks for an address (keykeeper/address-fields.ts).
+      isAddressFieldByName(field, pageDetails)
     );
   }
 

@@ -781,7 +781,15 @@ function brandCli() {
     read("apps/cli/src/keykeeper/brand.ts").replace(
       /export const CLI_BRAND: CliBrand = \{[\s\S]*?\n\};/,
       `export const CLI_BRAND: CliBrand = ${JSON.stringify(
-        { name: BRAND.name, command, envPrefix: prefix, version, releases: cli.releases },
+        {
+          name: BRAND.name,
+          command,
+          envPrefix: prefix,
+          version,
+          releases: cli.releases,
+          // The server `script get` asks by default: the product's own service.
+          server: BRAND.urls.webVault,
+        },
         null,
         2,
       )};`,
