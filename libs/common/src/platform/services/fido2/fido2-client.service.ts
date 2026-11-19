@@ -222,12 +222,17 @@ export class Fido2ClientService<
         throw new FallbackRequestedError();
       }
 
+      // Keykeeper: the authenticator says this only when the vault has a passkey the site named
+      // (excludeCredentials), so the site hears that, in words of its own.
       if (
         error instanceof Fido2AuthenticatorError &&
         error.errorCode === Fido2AuthenticatorErrorCode.InvalidState
       ) {
-        this.logService?.warning(`[Fido2Client] Unknown error: ${error}`);
-        throw new DOMException("Unknown error occured.", "InvalidStateError");
+        this.logService?.info(`[Fido2Client] Excluded credential: ${error}`);
+        throw new DOMException(
+          "A passkey the site named is already saved for this account.",
+          "InvalidStateError",
+        );
       }
 
       this.logService?.info(`[Fido2Client] Aborted by user: ${error}`);
