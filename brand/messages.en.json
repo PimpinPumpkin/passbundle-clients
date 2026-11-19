@@ -173,6 +173,9 @@
   "keykeeperExpiringSoon": {
     "message": "Expiring soon"
   },
+  "keykeeperItemTemplates": {
+    "message": "Item templates"
+  },
   "keykeeperVersionHistory": {
     "message": "Version history"
   },

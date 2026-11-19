@@ -32,6 +32,7 @@ import { SearchService } from "@bitwarden/common/vault/abstractions/search.servi
 import { VaultSettingsService } from "@bitwarden/common/vault/abstractions/vault-settings/vault-settings.service";
 import { CipherType } from "@bitwarden/common/vault/enums";
 import { isExpiringSoon } from "@bitwarden/common/vault/keykeeper/expiration";
+import { isOwnTemplate } from "@bitwarden/common/vault/keykeeper/templates";
 import { RestrictedItemTypesService } from "@bitwarden/common/vault/services/restricted-item-types.service";
 import {
   CipherViewLike,
@@ -321,6 +322,20 @@ export class VaultPopupItemsService {
             !CipherViewLikeUtils.isDeleted(cipher) &&
             isExpiringSoon(cipher as Parameters<typeof isExpiringSoon>[0]),
         ).length,
+    ),
+    distinctUntilChanged(),
+    shareReplay({ refCount: true, bufferSize: 1 }),
+  );
+
+  /**
+   * Keykeeper: how many of the person's own templates and their
+   * organizations' there are, for the category chips' "Item templates".
+   */
+  keykeeperTemplatesCount$: Observable<number> = this._activeCipherList$.pipe(
+    map(
+      (ciphers) =>
+        ciphers.filter((cipher) => !CipherViewLikeUtils.isDeleted(cipher) && isOwnTemplate(cipher))
+          .length,
     ),
     distinctUntilChanged(),
     shareReplay({ refCount: true, bufferSize: 1 }),

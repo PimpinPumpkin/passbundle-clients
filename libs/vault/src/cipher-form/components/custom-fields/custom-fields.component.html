@@ -29,11 +29,30 @@
             [cdkDragDisabled]="dragDisabled(field.value.type)"
             #customFieldRow
           >
-            <!-- Text Field -->
+            <!-- Text Field. Keykeeper: a template's typed fields (a date, a
+                 website, an email address, a phone number, a number) get
+                 their own input, and a warning that never stops a save. -->
             @if (field.value.type === FieldType.Text) {
               <bit-form-field class="tw-flex-1" disableMargin>
                 <bit-label>{{ field.value.name }}</bit-label>
-                <input bitInput formControlName="value" data-testid="custom-text-field" />
+                <input
+                  bitInput
+                  formControlName="value"
+                  data-testid="custom-text-field"
+                  [type]="inputType(field)"
+                  [attr.inputmode]="inputMode(field)"
+                />
+                @if (problem(field); as warning) {
+                  <bit-hint data-testid="keykeeper-field-warning"
+                    ><i
+                      class="bwi bwi-exclamation-triangle tw-text-warning tw-mr-1"
+                      aria-hidden="true"
+                    ></i
+                    >{{ warning }}</bit-hint
+                  >
+                } @else if (kindNote(field); as note) {
+                  <bit-hint data-testid="keykeeper-field-kind">{{ note }}</bit-hint>
+                }
                 @if (canEdit(field.value.type)) {
                   <button
                     type="button"
@@ -72,6 +91,9 @@
                   data-testid="custom-hidden-field"
                   class="tw-font-mono"
                 />
+                @if (kindNote(field); as note) {
+                  <bit-hint data-testid="keykeeper-field-kind">{{ note }}</bit-hint>
+                }
                 @if (canViewPasswords(i)) {
                   <button
                     type="button"

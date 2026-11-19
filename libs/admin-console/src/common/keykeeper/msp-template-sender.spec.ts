@@ -9,9 +9,13 @@ import { AccountService } from "@bitwarden/common/auth/abstractions/account.serv
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
-import { CipherType } from "@bitwarden/common/vault/enums";
-import { newTemplateDefinitionField } from "@bitwarden/common/vault/keykeeper/templates";
+import { CipherType, FieldType } from "@bitwarden/common/vault/enums";
+import {
+  customTemplate,
+  newTemplateDefinitionField,
+} from "@bitwarden/common/vault/keykeeper/templates";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
+import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
 import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
 import { KeyService } from "@bitwarden/key-management";
 // eslint-disable-next-line no-restricted-imports
@@ -172,6 +176,33 @@ describe("Sending a template", () => {
     expect(result.failed).toEqual([]);
     expect(cipherService.updateWithServer.mock.calls[0][0].id).toBe("copy");
     expect(cipherService.createWithServer).not.toHaveBeenCalled();
+  });
+
+  // DESIGN.md, "Where a field's type is kept".
+  it("gives the copy the template's typed fields and its expiration date field", async () => {
+    const source = template("source", "msp-shared", "fw");
+    source.fields = [
+      Object.assign(new FieldView(), { name: "Renews", type: FieldType.Text, value: "" }),
+      Object.assign(new FieldView(), { name: "Console", type: FieldType.Text, value: "" }),
+      newTemplateDefinitionField("note", "fw", undefined, {
+        types: { Renews: "date", Console: "url" },
+        expires: "Renews",
+      }),
+    ];
+    const { sender, cipherService } = setup([source]);
+    await sender.send(msp, source, [{ id: "dental", name: "Acme Dental" }], {
+      ...state("none"),
+      copies: [],
+    });
+
+    const copy = cipherService.createWithServer.mock.calls[0][0];
+    expect({ ...customTemplate(copy as any), source: undefined }).toMatchObject({
+      copy: true,
+      fields: [
+        { label: "Renews", kind: "date", expires: true },
+        { label: "Console", kind: "url" },
+      ],
+    });
   });
 
   it("never overwrites an item that isn't a copy of it, whatever the server recorded", async () => {
