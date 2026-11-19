@@ -130,7 +130,11 @@ export class Fido2AuthenticatorService<
           `[Fido2Authenticator] Aborting due to excluded credential found in vault.`,
         );
         await userInterfaceSession.informExcludedCredential(existingCipherIds);
-        throw new Fido2AuthenticatorError(Fido2AuthenticatorErrorCode.NotAllowed);
+        // Keykeeper: WebAuthn's InvalidStateError (authenticatorMakeCredential, step 3) once the
+        // person has seen that it's already saved and closed the window with its Close button, so
+        // the site can tell a passkey it already has from someone cancelling. Closing the window
+        // itself still hands the request to the browser, as everywhere else.
+        throw new Fido2AuthenticatorError(Fido2AuthenticatorErrorCode.InvalidState);
       }
 
       let cipher: CipherView;
