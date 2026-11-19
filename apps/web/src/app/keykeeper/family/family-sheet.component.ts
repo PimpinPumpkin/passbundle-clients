@@ -17,8 +17,8 @@ export type FamilySheet = {
   familyName: string;
   webVault: string;
   download: string;
-  /** While the link works: its QR code and when it ends. */
-  link: { qr: string | null; endsAt: Date } | null;
+  /** While the link works: its QR code, when it ends, and whether it lets people in on its own. */
+  link: { qr: string | null; endsAt: Date; automatic: boolean } | null;
 };
 
 /**
@@ -76,10 +76,15 @@ export type FamilySheet = {
                   data-testid="family-sheet-qr"
                 />
               }
-              <span data-testid="family-sheet-ends"
-                >Anyone who scans it can ask to join until {{ ends(link.endsAt) }}, so keep this
-                sheet at home.</span
-              >
+              <span data-testid="family-sheet-ends">
+                @if (link.automatic) {
+                  Anyone who scans it gets in until {{ ends(link.endsAt) }}, so keep this sheet at
+                  home.
+                } @else {
+                  Anyone who scans it can ask to join until {{ ends(link.endsAt) }}, so keep this
+                  sheet at home.
+                }
+              </span>
             } @else {
               <span data-testid="family-sheet-no-link"
                 >Ask whoever runs {{ s.familyName }} for an invite link.</span
@@ -143,6 +148,7 @@ export class KeykeeperFamilySheetComponent implements OnInit {
           : {
               qr: await qrCodeImage(shown.address, 240),
               endsAt: new Date(shown.settings.expiresAt * 1000),
+              automatic: shown.settings.automatic === true,
             },
     });
   }
