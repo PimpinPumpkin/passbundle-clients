@@ -54,6 +54,8 @@ describe("applyBrandEnvironment", () => {
       envPrefix: "PASSBUNDLE_",
       version: "",
       releases: "",
+      releaseRepository: "",
+      releaseKeys: [] as string[],
       server: "",
     };
     // `script get` reads PASSBUNDLE_TOKEN, the PowerShell module's name.
