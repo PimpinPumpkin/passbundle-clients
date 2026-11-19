@@ -186,13 +186,18 @@ describe("FidoAuthenticatorService", () => {
         expect(userInterfaceSession.informExcludedCredential).toHaveBeenCalled();
       });
 
-      /** Spec: return an error code equivalent to "NotAllowedError" and terminate the operation. */
-      it("should throw error", async () => {
+      /**
+       * Spec: If the user confirms consent to create a new credential, return an error code
+       * equivalent to "InvalidStateError" and terminate the operation.
+       * Keykeeper: closing the window with its Close button, once told, is that gesture; closing
+       * the window itself falls back to the browser instead (the user interface session throws).
+       */
+      it("should throw InvalidState once the user is informed", async () => {
         userInterfaceSession.informExcludedCredential.mockResolvedValue();
 
         const result = async () => await authenticator.makeCredential(params, windowReference);
 
-        await expect(result).rejects.toThrow(Fido2AuthenticatorErrorCode.NotAllowed);
+        await expect(result).rejects.toThrow(Fido2AuthenticatorErrorCode.InvalidState);
       });
 
       /** Deviation: Organization ciphers are not checked against excluded credentials, even if the user has access to them. */
