@@ -84,6 +84,8 @@ function buildUserDetails(
     userId: any;
     externalId: string;
     ssoExternalId: string;
+    type: OrganizationUserType;
+    permissions: PermissionsApi;
   }> = {},
 ): OrganizationUserAdminView {
   return new OrganizationUserAdminView({
@@ -92,11 +94,11 @@ function buildUserDetails(
     organizationId: ORG_ID,
     collections: [],
     groups: [],
-    type: OrganizationUserType.User,
+    type: overrides.type ?? OrganizationUserType.User,
     status: OrganizationUserStatusType.Confirmed,
     externalId: overrides.externalId ?? "",
     ssoExternalId: overrides.ssoExternalId ?? "",
-    permissions: new PermissionsApi(),
+    permissions: overrides.permissions ?? new PermissionsApi(),
     accessSecretsManager: false,
     accessPam: false,
     resetPasswordEnrolled: false,
@@ -343,6 +345,106 @@ describe("EditMemberDialogComponent", () => {
         expect.anything(),
         expect.anything(),
       );
+    });
+  });
+
+  // Keykeeper: every permission our server enforces, offered together; the
+  // dialog no longer hides any combination (DESIGN.md, "Roles and permissions").
+  describe("Keykeeper: a custom role's permissions", () => {
+    const custom = (permissions: Partial<PermissionsApi>) =>
+      buildUserDetails({
+        type: OrganizationUserType.Custom,
+        permissions: Object.assign(new PermissionsApi(), permissions),
+      });
+    const checkboxes = (fixture: ComponentFixture<EditMemberDialogComponent>) =>
+      Array.from(
+        fixture.nativeElement.querySelectorAll(
+          "[data-testid=custom-role-permissions] input[type=checkbox]",
+        ) as NodeListOf<HTMLInputElement>,
+      );
+
+    it("offers every permission together, and none of upstream's Manage all collections", async () => {
+      const { fixture } = await createComponent(defaultParams(), {
+        userDetails: custom({ manageUsers: true, keykeeperManageCollections: true }),
+      });
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(checkboxes(fixture)).toHaveLength(9);
+      expect(checkboxes(fixture).filter((c) => c.checked)).toHaveLength(2);
+      expect(fixture.nativeElement.querySelector("app-nested-checkbox")).toBeNull();
+      expect(
+        fixture.nativeElement.querySelector("[data-testid=custom-role-no-collections]"),
+      ).toBeNull();
+    });
+
+    it("sends the new permissions, with managing shared folders as creating them and never editing or deleting every one", async () => {
+      const { fixture, component, mocks } = await createComponent(defaultParams(), {
+        userDetails: custom({
+          manageUsers: true,
+          manageGroups: true,
+          accessReports: true,
+          keykeeperManageCollections: true,
+          keykeeperAccessAllItems: true,
+        }),
+      });
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      await component.submit();
+
+      const request = mocks.userAdminService.saveV2.mock.calls[0][0] as unknown as {
+        type: OrganizationUserType;
+        permissions: PermissionsApi;
+      };
+      expect(request.type).toBe(OrganizationUserType.Custom);
+      expect(request.permissions).toMatchObject({
+        manageUsers: true,
+        manageGroups: true,
+        accessReports: true,
+        keykeeperManageCollections: true,
+        keykeeperAccessAllItems: true,
+        createNewCollections: true,
+        editAnyCollection: false,
+        deleteAnyCollection: false,
+        managePolicies: false,
+      });
+    });
+
+    it("shows upstream's Manage all collections as managing shared folders with access to all items", async () => {
+      const { fixture, component } = await createComponent(defaultParams(), {
+        userDetails: custom({
+          createNewCollections: true,
+          editAnyCollection: true,
+          deleteAnyCollection: true,
+        }),
+      });
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect((component as any).permissionsGroup.getRawValue()).toMatchObject({
+        keykeeperManageCollections: true,
+        keykeeperAccessAllItems: true,
+        manageUsers: false,
+      });
+    });
+
+    it("sends no permissions for any other role", async () => {
+      const { fixture, component, mocks } = await createComponent(defaultParams(), {
+        userDetails: custom({ manageUsers: true }),
+      });
+      fixture.detectChanges();
+      await fixture.whenStable();
+      (component as any).formGroup.controls.type.setValue(OrganizationUserType.User);
+
+      await component.submit();
+
+      const request = mocks.userAdminService.saveV2.mock.calls[0][0] as unknown as {
+        permissions: PermissionsApi;
+      };
+      expect(request.permissions.manageUsers).toBeFalsy();
+      expect(request.permissions.keykeeperManageCollections).toBeFalsy();
     });
   });
 

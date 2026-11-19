@@ -34,6 +34,8 @@ const brand: CliBrand = {
   envPrefix: "PASSBUNDLE_",
   version: "",
   releases: "",
+  releaseRepository: "",
+  releaseKeys: [],
   server: "https://vault.example.com",
 };
 

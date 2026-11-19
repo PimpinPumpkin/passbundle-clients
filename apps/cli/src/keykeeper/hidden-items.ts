@@ -59,11 +59,6 @@ export function itemWithoutSecrets(item: CipherView): CipherView {
   return shown;
 }
 
-/** The item as a command shows it: all of it, or its plain values only. */
-export function shownItem(item: CipherView): CipherView {
-  return maySeeSecrets(item) ? item : itemWithoutSecrets(item);
-}
-
 const blank = (value: unknown) => value == null || value === "";
 
 type Values = Record<string, unknown>;
