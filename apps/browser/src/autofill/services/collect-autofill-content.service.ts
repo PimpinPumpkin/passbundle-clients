@@ -5,6 +5,7 @@ import {
   FormPurposeCategory,
 } from "@bitwarden/common/autofill/types";
 
+import { KeykeeperSiteRuleFields } from "../keykeeper/site-rule-fields";
 import AutofillField from "../models/autofill-field";
 import AutofillForm from "../models/autofill-form";
 import AutofillPageDetails from "../models/autofill-page-details";
@@ -87,6 +88,8 @@ export class CollectAutofillContentService implements CollectAutofillContentServ
   private readonly overlaySetupDelayMs = 100;
   // Constructed in the constructor body, not here: it closes over a field declared further down.
   private readonly shadowTracker: ShadowHostHydrationTracker;
+  // Keykeeper: marks the fields site rules name by selector (keykeeper/site-rule-fields.ts).
+  private readonly keykeeperSiteRuleFields: KeykeeperSiteRuleFields;
   private ownedExperienceTagNames: string[] = [];
   private readonly updateAfterMutationTimeout = 1000;
   private readonly shadowDomCheckDebounceMs = 300;
@@ -149,6 +152,9 @@ export class CollectAutofillContentService implements CollectAutofillContentServ
       this.domQueryService,
       this.mutationObserver,
       () => this.debouncedRequirePageDetailsUpdate(),
+    );
+    this.keykeeperSiteRuleFields = new KeykeeperSiteRuleFields(this.domQueryService, (command) =>
+      this.sendExtensionMessage(command),
     );
   }
 
@@ -294,6 +300,7 @@ export class CollectAutofillContentService implements CollectAutofillContentServ
 
     if (!this.domRecentlyMutated && this.autofillFieldElements.size) {
       this.updateCachedAutofillFieldVisibility();
+      await this.keykeeperSiteRuleFields.mark(this.autofillFieldElements);
 
       return this.getFormattedPageDetails(
         this.getFormattedAutofillFormsData(),
@@ -308,6 +315,7 @@ export class CollectAutofillContentService implements CollectAutofillContentServ
       formFieldElements as FormFieldElement[],
     );
     this.sortAutofillFieldElementsMap();
+    await this.keykeeperSiteRuleFields.mark(this.autofillFieldElements);
 
     if (!autofillFieldsData.length) {
       this.noFieldsFound = true;

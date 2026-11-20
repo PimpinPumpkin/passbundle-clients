@@ -23,8 +23,7 @@ import { schemeOf } from "@bitwarden/common/vault/keykeeper/fill-rules";
 
 import { BrowserApi } from "../../platform/browser/browser-api";
 
-
-import { FieldFingerprint, FillRule, hostOf, schemeOfUrl } from "./fill-rules";
+import { FieldFingerprint, FillRule, hostOf, SiteFixRules, schemeOfUrl } from "./fill-rules";
 
 export type FixFill = "username" | "password" | "totp" | "never";
 export type SiteFix = {
@@ -192,7 +191,9 @@ export class KeykeeperSiteFixes {
   }
 
   private async using(userId: UserId): Promise<boolean> {
-    return (await firstValueFrom(this.stateProvider.getUser(userId, USE_SITE_FIXES).state$)) !== false;
+    return (
+      (await firstValueFrom(this.stateProvider.getUser(userId, USE_SITE_FIXES).state$)) !== false
+    );
   }
 
   /**
@@ -221,19 +222,30 @@ export class KeykeeperSiteFixes {
    * ones. Only on https pages, and none for someone who turned them off.
    */
   async rulesFor(url: string): Promise<FillRule[]> {
+    const { msp, confirmed } = await this.rulesByKind(url);
+    return [...msp, ...confirmed];
+  }
+
+  /**
+   * The same, apart: the fill rules engine puts a feed's site rules between
+   * the two (fill-rules.ts, `applyFillRules`).
+   */
+  async rulesByKind(url: string): Promise<SiteFixRules> {
     const userId = await this.activeUser();
     const host = hostOf(url);
     if (userId == null || host === "" || schemeOfUrl(url) !== "https") {
-      return [];
+      return { msp: [], confirmed: [] };
     }
     if (!(await this.using(userId))) {
-      return [];
+      return { msp: [], confirmed: [] };
     }
     const list = await firstValueFrom(this.stateProvider.getUser(userId, FIX_LIST).state$);
-    return [...(list?.rules ?? []), ...(list?.fixes ?? [])]
-      .filter((fix) => fix.host === host)
-      .map(toRule)
-      .filter((rule): rule is FillRule => rule != null);
+    const rules = (fixes: SiteFix[] | undefined) =>
+      (fixes ?? [])
+        .filter((fix) => fix.host === host)
+        .map(toRule)
+        .filter((rule): rule is FillRule => rule != null);
+    return { msp: rules(list?.rules), confirmed: rules(list?.fixes) };
   }
 
   /** Shares a rule the person made, if they chose to share and it can be a fix. */
