@@ -96,6 +96,7 @@ import { getMspMemberHealth, MspMemberHealthClient, ownHealthLine } from "./msp-
 import { KeykeeperMspMemberHealthComponent } from "./msp-member-health.component";
 import { clientPolicySummary } from "./msp-policies";
 import { KeykeeperMspSeatsComponent } from "./msp-seats.component";
+import { SET_UP_REFUSED } from "./msp-setup";
 import { KeykeeperMspSiteFixesComponent } from "./msp-site-fixes.component";
 import { KeykeeperMspTemplatesComponent } from "./msp-templates.component";
 import { KeykeeperMspTwoStepComponent } from "./msp-two-step.component";
@@ -1024,6 +1025,11 @@ const CLIENT_FEATURES = {
             }
           }
         </section>
+      } @else if (!setUpAllowed()) {
+        <!-- Keykeeper: the server's MSP_SIGNUPS_ALLOWED is off, so no form that would fail at its last step. -->
+        <bit-callout type="info" title="Set up your MSP" data-testid="msp-setup-refused">
+          {{ setUpRefused }}
+        </bit-callout>
       } @else {
         <bit-callout type="info" title="Set up your MSP">
           Run all of your clients from one place. You'll be an admin of your MSP, and you can add
@@ -1073,6 +1079,9 @@ export class KeykeeperMspComponent implements OnInit {
   protected readonly trusted = signal<Set<string> | null>(null);
   /** Keykeeper: no two-step login that counts for MSP staff yet (DESIGN.md, "Two-step login for admins"). */
   protected readonly needsTwoStep = signal(false);
+  /** Keykeeper: whether this server lets people set up an MSP (MSP_SIGNUPS_ALLOWED). */
+  protected readonly setUpAllowed = signal(true);
+  protected readonly setUpRefused = SET_UP_REFUSED;
   protected readonly invitation = signal<{ token: string; info: InvitationInfo } | null>(null);
   protected readonly lastInvite = signal<{
     email: string;
@@ -1242,8 +1251,9 @@ export class KeykeeperMspComponent implements OnInit {
     try {
       const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
       this.myUserId.set(userId);
-      const msps = await this.mspApi.list();
+      const { msps, setUpAllowed } = await this.mspApi.listForConsole();
       this.msps.set(msps);
+      this.setUpAllowed.set(setUpAllowed);
       // Keykeeper: the MSP chosen in this browser, if they're still on its staff.
       const chosen = chosenMsp(msps, rememberedMsp(browserStorage(), userId));
       if (chosen) {

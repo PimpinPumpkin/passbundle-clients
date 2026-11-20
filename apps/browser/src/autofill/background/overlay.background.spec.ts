@@ -44,9 +44,11 @@ import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.servi
 import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { VaultSettingsService } from "@bitwarden/common/vault/abstractions/vault-settings/vault-settings.service";
 import { CipherRepromptType, CipherType, FieldType } from "@bitwarden/common/vault/enums";
+import { CardView } from "@bitwarden/common/vault/models/view/card.view";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { Fido2CredentialView } from "@bitwarden/common/vault/models/view/fido2-credential.view";
 import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
+import { IdentityView } from "@bitwarden/common/vault/models/view/identity.view";
 import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
 import { CredentialGeneratorService } from "@bitwarden/generator-core";
 import { GeneratedCredential, GeneratorHistoryService } from "@bitwarden/generator-history";
@@ -65,6 +67,8 @@ import {
   MAX_SUB_FRAME_DEPTH,
   RedirectFocusDirection,
 } from "../enums/autofill-overlay.enum";
+import { keykeeperFillPicker } from "../keykeeper/fill-field-menu";
+import AutofillField from "../models/autofill-field";
 import { AutofillService } from "../services/abstractions/autofill.service";
 import { InlineMenuFieldQualificationService } from "../services/inline-menu-field-qualification.service";
 import {
@@ -2314,6 +2318,106 @@ describe("OverlayBackground", () => {
       });
     });
 
+    // Keykeeper: the fill picker's choices for cards and identities, and a
+    // login's one-tap suggestion for the focused field (keykeeper/label-match.ts).
+    describe("Keykeeper: the fill picker's choices and one-tap suggestions", () => {
+      const original = { ...keykeeperFillPicker };
+      const bank = () => {
+        const cipher = new CipherView();
+        cipher.id = "cipher-1";
+        cipher.type = CipherType.Login;
+        cipher.name = "Example Bank";
+        cipher.login = new LoginView();
+        cipher.login.username = "alice-bank";
+        const customerId = new FieldView();
+        customerId.name = "Customer ID";
+        customerId.value = "C-12345";
+        customerId.type = FieldType.Text;
+        cipher.fields = [customerId];
+        return cipher;
+      };
+      const focus = (field: Partial<AutofillField>) => {
+        overlayBackground["focusedFieldData"] = createFocusedFieldDataMock({
+          tabId: 9,
+          frameId: 0,
+          focusedFieldOpid: "custno-opid",
+        });
+        overlayBackground["pageDetailsForTab"][9] = new Map([
+          [
+            0,
+            {
+              frameId: 0,
+              tab: createChromeTabMock({ id: 9 }),
+              details: createAutofillPageDetailsMock({
+                url: "https://bank.example.test/login",
+                fields: [createAutofillFieldMock({ opid: "custno-opid", ...field })],
+              }),
+            },
+          ],
+        ]);
+      };
+      const build = (cipher: CipherView) =>
+        overlayBackground["buildCipherData"]({
+          inlineMenuCipherId: "inline-menu-cipher-0",
+          cipher,
+          showFavicons: false,
+          iconsServerUrl: "https://icons.example.test",
+        } as any);
+
+      beforeEach(() => {
+        keykeeperFillPicker.itemMatches = async () => true;
+        keykeeperFillPicker.excluded = () => false;
+      });
+
+      afterEach(() => {
+        Object.assign(keykeeperFillPicker, original);
+      });
+
+      it("offers a login's custom field whose name matches the focused field's label, by name only", async () => {
+        focus({ htmlID: "custno", htmlName: "customer_number", "label-tag": "Customer number" });
+
+        const data = await build(bank());
+
+        expect(data.keykeeperSuggestion).toEqual({ key: "f0", title: "Fill Customer ID here?" });
+        expect(data.keykeeperFillChoices?.map((c) => c.key)).toContain("f0");
+        // The menu gets names, never values.
+        expect(JSON.stringify(data)).not.toContain("C-12345");
+      });
+
+      it("offers nothing for a field whose label doesn't match, or a login not for the page", async () => {
+        focus({ htmlID: "branch", htmlName: "branch", "label-tag": "Branch code" });
+        expect((await build(bank())).keykeeperSuggestion).toBeUndefined();
+
+        focus({ htmlID: "custno", htmlName: "customer_number", "label-tag": "Customer number" });
+        keykeeperFillPicker.itemMatches = async () => false;
+        expect((await build(bank())).keykeeperSuggestion).toBeUndefined();
+      });
+
+      it("gives cards and identities the picker's choices, a card's number only to someone who can see it", async () => {
+        focus({ htmlID: "cc" });
+        const card = new CipherView();
+        card.id = "card-1";
+        card.type = CipherType.Card;
+        card.card = new CardView();
+        card.card.cardholderName = "Alice Example";
+        card.card.number = "4111111111111111";
+        card.viewPassword = false;
+        const identity = new CipherView();
+        identity.id = "identity-1";
+        identity.type = CipherType.Identity;
+        identity.identity = new IdentityView();
+        identity.identity.city = "Springfield";
+
+        const cardData = await build(card);
+        const identityData = await build(identity);
+
+        expect(cardData.keykeeperFillChoices?.map((c) => c.key)).toEqual(["c0", "n", "s"]);
+        expect(JSON.stringify(cardData)).not.toContain("4111111111111111");
+        expect(identityData.keykeeperFillChoices?.map((c) => c.key)).toEqual(["i10", "n", "s"]);
+        expect(cardData.keykeeperSuggestion).toBeUndefined();
+      });
+    });
+
     describe("updateFocusedFieldData message handler", () => {
       it("sends a message to the sender frame to unset the most recently focused field data when the currently focused field does not belong to the sender", async () => {
         const tab = createChromeTabMock({ id: 2 });
@@ -2344,6 +2448,96 @@ describe("OverlayBackground", () => {
           { command: "unsetMostRecentlyFocusedField" },
           { frameId: firstSender.frameId },
         );
+      });
+
+      // Keykeeper: a login's one-tap suggestion is for the field the menu is
+      // in (keykeeper/label-match.ts); upstream keeps the list as it is
+      // between two login fields.
+      it("Keykeeper: shows the suggestions for the field focus moved to, and takes another field's away", async () => {
+        await initOverlayElementPorts();
+        activeAccountStatusMock$.next(AuthenticationStatus.Unlocked);
+        const original = { ...keykeeperFillPicker };
+        keykeeperFillPicker.itemMatches = async () => true;
+        keykeeperFillPicker.excluded = () => false;
+        try {
+          const tab = createChromeTabMock({ id: 2 });
+          const sender = mock<chrome.runtime.MessageSender>({ tab, frameId: 0 });
+          const cipher = new CipherView();
+          cipher.id = "cipher-1";
+          cipher.type = CipherType.Login;
+          cipher.name = "Example Bank";
+          cipher.login = new LoginView();
+          const customerId = new FieldView();
+          customerId.name = "Customer ID";
+          customerId.value = "C-12345";
+          customerId.type = FieldType.Text;
+          cipher.fields = [customerId];
+          overlayBackground["inlineMenuCiphers"] = new Map([["inline-menu-cipher-1", cipher]]);
+          overlayBackground["pageDetailsForTab"][tab.id] = new Map([
+            [
+              0,
+              {
+                frameId: 0,
+                tab,
+                details: createAutofillPageDetailsMock({
+                  url: "https://bank.example.test/login",
+                  fields: [
+                    createAutofillFieldMock({
+                      opid: "user",
+                      htmlID: "username",
+                      "label-tag": "Username",
+                    }),
+                    createAutofillFieldMock({
+                      opid: "custno",
+                      htmlID: "custno",
+                      htmlName: "customer_number",
+                      "label-tag": "Customer number",
+                    }),
+                  ],
+                }),
+              },
+            ],
+          ]);
+          const focus = async (opid: string) => {
+            sendMockExtensionMessage(
+              {
+                command: "updateFocusedFieldData",
+                focusedFieldData: createFocusedFieldDataMock({
+                  tabId: tab.id,
+                  frameId: 0,
+                  focusedFieldOpid: opid,
+                  inlineMenuFillType: CipherType.Login,
+                }),
+              },
+              sender,
+            );
+            await flushPromises();
+          };
+          const listUpdates = () =>
+            (listPortSpy.postMessage as jest.Mock).mock.calls
+              .map(([message]) => message)
+              .filter((message) => message.command === "updateAutofillInlineMenuListCiphers");
+
+          await focus("user");
+          (listPortSpy.postMessage as jest.Mock).mockClear();
+          await focus("custno");
+          expect(listUpdates().at(-1)?.ciphers[0].keykeeperSuggestion).toEqual({
+            key: "f0",
+            title: "Fill Customer ID here?",
+          });
+
+          (listPortSpy.postMessage as jest.Mock).mockClear();
+          await focus("user");
+          expect(listUpdates()).toHaveLength(1);
+          expect(listUpdates()[0].ciphers[0].keykeeperSuggestion).toBeUndefined();
+
+          // Nothing changes between two fields with none: the list stays as it is.
+          (listPortSpy.postMessage as jest.Mock).mockClear();
+          await focus("user");
+          expect(listUpdates()).toHaveLength(0);
+        } finally {
+          Object.assign(keykeeperFillPicker, original);
+        }
       });
 
       it("triggers an update of the identity ciphers present on a login field", async () => {
@@ -3943,6 +4137,70 @@ describe("OverlayBackground", () => {
         );
       });
 
+      it("Keykeeper: fills a one-tap suggestion only into a field it's still the suggestion for", async () => {
+        const original = { ...keykeeperFillPicker };
+        keykeeperFillPicker.itemMatches = async () => true;
+        keykeeperFillPicker.excluded = () => false;
+        try {
+          const cipher = new CipherView();
+          cipher.id = "cipher-1";
+          cipher.type = CipherType.Login;
+          cipher.login = new LoginView();
+          const customerId = new FieldView();
+          customerId.name = "Customer ID";
+          customerId.value = "C-42";
+          customerId.type = FieldType.Text;
+          cipher.fields = [customerId];
+          overlayBackground["inlineMenuCiphers"] = new Map([["inline-menu-cipher-1", cipher]]);
+          cipherService.getAllDecrypted.mockResolvedValue([cipher]);
+          const focusOn = (field: Partial<AutofillField>) => {
+            overlayBackground["focusedFieldData"] = {
+              tabId: sender.tab.id,
+              frameId: 0,
+              focusedFieldOpid: "focused",
+            } as any;
+            overlayBackground["pageDetailsForTab"][sender.tab.id] = new Map([
+              [
+                0,
+                {
+                  frameId: 0,
+                  tab: sender.tab,
+                  details: createAutofillPageDetailsMock({
+                    url: "https://example.com/login",
+                    fields: [createAutofillFieldMock({ opid: "focused", ...field })],
+                  }),
+                },
+              ],
+            ]);
+          };
+          const tap = async () => {
+            sendPortMessage(listMessageConnectorSpy, {
+              command: "keykeeperFillFieldWith",
+              inlineMenuCipherId: "inline-menu-cipher-1",
+              choiceKey: "f0",
+              keykeeperSuggestion: true,
+              portKey,
+            });
+            await flushPromises();
+          };
+
+          // The menu moved on to the Username box: the suggestion was another field's.
+          focusOn({ htmlID: "username", htmlName: "username", "label-tag": "Username" });
+          await tap();
+          expect(cipherService.updateWithServer).not.toHaveBeenCalled();
+
+          focusOn({
+            htmlID: "custno",
+            htmlName: "customer_number",
+            "label-tag": "Customer number",
+          });
+          await tap();
+          expect(cipherService.updateWithServer).toHaveBeenCalledWith(cipher, mockUserId);
+        } finally {
+          Object.assign(keykeeperFillPicker, original);
+        }
+      });
+
       it("does nothing for a choice the item doesn't have, or with no focused field", async () => {
         const cipher = new CipherView();
         cipher.type = CipherType.Login;
@@ -4092,6 +4350,78 @@ describe("OverlayBackground", () => {
         );
       });
 
+      // Keykeeper: a sign-in form's other field, known by its label, has the
+      // logins' menu for one-tap suggestions (keykeeper/label-match.ts).
+      it("Keykeeper: fills a login chosen in a sign-in form's other field as the popup does, never the username into it", async () => {
+        const cipher = new CipherView();
+        cipher.id = "cipher-1";
+        cipher.type = CipherType.Login;
+        cipher.login = new LoginView();
+        cipher.login.username = "alice-bank";
+        overlayBackground["inlineMenuCiphers"] = new Map([["inline-menu-cipher-1", cipher]]);
+        const field = (opid: string, custom: Partial<AutofillField>) =>
+          createAutofillFieldMock({
+            opid,
+            form: "f",
+            htmlName: "",
+            "label-left": "",
+            "label-right": "",
+            "label-top": "",
+            "label-aria": "",
+            placeholder: "",
+            title: "",
+            autoCompleteType: "",
+            ...custom,
+          });
+        const details = createAutofillPageDetailsMock({
+          url: sender.tab.url,
+          forms: { f: { opid: "f" } } as any,
+          fields: [
+            field("custno-opid", {
+              elementNumber: 0,
+              htmlID: "custno",
+              "label-tag": "Customer number",
+            }),
+            field("user-opid", { elementNumber: 1, htmlID: "username", "label-tag": "Username" }),
+            field("pw-opid", {
+              elementNumber: 2,
+              htmlID: "password",
+              type: "password",
+              "label-tag": "Password",
+              autoCompleteType: "current-password",
+            }),
+          ],
+        });
+        overlayBackground["pageDetailsForTab"][sender.tab.id] = new Map([
+          [sender.frameId, { frameId: sender.frameId, tab: sender.tab, details }],
+        ]);
+        autofillService.isPasswordRepromptRequired.mockResolvedValue(false);
+        const fillFrom = async (opid: string) => {
+          overlayBackground["focusedFieldData"] = createFocusedFieldDataMock({
+            tabId: sender.tab.id,
+            frameId: sender.frameId,
+            focusedFieldOpid: opid,
+            focusedFieldForm: "f",
+          });
+          sendPortMessage(listMessageConnectorSpy, {
+            command: "fillAutofillInlineMenuCipher",
+            inlineMenuCipherId: "inline-menu-cipher-1",
+            portKey,
+          });
+          await flushPromises();
+        };
+
+        await fillFrom("custno-opid");
+        expect(autofillOrchestrator.fillCipher).toHaveBeenLastCalledWith(
+          expect.objectContaining({ focusedFieldForm: "f", focusedFieldOpid: undefined }),
+        );
+
+        // From the username itself, upstream's own: the focused field counts.
+        await fillFrom("user-opid");
+        expect(autofillOrchestrator.fillCipher).toHaveBeenLastCalledWith(
+          expect.objectContaining({ focusedFieldOpid: "user-opid" }),
+        );
+      });
       it("does not record last-used (reorder the ciphers map) when no fill occurs", async () => {
         const cipher1 = mock<CipherView>({ id: "inline-menu-cipher-1" });
         const cipher2 = mock<CipherView>({ id: "inline-menu-cipher-2" });

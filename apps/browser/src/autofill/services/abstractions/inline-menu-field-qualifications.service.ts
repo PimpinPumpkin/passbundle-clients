@@ -10,6 +10,8 @@ export interface InlineMenuFieldQualificationService {
   isNewPasswordField(field: AutofillField): boolean;
   isEmailField(field: AutofillField): boolean;
   isFieldForLoginForm(field: AutofillField, pageDetails: AutofillPageDetails): boolean;
+  /** Keykeeper: a sign-in form's other text field, known by its label (keykeeper/label-match.ts). */
+  isLabelFieldForLoginForm(field: AutofillField, pageDetails: AutofillPageDetails): boolean;
   isFieldForCreditCardForm(field: AutofillField, pageDetails: AutofillPageDetails): boolean;
   isFieldForAccountCreationForm(field: AutofillField, pageDetails: AutofillPageDetails): boolean;
   isFieldForIdentityForm(field: AutofillField, pageDetails: AutofillPageDetails): boolean;

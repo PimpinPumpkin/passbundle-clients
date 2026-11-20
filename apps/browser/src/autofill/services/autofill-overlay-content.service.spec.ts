@@ -3205,6 +3205,69 @@ describe("AutofillOverlayContentService", () => {
     });
   });
 
+  // Keykeeper: a sign-in form's other text field, known by its label, gets the
+  // logins' menu, for a custom field of that name (keykeeper/label-match.ts).
+  describe("Keykeeper: the logins' menu on a sign-in form's other field", () => {
+    const field = (opid: string, label: string, custom: Partial<AutofillField> = {}) =>
+      createAutofillFieldMock({
+        opid,
+        htmlID: opid,
+        htmlName: opid,
+        htmlClass: "",
+        title: "",
+        "label-tag": label,
+        "label-aria": "",
+        "label-left": "",
+        "label-right": "",
+        "label-top": "",
+        placeholder: "",
+        autoCompleteType: "",
+        form: "signin",
+        ...custom,
+      });
+    const element = (id: string) => {
+      const el = document.getElementById(id) as ElementWithOpId<FormFieldElement>;
+      el.opid = `op-${id}`;
+      jest.spyOn(el, "addEventListener");
+      return el;
+    };
+
+    it("sets up a customer number beside the username and password for logins, and not a lone one", async () => {
+      autofillInit.startMonitoring();
+      document.body.innerHTML = `
+      <form id="signin">
+        <input type="text" id="custno" />
+        <input type="text" id="username" />
+        <input type="password" id="password" />
+      </form>
+      <form id="other"><input type="text" id="lone" /></form>
+      `;
+      const fields = {
+        custno: field("custno", "Customer number", { elementNumber: 0 }),
+        username: field("username", "Username", { elementNumber: 1 }),
+        password: field("password", "Password", {
+          elementNumber: 2,
+          type: "password",
+          autoCompleteType: "current-password",
+        }),
+        lone: field("lone", "Customer number", { elementNumber: 3, form: "other" }),
+      };
+      const pageDetails = mock<AutofillPageDetails>({
+        forms: { signin: mock<AutofillForm>(), other: mock<AutofillForm>() },
+        fields: Object.values(fields),
+      });
+      const custno = element("custno");
+      const lone = element("lone");
+
+      await autofillOverlayContentService.setupOverlayListeners(custno, fields.custno, pageDetails);
+      await autofillOverlayContentService.setupOverlayListeners(lone, fields.lone, pageDetails);
+
+      expect(fields.custno.inlineMenuFillType).toBe(CipherType.Login);
+      expect(custno.addEventListener).toHaveBeenCalledWith(EVENTS.FOCUS, expect.any(Function));
+      expect(lone.addEventListener).not.toHaveBeenCalled();
+    });
+  });
+
   // Keykeeper: the identities' menu on an address list and a street's text
   // area, which upstream never sets up (keykeeper/address-fields.ts).
   describe("Keykeeper: the menu on an address list and a street's text area", () => {

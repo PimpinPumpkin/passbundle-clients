@@ -87,6 +87,7 @@ import { ReportsModule } from "./dirt/reports";
 import { DataRecoveryComponent } from "./key-management/data-recovery/data-recovery.component";
 import { ConfirmKeyConnectorDomainComponent } from "./key-management/key-connector/confirm-key-connector-domain.component";
 import { setupImportRedirectGuard } from "./keykeeper/import/setup-import-redirect.guard";
+import { setUpMspGuard, setUpMspRedirectGuard } from "./keykeeper/msp/msp-setup.guard";
 import { KeykeeperMspComponent } from "./keykeeper/msp/msp.component";
 import { KeykeeperCreateOrganizationComponent } from "./keykeeper/organizations/create-organization.component";
 import { KeykeeperPersonalPlanComponent } from "./keykeeper/plan/personal-plan.component";
@@ -121,6 +122,14 @@ const routes: Routes = [
     path: "trial",
     redirectTo: AuthRoute.SignUp,
     pathMatch: "full",
+  },
+  {
+    // Keykeeper: the website's way in for an MSP signing up by itself: to
+    // sign up (or sign in), then to the MSP console's "Set up your MSP".
+    path: "set-up-msp",
+    pathMatch: "full",
+    canActivate: [setUpMspGuard],
+    children: [],
   },
   {
     path: "",
@@ -768,6 +777,8 @@ const routes: Routes = [
       {
         path: "vault",
         canActivate: [
+          // Keykeeper: first, so someone who came to set up an MSP lands there.
+          setUpMspRedirectGuard,
           setupImportRedirectGuard,
           premiumInterestRedirectGuard,
           setupExtensionRedirectGuard,

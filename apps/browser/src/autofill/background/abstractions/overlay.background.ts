@@ -188,6 +188,8 @@ export type OverlayPortMessage = {
   fillGeneratedPassword?: boolean;
   /** Keykeeper: the fill picker's choice for the focused field (keykeeper/fill-field-menu.ts). */
   choiceKey?: string;
+  /** Keykeeper: the choice is the login's one-tap suggestion for the focused field. */
+  keykeeperSuggestion?: boolean;
 };
 
 export type InlineMenuCipherData = {
@@ -219,6 +221,12 @@ export type InlineMenuCipherData = {
    * Names only, never values.
    */
   keykeeperFillChoices?: { key: string; title: string }[];
+  /**
+   * Keykeeper: for a login, the one-tap suggestion for the focused field: a
+   * custom field whose name matches the field's label ("Fill Customer ID
+   * here?"), as one of `keykeeperFillChoices`' keys (keykeeper/label-match.ts).
+   */
+  keykeeperSuggestion?: { key: string; title: string };
 };
 
 export type BuildCipherDataParams = {

@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { mock } from "jest-mock-extended";
 
+import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { FILL_RULE_FIELD_NAME, FillRule } from "@bitwarden/common/vault/keykeeper/fill-rules";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
@@ -40,7 +41,11 @@ describe("KeykeeperFillRulesFieldComponent", () => {
   let container: ReturnType<typeof mock<CipherFormContainer>>;
   let edited: CipherView;
 
-  async function render(initial: CipherView | null, mode: "edit" | "partial-edit" = "edit") {
+  async function render(
+    initial: CipherView | null,
+    mode: "edit" | "partial-edit" = "edit",
+    i18n?: Pick<I18nService, "t">,
+  ) {
     edited = initial ?? new CipherView();
     container = mock<CipherFormContainer>();
     container.getInitialCipherView.mockReturnValue(initial);
@@ -50,7 +55,10 @@ describe("KeykeeperFillRulesFieldComponent", () => {
     Object.defineProperty(container, "config", { value: { mode } });
     await TestBed.configureTestingModule({
       imports: [KeykeeperFillRulesFieldComponent],
-      providers: [{ provide: CipherFormContainer, useValue: container }],
+      providers: [
+        { provide: CipherFormContainer, useValue: container },
+        ...(i18n ? [{ provide: I18nService, useValue: i18n }] : []),
+      ],
     }).compileComponents();
     fixture = TestBed.createComponent(KeykeeperFillRulesFieldComponent);
     fixture.detectChanges();
@@ -71,6 +79,39 @@ describe("KeykeeperFillRulesFieldComponent", () => {
       "bank.example: the field with id pin gets nothing (never fill)",
     );
     expect(removeButtons()).toHaveLength(2);
+  });
+
+  it("says the rules in the person's language, upstream's words for the values", async () => {
+    const german: Record<string, string> = {
+      keykeeperFillRules: "Füllregeln",
+      keykeeperFillRuleFieldWithId: "das Feld mit der ID __$1__",
+      keykeeperFillRuleFieldLabeled: "das Feld „__$1__“",
+      keykeeperFillRuleGets: "__$1__ bekommt __$2__",
+      keykeeperFillRuleCustomField: "das Feld __$1__",
+      keykeeperFillRuleNothing: "nichts (nie füllen)",
+      keykeeperRemoveFillRule: "Regel entfernen: __$1__, __$2__",
+    };
+    const placeholder = (n: number) => ["__", "$", String(n), "__"].join("");
+    await render(item(), "edit", {
+      t: ((key: string, ...values: string[]) =>
+        values.reduce(
+          (text, value, i) => text.split(placeholder(i + 1)).join(value),
+          german[key] ?? "",
+        )) as I18nService["t"],
+    });
+
+    expect(text(fixture)).toContain("Füllregeln");
+    expect(text(fixture)).toContain(
+      "bank.example: das Feld „customer number“ bekommt das Feld Customer ID",
+    );
+    expect(text(fixture)).toContain(
+      "bank.example: das Feld mit der ID pin bekommt nichts (nie füllen)",
+    );
+    // Not translated yet: English.
+    expect(text(fixture)).toContain('Made with "Fill this field with" in the browser extension.');
+    expect(removeButtons()[1].getAttribute("aria-label")).toBe(
+      "Regel entfernen: bank.example, das Feld mit der ID pin bekommt nichts (nie füllen)",
+    );
   });
 
   it("removes one rule from the item being edited and keeps everything else", async () => {

@@ -33,7 +33,7 @@ import { ContainerService } from "../../platform/services/container.service";
 import { CipherId, UserId, OrganizationId, CollectionId } from "../../types/guid";
 import { OrgKey, UserKey } from "../../types/key";
 import { CipherEncryptionService } from "../abstractions/cipher-encryption.service";
-import { CipherSdkService } from "../abstractions/cipher-sdk.service";
+import { CipherSdkService, DecryptAllCiphersResult } from "../abstractions/cipher-sdk.service";
 import { EncryptionContext } from "../abstractions/cipher.service";
 import { CipherFileUploadService } from "../abstractions/file-upload/cipher-file-upload.service";
 import { FieldType } from "../enums";
@@ -48,9 +48,15 @@ import { CipherRequest } from "../models/request/cipher.request";
 import { CipherResponse } from "../models/response/cipher.response";
 import { AttachmentView } from "../models/view/attachment.view";
 import { CipherView } from "../models/view/cipher.view";
+import { Fido2CredentialView } from "../models/view/fido2-credential.view";
+import { LoginView } from "../models/view/login.view";
 
 import { CipherService } from "./cipher.service";
-import { DECRYPTED_CIPHERS, ENCRYPTED_CIPHERS } from "./key-state/ciphers.state";
+import {
+  DECRYPTED_CIPHERS,
+  ENCRYPTED_CIPHERS,
+  FAILED_DECRYPTED_CIPHERS,
+} from "./key-state/ciphers.state";
 
 const ENCRYPTED_TEXT = "This data has been encrypted";
 function encryptText(clearText: string | Uint8Array) {
@@ -1869,6 +1875,12 @@ describe("Cipher Service", () => {
       const cachedView = new CipherView();
       cachedView.id = "cached-cipher-id" as CipherId;
       cachedView.name = "Cached Cipher";
+      // Keykeeper: a cache is served only while it is the stored items
+      // (keykeeper/decrypted-cache.ts), so the stored item it was decrypted from.
+      cachedView.revisionDate = new Date(cipherData.revisionDate);
+      stateProvider.singleUser
+        .getFake(mockUserId, ENCRYPTED_CIPHERS)
+        .nextState({ [cachedView.id]: { ...cipherData, id: cachedView.id, folderId: undefined } });
 
       stateProvider.singleUser
         .getFake(mockUserId, DECRYPTED_CIPHERS)
@@ -1902,6 +1914,144 @@ describe("Cipher Service", () => {
       }
 
       expect(sdkServiceSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  // Keykeeper: in the browser extension the background and every open extension page (the
+  // popup, a popped-out vault) share one decrypted copy, and each fills it after decrypting. A
+  // page that started decrypting before a save cleared the copy writes its older copy after it
+  // (keykeeper/decrypted-cache.ts; DESIGN.md, "Passkeys").
+  describe.each([
+    ["the SDK's cipher operations off, as PassBundle's server leaves them", false],
+    ["the SDK's cipher operations on", true],
+  ])("a decrypted copy an extension page writes after a save (Keykeeper), with %s", (_, sdk) => {
+    const loginId = "7ff8c0b2-1d3e-4f8c-9b2d-1d3e4f8c0b31" as CipherId;
+    const newLoginId = "8ff8c0b2-1d3e-4f8c-9b2d-1d3e4f8c0b32" as CipherId;
+    const made = "2026-11-18T10:00:00.123456Z";
+    const passkeyAdded = "2026-11-18T10:00:00.391734Z";
+
+    const stored = (id: CipherId, revisionDate: string) =>
+      ({ ...cipherData, id, organizationId: null, folderId: null, revisionDate }) as CipherData;
+    const decrypted = (id: CipherId, revisionDate: string, passkeys: number) => {
+      const view = new CipherView();
+      view.id = id;
+      view.name = id === loginId ? "Passkeys Example" : "Sign in";
+      view.revisionDate = new Date(revisionDate);
+      view.login = new LoginView();
+      view.login.fido2Credentials = Array.from(
+        { length: passkeys },
+        () => new Fido2CredentialView(),
+      );
+      return view;
+    };
+
+    // The vault page's own CipherService, on the same state as the background's.
+    const pageSdk = mock<CipherSdkService>();
+    const pageEncryption = mock<CipherEncryptionService>();
+    let page: CipherService;
+    let pageFinishes: (views: CipherView[]) => void;
+
+    /** What the background's next decryption of the vault gives. */
+    const backgroundDecrypts = (views: CipherView[]) =>
+      sdk
+        ? cipherSdkService.getAllDecrypted.mockResolvedValue({ successes: views, failures: [] })
+        : cipherEncryptionService.decryptManyLegacy.mockResolvedValue([views, []]);
+    const backgroundDecryptions = () =>
+      sdk
+        ? cipherSdkService.getAllDecrypted.mock.calls.length
+        : cipherEncryptionService.decryptManyLegacy.mock.calls.length;
+
+    beforeEach(() => {
+      sdkCrudFeatureFlag$.next(sdk);
+      keyService.cipherDecryptionKeys$.mockReturnValue(
+        of({ userKey: makeSymmetricCryptoKey(64) as UserKey, orgKeys: {} } as CipherDecryptionKeys),
+      );
+      page = new CipherService(
+        keyService,
+        legacyCompatKeyService,
+        domainSettingsService,
+        apiService,
+        i18nService,
+        autofillSettingsService,
+        encryptService,
+        cipherFileUploadService,
+        configService,
+        stateProvider,
+        accountService,
+        logService,
+        pageEncryption,
+        messageSender,
+        pageSdk,
+      );
+      // The page's decryption waits until the test lets it finish.
+      const pending = new Promise<CipherView[]>((resolve) => {
+        pageFinishes = resolve;
+      });
+      pageSdk.getAllDecrypted.mockReturnValue(
+        pending.then((views) => ({ successes: views, failures: [] }) as DecryptAllCiphersResult),
+      );
+      pageEncryption.decryptManyLegacy.mockReturnValue(
+        pending.then((views) => [views, []] as [CipherView[], CipherView[]]),
+      );
+      stateProvider.singleUser.getFake(mockUserId, DECRYPTED_CIPHERS).nextState({});
+      stateProvider.singleUser.getFake(mockUserId, FAILED_DECRYPTED_CIPHERS).nextState([]);
+    });
+
+    it("isn't what the background answers with once a passkey was added to the login a moment before", async () => {
+      // The passkey's window saved the login, and the vault page starts decrypting the vault with it.
+      stateProvider.singleUser
+        .getFake(mockUserId, ENCRYPTED_CIPHERS)
+        .nextState({ [loginId]: stored(loginId, made) });
+      const pageDecrypting = page.getAllDecrypted(mockUserId);
+
+      // The background adds the passkey: the copy is cleared, then the login stored.
+      await cipherService.upsert([stored(loginId, passkeyAdded)], mockUserId);
+
+      // The page finishes after that and writes the login as it was.
+      pageFinishes([decrypted(loginId, made, 0)]);
+      await pageDecrypting;
+
+      // A site asks for a new passkey at once, naming that one (excludeCredentials).
+      backgroundDecrypts([decrypted(loginId, passkeyAdded, 1)]);
+      const [login] = await cipherService.getAllDecrypted(mockUserId);
+
+      expect(login.login.fido2Credentials).toHaveLength(1);
+    });
+
+    it("isn't what the background answers with once a login was saved a moment before", async () => {
+      stateProvider.singleUser
+        .getFake(mockUserId, ENCRYPTED_CIPHERS)
+        .nextState({ [loginId]: stored(loginId, made) });
+      const pageDecrypting = page.getAllDecrypted(mockUserId);
+
+      // The background saves a new login from the save prompt.
+      await cipherService.upsert([stored(newLoginId, made)], mockUserId);
+
+      pageFinishes([decrypted(loginId, made, 0)]);
+      await pageDecrypting;
+
+      // The fill menu asks for the site's logins at once.
+      backgroundDecrypts([decrypted(loginId, made, 0), decrypted(newLoginId, made, 0)]);
+      const logins = await cipherService.getAllDecrypted(mockUserId);
+
+      expect(logins.map((c) => c.id)).toEqual([loginId, newLoginId]);
+    });
+
+    it("is decrypted again once, then served again until the next change", async () => {
+      stateProvider.singleUser
+        .getFake(mockUserId, ENCRYPTED_CIPHERS)
+        .nextState({ [loginId]: stored(loginId, made) });
+      const pageDecrypting = page.getAllDecrypted(mockUserId);
+      await cipherService.upsert([stored(loginId, passkeyAdded)], mockUserId);
+      pageFinishes([decrypted(loginId, made, 0)]);
+      await pageDecrypting;
+
+      backgroundDecrypts([decrypted(loginId, passkeyAdded, 1)]);
+      await cipherService.getAllDecrypted(mockUserId);
+      const [again] = await cipherService.getAllDecrypted(mockUserId);
+
+      expect(again.login.fido2Credentials).toHaveLength(1);
+      expect(backgroundDecryptions()).toBe(1);
     });
   });
 

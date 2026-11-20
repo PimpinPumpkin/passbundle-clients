@@ -1,8 +1,23 @@
-import { ChangeDetectionStrategy, Component, computed, effect, input, signal } from "@angular/core";
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+} from "@angular/core";
 
 import { MspSiteFixes, SiteFixView } from "@bitwarden/admin-console/common";
+import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
-import { describeFingerprint, describeSource } from "@bitwarden/common/vault/keykeeper/fill-rules";
+import {
+  describeFingerprint,
+  describeSource,
+  englishFillRuleWords,
+  FillRuleWords,
+  fillRuleWords,
+} from "@bitwarden/common/vault/keykeeper/fill-rules";
 import { ToastService } from "@bitwarden/components";
 
 import { SharedModule } from "../../shared";
@@ -10,8 +25,11 @@ import { SharedModule } from "../../shared";
 import { KeykeeperMspApiService } from "./msp-api.service";
 
 /** How a fix finds its field, in a few words (the same words as an item's fill rules). */
-export function describeField(fix: SiteFixView): string {
-  return describeFingerprint(fix.field);
+export function describeField(
+  fix: SiteFixView,
+  words: FillRuleWords = englishFillRuleWords,
+): string {
+  return describeFingerprint(fix.field, words);
 }
 
 /** Whether two fixes are the same one. */
@@ -95,6 +113,8 @@ export class KeykeeperMspSiteFixesComponent {
   readonly mspId = input.required<string>();
 
   protected readonly fixes = signal<MspSiteFixes | null>(null);
+  /** The fixes' words, as an item's fill rules say them, in the person's language. */
+  private readonly words = fillRuleWords(inject(I18nService));
   /** Shared fixes that aren't a rule yet, each once. */
   protected readonly shared = computed(() => {
     const f = this.fixes();
@@ -121,11 +141,11 @@ export class KeykeeperMspSiteFixesComponent {
   }
 
   protected field(fix: SiteFixView) {
-    return describeField(fix);
+    return describeField(fix, this.words);
   }
 
   protected fill(fix: SiteFixView) {
-    return describeSource({ from: fix.fill });
+    return describeSource({ from: fix.fill }, this.words);
   }
 
   private async load(mspId: string) {
