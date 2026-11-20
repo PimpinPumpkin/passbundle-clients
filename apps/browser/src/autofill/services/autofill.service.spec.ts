@@ -6772,4 +6772,108 @@ describe("AutofillService", () => {
       });
     });
   });
+
+  // Keykeeper: a PIN beside the password, both masked, never gets the password
+  // (keykeeper/pin-fields.ts, and autofill-corpus.spec.ts's pin-beside-password.html).
+  describe("Keykeeper: a PIN beside the password", () => {
+    const site = "https://bank.example.test";
+    const field = (opid: string, elementNumber: number, custom: Record<string, unknown> = {}) =>
+      createAutofillFieldMock({
+        opid,
+        elementNumber,
+        htmlID: opid,
+        htmlName: opid,
+        htmlClass: "",
+        title: "",
+        "label-left": "",
+        "label-right": "",
+        "label-top": "",
+        "label-aria": "",
+        placeholder: "",
+        autoCompleteType: "",
+        selectInfo: null,
+        maxLength: 999,
+        form: "__form__0",
+        value: "",
+        ...custom,
+      });
+    const fields = () => [
+      field("customer", 0, { "label-tag": "Customer ID" }),
+      field("password", 1, { type: "password", "label-tag": "Password" }),
+      field("pin", 2, {
+        type: "password",
+        "label-tag": "Security PIN",
+        inputMode: "numeric",
+        maxLength: 4,
+      }),
+    ];
+    const bankLogin = (custom: FieldView[] = []) => {
+      const cipher = new CipherView();
+      cipher.type = CipherType.Login;
+      cipher.viewPassword = true;
+      cipher.login = new LoginView();
+      cipher.login.username = "alice";
+      cipher.login.password = "correct-password";
+      cipher.fields = custom;
+      return cipher;
+    };
+    const fillFrom = async (cipher: CipherView, focusedFieldOpid = "customer") => {
+      const script = await autofillService["generateFillScript"](
+        createAutofillPageDetailsMock({
+          url: `${site}/login`,
+          forms: { __form__0: createAutofillFormMock({ opid: "__form__0" }) },
+          fields: fields(),
+        }),
+        createGenerateFillScriptOptionsMock({ cipher, tabUrl: `${site}/login`, focusedFieldOpid }),
+      );
+      return Object.fromEntries(
+        script!.script
+          .filter(([action]) => action === "fill_by_opid")
+          .map(([, opid, value]) => [opid, value]),
+      );
+    };
+
+    it("fills the username and the password, and leaves the PIN empty", async () => {
+      expect(await fillFrom(bankLogin())).toEqual({
+        customer: "alice",
+        password: "correct-password",
+      });
+      expect(await fillFrom(bankLogin(), "password")).toEqual({
+        customer: "alice",
+        password: "correct-password",
+      });
+    });
+
+    it("fills the PIN from the custom field a fill rule names for it", async () => {
+      const pin = new FieldView();
+      pin.name = "Security PIN";
+      pin.value = "4321";
+      pin.type = FieldType.Hidden;
+      const cipher = bankLogin([pin]);
+      upsertFillRule(cipher, {
+        v: 1,
+        host: "bank.example.test",
+        field: { id: "pin" },
+        fill: { from: "field", name: "Security PIN" },
+      });
+
+      expect(await fillFrom(cipher)).toEqual({
+        customer: "alice",
+        password: "correct-password",
+        pin: "4321",
+      });
+    });
+
+    it("leaves the PIN empty when the password field is one never to fill", async () => {
+      const cipher = bankLogin();
+      upsertFillRule(cipher, {
+        v: 1,
+        host: "bank.example.test",
+        field: { id: "password" },
+        fill: { from: "never" },
+      });
+
+      expect(await fillFrom(cipher)).toEqual({ customer: "alice" });
+    });
+  });
 });
