@@ -294,6 +294,15 @@ export class KeykeeperEnrollment {
   }
 
   /**
+   * The one organization key this browser may enroll someone's user key to
+   * at unlock: the install command's fingerprint of it, from browser policy,
+   * never from the server. Null without one. See recovery-at-unlock.ts.
+   */
+  async recoveryPin(): Promise<string | null> {
+    return (await this.platform.managedJoinParts()).orgKey;
+  }
+
+  /**
    * Asks to join the organization the managed token belongs to, once per
    * account and token, and joins if the person says so.
    */

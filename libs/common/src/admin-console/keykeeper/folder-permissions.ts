@@ -7,6 +7,8 @@
 // passbundle-server's src/db/models/keykeeper_folder_permissions.rs; the two
 // must agree.
 
+import { OrganizationUserStatusType } from "../enums";
+
 /** Every capability but "see items", which is having the folder at all. */
 export type FolderGrid = {
   seePasswords: boolean;
@@ -234,6 +236,38 @@ export function itemLike(item: {
     organizationId: item.organizationId == null ? null : String(item.organizationId),
     collectionIds: (item.collectionIds ?? []).map(String),
   };
+}
+
+/** A membership, as far as exporting its organization goes (the apps' Organization). */
+export type ExportingMember = {
+  canAccessExport: boolean;
+  isAdmin: boolean;
+  status: OrganizationUserStatusType;
+  permissions?: { keykeeperAccessAllItems?: boolean } | null;
+};
+
+/**
+ * Whether an organization export is the whole organization, from the
+ * server's export (`GET /organizations/<id>/export`), with its items in no
+ * folder: only for those the server's export answers, owners and admins and
+ * a custom role with import and export and access to all items, who can
+ * export every folder anyway. Everyone else's organization export is the
+ * shared folders where their grid gives export, from their own synced items,
+ * so asking the server would only be refused (with 401 for a regular member,
+ * which signs the apps out). One rule for what may be exported, the grid's,
+ * in the web vault, the extension, and the command-line tool (DESIGN.md,
+ * "Folders and permissions").
+ */
+export function exportsWholeOrganization(member: ExportingMember | null | undefined): boolean {
+  // The server answers confirmed members only.
+  if (
+    member == null ||
+    !member.canAccessExport ||
+    member.status !== OrganizationUserStatusType.Confirmed
+  ) {
+    return false;
+  }
+  return member.isAdmin || member.permissions?.keykeeperAccessAllItems === true;
 }
 
 /**
