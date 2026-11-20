@@ -97,9 +97,11 @@ import {
   FILL_FIELD_REPROMPT_ACTION,
   fillFieldWith,
   fillPickerWords,
+  labelSuggestion,
 } from "../keykeeper/fill-field-menu";
 import { inlineMenuTotp } from "../keykeeper/inline-menu-totp";
 import AutofillField from "../models/autofill-field";
+import AutofillPageDetails from "../models/autofill-page-details";
 import { AutofillService, PageDetail } from "../services/abstractions/autofill.service";
 import { InlineMenuFieldQualificationService } from "../services/abstractions/inline-menu-field-qualifications.service";
 import { didFillOccur, shouldAutoCopyTotp } from "../types/fill-result";
@@ -154,6 +156,10 @@ const nonLoginInlineCipherType: CipherType[] = [
   CipherType.Identity,
   CipherType.SshKey,
 ];
+
+/** Keykeeper: one-tap suggestions shown, by inline menu cipher id, as one text to compare. */
+const suggestionsText = (shown: [string, string | undefined][]) =>
+  JSON.stringify(shown.filter(([, key]) => key != null));
 
 export class OverlayBackground implements OverlayBackgroundInterface {
   // Assigned as members so jest.spyOn can intercept them in tests
@@ -683,6 +689,10 @@ export class OverlayBackground implements OverlayBackgroundInterface {
     }
 
     this.currentInlineMenuCiphersCount = inlineMenuCipherData.length;
+    // Keykeeper: which one-tap suggestions the list now shows.
+    this.keykeeperSuggestionsShown = suggestionsText(
+      inlineMenuCipherData.map((data) => [data.id, data.keykeeperSuggestion?.key]),
+    );
     return inlineMenuCipherData;
   }
 
@@ -942,20 +952,7 @@ export class OverlayBackground implements OverlayBackgroundInterface {
             ? { rpName, userName }
             : null,
       };
-      // Keykeeper: the fill picker's choices, names only. The menu shows
-      // without them if an item's fields can't be read.
-      try {
-        inlineMenuData.keykeeperFillChoices = choicesFor(
-          cipher,
-          fillPickerWords(this.i18nService),
-          codes,
-        ).map(({ key, title }) => ({
-          key,
-          title,
-        }));
-      } catch {
-        inlineMenuData.keykeeperFillChoices = undefined;
-      }
+      await this.keykeeperAddFillChoices(inlineMenuData, cipher, codes);
       return inlineMenuData;
     }
 
@@ -963,6 +960,7 @@ export class OverlayBackground implements OverlayBackgroundInterface {
       // Keykeeper: without see passwords, the item's subtitle, which leaves
       // the number's last digits out.
       inlineMenuData.card = maySeeSecrets(cipher) ? cipher.card.subTitle : cipher.subTitle;
+      await this.keykeeperAddFillChoices(inlineMenuData, cipher, false);
       return inlineMenuData;
     }
 
@@ -972,7 +970,54 @@ export class OverlayBackground implements OverlayBackgroundInterface {
 
     inlineMenuData.identity =
       identityData || this.getIdentityCipherData(cipher, showInlineMenuAccountCreation);
+    await this.keykeeperAddFillChoices(inlineMenuData, cipher, false);
     return inlineMenuData;
+  }
+
+  /**
+   * Keykeeper: the fill picker's choices for a login, card, or identity,
+   * names only, and for a login, the one-tap suggestion for the focused field
+   * (a custom field whose name matches its label, keykeeper/label-match.ts).
+   * The menu shows without them if an item's fields can't be read.
+   */
+  private async keykeeperAddFillChoices(
+    inlineMenuData: InlineMenuCipherData,
+    cipher: CipherView,
+    codes: boolean,
+  ) {
+    const words = fillPickerWords(this.i18nService);
+    try {
+      inlineMenuData.keykeeperFillChoices = choicesFor(cipher, words, codes).map(
+        ({ key, title }) => ({ key, title }),
+      );
+    } catch {
+      inlineMenuData.keykeeperFillChoices = undefined;
+    }
+    try {
+      const focused = this.keykeeperFocusedField();
+      const suggestion = focused
+        ? await labelSuggestion(cipher, focused.field, focused.pageDetails, words)
+        : null;
+      inlineMenuData.keykeeperSuggestion = suggestion
+        ? { key: suggestion.key, title: suggestion.title }
+        : undefined;
+    } catch {
+      inlineMenuData.keykeeperSuggestion = undefined;
+    }
+  }
+
+  /** Keykeeper: the focused field as the page last described it, with its page details. */
+  private keykeeperFocusedField(): {
+    field: AutofillField;
+    pageDetails: AutofillPageDetails;
+  } | null {
+    const { tabId, frameId, focusedFieldOpid } = this.focusedFieldData ?? {};
+    if (tabId == null || frameId == null || !focusedFieldOpid) {
+      return null;
+    }
+    const pageDetails = this.pageDetailsForTab[tabId]?.get(frameId)?.details;
+    const field = pageDetails?.fields?.find((f) => f.opid === focusedFieldOpid);
+    return pageDetails && field ? { field, pageDetails } : null;
   }
 
   /**
@@ -1552,6 +1597,18 @@ export class OverlayBackground implements OverlayBackgroundInterface {
       );
     }
 
+    // Keykeeper: from a sign-in form's other field, known by its label, a
+    // login fills as the popup's Fill does in that form: its username goes
+    // where upstream finds the username, never into this field
+    // (InlineMenuFieldQualificationService.isLabelFieldForLoginForm).
+    const keykeeperFocused = this.keykeeperFocusedField();
+    const keykeeperLabelField =
+      keykeeperFocused != null &&
+      this.inlineMenuFieldQualificationService.isLabelFieldForLoginForm(
+        keykeeperFocused.field,
+        keykeeperFocused.pageDetails,
+      );
+
     const result = await this.autofillOrchestrator.fillCipher({
       tab,
       cipher,
@@ -1559,7 +1616,7 @@ export class OverlayBackground implements OverlayBackgroundInterface {
       fillNewPassword: true,
       allowTotpAutofill: true,
       focusedFieldForm: this.focusedFieldData?.focusedFieldForm,
-      focusedFieldOpid: this.focusedFieldData?.focusedFieldOpid,
+      focusedFieldOpid: keykeeperLabelField ? undefined : this.focusedFieldData?.focusedFieldOpid,
       inlineMenuFillType: this.focusedFieldData?.inlineMenuFillType,
       // Keykeeper: the frame of the field whose menu the person chose in,
       // which a card may fill (keykeeper/card-frames.ts).
@@ -2200,6 +2257,36 @@ export class OverlayBackground implements OverlayBackgroundInterface {
       this.updateOverlayCiphers(updateAllCipherTypes).catch((error) =>
         this.logService.error(error),
       );
+    } else if (sender.tab && this.focusedFieldMatchesFillType(CipherType.Login)) {
+      // Keykeeper: a login's one-tap suggestion is for the field the menu is
+      // in, so another field of the same kind gets its own, or none.
+      this.keykeeperUpdateSuggestions(sender.tab).catch((error) => this.logService.error(error));
+    }
+  }
+
+  /** Keykeeper: the one-tap suggestions the list shows now, as `suggestionsText` writes them. */
+  private keykeeperSuggestionsShown = "[]";
+
+  /**
+   * Keykeeper: shows the logins' one-tap suggestions for the field focus
+   * moved to, when they differ from what the list shows (none, or another
+   * field's). Upstream keeps the list as it is between fields of one kind.
+   */
+  private async keykeeperUpdateSuggestions(tab: chrome.tabs.Tab) {
+    const focused = this.keykeeperFocusedField();
+    const words = fillPickerWords(this.i18nService);
+    const shown: [string, string | undefined][] = [];
+    for (const [id, cipher] of this.inlineMenuCiphers) {
+      if (cipher.type !== CipherType.Login) {
+        continue;
+      }
+      const suggestion = focused
+        ? await labelSuggestion(cipher, focused.field, focused.pageDetails, words)
+        : null;
+      shown.push([id, suggestion?.key]);
+    }
+    if (suggestionsText(shown) !== this.keykeeperSuggestionsShown) {
+      await this.updateInlineMenuListCiphers(tab);
     }
   }
 
@@ -2305,7 +2392,7 @@ export class OverlayBackground implements OverlayBackgroundInterface {
    * right-click menu does (keykeeper/fill-field-menu.ts).
    */
   private async keykeeperFillFieldWith(
-    { inlineMenuCipherId, choiceKey }: OverlayPortMessage,
+    { inlineMenuCipherId, choiceKey, keykeeperSuggestion }: OverlayPortMessage,
     { sender }: chrome.runtime.Port,
   ) {
     if (!sender || !this.senderHasValidTab(sender) || !inlineMenuCipherId || !choiceKey) {
@@ -2341,6 +2428,15 @@ export class OverlayBackground implements OverlayBackgroundInterface {
     const field = pageDetail?.details?.fields.find((f) => f.opid === focusedFieldOpid);
     const url = pageDetail?.details?.url;
     if (!field || !url) {
+      return;
+    }
+    // A one-tap suggestion fills only the field it's for: the focused field
+    // must still be a confident match for that custom field.
+    if (
+      keykeeperSuggestion &&
+      (await labelSuggestion(cipher, field, pageDetail.details, fillPickerWords(this.i18nService)))
+        ?.key !== choice.key
+    ) {
       return;
     }
     this.closeInlineMenu(sender, { forceCloseInlineMenu: true });

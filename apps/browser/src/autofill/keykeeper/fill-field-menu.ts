@@ -1,9 +1,12 @@
 // Keykeeper fill picker: right-click any field, then "Fill this field with",
-// an item, and one of its values (or "Never fill this field"). It fills the
-// field now and saves the choice as a fill rule on the item (fill-rules.ts),
-// so every later autofill on that site does the same. An item that asks for
-// the master password asks first, for any choice, and nothing fills or is
-// saved unless the prompt succeeds.
+// an item, and one of its values (or "Never fill this field", or "Never fill
+// this field on this site" for every item). It fills the field now and saves
+// the choice as a fill rule on the item (fill-rules.ts), or in the person's
+// own settings for a site-wide never-fill (site-never-fill.ts), so every
+// later autofill on that site does the same. Logins, cards, and identities
+// each offer their values. An item that asks for the master password asks
+// first, for any choice, and nothing fills or is saved unless the prompt
+// succeeds.
 
 import { firstValueFrom } from "rxjs";
 
@@ -18,27 +21,41 @@ import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { TotpService } from "@bitwarden/common/vault/abstractions/totp.service";
 import { CipherType, FieldType } from "@bitwarden/common/vault/enums";
+import {
+  CARD_FILL_VALUES,
+  CARD_VALUE_WORDS,
+  IDENTITY_FILL_VALUES,
+  IDENTITY_VALUE_WORDS,
+} from "@bitwarden/common/vault/keykeeper/fill-rules";
 import { maySeeSecrets } from "@bitwarden/common/vault/keykeeper/hidden-secrets";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 
 import { BrowserApi } from "../../platform/browser/browser-api";
 import AutofillField from "../models/autofill-field";
+import AutofillPageDetails from "../models/autofill-page-details";
 import AutofillScript from "../models/autofill-script";
 import { AutofillTriageResponse } from "../types/autofill-triage";
 
+import { cardMayFillFrame, isPagesOwnSite } from "./card-frames";
 import {
+  decidingFingerprint,
+  fieldMatches,
+  fieldValueFor,
   FillRule,
   FillSource,
   fingerprintField,
   hostOf,
   isSecretSource,
-  schemeOfUrl,
   keykeeperSiteFixes,
-  staticValueFor,
+  keykeeperSiteNeverFill,
+  readFillRules,
+  ruleAppliesOn,
+  schemeOfUrl,
   upsertFillRule,
   visibleCustomFields,
 } from "./fill-rules";
 import { noteFill } from "./hidden-fills";
+import { confidentLabelMatch, labelText } from "./label-match";
 
 // No underscores: menu ids are split on "_".
 export const FILL_FIELD_ID = "kkfill";
@@ -48,19 +65,23 @@ export { FILL_FIELD_REPROMPT_ACTION, FILL_FIELD_REPROMPTED } from "./fill-field-
 /**
  * What the picker asks of the background, set by main.background: whether an
  * item is for a page, by its websites and the person's match settings, as
- * upstream's autofill decides it; and whether its two-step code shows, which
+ * upstream's autofill decides it; whether its two-step code shows, which
  * needs Premium or an organization that gives codes (two-step-codes.ts), as
- * autofill decides it. Until then, nothing is, and no code is offered.
+ * autofill decides it; and whether upstream's autofill leaves a field alone
+ * (`AutofillService.isExcludedFromFillRules`: search boxes, captchas,
+ * newsletter forms, the field types it never fills). Until then, nothing is
+ * for any page, no code is offered, and every field is left alone.
  */
 export const keykeeperFillPicker = {
   itemMatches: async (_cipher: CipherView, _url: string): Promise<boolean> => false,
   showsTotp: async (_cipher: CipherView): Promise<boolean> => false,
+  excluded: (_field: AutofillField, _pageDetails: AutofillPageDetails): boolean => true,
 };
 
 /**
  * The menu's words, by message key: ours from brand/messages.en.json, and
  * upstream's own for the values, which come translated. Here in English for
- * a build without our strings (and tests).
+ * a build without our strings (and tests). `$1` is where a name goes.
  */
 const ENGLISH = {
   keykeeperFillThisFieldWith: "Fill this field with",
@@ -68,29 +89,71 @@ const ENGLISH = {
   password: "Password",
   verificationCode: "Verification code",
   keykeeperNeverFillThisField: "Never fill this field",
+  keykeeperNeverFillThisFieldOnThisSite: "Never fill this field on this site",
+  keykeeperFillHere: "Fill $1 here?",
+  cardholderName: "Cardholder name",
+  number: "Number",
+  expirationMonth: "Expiration month",
+  expirationYear: "Expiration year",
+  securityCode: "Security code",
+  firstName: "First name",
+  middleName: "Middle name",
+  lastName: "Last name",
+  fullName: "Full name",
+  company: "Company",
+  email: "Email",
+  phone: "Phone",
+  address1: "Address 1",
+  address2: "Address 2",
+  address3: "Address 3",
+  cityTown: "City / Town",
+  stateProvince: "State / Province",
+  zipPostalCode: "Zip / Postal code",
+  country: "Country",
 };
 
 export type FillPickerWord = keyof typeof ENGLISH;
 
-/** Gives the menu's words. */
-export type FillPickerWords = (word: FillPickerWord) => string;
+/** Gives the menu's words, with a name where the word has a place for one. */
+export type FillPickerWords = (word: FillPickerWord, ...names: string[]) => string;
 
 /** The menu's words in English. */
-export const englishFillPickerWords: FillPickerWords = (word) => ENGLISH[word];
+export const englishFillPickerWords: FillPickerWords = (word, ...names) =>
+  ENGLISH[word].replace(/\$(\d)/g, (_, n: string) => names[Number(n) - 1] ?? "");
 
 /**
  * The menu's words in the person's language, English for any word that
  * isn't translated yet. Our own strings are English in every language for now.
  */
 export function fillPickerWords(i18n: Pick<I18nService, "t">): FillPickerWords {
-  return (word) => i18n.t(word) || ENGLISH[word];
+  return (word, ...names) =>
+    i18n.t(word, ...(names as [string?, string?, string?])) ||
+    englishFillPickerWords(word, ...names);
 }
 
-export type FillChoice = { key: string; title: string; source: FillSource };
+export type FillChoice = {
+  key: string;
+  title: string;
+  source: FillSource;
+  /** "Never fill this field on this site": for every item, kept in the person's settings. */
+  siteWide?: boolean;
+};
+
+/** The item kinds the picker offers values of. */
+const PICKED_TYPES: ReadonlySet<CipherType> = new Set([
+  CipherType.Login,
+  CipherType.Card,
+  CipherType.Identity,
+]);
 
 /**
- * What an item can fill into a field, in menu order, named in `words`: its
- * two-step code only where `codes` says it shows (`keykeeperFillPicker.showsTotp`).
+ * What an item can fill into a field, in menu order, named in `words`: a
+ * login's username, password, and two-step code (only where `codes` says it
+ * shows, `keykeeperFillPicker.showsTotp`); a card's name, number, expiry
+ * month and year, and security code; an identity's names, company, email,
+ * phone, and address; then the item's custom fields, and the two never-fills.
+ * Someone who can't see the item's secrets isn't offered them: a login's
+ * password, a card's number and code, hidden fields.
  */
 export function choicesFor(
   cipher: CipherView,
@@ -98,14 +161,41 @@ export function choicesFor(
   codes = false,
 ): FillChoice[] {
   const choices: FillChoice[] = [];
-  if (cipher.login?.username) {
-    choices.push({ key: "u", title: words("username"), source: { from: "username" } });
+  const maySee = maySeeSecrets(cipher);
+  if (cipher.type !== CipherType.Card && cipher.type !== CipherType.Identity) {
+    if (cipher.login?.username) {
+      choices.push({ key: "u", title: words("username"), source: { from: "username" } });
+    }
+    if (cipher.login?.password && maySee) {
+      choices.push({ key: "p", title: words("password"), source: { from: "password" } });
+    }
+    if (cipher.login?.totp && codes) {
+      choices.push({ key: "t", title: words("verificationCode"), source: { from: "totp" } });
+    }
   }
-  if (cipher.login?.password && maySeeSecrets(cipher)) {
-    choices.push({ key: "p", title: words("password"), source: { from: "password" } });
+  if (cipher.type === CipherType.Card) {
+    CARD_FILL_VALUES.forEach((value, index) => {
+      const source: FillSource = { from: "card", value };
+      if (cipher.card?.[value] && (maySee || !isSecretSource(cipher, source))) {
+        choices.push({
+          key: `c${index}`,
+          title: words(CARD_VALUE_WORDS[value] as FillPickerWord),
+          source,
+        });
+      }
+    });
   }
-  if (cipher.login?.totp && codes) {
-    choices.push({ key: "t", title: words("verificationCode"), source: { from: "totp" } });
+  if (cipher.type === CipherType.Identity) {
+    IDENTITY_FILL_VALUES.forEach((value, index) => {
+      const source: FillSource = { from: "identity", value };
+      if (cipher.identity?.[value] && (maySee || !isSecretSource(cipher, source))) {
+        choices.push({
+          key: `i${index}`,
+          title: words(IDENTITY_VALUE_WORDS[value] as FillPickerWord),
+          source,
+        });
+      }
+    });
   }
   visibleCustomFields(cipher).forEach((field, index) => {
     // Hidden fields stay hidden from someone who can't see the item's passwords.
@@ -125,7 +215,112 @@ export function choicesFor(
     title: words("keykeeperNeverFillThisField"),
     source: { from: "never" },
   });
+  choices.push({
+    key: "s",
+    title: words("keykeeperNeverFillThisFieldOnThisSite"),
+    source: { from: "never" },
+    siteWide: true,
+  });
   return choices;
+}
+
+/** Field types a label suggestion fills: ones people type a value into. */
+const TYPED_INTO = new Set(["text", "email", "tel", "number", "url", "password"]);
+
+/**
+ * Whether upstream's own matching fills a custom field into this field
+ * anyway: the field's id, name, or one of its labels is the custom field's
+ * name, without case (`AutofillService.findMatchingFieldIndex`). A name with
+ * "=" is one of upstream's patterns ("regex=", "csv=", "id="): never a label.
+ */
+function upstreamFillsByName(field: AutofillField, name: string): boolean {
+  if (name.includes("=")) {
+    return true;
+  }
+  const wanted = name.toLowerCase();
+  return [
+    field.htmlID,
+    field.htmlName,
+    field["label-left"],
+    field["label-right"],
+    field["label-tag"],
+    field["label-aria"],
+    field.placeholder,
+  ].some(
+    (value) =>
+      typeof value === "string" &&
+      value
+        .trim()
+        .replace(/(?:\r\n|\r|\n)/g, "")
+        .toLowerCase() === wanted,
+  );
+}
+
+/**
+ * The one-tap suggestion for the field the menu is in: a login's custom
+ * field whose name is a confident match for the field's label
+ * (label-match.ts), offered as "Fill Customer ID here?". It's the picker's
+ * own choice for that custom field (the same key), so the tap fills and
+ * remembers it through `fillFieldWith`; nothing fills before the tap. None
+ * when the login isn't for the page or frame the field is in; when the field
+ * is one upstream's autofill leaves alone, can't be seen, or isn't typed
+ * into; when a rule of the login's, or the person's site-wide never-fill,
+ * already decides the field; when upstream fills a custom field there by its
+ * name anyway; or when more than one custom field matches. A hidden custom
+ * field is suggested only to someone who can see the item's passwords, and
+ * only for a password field.
+ */
+export async function labelSuggestion(
+  cipher: CipherView,
+  field: AutofillField,
+  pageDetails: AutofillPageDetails,
+  words: FillPickerWords = englishFillPickerWords,
+): Promise<FillChoice | null> {
+  const url = pageDetails.url;
+  if (
+    cipher.type !== CipherType.Login ||
+    !field.viewable ||
+    field.readonly ||
+    field.disabled ||
+    typeof field.type !== "string" ||
+    !TYPED_INTO.has(field.type) ||
+    keykeeperFillPicker.excluded(field, pageDetails)
+  ) {
+    return null;
+  }
+  const custom = visibleCustomFields(cipher);
+  if (
+    custom.length === 0 ||
+    custom.some((f) => f.name != null && upstreamFillsByName(field, f.name))
+  ) {
+    return null;
+  }
+  const decided = [...(await keykeeperSiteNeverFill.rulesFor(url)), ...readFillRules(cipher)].some(
+    (rule) =>
+      (rule.host == null ? rule.fill.from === "never" : ruleAppliesOn(rule, url)) &&
+      fieldMatches(rule.field, field),
+  );
+  if (decided) {
+    return null;
+  }
+  const label = labelText(field);
+  const matches = custom
+    .map((f, index) => ({ f, index }))
+    .filter(({ f }) => {
+      if (!f.name || !f.value || (f.type !== FieldType.Text && f.type !== FieldType.Hidden)) {
+        return false;
+      }
+      if (f.type === FieldType.Hidden && (!maySeeSecrets(cipher) || field.type !== "password")) {
+        return false;
+      }
+      return confidentLabelMatch(label, f.name);
+    });
+  if (matches.length !== 1 || !(await keykeeperFillPicker.itemMatches(cipher, url))) {
+    return null;
+  }
+  const { f, index } = matches[0];
+  const choice = choicesFor(cipher, words).find((c) => c.key === `f${index}`);
+  return choice ? { ...choice, title: words("keykeeperFillHere", f.name ?? "") } : null;
 }
 
 /** Reads `kkfill_<cipherId>_<choiceKey>`. Cipher ids are GUIDs, without underscores. */
@@ -178,12 +373,12 @@ export async function removeFillFieldMenu(): Promise<void> {
   });
 }
 
-/** Adds an item, with its values, under "Fill this field with". */
+/** Adds an item (a login, a card, or an identity), with its values, under "Fill this field with". */
 export async function addCipherToFillFieldMenu(
   cipher: CipherView | undefined,
   words: FillPickerWords = englishFillPickerWords,
 ): Promise<void> {
-  if (!cipher?.id || cipher.type !== CipherType.Login) {
+  if (!cipher?.id || !PICKED_TYPES.has(cipher.type)) {
     return;
   }
   const parentId = `${FILL_FIELD_ID}_${cipher.id}`;
@@ -192,9 +387,9 @@ export async function addCipherToFillFieldMenu(
   }
   await create({ id: parentId, parentId: FILL_FIELD_ID, title: sanitizeTitle(cipher.name ?? "") });
   createdFillFieldMenuIds.add(parentId);
-  const codes = await keykeeperFillPicker.showsTotp(cipher);
+  const codes = cipher.type === CipherType.Login && (await keykeeperFillPicker.showsTotp(cipher));
   for (const choice of choicesFor(cipher, words, codes)) {
-    if (choice.source.from === "never") {
+    if (choice.source.from === "never" && !choice.siteWide) {
       await create({ id: `${parentId}_separator`, parentId, type: "separator" });
     }
     const id = `${parentId}_${choice.key}`;
@@ -277,7 +472,7 @@ export async function handleFillFieldMenuClick(
     return true;
   }
   const cipher = (await deps.cipherService.getAllDecrypted(userId)).find(
-    (c) => c.id === parsed.cipherId,
+    (c) => c.id === parsed.cipherId && PICKED_TYPES.has(c.type),
   );
   const choice = cipher
     ? choicesFor(cipher, undefined, await keykeeperFillPicker.showsTotp(cipher)).find(
@@ -360,13 +555,50 @@ export async function finishPickAfterReprompt(
     ? choicesFor(cipher, undefined, await keykeeperFillPicker.showsTotp(cipher)).find(
         (c) =>
           c.key === pick.choice.key &&
-          JSON.stringify(c.source) === JSON.stringify(pick.choice.source),
+          JSON.stringify(c.source) === JSON.stringify(pick.choice.source) &&
+          !!c.siteWide === !!pick.choice.siteWide,
       )
     : undefined;
   if (!cipher || !choice) {
     return false;
   }
   return pickNow({ ...pick, cipher, choice }, deps);
+}
+
+/**
+ * Whether a value of this item may go into the frame the field is in, by the
+ * item's kind. A login's secret only where the item's websites match the
+ * page or frame, by upstream's matching. A card's values (its custom fields
+ * too) by the card frame rule (card-frames.ts): the page itself, its own
+ * site's frames, and payment services' frames. That rule also lets a card
+ * fill the frame a fill started in, but a pick always starts in the field's
+ * own frame, and becomes a rule that fills there again, so that part doesn't
+ * count here: another site's frame never gets a card's value. An identity's
+ * values, which are plain, fill every frame, as upstream's identity fill
+ * does; its secrets (hidden fields) only the page and its own site's frames.
+ */
+async function mayPickInto(
+  cipher: CipherView,
+  choice: FillChoice,
+  frameId: number,
+  frameUrl: string,
+  tabUrl: string | undefined,
+  secret: boolean,
+): Promise<{ allowed: boolean; itemMatches: boolean }> {
+  if (cipher.type === CipherType.Card) {
+    const allowed =
+      choice.source.from === "never" || cardMayFillFrame({ frameId, frameUrl, tabUrl });
+    return { allowed, itemMatches: allowed };
+  }
+  if (cipher.type === CipherType.Identity) {
+    const allowed = !secret || frameId === 0 || isPagesOwnSite(frameUrl, tabUrl);
+    return { allowed, itemMatches: allowed };
+  }
+  // Upstream's matching: the item is for the page (or frame) the field is in.
+  // A secret goes nowhere else, such as an ad's frame; anything else asks
+  // first, as upstream's warning about a frame from another site does.
+  const itemMatches = await keykeeperFillPicker.itemMatches(cipher, frameUrl);
+  return { allowed: !secret || itemMatches, itemMatches };
 }
 
 async function pickNow(
@@ -379,11 +611,15 @@ async function pickNow(
     return false;
   }
   const secret = isSecretSource(cipher, choice.source);
-  // Upstream's matching: the item is for the page (or frame) the field is in.
-  // A secret goes nowhere else, such as an ad's frame; anything else asks
-  // first, as upstream's warning about a frame from another site does.
-  const itemMatches = await keykeeperFillPicker.itemMatches(cipher, target.url);
-  if (secret && !itemMatches) {
+  const { allowed, itemMatches } = await mayPickInto(
+    cipher,
+    choice,
+    frameId,
+    target.url,
+    tab.url,
+    secret,
+  );
+  if (!allowed) {
     return false;
   }
   // For someone who can't see the item's passwords, a secret goes only into
@@ -399,13 +635,19 @@ async function pickNow(
     field: fingerprintField(target.field),
     fill: choice.source,
   };
+  // A site-wide rule keeps only what decides the field, and fills nothing.
+  const siteRule: FillRule = {
+    ...rule,
+    field: decidingFingerprint(rule.field),
+    fill: { from: "never" },
+  };
 
   let filled = false;
   if (choice.source.from !== "never") {
     const value =
       choice.source.from === "totp"
         ? (await firstValueFrom(deps.totpService.getCode$(cipher.login.totp))).code
-        : staticValueFor(cipher, choice.source);
+        : fieldValueFor(cipher, choice.source, target.field);
     if (value) {
       const fillScript = new AutofillScript();
       fillScript.requiresInsecurePageConfirmation = requiresInsecurePageConfirmation(
@@ -432,6 +674,20 @@ async function pickNow(
     }
   }
 
+  if (choice.siteWide && rule.host) {
+    // For every item on the site, in the person's settings. A list that's
+    // full keeps it on this item instead, which still never fills it here.
+    if (await keykeeperSiteNeverFill.add(siteRule)) {
+      void keykeeperSiteFixes.share(siteRule).catch(() => {});
+      return false;
+    }
+  }
+  if (choice.source.from !== "never" && rule.host) {
+    // A value chosen for a field the person had said never to fill on this
+    // site: the newer choice wins, as a new choice for a field replaces an
+    // item's older rule.
+    await keykeeperSiteNeverFill.remove(siteRule);
+  }
   upsertFillRule(cipher, rule);
   await deps.cipherService.updateWithServer(cipher, userId);
   // For people who share fixes; custom fields never leave the device.
