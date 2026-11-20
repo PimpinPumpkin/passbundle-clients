@@ -72,6 +72,7 @@ import { PopOutComponent } from "../../../platform/popup/components/pop-out.comp
 import { PopupHeaderComponent } from "../../../platform/popup/layout/popup-header.component";
 import { PopupPageComponent } from "../../../platform/popup/layout/popup-page.component";
 import { KeykeeperSiteFixesSettingsComponent } from "../../keykeeper/popup/site-fixes-settings.component";
+import { KeykeeperSiteNeverFillSettingsComponent } from "../../keykeeper/popup/site-never-fill-settings.component";
 
 import { FillAssistPopoverComponent } from "./fill-assist-popover/fill-assist-popover.component";
 
@@ -88,6 +89,7 @@ import { FillAssistPopoverComponent } from "./fill-assist-popover/fill-assist-po
     FillAssistPopoverComponent,
     FormFieldModule,
     KeykeeperSiteFixesSettingsComponent,
+    KeykeeperSiteNeverFillSettingsComponent,
     FormsModule,
     IconButtonModule,
     ItemModule,

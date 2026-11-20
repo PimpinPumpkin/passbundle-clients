@@ -199,6 +199,45 @@ describe("Keykeeper: imports never plant our own fields", () => {
       ]);
     });
 
+    it("brings back a fill rule for a card's or an identity's value, rewritten, and drops one it can't read", async () => {
+      const cardRule = {
+        v: 1,
+        host: "js.stripe.com",
+        field: { id: "cvc" },
+        fill: { from: "card", value: "code", extra: 1 },
+      };
+      const cityRule = {
+        v: 1,
+        host: "shop.example.test",
+        field: { name: "town" },
+        fill: { from: "identity", value: "city" },
+      };
+      const unknown = {
+        v: 1,
+        host: "shop.example.test",
+        field: { id: "x" },
+        fill: { from: "card", value: "pin" },
+      };
+      const cipher = await parse(
+        bitwardenExport([
+          { name: "keykeeper.fill", value: JSON.stringify(cardRule), type: FieldType.Hidden },
+          { name: "keykeeper.fill", value: JSON.stringify(cityRule), type: FieldType.Hidden },
+          { name: "keykeeper.fill", value: JSON.stringify(unknown), type: FieldType.Hidden },
+        ]),
+      );
+
+      expect(readFillRules(cipher)).toEqual([
+        {
+          v: 1,
+          host: "js.stripe.com",
+          field: { id: "cvc" },
+          fill: { from: "card", value: "code" },
+        },
+        cityRule,
+      ]);
+      expect(reserved({ ciphers: [cipher] } as ImportResult)).toHaveLength(2);
+    });
+
     // DESIGN.md, "Where a field's type is kept".
     it("brings back a template's and an item's typed fields, only the well-formed ones", async () => {
       const template = await parse(

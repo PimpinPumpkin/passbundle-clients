@@ -59,6 +59,7 @@ import { stampWebExtSender } from "../../platform/utils/web-ext-sender";
 import { AutofillMessageCommand, AutofillMessageSender } from "../enums/autofill-message.enums";
 import { AutofillOutcome } from "../enums/autofill-outcome.enum";
 import { InlineMenuFillTypes } from "../enums/autofill-overlay.enum";
+import { keykeeperSiteNeverFill, upsertFillRule } from "../keykeeper/fill-rules";
 import AutofillField from "../models/autofill-field";
 import AutofillPageDetails from "../models/autofill-page-details";
 import AutofillScript from "../models/autofill-script";
@@ -6425,6 +6426,60 @@ describe("AutofillService", () => {
         String(i + 1).padStart(2, "0"),
       ]),
     ];
+
+    // Keykeeper: fill rules for a card's values, and site-wide never-fill,
+    // through upstream's fill script (keykeeper/fill-rules.ts).
+    describe("fill rules and never-fill on this site", () => {
+      const original = keykeeperSiteNeverFill.rulesFor;
+      afterEach(() => {
+        keykeeperSiteNeverFill.rulesFor = original;
+      });
+      const realCard = () => {
+        const cipher = new CipherView();
+        cipher.type = CipherType.Card;
+        cipher.viewPassword = true;
+        cipher.card = card();
+        cipher.fields = [];
+        return cipher;
+      };
+      const fillWith = async (cipher: CipherView, fields: AutofillField[]) => {
+        const script = await autofillService["generateFillScript"](
+          createAutofillPageDetailsMock({ url: "https://shop.example.test/checkout", fields }),
+          createGenerateFillScriptOptionsMock({ cipher, tabUrl: "https://shop.example.test/" }),
+        );
+        return fills(script!);
+      };
+
+      it("puts a card's value where its rule says, and upstream's matching fills the rest", async () => {
+        const cipher = realCard();
+        upsertFillRule(cipher, {
+          v: 1,
+          host: "shop.example.test",
+          field: { id: "pan" },
+          fill: { from: "card", value: "number" },
+        });
+
+        const filled = await fillWith(cipher, [
+          field("pan", { "label-tag": "Long number on the front" }),
+          field("cvc", { autoCompleteType: "cc-csc" }),
+        ]);
+
+        expect(filled).toEqual({ pan: "4111111111111111", cvc: "123" });
+      });
+
+      it("keeps a field never filled on the site empty for a card too, and upstream's matching off it", async () => {
+        keykeeperSiteNeverFill.rulesFor = async () => [
+          { v: 1, host: "shop.example.test", field: { id: "ccnumber" }, fill: { from: "never" } },
+        ];
+
+        const filled = await fillWith(realCard(), [
+          field("ccnumber", { autoCompleteType: "cc-number" }),
+          field("cvc", { autoCompleteType: "cc-csc" }),
+        ]);
+
+        expect(filled).toEqual({ cvc: "123" });
+      });
+    });
 
     it("puts the name on the card only in the card's own field, after a shipping name", async () => {
       const filled = await cardFill([

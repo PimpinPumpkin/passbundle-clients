@@ -79,6 +79,12 @@ function wellFormedRule(value: string | null | undefined): FillRule | null {
       return null;
     }
     fill = { from: "field", name };
+  } else if (parsed.fill.from === "card" || parsed.fill.from === "identity") {
+    // A value parseFillRule already knows by name.
+    fill =
+      parsed.fill.from === "card"
+        ? { from: "card", value: parsed.fill.value }
+        : { from: "identity", value: parsed.fill.value };
   } else {
     fill = { from: parsed.fill.from };
   }

@@ -68,9 +68,9 @@ import {
 import { cardMayFillFrame, isPaymentServiceFrame } from "../keykeeper/card-frames";
 import {
   applyFillRules,
+  fieldValueFor,
   FillSource,
   mayFillValue,
-  staticValueFor,
   visibleCustomFields,
 } from "../keykeeper/fill-rules";
 import { noteFill } from "../keykeeper/hidden-fills";
@@ -743,7 +743,7 @@ export default class AutofillService implements AutofillServiceInterface {
       pageDetails,
       fillScript,
       filledFields,
-      (source) => this.keykeeperFillRuleValue(options.cipher, source),
+      (source, field) => this.keykeeperFillRuleValue(options.cipher, source, field),
       AutofillService.fillByOpid,
       {
         userStarted: !options.onPageLoad,
@@ -852,11 +852,13 @@ export default class AutofillService implements AutofillServiceInterface {
   }
 
   /**
-   * Keykeeper: the value a fill rule asks for, including a fresh TOTP code.
+   * Keykeeper: the value a fill rule asks for, as the field takes it (a list's
+   * option, a card's month as two digits), including a fresh TOTP code.
    */
   private async keykeeperFillRuleValue(
     cipher: CipherView,
     source: FillSource,
+    field: AutofillField,
   ): Promise<string | null> {
     if (source.from === "totp") {
       if (!cipher.login?.totp) {
@@ -864,7 +866,7 @@ export default class AutofillService implements AutofillServiceInterface {
       }
       return (await firstValueFrom(this.totpService.getCode$(cipher.login.totp))).code;
     }
-    return staticValueFor(cipher, source);
+    return fieldValueFor(cipher, source, field);
   }
 
   /**
