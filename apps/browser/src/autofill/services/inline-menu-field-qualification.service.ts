@@ -1,5 +1,6 @@
 import { isAddressFieldByName } from "../keykeeper/address-fields";
 import { hasTellingWord, labelText } from "../keykeeper/label-match";
+import { isPinBesidePassword, withoutPinsBesidePasswords } from "../keykeeper/pin-fields";
 import AutofillField from "../models/autofill-field";
 import AutofillPageDetails from "../models/autofill-page-details";
 import { sendExtensionMessage } from "../utils";
@@ -170,6 +171,13 @@ export class InlineMenuFieldQualificationService implements InlineMenuFieldQuali
    * @param pageDetails - The details of the page that the field is on.
    */
   isFieldForLoginForm(field: AutofillField, pageDetails: AutofillPageDetails): boolean {
+    // Keykeeper: a PIN beside a password isn't a second password, and isn't
+    // one to fill a login into (keykeeper/pin-fields.ts).
+    if (isPinBesidePassword(field, pageDetails)) {
+      return false;
+    }
+    pageDetails = withoutPinsBesidePasswords(pageDetails);
+
     /**
      * Totp inline menu is available only for premium users.
      */
@@ -255,6 +263,8 @@ export class InlineMenuFieldQualificationService implements InlineMenuFieldQuali
    * upstream leaves alone or one whose autocomplete hint says what it is.
    */
   isLabelFieldForLoginForm(field: AutofillField, pageDetails: AutofillPageDetails): boolean {
+    // A PIN beside the password isn't a second one (keykeeper/pin-fields.ts).
+    pageDetails = withoutPinsBesidePasswords(pageDetails);
     if (
       field.viewable !== true ||
       field.readonly === true ||
@@ -351,6 +361,13 @@ export class InlineMenuFieldQualificationService implements InlineMenuFieldQuali
    * @param pageDetails - The details of the page that the field is on.
    */
   isFieldForAccountCreationForm(field: AutofillField, pageDetails: AutofillPageDetails): boolean {
+    // Keykeeper: a PIN beside a password isn't a new password, nor a second
+    // one that makes the form a sign-up (keykeeper/pin-fields.ts).
+    if (isPinBesidePassword(field, pageDetails)) {
+      return false;
+    }
+    pageDetails = withoutPinsBesidePasswords(pageDetails);
+
     if (
       this.isExcludedFieldType(field, this.excludedAutofillFieldTypesSet) ||
       this.isTotpField(field)

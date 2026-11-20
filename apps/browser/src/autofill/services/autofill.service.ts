@@ -75,6 +75,7 @@ import {
 } from "../keykeeper/fill-rules";
 import { noteFill } from "../keykeeper/hidden-fills";
 import { phonePartFor } from "../keykeeper/identity-fields";
+import { pinsBesidePasswords, withoutPinsBesidePasswords } from "../keykeeper/pin-fields";
 import AutofillField from "../models/autofill-field";
 import AutofillPageDetails from "../models/autofill-page-details";
 import AutofillScript from "../models/autofill-script";
@@ -754,9 +755,14 @@ export default class AutofillService implements AutofillServiceInterface {
       },
     );
     if (neverFill.size) {
+      const kept = pageDetails.fields.filter((field) => !neverFill.has(field.opid));
+      // And a PIN beside a password that's never filled doesn't take the
+      // password's place (keykeeper/pin-fields.ts).
+      const pins = pinsBesidePasswords(pageDetails.fields);
+      const stillBeside = pinsBesidePasswords(kept);
       pageDetails = {
         ...pageDetails,
-        fields: pageDetails.fields.filter((field) => !neverFill.has(field.opid)),
+        fields: kept.filter((field) => !pins.has(field) || stillBeside.has(field)),
       };
     }
     // Keykeeper: our own fields (fill rules, expiry dates) never fill a page field by name.
@@ -3023,7 +3029,8 @@ export default class AutofillService implements AutofillServiceInterface {
         ? new Set<string>()
         : AutofillService.collectExcludedPasswordFieldIds(pageDetails);
 
-    pageDetails.fields.forEach((f) => {
+    // Keykeeper: a PIN beside a password never gets a password (keykeeper/pin-fields.ts).
+    withoutPinsBesidePasswords(pageDetails).fields.forEach((f) => {
       const isPassword = f.type === "password";
       if (
         !isPassword &&

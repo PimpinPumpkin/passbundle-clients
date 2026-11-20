@@ -5,6 +5,7 @@ import {
   FormPurposeCategory,
 } from "@bitwarden/common/autofill/types";
 
+import { pinAttributes } from "../keykeeper/pin-fields";
 import AutofillField from "../models/autofill-field";
 import AutofillForm from "../models/autofill-form";
 import AutofillPageDetails from "../models/autofill-page-details";
@@ -929,6 +930,8 @@ export class CollectAutofillContentService implements CollectAutofillContentServ
       "aria-disabled": this.getAttributeBoolean(element, AUTOFILL_ATTRIBUTES.ARIA_DISABLED, true),
       "aria-haspopup": this.getAttributeBoolean(element, AUTOFILL_ATTRIBUTES.ARIA_HASPOPUP, true),
       "data-stripe": this.getPropertyOrAttribute(element, AUTOFILL_ATTRIBUTES.DATA_STRIPE),
+      // Keykeeper: inputmode and pattern, which can mark a PIN (keykeeper/pin-fields.ts).
+      ...pinAttributes(element),
     };
 
     this.cacheAutofillFieldElement(index, element, autofillField);
