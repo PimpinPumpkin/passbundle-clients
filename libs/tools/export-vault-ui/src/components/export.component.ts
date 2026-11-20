@@ -37,7 +37,10 @@ import { UserVerificationDialogComponent } from "@bitwarden/auth/angular";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import { PolicyType } from "@bitwarden/common/admin-console/enums";
-import { gridOf } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
+import {
+  exportsWholeOrganization,
+  gridOf,
+} from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
@@ -50,7 +53,7 @@ import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/pl
 import { getById } from "@bitwarden/common/platform/misc";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
 import { pin } from "@bitwarden/common/tools/rx";
-import { isId, OrganizationId } from "@bitwarden/common/types/guid";
+import { isId, OrganizationId, UserId } from "@bitwarden/common/types/guid";
 import {
   AsyncActionsModule,
   BitSubmitDirective,
@@ -444,6 +447,8 @@ export class ExportComponent implements OnInit, OnDestroy, AfterViewInit {
     this.exportForm.controls.vaultSelector.patchValue(this.organizationId);
     this.exportForm.controls.vaultSelector.disable();
 
+    // Keykeeper: the whole organization only for those the server's export
+    // answers (onlyFoldersTheyCanExport).
     this.onlyManagedCollections = false;
   }
 
@@ -650,8 +655,26 @@ export class ExportComponent implements OnInit, OnDestroy, AfterViewInit {
           this.organizationId,
           this.format,
           this.filePassword,
-          this.onlyManagedCollections,
+          await this.onlyFoldersTheyCanExport(userId),
         );
+  }
+
+  /**
+   * Keykeeper: the admin console's Export is the whole organization only for
+   * owners, admins, and a custom role with import and export and access to
+   * all items, whom the server's export answers. A custom role without
+   * access to all items, which also opens it, exports the shared folders
+   * where it can export, from its own synced items, as the Password
+   * Manager's Export does (DESIGN.md, "Folders and permissions").
+   */
+  private async onlyFoldersTheyCanExport(userId: UserId): Promise<boolean> {
+    if (this.onlyManagedCollections) {
+      return true;
+    }
+    const organization = await firstValueFrom(
+      this.organizationService.organizations$(userId).pipe(getById(this.organizationId)),
+    );
+    return !exportsWholeOrganization(organization);
   }
 
   protected async collectEvent(): Promise<void> {
