@@ -376,6 +376,7 @@ describe("master password re-prompt", () => {
         policyService,
         mock<EventCollectionService>(),
         accountService,
+        mock<OrganizationService>(),
         cipherService,
       );
     });
