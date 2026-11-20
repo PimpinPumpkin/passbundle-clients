@@ -47,6 +47,7 @@ import {
 import { CipherFileUploadService } from "../abstractions/file-upload/cipher-file-upload.service";
 import { FieldType } from "../enums";
 import { CipherType } from "../enums/cipher-type";
+import { decryptedCacheIsCurrent } from "../keykeeper/decrypted-cache";
 import { withCardExpirations } from "../keykeeper/expiration";
 import { keepHiddenItemWebsites } from "../keykeeper/hidden-websites";
 import { CipherData } from "../models/data/cipher.data";
@@ -397,7 +398,8 @@ export class CipherService implements CipherServiceAbstraction {
       return this.getAllDecryptedUsingSdk(userId);
     }
 
-    const decCiphers = await this.getDecryptedCiphers(userId);
+    // Keykeeper: only a copy that is still the stored items (keykeeper/decrypted-cache.ts).
+    const decCiphers = await this.getCurrentDecryptedCiphers(userId);
     if (decCiphers != null && decCiphers.length !== 0) {
       return decCiphers;
     }
@@ -418,7 +420,8 @@ export class CipherService implements CipherServiceAbstraction {
   }
 
   private async getAllDecryptedUsingSdk(userId: UserId): Promise<CipherView[]> {
-    const decCiphers = await this.getDecryptedCiphers(userId);
+    // Keykeeper: only a copy that is still the stored items (keykeeper/decrypted-cache.ts).
+    const decCiphers = await this.getCurrentDecryptedCiphers(userId);
     if (decCiphers != null && decCiphers.length !== 0) {
       return decCiphers;
     }
@@ -466,6 +469,21 @@ export class CipherService implements CipherServiceAbstraction {
     return Object.values(
       await firstValueFrom(this.decryptedCiphersState(userId).state$.pipe(map((c) => c ?? {}))),
     );
+  }
+
+  /**
+   * Keykeeper: the decrypted copy, or none when it isn't the stored items as they are now.
+   * Another extension page can write a copy it decrypted before a save cleared it
+   * (keykeeper/decrypted-cache.ts); decrypting again replaces it.
+   */
+  private async getCurrentDecryptedCiphers(userId: UserId): Promise<CipherView[]> {
+    const cached = await this.getDecryptedCiphers(userId);
+    if (cached.length === 0) {
+      return cached;
+    }
+    const stored = await firstValueFrom(this.encryptedCiphersState(userId).state$);
+    const failed = await firstValueFrom(this.failedToDecryptCiphersState(userId).state$);
+    return decryptedCacheIsCurrent(cached, failed, stored) ? cached : [];
   }
 
   /**
