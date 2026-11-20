@@ -146,6 +146,13 @@ export default class AutofillField {
    * used for totp multiline calculations
    */
   fieldRect?: FieldRect;
+
+  /**
+   * Keykeeper: the selectors of PassBundle's site rules (or an operator's)
+   * that found this field on the page (keykeeper/site-rule-fields.ts). Only
+   * our fill rules read it; it doesn't make the field a targeted one.
+   */
+  keykeeperSelectors?: string[];
 }
 
 /** `readonly` / `disabled` from collected field data; a full {@link AutofillField} is assignable. */
