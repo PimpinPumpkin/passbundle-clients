@@ -4,12 +4,16 @@ import { OptionValues } from "commander";
 import * as inquirer from "inquirer";
 import { firstValueFrom, switchMap } from "rxjs";
 
+import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import { PolicyType } from "@bitwarden/common/admin-console/enums";
+import { exportsWholeOrganization } from "@bitwarden/common/admin-console/keykeeper/folder-permissions";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { EventCollectionService, EventType } from "@bitwarden/common/dirt/event-logs";
+import { getById } from "@bitwarden/common/platform/misc";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
+import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import {
   ExportFormat,
@@ -29,6 +33,9 @@ export class ExportCommand {
     private policyService: PolicyService,
     private eventCollectionService: EventCollectionService,
     private accountService: AccountService,
+    // Keykeeper: who the person is in the organization they export, which
+    // decides where its export comes from (exportsWholeOrganization).
+    private organizationService: OrganizationService,
     // Keykeeper: whether what it writes holds an item that asks for the
     // master password again (keykeeper/reprompt.ts).
     private cipherService?: CipherService,
@@ -102,6 +109,7 @@ export class ExportCommand {
               options.organizationid,
               format,
               password,
+              await this.onlyFoldersTheyCanExport(userId, options.organizationid),
             );
 
       const eventType = options.organizationid
@@ -152,6 +160,22 @@ export class ExportCommand {
       return answer.password as string;
     }
     return null;
+  }
+
+  /**
+   * Keykeeper: the whole organization, from the server's export, only for
+   * owners, admins, and a custom role with import and export and access to
+   * all items, whom it answers. Everyone else exports the shared folders
+   * where they can export, from their own synced items, as the web vault's
+   * Export does; the server's export would refuse them, and its 401 for a
+   * regular member signed the tool out (DESIGN.md, "Folders and
+   * permissions").
+   */
+  private async onlyFoldersTheyCanExport(userId: UserId, organizationId: string) {
+    const organization = await firstValueFrom(
+      this.organizationService.organizations$(userId).pipe(getById(organizationId)),
+    );
+    return !exportsWholeOrganization(organization);
   }
 
   private isSupportedExportFormat(format: string): format is ExportFormat {
