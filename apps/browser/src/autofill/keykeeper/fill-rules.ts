@@ -6,7 +6,7 @@
 // small JSON document. Using a custom field keeps the server and other clients
 // compatible: they store and sync it like any other field.
 
-import { FieldType } from "@bitwarden/common/vault/enums";
+import { CipherType, FieldType } from "@bitwarden/common/vault/enums";
 import {
   FieldFingerprint,
   FILL_RULE_FIELD_NAME,
@@ -29,6 +29,10 @@ import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
 import AutofillField from "../models/autofill-field";
 import AutofillPageDetails from "../models/autofill-page-details";
 import AutofillScript from "../models/autofill-script";
+
+import { countryOption, optionFor, stateOption } from "./address-names";
+import { monthOption, yearOption } from "./card-fields";
+import { shownLabel } from "./label-match";
 
 // The stored form lives in @bitwarden/common, so the item view and editor can
 // show rules too.
@@ -57,15 +61,14 @@ export function schemeOfUrl(url: string | null | undefined): RuleScheme | null {
 /** Whether a rule made for a site applies on the page at `url`: the same scheme and host. */
 export function ruleAppliesOn(rule: FillRule, url: string | null | undefined): boolean {
   const host = hostOf(url);
-  return rule.host != null && host !== "" && rule.host === host && schemeOf(rule) === schemeOfUrl(url);
+  return (
+    rule.host != null && host !== "" && rule.host === host && schemeOf(rule) === schemeOfUrl(url)
+  );
 }
 
-const normalize = (text: string | null | undefined) =>
-  (text ?? "").replace(/\s+/g, " ").trim().toLowerCase();
-
 /** The label people see next to the field, as the page describes it. */
-function fieldLabel(field: AutofillField): string {
-  return normalize(field["label-tag"] || field["label-aria"] || field.placeholder || "");
+export function fieldLabel(field: AutofillField): string {
+  return shownLabel(field);
 }
 
 /** Builds a fingerprint for a field on a page, from its most stable attributes. */
@@ -103,9 +106,25 @@ export function fieldMatches(fingerprint: FieldFingerprint, field: AutofillField
 }
 
 /**
+ * The same fingerprint, by the one key that decides (`fieldMatches`): the id,
+ * else the name, else the label. Site-wide rules keep only that, so the
+ * account's settings stay small.
+ */
+export function decidingFingerprint(fingerprint: FieldFingerprint): FieldFingerprint {
+  if (fingerprint.id) {
+    return { id: fingerprint.id };
+  }
+  if (fingerprint.name) {
+    return { name: fingerprint.name };
+  }
+  return fingerprint.label ? { label: fingerprint.label } : {};
+}
+
+/**
  * Whether a source is something the item can hide, by the shared allowlist
- * (hidden-secrets.ts): the password, a verification code, a hidden custom
- * field, or a linked one that fills a secret.
+ * (hidden-secrets.ts): the password, a verification code, a card's number
+ * and security code, a hidden custom field, or a linked one that fills a
+ * secret.
  */
 export function isSecretSource(cipher: CipherView, source: FillSource): boolean {
   switch (source.from) {
@@ -115,6 +134,10 @@ export function isSecretSource(cipher: CipherView, source: FillSource): boolean 
       return isSecretValue("login.password");
     case "totp":
       return isSecretValue("login.totp");
+    case "card":
+      return isSecretValue(`card.${source.value}`);
+    case "identity":
+      return isSecretValue(`identity.${source.value}`);
     // A rule names a field by its name; if a secret field shares it, it counts as one.
     case "field":
       return visibleCustomFields(cipher).some(
@@ -186,6 +209,19 @@ export const keykeeperSiteFixes = {
   share: async (_rule: FillRule): Promise<void> => {},
 };
 
+/**
+ * The person's own site-wide never-fill rules (site-never-fill.ts): "Never
+ * fill this field on this site", for every item. Kept in the account's
+ * encrypted settings; the extension's background fills these in. `add`
+ * answers false when the list is full; until then there are none, and none
+ * can be added.
+ */
+export const keykeeperSiteNeverFill = {
+  rulesFor: async (_url: string): Promise<FillRule[]> => [],
+  add: async (_rule: FillRule): Promise<boolean> => false,
+  remove: async (_rule: FillRule): Promise<void> => {},
+};
+
 /** How a fill was started, and upstream's limits for it, which rules keep too. */
 export type FillRuleOptions = {
   /**
@@ -207,7 +243,10 @@ export type FillRuleOptions = {
   excluded: (field: AutofillField, pageDetails: AutofillPageDetails) => boolean;
 };
 
-/** A rule, and whether it came from the server (a site fix) rather than the item. */
+/**
+ * A rule, and whether it came from the server (a site fix) rather than the
+ * item. The person's site-wide never-fill rules count as the item's.
+ */
 type AppliedRule = { rule: FillRule; fix: boolean };
 
 /**
@@ -247,33 +286,41 @@ function mayApply(
 }
 
 /**
- * Applies an item's fill rules, then any site fixes for the page, to a fill
- * script, before upstream's own matching runs. Only rules made on this page's
- * scheme and host apply; a never rule from before rules had a host applies
- * anywhere, since it only holds a value back. Site fixes apply only to a fill
- * the person started, never on page load. Value rules fill their field, within
- * upstream's limits for the fill (`FillRuleOptions`). Never rules claim their
- * field without filling it. Fields claimed here are added to `filledFields`,
- * which upstream's matching skips. Returns the never-fill fields' opids, which
- * the caller also hides from upstream's field selection, so a password meant
- * for a never-fill field goes to the next fitting field instead of nowhere.
+ * Applies the person's site-wide never-fill rules, an item's fill rules, then
+ * any site fixes for the page, to a fill script, before upstream's own
+ * matching runs. Only rules made on this page's scheme and host apply; a
+ * never rule from before rules had a host applies anywhere, since it only
+ * holds a value back. Site-wide never-fill holds for every item, on page load
+ * too, and comes first: a rule someone else put on a shared item never fills
+ * a field the person said never to fill on that site. Site fixes apply only
+ * to a fill the person started, never on page load. Value rules fill their
+ * field, within upstream's limits for the fill (`FillRuleOptions`). Never
+ * rules claim their field without filling it. Fields claimed here are added
+ * to `filledFields`, which upstream's matching skips. Returns the never-fill
+ * fields' opids, which the caller also hides from upstream's field selection,
+ * so a password meant for a never-fill field goes to the next fitting field
+ * instead of nowhere.
  */
 export async function applyFillRules(
   cipher: CipherView,
   pageDetails: AutofillPageDetails,
   fillScript: AutofillScript,
   filledFields: { [opid: string]: AutofillField },
-  valueFor: (source: FillSource) => Promise<string | null>,
+  valueFor: (source: FillSource, field: AutofillField) => Promise<string | null>,
   fill: (fillScript: AutofillScript, field: AutofillField, value: string) => void,
   options: FillRuleOptions,
 ): Promise<Set<string>> {
   const neverFill = new Set<string>();
   const applies = (r: FillRule) =>
     r.host == null ? r.fill.from === "never" : ruleAppliesOn(r, pageDetails.url);
-  // The item's own rules first, then site fixes for this site: a field the
-  // item has a rule for is the item's.
+  // Site-wide never-fill first, then the item's own rules, then site fixes
+  // for this site: a field the item has a rule for is the item's.
+  const siteNever = (await keykeeperSiteNeverFill.rulesFor(pageDetails.url)).filter(
+    (rule) => rule.fill.from === "never",
+  );
   const fixes = options.userStarted ? await keykeeperSiteFixes.rulesFor(pageDetails.url) : [];
   const rules: AppliedRule[] = [
+    ...siteNever.map((rule) => ({ rule, fix: false })),
     ...readFillRules(cipher).map((rule) => ({ rule, fix: false })),
     ...fixes.map((rule) => ({ rule, fix: true })),
   ].filter(({ rule }) => applies(rule));
@@ -296,7 +343,7 @@ export async function applyFillRules(
     if (!mayApply(cipher, applied, field, pageDetails, options)) {
       continue;
     }
-    const value = await valueFor(applied.rule.fill);
+    const value = await valueFor(applied.rule.fill, field);
     if (value == null || value === "") {
       continue;
     }
@@ -315,7 +362,51 @@ export function staticValueFor(cipher: CipherView, source: FillSource): string |
       return cipher.login?.password ?? null;
     case "field":
       return visibleCustomFields(cipher).find((f) => f.name === source.name)?.value ?? null;
+    case "card":
+      return cipher.type === CipherType.Card ? (cipher.card?.[source.value] ?? null) : null;
+    case "identity":
+      return cipher.type === CipherType.Identity ? (cipher.identity?.[source.value] ?? null) : null;
     default:
       return null;
   }
+}
+
+/**
+ * The value for a source as this field takes it: a list gets the option that
+ * is the value (a card's month and year, an identity's state and country by
+ * code or name, as upstream's fill and ours choose them), or nothing when it
+ * has none; a text field gets a card's month as two digits and its year as
+ * four, or two where the field takes only two.
+ */
+export function fieldValueFor(
+  cipher: CipherView,
+  source: FillSource,
+  field: AutofillField,
+): string | null {
+  const value = staticValueFor(cipher, source);
+  if (value == null || value === "") {
+    return value;
+  }
+  const options = field.selectInfo?.options as (string | null)[][] | undefined;
+  if (source.from === "card" && (source.value === "expMonth" || source.value === "expYear")) {
+    if (options) {
+      return source.value === "expMonth" ? monthOption(options, value) : yearOption(options, value);
+    }
+    if (source.value === "expMonth") {
+      const month = parseInt(value, 10);
+      return month >= 1 && month <= 12 ? String(month).padStart(2, "0") : value;
+    }
+    const year = /^\d{2}$/.test(value.trim()) ? `20${value.trim()}` : value.trim();
+    return field.maxLength === 2 ? year.slice(-2) : year;
+  }
+  if (!options) {
+    return value;
+  }
+  if (source.from === "identity" && source.value === "state") {
+    return stateOption(options, value, cipher.identity?.country);
+  }
+  if (source.from === "identity" && source.value === "country") {
+    return countryOption(options, value);
+  }
+  return optionFor(options, [value]);
 }

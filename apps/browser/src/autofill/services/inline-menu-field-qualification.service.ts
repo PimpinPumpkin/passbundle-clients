@@ -1,4 +1,5 @@
 import { isAddressFieldByName } from "../keykeeper/address-fields";
+import { hasTellingWord, labelText } from "../keykeeper/label-match";
 import AutofillField from "../models/autofill-field";
 import AutofillPageDetails from "../models/autofill-page-details";
 import { sendExtensionMessage } from "../utils";
@@ -239,6 +240,48 @@ export class InlineMenuFieldQualificationService implements InlineMenuFieldQuali
       next != null &&
       this.isCurrentPasswordField(next) &&
       this.isPasswordFieldForLoginForm(next, pageDetails)
+    );
+  }
+
+  /**
+   * Keykeeper: a text field in a sign-in form that isn't the username, known
+   * by a label of its own ("Customer number" beside "Username" and
+   * "Password"), gets the logins' menu, so a login's custom field whose name
+   * matches the label can be offered there with one tap (keykeeper/
+   * label-match.ts). Choosing a login in it fills as the popup's Fill does in
+   * that form, never the username into this field (overlay.background.ts).
+   * In the same form as exactly one sign-in password field, with a label
+   * that says what it is (not just "Name" or "Code"), and not a field
+   * upstream leaves alone or one whose autocomplete hint says what it is.
+   */
+  isLabelFieldForLoginForm(field: AutofillField, pageDetails: AutofillPageDetails): boolean {
+    if (
+      field.viewable !== true ||
+      field.readonly === true ||
+      field.disabled === true ||
+      typeof field.type !== "string" ||
+      !["text", "tel", "number"].includes(field.type) ||
+      this.isExcludedFieldType(field, this.excludedAutofillFieldTypesSet) ||
+      this.fieldHasDisqualifyingAttributeValue(field) ||
+      this.isTotpField(field) ||
+      this.isUsernameField(field) ||
+      this.isUnnamedUsernameBeforePassword(field, pageDetails) ||
+      !hasTellingWord(labelText(field))
+    ) {
+      return false;
+    }
+    const hint =
+      typeof field.autoCompleteType === "string" ? field.autoCompleteType.trim().toLowerCase() : "";
+    if (hint !== "" && hint !== "on" && hint !== "off") {
+      return false;
+    }
+    const passwords = pageDetails.fields.filter(
+      (other) => other.viewable === true && other.form === field.form && other.type === "password",
+    );
+    return (
+      passwords.length === 1 &&
+      this.isCurrentPasswordField(passwords[0]) &&
+      this.isPasswordFieldForLoginForm(passwords[0], pageDetails)
     );
   }
 
