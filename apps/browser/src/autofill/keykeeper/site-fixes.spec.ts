@@ -125,11 +125,14 @@ describe("Site fixes", () => {
     cipher.login.password = "secret";
     upsertFillRule(cipher, rule({ id: "custno" }, { from: "never" }));
     const original = keykeeperSiteFixes.rulesFor;
-    keykeeperSiteFixes.rulesFor = async () => [
-      rule({ id: "custno" }, { from: "username" }),
-      rule({ id: "member" }, { from: "username" }),
-      rule({ id: "hidden-member" }, { from: "username" }),
-    ];
+    keykeeperSiteFixes.rulesFor = async () => ({
+      msp: [],
+      confirmed: [
+        rule({ id: "custno" }, { from: "username" }),
+        rule({ id: "member" }, { from: "username" }),
+        rule({ id: "hidden-member" }, { from: "username" }),
+      ],
+    });
     const field = (opid: string, htmlID: string, viewable = true) =>
       ({ opid, htmlID, viewable, type: "text" }) as AutofillField;
     const fillScript = new AutofillScript();
@@ -179,7 +182,7 @@ describe("Site fixes", () => {
       const asked: string[] = [];
       keykeeperSiteFixes.rulesFor = async (u) => {
         asked.push(u);
-        return fixes;
+        return { msp: [], confirmed: fixes };
       };
       const fillScript = new AutofillScript();
       try {
@@ -199,7 +202,10 @@ describe("Site fixes", () => {
     };
 
     it("put a password only into a password field, even for someone who can see it", async () => {
-      const fixes = [rule({ id: "q" }, { from: "password" }), rule({ id: "pw" }, { from: "password" })];
+      const fixes = [
+        rule({ id: "q" }, { from: "password" }),
+        rule({ id: "pw" }, { from: "password" }),
+      ];
 
       expect(
         (await fillWith(fixes, [field("__0", "q"), field("__1", "pw", "password")])).script,
@@ -239,7 +245,11 @@ describe("Site fixes", () => {
     });
 
     it("can be turned off: then none fill and the list isn't downloaded", async () => {
-      const fix: SiteFix = { host: HOST, field: { id: "pw", name: "", label: "" }, fill: "password" };
+      const fix: SiteFix = {
+        host: HOST,
+        field: { id: "pw", name: "", label: "" },
+        fill: "password",
+      };
       const { service, apiService, stateProvider } = setUp({ fixes: [fix], rules: [] });
       await service.refresh(USER);
       expect(await service.rulesFor(`https://${HOST}/login`)).toEqual([toRule(fix)]);
