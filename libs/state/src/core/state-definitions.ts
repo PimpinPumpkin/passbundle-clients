@@ -344,3 +344,8 @@ export const KEYKEEPER_RELOAD_SETTING_DISK = new StateDefinition("keykeeperReloa
 export const KEYKEEPER_PLAN_DISK = new StateDefinition("keykeeperPlan", "disk", {
   web: "disk-local",
 });
+/**
+ * Whether this unlock already tried to enroll someone in their organizations'
+ * account recovery (DESIGN.md, "Enrolling at unlock"), per account.
+ */
+export const KEYKEEPER_RECOVERY_MEMORY = new StateDefinition("keykeeperRecovery", "memory");

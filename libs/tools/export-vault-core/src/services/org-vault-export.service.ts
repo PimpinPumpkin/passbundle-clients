@@ -38,6 +38,16 @@ import { ExportHelper } from "./export-helper";
 import { OrganizationVaultExportServiceAbstraction } from "./org-vault-export.service.abstraction";
 import { ExportFormat } from "./vault-export.service.abstraction";
 
+/**
+ * Keykeeper: an export of the folders someone can export, when they can
+ * export none of this organization's, is refused rather than written empty.
+ */
+function refuseWithoutExportableFolders(folders: unknown[]): void {
+  if (folders.length === 0) {
+    throw new Error("You can't export any of this organization's shared folders.");
+  }
+}
+
 export class OrganizationVaultExportService
   extends BaseVaultExportService
   implements OrganizationVaultExportServiceAbstraction
@@ -109,8 +119,9 @@ export class OrganizationVaultExportService
 
     // Keykeeper: an organization's whole export holds every item, so it's
     // refused to anyone with a shared folder there they can't export
-    // (DESIGN.md, "Folders and permissions"). Owners and admins can export
-    // every folder.
+    // (DESIGN.md, "Folders and permissions"). Callers ask for it only for
+    // those the server's export answers (exportsWholeOrganization), who can
+    // export every folder; this stays as a backstop.
     if (!onlyManagedCollections) {
       const collections = await firstValueFrom(
         this.collectionService.decryptedCollections$(userId),
@@ -268,6 +279,7 @@ export class OrganizationVaultExportService
         ),
       ),
     );
+    refuseWithoutExportableFolders(decCollections);
 
     const restrictions = await firstValueFrom(this.restrictedItemTypesService.restricted$);
 
@@ -310,6 +322,7 @@ export class OrganizationVaultExportService
         ),
       ),
     );
+    refuseWithoutExportableFolders(encCollections);
 
     const restrictions = await firstValueFrom(this.restrictedItemTypesService.restricted$);
 
