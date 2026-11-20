@@ -165,6 +165,15 @@ function setUp(options: Options = {}) {
 }
 
 describe("Keykeeper enrollment through the install command", () => {
+  it("gives the install command's organization key fingerprint, from browser policy, to enrolling at unlock", async () => {
+    const pinned = setUp();
+    expect(await pinned.enrollment.recoveryPin()).toBe(fingerprintOf(orgPublicKey));
+    expect(pinned.apiService.send).not.toHaveBeenCalled();
+
+    const none = setUp({ joinParts: { secret: joinSecret, orgKey: null } });
+    expect(await none.enrollment.recoveryPin()).toBeNull();
+  });
+
   it("does nothing without a token from browser policy", async () => {
     const { enrollment, apiService } = setUp({ managedToken: null });
 

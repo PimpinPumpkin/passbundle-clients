@@ -587,6 +587,7 @@ export class VaultProgram extends BaseProgram {
           this.serviceContainer.policyService,
           this.serviceContainer.eventCollectionService,
           this.serviceContainer.accountService,
+          this.serviceContainer.organizationService,
           this.serviceContainer.cipherService,
         );
         const response = await command.run(options);

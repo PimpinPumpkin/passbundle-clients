@@ -31,6 +31,7 @@ import {
   KeykeeperJoinChecks,
   KeykeeperMspRequests,
   KeykeeperMspWork,
+  KeykeeperRecoveryAtUnlock,
   KeykeeperScriptCopies,
   KeykeeperScriptRefresher,
   KeykeeperTemplateSender,
@@ -423,6 +424,7 @@ import { KeykeeperDevReload } from "../keykeeper/dev-reload";
 import { KeykeeperEnrollment } from "../keykeeper/enrollment";
 import { KeykeeperExpirationReminders } from "../keykeeper/expiration-reminders";
 import { startMspWork } from "../keykeeper/msp-work";
+import { extensionRecoveryAtUnlock } from "../keykeeper/recovery-at-unlock";
 import { BrowserActionsService } from "../platform/actions/browser-actions.service";
 import { DefaultBadgeBrowserApi } from "../platform/badge/badge-browser-api";
 import { BadgeService } from "../platform/badge/badge.service";
@@ -646,6 +648,7 @@ export default class MainBackground {
   keykeeperSiteNeverFill: KeykeeperSiteNeverFill;
   keykeeperEnrollment: KeykeeperEnrollment;
   keykeeperMspWork: KeykeeperMspWork;
+  keykeeperRecoveryAtUnlock: KeykeeperRecoveryAtUnlock;
   keykeeperAgentBiometrics: KeykeeperAgentBiometrics;
   keykeeperOpenAndFill: KeykeeperOpenAndFill;
   keykeeperPasswordChange: KeykeeperPasswordChange;
@@ -2123,6 +2126,25 @@ export default class MainBackground {
       ),
     );
     startMspWork(this.keykeeperMspWork);
+    // Keykeeper: enrolls people in account recovery at unlock, where their
+    // organization turned it on after they joined, only to the organization
+    // key the install command names (recovery-at-unlock.ts).
+    this.keykeeperRecoveryAtUnlock = extensionRecoveryAtUnlock({
+      accountService: this.accountService,
+      authService: this.authService,
+      organizationService: this.organizationService,
+      policyService: this.policyService,
+      syncService: this.syncService,
+      keyService: this.keyService,
+      encryptService: this.encryptService,
+      apiService: this.apiService,
+      organizationUserApiService: this.organizationUserApiService,
+      i18nService: this.i18nService,
+      stateProvider: this.stateProvider,
+      logService: this.logService,
+      pin: () => this.keykeeperEnrollment.recoveryPin(),
+    });
+    this.keykeeperRecoveryAtUnlock.start();
     // Keykeeper: the generator's settings, and the fields never filled on a
     // site, follow someone to each device.
     new KeykeeperGeneratorSettingsSync(

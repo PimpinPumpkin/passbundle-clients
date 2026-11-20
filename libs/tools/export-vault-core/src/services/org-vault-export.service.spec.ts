@@ -179,18 +179,20 @@ function login(name: string, folderId: string): CipherView {
 describe("OrganizationVaultExportService and shared folder permissions", () => {
   let collectionService: MockProxy<CollectionService>;
   let cipherService: MockProxy<CipherService>;
+  let vaultExportApiService: MockProxy<VaultExportApiService>;
   let service: OrganizationVaultExportService;
 
   beforeEach(() => {
     collectionService = mock<CollectionService>();
     cipherService = mock<CipherService>();
+    vaultExportApiService = mock<VaultExportApiService>();
     const restricted = {
       restricted$: of([]),
       isCipherRestricted: () => false,
     } as unknown as RestrictedItemTypesService;
     service = new OrganizationVaultExportService(
       cipherService,
-      mock<VaultExportApiService>(),
+      vaultExportApiService,
       mock<KeyGenerationService>(),
       mock<KeyService>(),
       mock<EncryptService>(),
@@ -228,4 +230,72 @@ describe("OrganizationVaultExportService and shared folder permissions", () => {
       "You can't export some of this organization's shared folders.",
     );
   });
+
+  it("goes by what any folder holding an item allows, and leaves out what only folders without export hold", async () => {
+    collectionService.decryptedCollections$.mockReturnValue(
+      of([
+        folder("reports", { ...FOLDER_PRESETS.view, export: true }),
+        folder("payroll", FOLDER_PRESETS.view),
+        folder("domain admins", FOLDER_PRESETS.viewHidden),
+      ]),
+    );
+    const shared = login("Shared drive", "reports");
+    shared.collectionIds = ["reports", "payroll"];
+    const elsewhere = login("Another organization's", "reports");
+    elsewhere.organizationId = "other-org";
+    const trashed = login("In the trash", "reports");
+    trashed.deletedDate = new Date();
+    cipherService.getAllDecrypted.mockResolvedValue([
+      login("Quarterly report", "reports"),
+      shared,
+      login("Payroll portal", "payroll"),
+      login("Domain admin", "domain admins"),
+      elsewhere,
+      trashed,
+    ]);
+
+    const doc = JSON.parse(
+      (await service.getOrganizationExport(kkUser, org, "json", true)).data as string,
+    );
+
+    expect(doc.items.map((i: { name: string }) => i.name)).toEqual([
+      "Quarterly report",
+      "Shared drive",
+    ]);
+    expect(doc.collections.map((c: { name: string }) => c.name)).toEqual(["reports"]);
+    // From their own synced items: the server's export isn't asked.
+    expect(vaultExportApiService.getOrganizationExport).not.toHaveBeenCalled();
+  });
+
+  it("refuses, rather than writing an empty file, someone who can export none of the organization's folders", async () => {
+    collectionService.decryptedCollections$.mockReturnValue(
+      of([
+        folder("payroll", FOLDER_PRESETS.view),
+        folder("domain admins", FOLDER_PRESETS.viewHidden),
+      ]),
+    );
+    collectionService.encryptedCollections$.mockReturnValue(
+      of([
+        { id: "payroll", organizationId: org, ...upstreamFields(FOLDER_PRESETS.view) },
+      ] as unknown as Collection[]),
+    );
+    cipherService.getAllDecrypted.mockResolvedValue([login("Payroll portal", "payroll")]);
+    cipherService.getAll.mockResolvedValue([]);
+
+    for (const format of ["json", "csv", "encrypted_json"] as const) {
+      await expect(service.getOrganizationExport(kkUser, org, format, true)).rejects.toThrow(
+        "You can't export any of this organization's shared folders.",
+      );
+    }
+    expect(vaultExportApiService.getOrganizationExport).not.toHaveBeenCalled();
+  });
 });
+
+function upstreamFields(grid: FolderGrid) {
+  return {
+    readOnly: !grid.edit,
+    hidePasswords: !grid.seePasswords,
+    manage: grid.manage,
+    keykeeper: grid,
+  };
+}

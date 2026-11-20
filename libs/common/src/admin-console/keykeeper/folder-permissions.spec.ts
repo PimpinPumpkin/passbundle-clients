@@ -1,4 +1,9 @@
+import { OrganizationUserStatusType, OrganizationUserType } from "../enums";
+import { PermissionsApi } from "../models/api/permissions.api";
+import { Organization } from "../models/domain/organization";
+
 import {
+  exportsWholeOrganization,
   FOLDER_PRESETS,
   FolderGrid,
   GRID_ALL,
@@ -196,5 +201,82 @@ describe("itemLike", () => {
       organizationId: null,
       collectionIds: [],
     });
+  });
+});
+
+describe("exportsWholeOrganization", () => {
+  /** A confirmed membership, as the apps hold it from the server's profile. */
+  function membership(
+    type: OrganizationUserType,
+    permissions: Record<string, boolean> = {},
+    more: Partial<Organization> = {},
+  ): Organization {
+    return Object.assign(new Organization(), {
+      type,
+      status: OrganizationUserStatusType.Confirmed,
+      enabled: true,
+      isMember: true,
+      permissions: new PermissionsApi(permissions),
+      ...more,
+    });
+  }
+
+  // Each role as the server's export (passbundle-server, get_org_export)
+  // answers it: the whole organization for these, and refused for the rest,
+  // who export their own synced items' folders instead.
+  it("is the whole organization for owners, admins, and a custom role with import and export and access to all items", () => {
+    expect(exportsWholeOrganization(membership(OrganizationUserType.Owner))).toBe(true);
+    expect(exportsWholeOrganization(membership(OrganizationUserType.Admin))).toBe(true);
+    // An MSP's technician who is an admin in the client.
+    expect(
+      exportsWholeOrganization(
+        membership(OrganizationUserType.Admin, {}, { keykeeperFromMsp: true }),
+      ),
+    ).toBe(true);
+    // A client's own custom role, and a technician's with vault items.
+    const exporter = { accessImportExport: true, keykeeperAccessAllItems: true };
+    expect(exportsWholeOrganization(membership(OrganizationUserType.Custom, exporter))).toBe(true);
+    expect(
+      exportsWholeOrganization(
+        membership(OrganizationUserType.Custom, exporter, { keykeeperFromMsp: true }),
+      ),
+    ).toBe(true);
+  });
+
+  it("isn't for anyone the server's export refuses", () => {
+    // Import and export without access to all items: it covers import.
+    expect(
+      exportsWholeOrganization(
+        membership(OrganizationUserType.Custom, { accessImportExport: true }),
+      ),
+    ).toBe(false);
+    // Access to all items without import and export: every folder's items,
+    // from their own, but not the admin console's export.
+    expect(
+      exportsWholeOrganization(
+        membership(OrganizationUserType.Custom, { keykeeperAccessAllItems: true }),
+      ),
+    ).toBe(false);
+    expect(
+      exportsWholeOrganization(membership(OrganizationUserType.Custom, { manageUsers: true })),
+    ).toBe(false);
+    // A regular member, however much they can export in the grid.
+    expect(exportsWholeOrganization(membership(OrganizationUserType.User))).toBe(false);
+    // Upstream's Manager, which the apps no longer name.
+    expect(exportsWholeOrganization(membership(3 as OrganizationUserType))).toBe(false);
+  });
+
+  it("isn't for a membership the person doesn't have", () => {
+    expect(exportsWholeOrganization(undefined)).toBe(false);
+    expect(exportsWholeOrganization(null)).toBe(false);
+    expect(
+      exportsWholeOrganization(membership(OrganizationUserType.Owner, {}, { isMember: false })),
+    ).toBe(false);
+    // An admin who has joined but isn't confirmed yet, without the organization's key.
+    expect(
+      exportsWholeOrganization(
+        membership(OrganizationUserType.Admin, {}, { status: OrganizationUserStatusType.Accepted }),
+      ),
+    ).toBe(false);
   });
 });
