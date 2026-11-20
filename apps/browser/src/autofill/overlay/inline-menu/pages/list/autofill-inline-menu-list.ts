@@ -978,6 +978,11 @@ export class AutofillInlineMenuList extends AutofillInlineMenuPageElement {
     );
     for (let cipherIndex = this.currentCipherIndex; cipherIndex < lastIndex; cipherIndex++) {
       this.ciphersList.appendChild(this.buildInlineMenuListActionsItem(this.ciphers[cipherIndex]));
+      // Keykeeper: a login's one-tap suggestion for this field, below it.
+      const keykeeperSuggestion = this.keykeeperBuildSuggestionItem(this.ciphers[cipherIndex]);
+      if (keykeeperSuggestion) {
+        this.ciphersList.appendChild(keykeeperSuggestion);
+      }
       this.currentCipherIndex++;
     }
 
@@ -1473,6 +1478,55 @@ export class AutofillInlineMenuList extends AutofillInlineMenuPageElement {
     });
     pickButton.addEventListener(EVENTS.KEYUP, this.keykeeperHandlePickKeyUp(choices));
     return pickButton;
+  }
+
+  /**
+   * Keykeeper: a login's one-tap suggestion for the field the menu is in
+   * ("Fill Customer ID here?"): a custom field whose name matches the
+   * field's label (keykeeper/label-match.ts). Its own row under the login, so
+   * the arrow keys reach it as they reach the next login. Pressing it fills
+   * the field and remembers the choice, as picking that value with "Fill this
+   * field with" does; nothing fills before.
+   */
+  private keykeeperBuildSuggestionItem(cipher: InlineMenuCipherData): HTMLElement | null {
+    const suggestion = cipher.keykeeperSuggestion;
+    if (!suggestion) {
+      return null;
+    }
+    const button = globalThis.document.createElement("button");
+    button.tabIndex = -1;
+    button.classList.add("inline-menu-list-action", "keykeeper-suggestion-button");
+    button.textContent = suggestion.title;
+    button.setAttribute("aria-label", `${suggestion.title} ${cipher.name}`);
+    button.addEventListener(EVENTS.CLICK, (event: Event) => {
+      if (!EventSecurity.isEventTrusted(event)) {
+        return;
+      }
+      this.postMessageToParent({
+        command: "keykeeperFillFieldWith",
+        inlineMenuCipherId: cipher.id,
+        choiceKey: suggestion.key,
+        keykeeperSuggestion: true,
+      });
+    });
+    button.addEventListener(EVENTS.KEYUP, (event: KeyboardEvent) => {
+      if (!EventSecurity.isEventTrusted(event)) {
+        return;
+      }
+      if (event.code === "ArrowDown") {
+        this.focusNextListItem(item);
+      } else if (event.code === "ArrowUp") {
+        this.focusPreviousListItem(item);
+      } else {
+        return;
+      }
+      event.preventDefault();
+    });
+    const item = globalThis.document.createElement("li");
+    item.setAttribute("role", "listitem");
+    item.classList.add("inline-menu-list-actions-item", "keykeeper-suggestion-item");
+    item.appendChild(button);
+    return item;
   }
 
   /** Keykeeper: arrows from the picker's button, like the row's other buttons. */

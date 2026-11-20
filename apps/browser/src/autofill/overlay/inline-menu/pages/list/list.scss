@@ -663,6 +663,39 @@ body * {
   }
 }
 
+// Keykeeper: a login's one-tap suggestion for the field ("Fill Customer ID
+// here?"), its own row under the login, lined up with the login's name.
+.inline-menu-list-actions-item.keykeeper-suggestion-item {
+  padding: 0 0.8rem 0.6rem 4.4rem;
+
+  .keykeeper-suggestion-button {
+    width: 100%;
+    text-align: left;
+    padding: 0.6rem 0.8rem;
+    margin: 0;
+    border-radius: 0.4rem;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 600;
+
+    @include themify($themes) {
+      color: themed("textColor");
+      background-color: themed("backgroundOffsetColor");
+      border: 1px solid themed("borderColor");
+    }
+
+    &:hover,
+    &:focus-visible {
+      outline-width: 0.2rem;
+      outline-style: solid;
+
+      @include themify($themes) {
+        outline-color: themed("focusOutlineColor");
+      }
+    }
+  }
+}
+
 // Keykeeper: items' tiles, as in the popup (keykeeper/inline-menu-tile.ts and
 // DESIGN.md, "The look"): the site's icon on white, the login's letter on its
 // tint, or the category's flat tile, a tint of its tone with the glyph in the

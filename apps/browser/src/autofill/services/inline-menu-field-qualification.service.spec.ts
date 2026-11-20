@@ -1524,6 +1524,92 @@ describe("InlineMenuFieldQualificationService", () => {
     });
   });
 
+  // Keykeeper: a sign-in form's other text field, known by its label, gets the
+  // logins' menu, for a custom field of that name (keykeeper/label-match.ts).
+  describe("Keykeeper: isLabelFieldForLoginForm", () => {
+    const field = (custom: Partial<AutofillField>) =>
+      createAutofillFieldMock({
+        htmlName: "",
+        "label-left": "",
+        "label-right": "",
+        "label-top": "",
+        "label-aria": "",
+        placeholder: "",
+        title: "",
+        form: "f",
+        autoCompleteType: "",
+        ...custom,
+      });
+    // The bank's sign-in: a customer number, then the username, then the password.
+    const customerNumber = () =>
+      field({ opid: "c", elementNumber: 0, htmlID: "custno", "label-tag": "Customer number" });
+    const username = () =>
+      field({ opid: "u", elementNumber: 1, htmlID: "username", "label-tag": "Username" });
+    const password = (custom: Partial<AutofillField> = {}) =>
+      field({
+        opid: "p",
+        elementNumber: 2,
+        htmlID: "password",
+        type: "password",
+        "label-tag": "Password",
+        autoCompleteType: "current-password",
+        ...custom,
+      });
+    const page = (fields: AutofillField[]) =>
+      ({
+        forms: { f: createAutofillFormMock({ opid: "f" }) },
+        fields,
+      }) as unknown as AutofillPageDetails;
+    const qualifies = (target: AutofillField, fields: AutofillField[]) =>
+      inlineMenuFieldQualificationService.isLabelFieldForLoginForm(target, page(fields));
+
+    it("is a text field with a label of its own in a sign-in form, not the username", () => {
+      const target = customerNumber();
+      expect(qualifies(target, [target, username(), password()])).toBe(true);
+      // Upstream's username field, and ours just before the password, keep their own menu.
+      const user = username();
+      expect(qualifies(user, [customerNumber(), user, password()])).toBe(false);
+    });
+
+    it("isn't one in a form with no password, a new password, or two", () => {
+      const target = customerNumber();
+      expect(qualifies(target, [target, username()])).toBe(false);
+      expect(
+        qualifies(target, [target, username(), password({ autoCompleteType: "new-password" })]),
+      ).toBe(false);
+      expect(
+        qualifies(target, [target, username(), password(), password({ opid: "p2", htmlID: "p2" })]),
+      ).toBe(false);
+    });
+
+    it("isn't one in another form than the password's", () => {
+      const target = { ...customerNumber(), form: "g" };
+      expect(qualifies(target, [target, username(), password()])).toBe(false);
+    });
+
+    it("isn't one without a label that says what it is", () => {
+      const generic = { ...customerNumber(), "label-tag": "Code" };
+      expect(qualifies(generic, [generic, username(), password()])).toBe(false);
+      const unlabeled = { ...customerNumber(), "label-tag": "" };
+      expect(qualifies(unlabeled, [unlabeled, username(), password()])).toBe(false);
+    });
+
+    it("isn't one upstream leaves alone, or one whose autocomplete hint says what it is", () => {
+      for (const custom of [
+        { type: "search" },
+        { type: "checkbox" },
+        { htmlID: "captcha" },
+        { viewable: false },
+        { readonly: true },
+        { autoCompleteType: "one-time-code" },
+        { autoCompleteType: "postal-code" },
+      ] as Partial<AutofillField>[]) {
+        const target = { ...customerNumber(), ...custom };
+        expect(qualifies(target, [target, username(), password()])).toBe(false);
+      }
+    });
+  });
+
   // Keykeeper: address fields known only by name or label get the identities'
   // menu, in a form that asks for an address (keykeeper/address-fields.ts).
   describe("Keykeeper: isFieldForIdentityForm, for address fields with no autocomplete hint", () => {

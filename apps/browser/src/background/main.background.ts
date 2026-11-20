@@ -389,11 +389,15 @@ import {
   localStateStore,
 } from "../autofill/keykeeper/browser-autofill-switches";
 import { keykeeperFillPicker as fillPickerHooks } from "../autofill/keykeeper/fill-field-menu";
-import { keykeeperSiteFixes as siteFixHooks } from "../autofill/keykeeper/fill-rules";
+import {
+  keykeeperSiteFixes as siteFixHooks,
+  keykeeperSiteNeverFill as siteNeverFillHooks,
+} from "../autofill/keykeeper/fill-rules";
 import { KeykeeperOpenAndFill } from "../autofill/keykeeper/open-and-fill";
 import { PASSWORD_CHANGE_SCRIPT } from "../autofill/keykeeper/password-change/password-change-messages";
 import { KeykeeperPasswordChange } from "../autofill/keykeeper/password-change/password-change.background";
 import { KeykeeperSiteFixes } from "../autofill/keykeeper/site-fixes";
+import { KeykeeperSiteNeverFill } from "../autofill/keykeeper/site-never-fill";
 import { AutofillLifecycleService } from "../autofill/services/abstractions/autofill-lifecycle.service";
 import { AutofillService as AutofillServiceAbstraction } from "../autofill/services/abstractions/autofill.service";
 import { AutofillBadgeUpdaterService } from "../autofill/services/autofill-badge-updater.service";
@@ -639,6 +643,7 @@ export default class MainBackground {
   // Keykeeper
   keykeeperExpirationReminders: KeykeeperExpirationReminders;
   keykeeperSiteFixes: KeykeeperSiteFixes;
+  keykeeperSiteNeverFill: KeykeeperSiteNeverFill;
   keykeeperEnrollment: KeykeeperEnrollment;
   keykeeperMspWork: KeykeeperMspWork;
   keykeeperAgentBiometrics: KeykeeperAgentBiometrics;
@@ -1975,6 +1980,17 @@ export default class MainBackground {
     this.keykeeperSiteFixes.init();
     siteFixHooks.rulesFor = (url) => this.keykeeperSiteFixes.rulesFor(url);
     siteFixHooks.share = (rule) => this.keykeeperSiteFixes.share(rule);
+    // Keykeeper: "Never fill this field on this site", for every item, from
+    // the account's encrypted settings.
+    this.keykeeperSiteNeverFill = new KeykeeperSiteNeverFill(
+      this.stateProvider,
+      this.keyService,
+      this.encryptService,
+      this.accountService,
+    );
+    siteNeverFillHooks.rulesFor = (url) => this.keykeeperSiteNeverFill.rulesFor(url);
+    siteNeverFillHooks.add = (rule) => this.keykeeperSiteNeverFill.add(rule);
+    siteNeverFillHooks.remove = (rule) => this.keykeeperSiteNeverFill.remove(rule);
     // Keykeeper: the fill picker matches an item to a page as autofill does.
     const itemMatches = async (cipher: CipherView, url: string) => {
       const equivalentDomains = await firstValueFrom(
@@ -1988,6 +2004,9 @@ export default class MainBackground {
     fillPickerHooks.itemMatches = itemMatches;
     // Keykeeper: and offers an item's two-step code only where it shows.
     fillPickerHooks.showsTotp = (cipher) => this.autofillService.showsTotp(cipher);
+    // Keykeeper: and suggests a custom field only where upstream's autofill
+    // would fill at all.
+    fillPickerHooks.excluded = AutofillService.isExcludedFromFillRules;
     // Keykeeper: "Open and fill": a login's open button fills the tab it opens, once.
     this.keykeeperOpenAndFill = new KeykeeperOpenAndFill({
       autofillService: this.autofillService,
@@ -2104,7 +2123,8 @@ export default class MainBackground {
       ),
     );
     startMspWork(this.keykeeperMspWork);
-    // Keykeeper: the generator's settings follow someone to each device.
+    // Keykeeper: the generator's settings, and the fields never filled on a
+    // site, follow someone to each device.
     new KeykeeperGeneratorSettingsSync(
       this.apiService,
       this.accountService,
@@ -2114,6 +2134,9 @@ export default class MainBackground {
       this.encryptService,
       this.stateProvider,
       this.logService,
+      undefined,
+      undefined,
+      [this.keykeeperSiteNeverFill.syncedPart()],
     ).start();
     // Keykeeper: the browser's own card and address autofill, off in a work
     // profile when an organization of an account signed in here turns them
