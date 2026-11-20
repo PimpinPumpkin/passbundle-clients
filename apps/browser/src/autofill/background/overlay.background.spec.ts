@@ -465,6 +465,70 @@ describe("OverlayBackground", () => {
       expect(pageDetailsForTabSpy[tabId]).toBeUndefined();
       expect(portKeyForTabSpy[tabId]).toBeUndefined();
     });
+
+    // Keykeeper: a tab closed, or sent to another page, in the middle of a
+    // fill never says the fill ended, and the menu stayed closed in every tab.
+    describe("Keykeeper: a fill whose tab goes away mid-fill", () => {
+      const isFilling = async (tabId: number) => {
+        const sendResponse = jest.fn();
+        sendMockExtensionMessage(
+          { command: "checkIsFieldCurrentlyFilling" },
+          mock<chrome.runtime.MessageSender>({ tab: createChromeTabMock({ id: tabId }) }),
+          sendResponse,
+        );
+        await flushPromises();
+        return sendResponse.mock.calls[0][0];
+      };
+
+      beforeEach(async () => {
+        sendMockExtensionMessage(
+          { command: "updateIsFieldCurrentlyFilling", isFieldCurrentlyFilling: true },
+          mock<chrome.runtime.MessageSender>({ tab: createChromeTabMock({ id: 1 }), frameId: 0 }),
+        );
+        await flushPromises();
+      });
+
+      it("ends when its tab closes", async () => {
+        overlayBackground.removePageDetails(1);
+
+        expect(await isFilling(2)).toBe(false);
+      });
+
+      it("ends when its tab goes to another page", async () => {
+        triggerWebNavigationOnCommittedEvent(
+          mock<chrome.webNavigation.WebNavigationFramedCallbackDetails>({ tabId: 1, frameId: 0 }),
+        );
+        await flushPromises();
+
+        expect(await isFilling(1)).toBe(false);
+      });
+
+      it("goes on when another tab closes, or a frame in its tab navigates", async () => {
+        overlayBackground.removePageDetails(2);
+        triggerWebNavigationOnCommittedEvent(
+          mock<chrome.webNavigation.WebNavigationFramedCallbackDetails>({ tabId: 1, frameId: 3 }),
+        );
+        await flushPromises();
+
+        expect(await isFilling(1)).toBe(true);
+      });
+
+      it("isn't ended by its tab closing after it said it ended", async () => {
+        sendMockExtensionMessage(
+          { command: "updateIsFieldCurrentlyFilling", isFieldCurrentlyFilling: false },
+          mock<chrome.runtime.MessageSender>({ tab: createChromeTabMock({ id: 1 }), frameId: 0 }),
+        );
+        sendMockExtensionMessage(
+          { command: "updateIsFieldCurrentlyFilling", isFieldCurrentlyFilling: true },
+          mock<chrome.runtime.MessageSender>({ tab: createChromeTabMock({ id: 2 }), frameId: 0 }),
+        );
+        await flushPromises();
+
+        overlayBackground.removePageDetails(1);
+
+        expect(await isFilling(2)).toBe(true);
+      });
+    });
   });
 
   describe("inline menu list port init message", () => {
