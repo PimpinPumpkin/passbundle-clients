@@ -393,12 +393,14 @@ import { keykeeperFillPicker as fillPickerHooks } from "../autofill/keykeeper/fi
 import {
   keykeeperSiteFixes as siteFixHooks,
   keykeeperSiteNeverFill as siteNeverFillHooks,
+  keykeeperSiteRules as siteRuleHooks,
 } from "../autofill/keykeeper/fill-rules";
 import { KeykeeperOpenAndFill } from "../autofill/keykeeper/open-and-fill";
 import { PASSWORD_CHANGE_SCRIPT } from "../autofill/keykeeper/password-change/password-change-messages";
 import { KeykeeperPasswordChange } from "../autofill/keykeeper/password-change/password-change.background";
 import { KeykeeperSiteFixes } from "../autofill/keykeeper/site-fixes";
 import { KeykeeperSiteNeverFill } from "../autofill/keykeeper/site-never-fill";
+import { KeykeeperSiteRules } from "../autofill/keykeeper/site-rules";
 import { AutofillLifecycleService } from "../autofill/services/abstractions/autofill-lifecycle.service";
 import { AutofillService as AutofillServiceAbstraction } from "../autofill/services/abstractions/autofill.service";
 import { AutofillBadgeUpdaterService } from "../autofill/services/autofill-badge-updater.service";
@@ -645,6 +647,7 @@ export default class MainBackground {
   // Keykeeper
   keykeeperExpirationReminders: KeykeeperExpirationReminders;
   keykeeperSiteFixes: KeykeeperSiteFixes;
+  keykeeperSiteRules: KeykeeperSiteRules;
   keykeeperSiteNeverFill: KeykeeperSiteNeverFill;
   keykeeperEnrollment: KeykeeperEnrollment;
   keykeeperMspWork: KeykeeperMspWork;
@@ -1981,8 +1984,19 @@ export default class MainBackground {
       this.stateProvider,
     );
     this.keykeeperSiteFixes.init();
-    siteFixHooks.rulesFor = (url) => this.keykeeperSiteFixes.rulesFor(url);
+    siteFixHooks.rulesFor = (url) => this.keykeeperSiteFixes.rulesByKind(url);
     siteFixHooks.share = (rule) => this.keykeeperSiteFixes.share(rule);
+    // Keykeeper: site rules from the signed feed the server mirrors,
+    // PassBundle's or the operator's own (autofill/keykeeper/site-rules.ts).
+    this.keykeeperSiteRules = new KeykeeperSiteRules({
+      apiService: this.apiService,
+      accountService: this.accountService,
+      authService: this.authService,
+      stateProvider: this.stateProvider,
+      environmentService: this.environmentService,
+    });
+    this.keykeeperSiteRules.init();
+    siteRuleHooks.rulesFor = (url) => this.keykeeperSiteRules.rulesFor(url);
     // Keykeeper: "Never fill this field on this site", for every item, from
     // the account's encrypted settings.
     this.keykeeperSiteNeverFill = new KeykeeperSiteNeverFill(
