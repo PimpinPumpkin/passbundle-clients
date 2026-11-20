@@ -309,6 +309,12 @@ export const KEYKEEPER_JOINS_DISK = new StateDefinition("keykeeperJoins", "disk"
 /** Whether someone shares site fixes, and the fixes that apply on their server. */
 export const KEYKEEPER_SITE_FIXES_DISK = new StateDefinition("keykeeperSiteFixes", "disk");
 /**
+ * Someone's own site-wide never-fill rules ("Never fill this field on this
+ * site"), as their account's settings keep them: encrypted with the account's
+ * key, here as on the server.
+ */
+export const KEYKEEPER_FILL_DISK = new StateDefinition("keykeeperFill", "disk");
+/**
  * Whether someone's passwords are checked against known breaches on their own
  * after unlocking, per account. Kept across browser sessions in the web vault.
  */

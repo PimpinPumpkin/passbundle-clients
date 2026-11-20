@@ -1,6 +1,8 @@
 import { CipherType, FieldType } from "@bitwarden/common/vault/enums";
+import { CardView } from "@bitwarden/common/vault/models/view/card.view";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
+import { IdentityView } from "@bitwarden/common/vault/models/view/identity.view";
 import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
 
 import AutofillField from "../models/autofill-field";
@@ -10,14 +12,17 @@ import AutofillService from "../services/autofill.service";
 
 import {
   applyFillRules,
+  decidingFingerprint,
   fieldMatches,
+  fieldValueFor,
+  isSecretSource,
+  keykeeperSiteNeverFill,
   FillRule,
   FillRuleOptions,
   FILL_RULE_FIELD_NAME,
   FillSource,
   fingerprintField,
   readFillRules,
-  staticValueFor,
   upsertFillRule,
   visibleCustomFields,
 } from "./fill-rules";
@@ -199,8 +204,9 @@ describe("Keykeeper fill rules", () => {
   });
 
   describe("applyFillRules", () => {
-    const valueFor = (cipher: CipherView) => async (source: FillSource) =>
-      source.from === "totp" ? "123456" : staticValueFor(cipher, source);
+    // As autofill.service.ts asks: the value as the field takes it.
+    const valueFor = (cipher: CipherView) => async (source: FillSource, field: AutofillField) =>
+      source.from === "totp" ? "123456" : fieldValueFor(cipher, source, field);
 
     it("fills a field from a custom field and claims it", async () => {
       const cipher = loginItem([customField("Customer ID", "C-12345")]);
@@ -212,7 +218,15 @@ describe("Keykeeper fill rules", () => {
       const fillScript = new AutofillScript();
       const filledFields: { [opid: string]: AutofillField } = {};
 
-      await applyFillRules(cipher, pageDetails, fillScript, filledFields, valueFor(cipher), fill, STARTED);
+      await applyFillRules(
+        cipher,
+        pageDetails,
+        fillScript,
+        filledFields,
+        valueFor(cipher),
+        fill,
+        STARTED,
+      );
 
       expect(fillScript.script).toEqual([["fill_by_opid", "__1", "C-12345"]]);
       expect(Object.keys(filledFields)).toEqual(["__1"]);
@@ -337,7 +351,10 @@ describe("Keykeeper fill rules", () => {
       const cipher = loginItem([customField("Customer ID", "C-12345")]);
       upsertFillRule(cipher, rule({ id: "q" }, { from: "password" }));
       upsertFillRule(cipher, rule({ id: "query" }, { from: "username" }));
-      upsertFillRule(cipher, rule({ id: "captcha-answer" }, { from: "field", name: "Customer ID" }));
+      upsertFillRule(
+        cipher,
+        rule({ id: "captcha-answer" }, { from: "field", name: "Customer ID" }),
+      );
       upsertFillRule(cipher, rule({ id: "news-email" }, { from: "username" }));
       upsertFillRule(cipher, rule({ id: "member" }, { from: "username" }));
 
@@ -352,7 +369,9 @@ describe("Keykeeper fill rules", () => {
         ],
         PAGE,
         STARTED,
-        { f1: { opid: "f1", htmlID: "newsletter-signup" } } as unknown as AutofillPageDetails["forms"],
+        {
+          f1: { opid: "f1", htmlID: "newsletter-signup" },
+        } as unknown as AutofillPageDetails["forms"],
       );
 
       expect(result.script).toEqual([["fill_by_opid", "__5", "alice"]]);
@@ -383,9 +402,7 @@ describe("Keykeeper fill rules", () => {
         ["fill_by_opid", "__3", "correct-password"],
       ]);
       // A code only where the account may use one.
-      expect(
-        (await run(cipher, [otp], PAGE, { ...STARTED, allowTotp: false })).script,
-      ).toEqual([]);
+      expect((await run(cipher, [otp], PAGE, { ...STARTED, allowTotp: false })).script).toEqual([]);
     });
 
     it("fills only on the host the rule was made on", async () => {
@@ -472,6 +489,179 @@ describe("Keykeeper fill rules", () => {
       expect(
         (await run(cipher, [pageField({ opid: "__2", htmlID: "pin", type: "password" })])).script,
       ).toEqual([["fill_by_opid", "__2", "4321"]]);
+    });
+
+    describe("never fill this field on this site", () => {
+      const original = keykeeperSiteNeverFill.rulesFor;
+      let siteNever: FillRule[];
+
+      beforeEach(() => {
+        siteNever = [rule({ id: "custno" }, { from: "never" })];
+        keykeeperSiteNeverFill.rulesFor = async (url) =>
+          siteNever.filter((r) => new URL(url).host === r.host);
+      });
+
+      afterEach(() => {
+        keykeeperSiteNeverFill.rulesFor = original;
+      });
+
+      it("holds every item back from the field, and hides it from upstream's matching", async () => {
+        const first = loginItem();
+        const second = loginItem([customField("custno", "C-1")]);
+        const fields = [pageField({ opid: "__1", htmlID: "custno" })];
+
+        expect(await run(first, fields)).toEqual({ script: [], neverFill: ["__1"] });
+        expect(await run(second, fields)).toEqual({ script: [], neverFill: ["__1"] });
+      });
+
+      it("holds on page load too", async () => {
+        const fields = [pageField({ opid: "__1", htmlID: "custno" })];
+
+        expect(await run(loginItem(), fields, PAGE, PAGE_LOAD)).toEqual({
+          script: [],
+          neverFill: ["__1"],
+        });
+      });
+
+      it("wins over a rule on the item, which someone else may have put on a shared one", async () => {
+        const cipher = loginItem([customField("Customer ID", "C-12345")]);
+        upsertFillRule(cipher, rule({ id: "custno" }, { from: "field", name: "Customer ID" }));
+
+        expect(await run(cipher, [pageField({ opid: "__1", htmlID: "custno" })])).toEqual({
+          script: [],
+          neverFill: ["__1"],
+        });
+      });
+
+      it("holds only on the site it was made on, by scheme and host", async () => {
+        const fields = [pageField({ opid: "__1", htmlID: "custno" })];
+        expect((await run(loginItem(), fields, "https://other.example.com/")).neverFill).toEqual(
+          [],
+        );
+
+        siteNever = [{ ...rule({ id: "custno" }, { from: "never" }), scheme: "http" }];
+        expect((await run(loginItem(), fields)).neverFill).toEqual([]);
+        expect((await run(loginItem(), fields, `http://${HOST}/login`)).neverFill).toEqual(["__1"]);
+      });
+
+      it("keeps only what decides the field", () => {
+        expect(decidingFingerprint({ id: "a", name: "b", label: "c" })).toEqual({ id: "a" });
+        expect(decidingFingerprint({ name: "b", label: "c" })).toEqual({ name: "b" });
+        expect(decidingFingerprint({ label: "c" })).toEqual({ label: "c" });
+      });
+    });
+
+    describe("cards and identities", () => {
+      function cardItem(): CipherView {
+        const cipher = new CipherView();
+        cipher.type = CipherType.Card;
+        cipher.viewPassword = true;
+        cipher.card = new CardView();
+        cipher.card.cardholderName = "Alice Example";
+        cipher.card.number = "4111111111111111";
+        cipher.card.expMonth = "3";
+        cipher.card.expYear = "29";
+        cipher.card.code = "123";
+        return cipher;
+      }
+
+      it("fills a card's values by rule", async () => {
+        const cipher = cardItem();
+        upsertFillRule(cipher, rule({ id: "num" }, { from: "card", value: "number" }));
+        upsertFillRule(cipher, rule({ id: "who" }, { from: "card", value: "cardholderName" }));
+
+        expect(
+          (
+            await run(cipher, [
+              pageField({ opid: "__1", htmlID: "num", type: "text" }),
+              pageField({ opid: "__2", htmlID: "who", type: "text" }),
+            ])
+          ).script,
+        ).toEqual([
+          ["fill_by_opid", "__1", "4111111111111111"],
+          ["fill_by_opid", "__2", "Alice Example"],
+        ]);
+      });
+
+      it("treats a card's number and code as secrets, its name and expiry as plain", () => {
+        const cipher = cardItem();
+        expect(isSecretSource(cipher, { from: "card", value: "number" })).toBe(true);
+        expect(isSecretSource(cipher, { from: "card", value: "code" })).toBe(true);
+        expect(isSecretSource(cipher, { from: "card", value: "cardholderName" })).toBe(false);
+        expect(isSecretSource(cipher, { from: "card", value: "expMonth" })).toBe(false);
+        expect(isSecretSource(cipher, { from: "identity", value: "city" })).toBe(false);
+      });
+
+      it("puts a card's number only into a password field for someone who can't see it", async () => {
+        const cipher = cardItem();
+        cipher.viewPassword = false;
+        upsertFillRule(cipher, rule({ id: "num" }, { from: "card", value: "number" }));
+        upsertFillRule(cipher, rule({ id: "exp" }, { from: "card", value: "expMonth" }));
+
+        expect(
+          (
+            await run(cipher, [
+              pageField({ opid: "__1", htmlID: "num", type: "text" }),
+              pageField({ opid: "__2", htmlID: "exp", type: "text" }),
+            ])
+          ).script,
+        ).toEqual([["fill_by_opid", "__2", "03"]]);
+        expect(
+          (await run(cipher, [pageField({ opid: "__1", htmlID: "num", type: "password" })])).script,
+        ).toEqual([["fill_by_opid", "__1", "4111111111111111"]]);
+      });
+
+      it("gives each field a card's value as it takes it", () => {
+        const cipher = cardItem();
+        const month = { from: "card", value: "expMonth" } as const;
+        const year = { from: "card", value: "expYear" } as const;
+        const list = (options: string[][]) =>
+          pageField({ type: "select-one", selectInfo: { options } });
+
+        expect(fieldValueFor(cipher, month, pageField({ type: "text" }))).toBe("03");
+        expect(fieldValueFor(cipher, year, pageField({ type: "text" }))).toBe("2029");
+        expect(fieldValueFor(cipher, year, pageField({ type: "text", maxLength: 2 }))).toBe("29");
+        expect(fieldValueFor(cipher, month, list([["march", "3"]]))).toBe("3");
+        expect(fieldValueFor(cipher, year, list([["2029", "29"]]))).toBe("29");
+        // A list without the value is left alone.
+        expect(fieldValueFor(cipher, month, list([["april", "4"]]))).toBeNull();
+      });
+
+      it("gives a list an identity's state and country by code or name", () => {
+        const cipher = new CipherView();
+        cipher.type = CipherType.Identity;
+        cipher.identity = new IdentityView();
+        cipher.identity.state = "CA";
+        cipher.identity.country = "US";
+        cipher.identity.city = "Springfield";
+        const list = (options: string[][]) =>
+          pageField({ type: "select-one", selectInfo: { options } });
+
+        expect(
+          fieldValueFor(
+            cipher,
+            { from: "identity", value: "state" },
+            list([
+              ["california", "California"],
+              ["oregon", "Oregon"],
+            ]),
+          ),
+        ).toBe("California");
+        expect(
+          fieldValueFor(
+            cipher,
+            { from: "identity", value: "country" },
+            list([["unitedstates", "United States"]]),
+          ),
+        ).toBe("United States");
+        expect(
+          fieldValueFor(cipher, { from: "identity", value: "city" }, pageField({ type: "text" })),
+        ).toBe("Springfield");
+        // Another kind of item has none of an identity's values.
+        expect(
+          fieldValueFor(loginItem(), { from: "identity", value: "city" }, pageField({})),
+        ).toBeNull();
+      });
     });
 
     it("does nothing for an item without rules", async () => {
