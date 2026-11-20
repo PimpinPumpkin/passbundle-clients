@@ -850,6 +850,134 @@
   "keykeeperNeverFillThisField": {
     "message": "Never fill this field"
   },
+  "keykeeperNeverFillThisFieldOnThisSite": {
+    "message": "Never fill this field on this site"
+  },
+  "keykeeperFillHere": {
+    "message": "Fill $NAME$ here?",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "Customer ID"
+      }
+    }
+  },
+  "keykeeperFillRules": {
+    "message": "Fill rules"
+  },
+  "keykeeperFillRulesMadeWith": {
+    "message": "Made with \"Fill this field with\" in the browser extension."
+  },
+  "keykeeperFillRulesEditToRemove": {
+    "message": "Edit the item to remove one."
+  },
+  "keykeeperRemoveFillRule": {
+    "message": "Remove the rule: $SITE$, $RULE$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "bank.example"
+      },
+      "rule": {
+        "content": "$2",
+        "example": "the field with id custno gets the Customer ID field"
+      }
+    }
+  },
+  "keykeeperFillRuleEverySite": {
+    "message": "Every site"
+  },
+  "keykeeperFillRuleFieldWithId": {
+    "message": "the field with id $ID$",
+    "placeholders": {
+      "id": {
+        "content": "$1",
+        "example": "custno"
+      }
+    }
+  },
+  "keykeeperFillRuleFieldNamed": {
+    "message": "the field named $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "customer_number"
+      }
+    }
+  },
+  "keykeeperFillRuleFieldLabeled": {
+    "message": "the field labeled \"$LABEL$\"",
+    "placeholders": {
+      "label": {
+        "content": "$1",
+        "example": "customer number"
+      }
+    }
+  },
+  "keykeeperFillRuleGets": {
+    "message": "$FIELD$ gets $VALUE$",
+    "placeholders": {
+      "field": {
+        "content": "$1",
+        "example": "the field with id custno"
+      },
+      "value": {
+        "content": "$2",
+        "example": "the Customer ID field"
+      }
+    }
+  },
+  "keykeeperFillRuleCustomField": {
+    "message": "the $NAME$ field",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "Customer ID"
+      }
+    }
+  },
+  "keykeeperFillRuleCardValue": {
+    "message": "the card's $VALUE$",
+    "placeholders": {
+      "value": {
+        "content": "$1",
+        "example": "Security code"
+      }
+    }
+  },
+  "keykeeperFillRuleIdentityValue": {
+    "message": "the identity's $VALUE$",
+    "placeholders": {
+      "value": {
+        "content": "$1",
+        "example": "City / Town"
+      }
+    }
+  },
+  "keykeeperFillRuleNothing": {
+    "message": "nothing (never fill)"
+  },
+  "keykeeperFillRuleFieldMissing": {
+    "message": "$RULE$, which this item doesn't have",
+    "placeholders": {
+      "rule": {
+        "content": "$1",
+        "example": "the field with id custno gets the Customer ID field"
+      }
+    }
+  },
+  "keykeeperNeverFilledFields": {
+    "message": "Fields never filled"
+  },
+  "keykeeperNeverFilledFieldsHint": {
+    "message": "Fields you chose \"Never fill this field on this site\" for. They stay empty for every item on that site, in every browser you sign in to."
+  },
+  "keykeeperNeverFilledFieldsNone": {
+    "message": "None yet. To add one, right-click a field, then Fill this field with."
+  },
+  "keykeeperNeverFilledFieldsFull": {
+    "message": "The list is nearly full. Remove one to make room; until then, a new one is kept on its item only."
+  },
   "keykeeperItemInVault": {
     "message": "$KIND$ in $VAULT$",
     "placeholders": {

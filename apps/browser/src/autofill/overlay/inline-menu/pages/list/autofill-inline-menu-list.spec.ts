@@ -1287,6 +1287,82 @@ describe("AutofillInlineMenuList", () => {
         });
       });
 
+      // Keykeeper: a login's one-tap suggestion for the field (keykeeper/label-match.ts).
+      describe("one-tap suggestion", () => {
+        beforeEach(() => {
+          postWindowMessage(
+            createInitAutofillInlineMenuListMessageMock({
+              portKey,
+              ciphers: [
+                createAutofillOverlayCipherDataMock(1, {
+                  keykeeperFillChoices: [
+                    { key: "u", title: "Username" },
+                    { key: "f0", title: "Customer ID" },
+                  ],
+                  keykeeperSuggestion: { key: "f0", title: "Fill Customer ID here?" },
+                }),
+                createAutofillOverlayCipherDataMock(2),
+              ],
+            }),
+          );
+        });
+
+        const container = () => autofillInlineMenuList["inlineMenuListContainer"];
+        const suggestion = () =>
+          container().querySelector(".keykeeper-suggestion-button") as HTMLElement;
+
+        it("shows the suggestion in its own row under its login, and only there", () => {
+          const rows = Array.from(
+            container().querySelectorAll(".inline-menu-list-actions-item"),
+          ) as HTMLElement[];
+
+          expect(container().querySelectorAll(".keykeeper-suggestion-button")).toHaveLength(1);
+          expect(suggestion().textContent).toBe("Fill Customer ID here?");
+          expect(rows[1].contains(suggestion())).toBe(true);
+          expect(rows[0].contains(suggestion())).toBe(false);
+        });
+
+        it("asks the background to fill the field with that value only when pressed", () => {
+          expect(globalThis.parent.postMessage).not.toHaveBeenCalledWith(
+            expect.objectContaining({ command: "keykeeperFillFieldWith" }),
+            expect.anything(),
+          );
+
+          suggestion().dispatchEvent(new Event("click"));
+
+          // Marked as the suggestion, so the background checks it's still this field's.
+          expect(globalThis.parent.postMessage).toHaveBeenCalledWith(
+            {
+              command: "keykeeperFillFieldWith",
+              inlineMenuCipherId: "1",
+              choiceKey: "f0",
+              keykeeperSuggestion: true,
+              portKey,
+              token: "test-token",
+            },
+            expectedOrigin,
+          );
+        });
+
+        it("is reached with the arrows, from its login and on to the next", () => {
+          const [firstLogin, nextLogin] = Array.from(
+            container().querySelectorAll(".fill-cipher-button"),
+          ) as HTMLElement[];
+          jest.spyOn(suggestion(), "focus");
+          jest.spyOn(firstLogin, "focus");
+          jest.spyOn(nextLogin, "focus");
+
+          firstLogin.dispatchEvent(new KeyboardEvent("keyup", { code: "ArrowDown" }));
+          expect(suggestion().focus).toHaveBeenCalled();
+
+          suggestion().dispatchEvent(new KeyboardEvent("keyup", { code: "ArrowDown" }));
+          expect(nextLogin.focus).toHaveBeenCalled();
+
+          suggestion().dispatchEvent(new KeyboardEvent("keyup", { code: "ArrowUp" }));
+          expect(firstLogin.focus).toHaveBeenCalled();
+        });
+      });
+
       describe("view cipher button event listeners", () => {
         beforeEach(() => {
           postWindowMessage(createInitAutofillInlineMenuListMessageMock({ portKey }));
