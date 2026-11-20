@@ -43,7 +43,7 @@ describe("KeykeeperDevReload", () => {
   it("does nothing in Firefox, whose chrome namespace answers through callbacks only", async () => {
     // Firefox's chrome.management.getSelf() without a callback returns
     // undefined, where Chrome's returns a promise.
-    (globalThis as any).chrome.management.getSelf = () => undefined;
+    (globalThis as any).chrome.management.getSelf = (): undefined => undefined;
     await expect(new KeykeeperDevReload(fetchFn).init()).resolves.toBeUndefined();
     expect(createAlarm).not.toHaveBeenCalled();
     expect(session).toEqual({});
