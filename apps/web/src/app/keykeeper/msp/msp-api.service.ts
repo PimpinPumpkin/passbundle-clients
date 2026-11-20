@@ -61,6 +61,7 @@ import { EncryptService, LegacyCompatKeyService } from "@bitwarden/legacy-crypto
 import { KeykeeperJoinSealer, ReportedJoining } from "../joining/join-sealer.service";
 
 import { ClientMspEvent, MspEvent } from "./msp-activity";
+import { readMspList } from "./msp-setup";
 import { StaffKey, staffPhrases } from "./staff-fingerprint";
 import { reachesEveryClient } from "./technician-access";
 
@@ -416,6 +417,14 @@ export class KeykeeperMspApiService extends KeykeeperMspRequests {
     const saved = await super.setMspJoining(mspId, joining, seals);
     await this.sealer.remember(seals);
     return saved;
+  }
+
+  /**
+   * The MSPs the person is staff of, and whether this server lets them set
+   * one up (MSP_SIGNUPS_ALLOWED), in one request, for the console.
+   */
+  async listForConsole(): Promise<{ msps: MspSummary[]; setUpAllowed: boolean }> {
+    return readMspList(await this.apiService.send("GET", "/keykeeper/msp", null, true, true));
   }
 
   async create(name: string): Promise<MspSummary> {
