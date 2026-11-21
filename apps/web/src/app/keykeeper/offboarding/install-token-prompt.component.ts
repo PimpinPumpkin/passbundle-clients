@@ -5,6 +5,7 @@ import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-er
 import { ButtonModule, CalloutModule, DialogService, ToastService } from "@bitwarden/components";
 
 import { KeykeeperMspApiService } from "../msp/msp-api.service";
+import { hasCompanyFeatures } from "../plan/company-features";
 
 import { replaceTokenPrompt } from "./offboarding";
 
@@ -58,7 +59,9 @@ export class KeykeeperInstallTokenPromptComponent {
   }
 
   private async load(org: Organization) {
-    if (!(org.isOwner || org.isAdmin)) {
+    // A family has no install command (it's a company feature, which its
+    // sync turns off), so there's nothing to ask the server about.
+    if (!(org.isOwner || org.isAdmin) || !hasCompanyFeatures(org)) {
       this.prompt.set(null);
       return;
     }
