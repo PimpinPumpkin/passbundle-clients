@@ -1,4 +1,4 @@
-import { TestBed } from "@angular/core/testing";
+import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormBuilder } from "@angular/forms";
 import { mock } from "jest-mock-extended";
 import { of } from "rxjs";
@@ -9,7 +9,10 @@ import { OrganizationData } from "@bitwarden/common/admin-console/models/data/or
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { ProfileOrganizationResponse } from "@bitwarden/common/admin-console/models/response/profile-organization.response";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import { translate } from "@bitwarden/common/billing/keykeeper/plan-messages.spec-util";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
+import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
+import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { DialogService, ToastService } from "@bitwarden/components";
 
 import { KeykeeperJoinSealer } from "../joining/join-sealer.service";
@@ -147,5 +150,132 @@ describe("the install command's card on Joining and security", () => {
 
     expect(api.getOrgEnrollment).toHaveBeenCalledWith(ORG);
     expect(c.state()).toBeNull();
+  });
+});
+
+describe("what a phone's MDM sets, on the install command's card", () => {
+  const FINGERPRINT = "c".repeat(43);
+
+  afterEach(() => TestBed.resetTestingModule());
+
+  /** The card as the page shows it, for someone the server answers this way. */
+  async function render(
+    organizations: Organization[],
+    answer: ClientEnrollment | { provider: string; removedSinceToken: number } | Error,
+  ): Promise<ComponentFixture<KeykeeperOrgInstallComponent>> {
+    TestBed.resetTestingModule();
+    const api = mock<KeykeeperMspApiService>();
+    if (answer instanceof Error) {
+      api.getOrgEnrollment.mockRejectedValue(answer);
+    } else {
+      api.getOrgEnrollment.mockResolvedValue(answer);
+    }
+    const environmentService = mock<EnvironmentService>();
+    environmentService.environment$ = of({
+      getWebVaultUrl: () => "https://vault.example.test",
+    }) as any;
+    const sealer = mock<KeykeeperJoinSealer>();
+    sealer.commandParts.mockResolvedValue({
+      secret: "b".repeat(43),
+      fingerprint: FINGERPRINT,
+      phrase: ["alpha", "bravo"],
+    });
+    const organizationService = mock<OrganizationService>();
+    organizationService.organizations$.mockReturnValue(of(organizations));
+    // Ours from brand/messages.en.json (a key that isn't there fails), the
+    // script names brand.json gives at build time, and upstream's as their keys.
+    const built: Record<string, string> = {
+      keykeeperInstallScript: "Install-PassBundle.ps1",
+      keykeeperInstallScriptMacLinux: "install-passbundle.sh",
+      keykeeperMacProfile: "PassBundle.mobileconfig",
+    };
+    await TestBed.configureTestingModule({
+      imports: [KeykeeperOrgInstallComponent],
+      providers: [
+        { provide: KeykeeperMspApiService, useValue: api },
+        { provide: EnvironmentService, useValue: environmentService },
+        { provide: DialogService, useValue: mock<DialogService>() },
+        { provide: ToastService, useValue: mock<ToastService>() },
+        { provide: KeykeeperJoinSealer, useValue: sealer },
+        {
+          provide: AccountService,
+          useValue: { activeAccount$: of({ id: "user" }) } as unknown as AccountService,
+        },
+        { provide: OrganizationService, useValue: organizationService },
+        { provide: PlatformUtilsService, useValue: mock<PlatformUtilsService>() },
+        {
+          provide: I18nService,
+          useValue: {
+            t: (key: string, ...values: string[]) =>
+              built[key] ?? (key.startsWith("keykeeper") ? translate(key, ...values) : key),
+            translationLocale: "en-US",
+          },
+        },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(KeykeeperOrgInstallComponent);
+    fixture.componentRef.setInput("organizationId", ORG);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  const page = (fixture: ComponentFixture<KeykeeperOrgInstallComponent>) =>
+    fixture.nativeElement as HTMLElement;
+  const phoneValues = (fixture: ComponentFixture<KeykeeperOrgInstallComponent>) =>
+    Array.from(page(fixture).querySelectorAll('[data-testid="org-install-phones"] [data-key]')).map(
+      (row) => [
+        row.getAttribute("data-key"),
+        row.querySelector('[data-testid="org-install-phone-value"]')?.textContent?.trim(),
+      ],
+    );
+
+  it.each([
+    ["owner", 0],
+    ["admin", 1],
+  ] as const)(
+    "a business's %s sees this organization's server and key fingerprint, next to the command",
+    async (_who, type) => {
+      const fixture = await render([business(type)], enrollment);
+
+      expect(page(fixture).querySelector('[data-testid="org-install-command"]')).not.toBeNull();
+      expect(phoneValues(fixture)).toEqual([
+        ["server_url", "https://vault.example.test"],
+        ["org_key_fingerprint", FINGERPRINT],
+      ]);
+    },
+  );
+
+  it.each([
+    ["someone the server doesn't show the command to", () => new Error("Not found")],
+    [
+      "an admin of an MSP's client, whose command is in the MSP's console",
+      () => ({ provider: "Northwind IT", removedSinceToken: 0 }),
+    ],
+  ])(
+    "%s sees neither the command nor what phones get, which an admin sees",
+    async (_who, answer) => {
+      // The admin who sees the command sees the phones' values.
+      const admin = await render([business(1)], enrollment);
+      expect(phoneValues(admin)).toHaveLength(2);
+
+      const other = await render([business(1)], answer());
+
+      expect(page(other).querySelector('[data-testid="org-install-command"]')).toBeNull();
+      expect(page(other).querySelector('[data-testid="org-install-phones"]')).toBeNull();
+      expect(page(other).textContent).not.toContain(FINGERPRINT);
+      expect(page(other).textContent).not.toContain("org_key_fingerprint");
+    },
+  );
+
+  it("a family's owner, who has no install command, sees nothing for phones either, which a business's owner sees", async () => {
+    const ownersCard = await render([business(0)], enrollment);
+    expect(phoneValues(ownersCard)).toHaveLength(2);
+
+    const familyOwner = await render([family(0)], enrollment);
+
+    expect(page(familyOwner).querySelector('[data-testid="org-install"]')).toBeNull();
+    expect(page(familyOwner).textContent).not.toContain(FINGERPRINT);
   });
 });

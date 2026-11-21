@@ -2412,5 +2412,29 @@
         "example": "PassBundle"
       }
     }
+  },
+  "keykeeperPhoneSettingsWhere": {
+    "message": "For phones, set these in your MDM: in the app's managed configuration on Android, and in its managed app configuration on iPhone."
+  },
+  "keykeeperPhoneSettingCopy": {
+    "message": "Copy"
+  },
+  "keykeeperPhoneSettingCopyLabel": {
+    "message": "Copy the value for $KEY$",
+    "placeholders": {
+      "key": {
+        "content": "$1",
+        "example": "server_url"
+      }
+    }
+  },
+  "keykeeperPhoneSettingCopied": {
+    "message": "Copied the value for $KEY$",
+    "placeholders": {
+      "key": {
+        "content": "$1",
+        "example": "server_url"
+      }
+    }
   }
 }

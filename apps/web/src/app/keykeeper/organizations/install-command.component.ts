@@ -7,6 +7,8 @@ import {
   InstallPlatform,
   installSteps,
   MAC_PROFILE_SCRIPT,
+  PhoneSetting,
+  phoneSettings,
 } from "@bitwarden/admin-console/common";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
@@ -22,9 +24,12 @@ export type ShownInstallParts = InstallCommandParts & { phrase?: string[] | null
  * carrying the same server, token, join secret, and key fingerprint, checked
  * and quoted for the shell that runs it (install-command.ts). A Mac takes
  * managed settings only from a profile an MDM installs, so its command makes
- * that profile, and a second one installs the app. Used by the MSP console
- * for each client and by a company's own Settings page. See DESIGN.md,
- * "Onboarding through the RMM".
+ * that profile, and a second one installs the app. Below it, what a phone's
+ * MDM sets for our app: the same server and key fingerprint, under the keys
+ * the phone apps read (install-command.ts, phoneSettings). Used by the MSP
+ * console for each client and by a company's own Settings page, so whoever
+ * sees the command sees them, and nobody else. See DESIGN.md, "Onboarding
+ * through the RMM" and "Enrolling at unlock".
  */
 @Component({
   selector: "app-keykeeper-install-command",
@@ -120,6 +125,34 @@ export type ShownInstallParts = InstallCommandParts & { phrase?: string[] | null
         <span class="tw-font-mono">{{ phrase.join("-") }}</span>
       </p>
     }
+    @if (phones(); as settings) {
+      <div class="tw-mt-4" [attr.data-testid]="testId('phones')">
+        <p bitTypography="body2">{{ "keykeeperPhoneSettingsWhere" | i18n }}</p>
+        @for (setting of settings; track setting.key) {
+          <div
+            class="tw-mb-2 tw-flex tw-flex-wrap tw-items-center tw-gap-2"
+            [attr.data-testid]="testId('phone-setting')"
+            [attr.data-key]="setting.key"
+          >
+            <code class="tw-text-sm tw-font-semibold">{{ setting.key }}</code>
+            <code
+              class="tw-break-all tw-rounded tw-bg-background-alt tw-px-3 tw-py-2 tw-text-sm"
+              [attr.data-testid]="testId('phone-value')"
+              >{{ setting.value }}</code
+            >
+            <button
+              bitButton
+              buttonType="secondary"
+              type="button"
+              [attr.aria-label]="'keykeeperPhoneSettingCopyLabel' | i18n: setting.key"
+              (click)="copySetting(setting)"
+            >
+              {{ "keykeeperPhoneSettingCopy" | i18n }}
+            </button>
+          </div>
+        }
+      </div>
+    }
   `,
 })
 export class KeykeeperInstallCommandComponent {
@@ -158,6 +191,8 @@ export class KeykeeperInstallCommandComponent {
       installOptionsFor(this.browserAutofill()),
     ),
   );
+  /** What a phone's MDM sets for the app: this server and the command's key fingerprint. */
+  protected readonly phones = computed(() => phoneSettings(this.serverUrl(), this.parts()));
   /** Whether the command turns off the browsers' card and address autofill. */
   protected readonly autofillOff = computed(
     () => installOptionsFor(this.browserAutofill()).browserAutofillOff === true,
@@ -171,6 +206,14 @@ export class KeykeeperInstallCommandComponent {
 
   protected testId(name: string): string {
     return `${this.testIdPrefix()}-${name}`;
+  }
+
+  protected copySetting(setting: PhoneSetting) {
+    this.platformUtilsService.copyToClipboard(setting.value);
+    this.toastService.showToast({
+      variant: "success",
+      message: this.i18nService.t("keykeeperPhoneSettingCopied", setting.key),
+    });
   }
 
   protected copy(text: string, which: "command" | "app") {
