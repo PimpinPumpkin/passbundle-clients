@@ -3,6 +3,9 @@ import { FormBuilder } from "@angular/forms";
 import { firstValueFrom } from "rxjs";
 
 import { ClientEnrollment } from "@bitwarden/admin-console/common";
+import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
+import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
 import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { DialogService, ToastService } from "@bitwarden/components";
@@ -10,6 +13,7 @@ import { DialogService, ToastService } from "@bitwarden/components";
 import { SharedModule } from "../../shared";
 import { KeykeeperJoinSealer } from "../joining/join-sealer.service";
 import { KeykeeperMspApiService } from "../msp/msp-api.service";
+import { hasCompanyFeatures } from "../plan/company-features";
 
 import { KeykeeperInstallCommandComponent, ShownInstallParts } from "./install-command.component";
 
@@ -21,8 +25,9 @@ type InstallState =
 /**
  * Keykeeper: a company's own install command, on its organization's Settings
  * page, for owners and admins (the server answers no one else, and the card
- * stays hidden). The same command an MSP's console has for each client. See
- * DESIGN.md, "A company's own IT".
+ * stays hidden). The same command an MSP's console has for each client. A
+ * family has none (it's a company feature, which its sync turns off), so the
+ * card doesn't ask the server for one. See DESIGN.md, "A company's own IT".
  */
 @Component({
   selector: "app-keykeeper-org-install",
@@ -111,6 +116,8 @@ export class KeykeeperOrgInstallComponent {
     private readonly dialogService: DialogService,
     private readonly toastService: ToastService,
     private readonly sealer: KeykeeperJoinSealer,
+    private readonly accountService: AccountService,
+    private readonly organizationService: OrganizationService,
   ) {
     effect(() => {
       const id = this.organizationId();
@@ -119,6 +126,12 @@ export class KeykeeperOrgInstallComponent {
   }
 
   private async load(orgId: string) {
+    if (await this.withoutCompanyFeatures(orgId)) {
+      // A family: the server would only say "not found", an error in the
+      // browser's console on every visit.
+      this.state.set(null);
+      return;
+    }
     const environment = await firstValueFrom(this.environmentService.environment$);
     this.serverUrl.set(environment.getWebVaultUrl());
     try {
@@ -132,6 +145,18 @@ export class KeykeeperOrgInstallComponent {
       // Not an owner or admin: the server says not found, and the card stays hidden.
       this.state.set(null);
     }
+  }
+
+  /**
+   * Whether the sync says this organization has no company features, as for
+   * a family where plans are enforced. One that isn't in the sync is asked
+   * about, as before.
+   */
+  private async withoutCompanyFeatures(orgId: string): Promise<boolean> {
+    const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
+    const organizations = await firstValueFrom(this.organizationService.organizations$(userId));
+    const organization = organizations.find((o) => o.id === orgId);
+    return organization != null && !hasCompanyFeatures(organization);
   }
 
   /**
