@@ -262,8 +262,16 @@ export abstract class LoginStrategy<TData extends LoginStrategyData = LoginStrat
     result.userId = userId;
 
     if (response.twoFactorToken != null) {
-      // note: we can read email from access token b/c it was saved in saveAccountInformation
-      const userEmail = await this.tokenService.getEmail();
+      // Keykeeper: the email from this answer's own access token, not read
+      // back from the one just saved: on the command-line tool the saved
+      // state can lag the write (its file storage takes a lock), so the read
+      // found no token and failed a login the server had let in. Our server
+      // sends this token after every new-device check (DESIGN.md, "New-device
+      // check"); keykeeper-device-token.spec.ts.
+      const userEmail = (await this.tokenService.decodeAccessToken(response.accessToken))?.email;
+      if (typeof userEmail !== "string") {
+        throw new Error("No email found");
+      }
 
       await this.tokenService.setTwoFactorToken(userEmail, response.twoFactorToken);
     }
