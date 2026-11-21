@@ -16,6 +16,8 @@ import { UserId } from "@bitwarden/common/types/guid";
 import { DialogRef, DIALOG_DATA, ToastService } from "@bitwarden/components";
 import { LogService } from "@bitwarden/logging";
 
+import { KeykeeperApprovalConfirmation } from "../keykeeper/confirm-approval/confirm-approval.service";
+
 import { LoginApprovalDialogComponent } from "./login-approval-dialog.component";
 
 describe("LoginApprovalDialogComponent", () => {
@@ -31,6 +33,7 @@ describe("LoginApprovalDialogComponent", () => {
   let logService: MockProxy<LogService>;
   let toastService: MockProxy<ToastService>;
   let validationService: MockProxy<ValidationService>;
+  let confirmation: MockProxy<KeykeeperApprovalConfirmation>;
 
   const testNotificationId = "test-notification-id";
   const testEmail = "test@bitwarden.com";
@@ -46,6 +49,8 @@ describe("LoginApprovalDialogComponent", () => {
     logService = mock<LogService>();
     toastService = mock<ToastService>();
     validationService = mock<ValidationService>();
+    confirmation = mock<KeykeeperApprovalConfirmation>();
+    confirmation.confirm.mockResolvedValue(true);
 
     accountService.activeAccount$ = of({
       id: "test-user-id" as UserId,
@@ -68,6 +73,7 @@ describe("LoginApprovalDialogComponent", () => {
         { provide: LogService, useValue: logService },
         { provide: ToastService, useValue: toastService },
         { provide: ValidationService, useValue: validationService },
+        { provide: KeykeeperApprovalConfirmation, useValue: confirmation },
       ],
     }).compileComponents();
 
@@ -192,6 +198,135 @@ describe("LoginApprovalDialogComponent", () => {
       expect(apiService.getAuthRequest).not.toHaveBeenCalled();
       expect(authRequestService.approveOrDenyAuthRequest).not.toHaveBeenCalled();
       expect(logService.error).toHaveBeenCalled();
+    });
+  });
+
+  // Keykeeper: approving asks the person to confirm it's them first, as our
+  // apps do; denying doesn't (DESIGN.md, "The web vault and the extension").
+  describe("confirming before approving", () => {
+    const waiting = {
+      id: "test-request-id",
+      publicKey: testPublicKey,
+      creationDate: new Date().toISOString(),
+      requestApproved: undefined,
+      responseDate: undefined,
+    } as AuthRequestResponse;
+
+    beforeEach(async () => {
+      apiService.getAuthRequest.mockResolvedValue(waiting);
+      authRequestService.getFingerprintPhrase.mockResolvedValue("test-phrase");
+      authRequestService.approveOrDenyAuthRequest.mockResolvedValue(waiting);
+      await component.ngOnInit();
+      apiService.getAuthRequest.mockClear();
+    });
+
+    it("approves only after the person confirms", async () => {
+      confirmation.confirm.mockResolvedValue(true);
+
+      await component.approveLogin();
+
+      expect(confirmation.confirm).toHaveBeenCalledTimes(1);
+      expect(confirmation.confirm.mock.invocationCallOrder[0]).toBeLessThan(
+        authRequestService.approveOrDenyAuthRequest.mock.invocationCallOrder[0],
+      );
+      expect(authRequestService.approveOrDenyAuthRequest).toHaveBeenCalledWith(true, waiting);
+    });
+
+    it("sends nothing, and stays open, when the person doesn't confirm (a wrong password, or Cancel)", async () => {
+      confirmation.confirm.mockResolvedValue(false);
+
+      await component.approveLogin();
+
+      expect(confirmation.confirm).toHaveBeenCalledTimes(1);
+      expect(authRequestService.approveOrDenyAuthRequest).not.toHaveBeenCalled();
+      expect(apiService.getAuthRequest).not.toHaveBeenCalled();
+      expect(dialogRef.close).not.toHaveBeenCalled();
+    });
+
+    it("denies without asking for a confirmation", async () => {
+      await component.denyLogin();
+
+      expect(confirmation.confirm).not.toHaveBeenCalled();
+      expect(authRequestService.approveOrDenyAuthRequest).toHaveBeenCalledWith(false, waiting);
+    });
+  });
+
+  // Keykeeper: where the request comes from, from the server's own location
+  // database, with the database's credit beside it (DESIGN.md, "New-device
+  // check", "Where a sign-in comes from").
+  describe("where the request comes from", () => {
+    const rendered = async (fields: Record<string, unknown>) => {
+      i18nService.t.mockImplementation((key: string) =>
+        key === "keykeeperApproveSignInUnknownLocation" ? "Unknown location" : key,
+      );
+      apiService.getAuthRequest.mockResolvedValue(
+        new AuthRequestResponse({
+          id: "test-request-id",
+          publicKey: testPublicKey,
+          requestDeviceType: "Chrome",
+          requestDeviceTypeValue: 9,
+          requestIpAddress: "203.0.113.7",
+          creationDate: new Date().toISOString(),
+          requestApproved: null,
+          responseDate: null,
+          ...fields,
+        }),
+      );
+      authRequestService.getFingerprintPhrase.mockResolvedValue("test-phrase");
+      await component.ngOnInit();
+      fixture.detectChanges();
+      const el: HTMLElement = fixture.nativeElement;
+      return {
+        location: el.querySelector("[data-testid=keykeeper-login-approval-location]"),
+        source: el.querySelector("[data-testid=keykeeper-login-approval-location-source]"),
+        text: el.textContent!.replace(/\s+/g, " "),
+      };
+    };
+
+    const dbIp = { name: "IP Geolocation by DB-IP", url: "https://db-ip.com" };
+
+    it("shows the location and its address, with the database's credit linked beside it", async () => {
+      const { location, source } = await rendered({
+        location: "Fixture City, Germany",
+        locationSource: dbIp,
+      });
+
+      expect(location!.textContent!.replace(/\s+/g, " ").trim()).toBe(
+        "Fixture City, Germany (203.0.113.7)",
+      );
+      const link = source!.querySelector("a")!;
+      expect(link.textContent!.trim()).toBe("IP Geolocation by DB-IP");
+      expect(link.getAttribute("href")).toBe("https://db-ip.com");
+      expect(link.getAttribute("rel")).toBe("noreferrer");
+    });
+
+    it("credits a database without an address in words, and never links what isn't https", async () => {
+      const { source } = await rendered({
+        location: "Fixture City, Germany",
+        locationSource: { name: "Our own database", url: "javascript:alert(1)" },
+      });
+
+      expect(source!.textContent!.trim()).toBe("Our own database");
+      expect(source!.querySelector("a")).toBeNull();
+    });
+
+    it("says Unknown location, with no credit, for an address the database can't place", async () => {
+      const { location, source } = await rendered({ location: null, locationSource: dbIp });
+
+      expect(location!.textContent!.replace(/\s+/g, " ").trim()).toBe(
+        "Unknown location (203.0.113.7)",
+      );
+      expect(source).toBeNull();
+    });
+
+    it("shows no location and no credit when the server has no location database", async () => {
+      const { location, source, text } = await rendered({ location: null, locationSource: null });
+
+      expect(location).toBeNull();
+      expect(source).toBeNull();
+      expect(text).not.toContain("Unknown location");
+      // Upstream's line, as it was: the address.
+      expect(text).toContain("(203.0.113.7)");
     });
   });
 });

@@ -1374,6 +1374,9 @@
   "keykeeperApproveSignInWhere": {
     "message": "Where"
   },
+  "keykeeperApproveSignInAddress": {
+    "message": "Address"
+  },
   "keykeeperApproveSignInUnknownLocation": {
     "message": "Unknown location"
   },
@@ -1409,6 +1412,21 @@
   },
   "keykeeperApproveSignInGone": {
     "message": "That sign-in has ended or was answered on another device."
+  },
+  "keykeeperConfirmApprovalTitle": {
+    "message": "Confirm it's you"
+  },
+  "keykeeperConfirmApprovalBody": {
+    "message": "Enter your master password to approve this sign-in."
+  },
+  "keykeeperConfirmApprovalCode": {
+    "message": "Enter the code sent to your email to approve this sign-in."
+  },
+  "keykeeperConfirmApprovalWrong": {
+    "message": "That isn't your master password, so nothing was sent."
+  },
+  "keykeeperConfirmApprovalButton": {
+    "message": "Approve"
   },
   "keykeeperApproveSignInEmailLater": {
     "message": "They asked for a code by email instead, which can be sent after $TIME$. Deny it if this isn't you.",

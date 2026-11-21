@@ -20,11 +20,13 @@ import {
   DialogModule,
   DialogService,
   IconModule,
+  LinkModule,
   ToastService,
 } from "@bitwarden/components";
 import { LogService } from "@bitwarden/logging";
 
 import { JslibModule } from "../../jslib.module";
+import { KeykeeperApprovalConfirmation } from "../keykeeper/confirm-approval/confirm-approval.service";
 
 const RequestTimeOut = 60000 * 15; // 15 Minutes
 const RequestTimeUpdate = 60000 * 5; // 5 Minutes
@@ -37,7 +39,15 @@ export interface LoginApprovalDialogParams {
 // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
 @Component({
   templateUrl: "login-approval-dialog.component.html",
-  imports: [AsyncActionsModule, ButtonModule, CommonModule, DialogModule, IconModule, JslibModule],
+  imports: [
+    AsyncActionsModule,
+    ButtonModule,
+    CommonModule,
+    DialogModule,
+    IconModule,
+    JslibModule,
+    LinkModule,
+  ],
 })
 export class LoginApprovalDialogComponent implements OnInit, OnDestroy {
   authRequestId: string;
@@ -60,6 +70,7 @@ export class LoginApprovalDialogComponent implements OnInit, OnDestroy {
     private logService: LogService,
     private toastService: ToastService,
     private validationService: ValidationService,
+    private keykeeperConfirmation: KeykeeperApprovalConfirmation,
   ) {
     this.authRequestId = params.notificationId;
   }
@@ -129,8 +140,27 @@ export class LoginApprovalDialogComponent implements OnInit, OnDestroy {
   };
 
   approveLogin = async () => {
+    // Keykeeper: the person proves it's them before the key is sent, as in
+    // our apps (KeykeeperApprovalConfirmation). Otherwise nothing is sent,
+    // and the request stays waiting. Denying asks nothing.
+    if (!(await this.keykeeperConfirmation.confirm())) {
+      return;
+    }
     await this.retrieveAuthRequestAndRespond(true);
   };
+
+  /**
+   * Keykeeper: whether to show where the request comes from, from the
+   * server's own location database: its location, or "Unknown location"
+   * for an address the database can't place. Without the database, upstream's
+   * line, unchanged.
+   */
+  get keykeeperShowsLocation(): boolean {
+    return (
+      this.authRequestResponse?.keykeeperLocation != null ||
+      this.authRequestResponse?.keykeeperLocationSource != null
+    );
+  }
 
   private async retrieveAuthRequestAndRespond(approve: boolean) {
     if (this.authRequestResponse == null) {

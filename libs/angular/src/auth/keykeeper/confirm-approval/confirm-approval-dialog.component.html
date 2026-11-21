@@ -1,0 +1,43 @@
+<form
+  [formGroup]="form"
+  [bitSubmit]="confirm"
+  bit-dialog
+  dialogSize="small"
+  data-testid="keykeeper-confirm-approval"
+>
+  <span bitDialogTitle>{{ "keykeeperConfirmApprovalTitle" | i18n }}</span>
+
+  <ng-container bitDialogContent>
+    <p>{{ "keykeeperConfirmApprovalBody" | i18n }}</p>
+    <bit-form-field>
+      <bit-label>{{ "masterPass" | i18n }}</bit-label>
+      <input
+        bitInput
+        type="password"
+        formControlName="masterPassword"
+        appAutofocus
+        appInputVerbatim
+        data-testid="keykeeper-confirm-approval-password"
+      />
+      <button type="button" bitIconButton bitSuffix bitPasswordInputToggle></button>
+    </bit-form-field>
+    @if (wrong) {
+      <p
+        class="tw-text-danger tw-text-sm tw-mb-0"
+        role="alert"
+        data-testid="keykeeper-confirm-approval-wrong"
+      >
+        {{ "keykeeperConfirmApprovalWrong" | i18n }}
+      </p>
+    }
+  </ng-container>
+
+  <ng-container bitDialogFooter>
+    <button bitButton bitFormButton type="submit" buttonType="primary">
+      {{ "keykeeperConfirmApprovalButton" | i18n }}
+    </button>
+    <button bitButton type="button" buttonType="secondary" (click)="cancel()">
+      {{ "cancel" | i18n }}
+    </button>
+  </ng-container>
+</form>
