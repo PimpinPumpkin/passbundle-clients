@@ -1,4 +1,5 @@
 // Keykeeper: MSP code shared by the web vault and the browser extension.
+export * from "./family-link";
 export * from "./install-command";
 export * from "./join-checks";
 export * from "./join-seals";

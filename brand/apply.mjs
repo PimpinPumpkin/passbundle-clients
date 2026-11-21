@@ -296,6 +296,9 @@ function apply() {
     fail('brand.json needs "urls.website", the website\'s address, such as "https://example.com".');
   }
   ownMessages.keykeeperContactPage = { message: `${BRAND.urls.website}/contact/` };
+  // The website's Download page, where a family's printed sheet sends people
+  // for the apps.
+  ownMessages.keykeeperDownloadPage = { message: `${BRAND.urls.website}/download/` };
   for (const rel of trackedFiles(
     "apps/browser/src/_locales/en/messages.json",
     "apps/web/src/locales/en/messages.json",

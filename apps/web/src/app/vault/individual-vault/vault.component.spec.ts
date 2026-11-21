@@ -87,6 +87,7 @@ import {
 } from "@bitwarden/vault";
 
 import { OrganizationWarningsService } from "../../billing/organizations/warnings/services";
+import { KeykeeperFamilyLinkService } from "../../keykeeper/family/family-link.service";
 import { KeykeeperMspApiService } from "../../keykeeper/msp/msp-api.service";
 import { ProductSwitcherService } from "../../layouts/product-switcher/shared/product-switcher.service";
 import { VaultItemsComponent } from "../components/vault-items/vault-items.component";
@@ -201,6 +202,12 @@ describe("VaultComponent", () => {
         { provide: SearchService, useValue: mock<SearchService>() },
         { provide: SearchPipe, useValue: mock<SearchPipe>() },
         { provide: ApiService, useValue: mock<ApiService>() },
+        // Keykeeper: the legacy contact suggestion over the vault, which asks
+        // the server whether to show.
+        {
+          provide: KeykeeperFamilyLinkService,
+          useValue: { legacyContactSuggestion: () => Promise.resolve(false) },
+        },
         // Keykeeper: the two-step login notice asks who's waiting.
         {
           provide: KeykeeperMspApiService,

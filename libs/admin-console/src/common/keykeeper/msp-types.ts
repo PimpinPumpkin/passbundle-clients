@@ -322,6 +322,12 @@ export type PendingMember = {
   joinProof?: string | null;
   /** The install command's join secret, encrypted with the organization's key. */
   enrollmentSecret?: string | null;
+  /**
+   * Someone who joined a family with its invite link: the link's settings,
+   * encrypted with the family's key, and the join's proof. Such a join is
+   * let in on the link's terms only (family-link.ts).
+   */
+  familyLink?: { sealed: string | null; joinProof: string | null };
 };
 
 /**
@@ -334,6 +340,8 @@ export type OrganizationJoining = {
   autoConfirm: boolean;
   domains: string[];
   seal: string | null;
+  /** A family's invite link's settings, encrypted with the family's key, so the apps remember the newest. */
+  familyLink?: string | null;
 };
 
 /** How people join an organization. See DESIGN.md, "Joining". */

@@ -5,6 +5,7 @@ import { map } from "rxjs";
 
 import { HeaderModule } from "../../layouts/header/header.module";
 import { SharedModule } from "../../shared";
+import { KeykeeperFamilyLinkComponent } from "../family/family-link.component";
 import { KeykeeperOrgJoiningComponent } from "../joining/org-joining.component";
 
 import { KeykeeperAdminTwoStepComponent } from "./admin-two-step.component";
@@ -16,8 +17,8 @@ import { KeykeeperScriptAccessComponent } from "./script-access.component";
 
 /**
  * Keykeeper: an organization's "Joining and security" page, under Settings,
- * for its owners and admins: two-step login for admins, how people join, the
- * install command, script access, assisted password change, Members' own
+ * for its owners and admins: a family's invite link, two-step login for
+ * admins, how people join, the install command, script access, assisted password change, Members' own
  * passwords, and the browsers' card and address autofill. Organization info,
  * where these were, is upstream's owners-only page, and it loads an
  * owners-only endpoint, so a company's own IT admin couldn't reach them
@@ -36,6 +37,7 @@ import { KeykeeperScriptAccessComponent } from "./script-access.component";
     HeaderModule,
     KeykeeperAdminTwoStepComponent,
     KeykeeperBrowserAutofillSettingComponent,
+    KeykeeperFamilyLinkComponent,
     KeykeeperMemberHealthSettingComponent,
     KeykeeperOrgJoiningComponent,
     KeykeeperOrgInstallComponent,
@@ -48,6 +50,8 @@ import { KeykeeperScriptAccessComponent } from "./script-access.component";
       @if (organizationId(); as id) {
         <!-- Each card starts with a wide gap above its heading; the first one sits at the top. -->
         <div class="-tw-mt-16" data-testid="joining-security">
+          <!-- A family's invite link: only a family's owners and admins get it. -->
+          <app-keykeeper-family-link [organizationId]="id" />
           <app-keykeeper-admin-two-step [organizationId]="id" />
           <app-keykeeper-org-joining [organizationId]="id" />
           <app-keykeeper-org-install [organizationId]="id" />
