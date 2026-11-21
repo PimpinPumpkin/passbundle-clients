@@ -103,29 +103,47 @@ export class KeykeeperJoiningMemory {
 
   /** The newest joining seal seen for each organization. */
   async newest(userId: UserId): Promise<Record<string, JoiningMark>> {
-    return (
-      (await firstValueFrom(this.stateProvider.getUser(userId, KEYKEEPER_JOINING_SEEN).state$)) ??
-      {}
-    );
+    return newestSeen(this.stateProvider, KEYKEEPER_JOINING_SEEN, userId);
   }
 
-  /**
-   * Records `mark` as the newest for this organization if it's newer than
-   * what's there, and says whether it's current: not older than the newest.
-   */
-  private async see(userId: UserId, organizationId: string, mark: JoiningMark): Promise<boolean> {
-    const newer = (seen: Record<string, JoiningMark> | null) => {
-      const newest = seen?.[organizationId];
-      return newest == null || compareJoiningMarks(mark, newest) > 0;
-    };
-    const after = await this.stateProvider.getUser(userId, KEYKEEPER_JOINING_SEEN).update(
-      (seen) => ({
-        ...(seen ?? {}),
-        [organizationId]: { sealedAt: mark.sealedAt, nonce: mark.nonce },
-      }),
-      { shouldUpdate: newer },
-    );
-    const newest = after?.[organizationId];
-    return newest != null && compareJoiningMarks(mark, newest) >= 0;
+  private see(userId: UserId, organizationId: string, mark: JoiningMark): Promise<boolean> {
+    return seeNewest(this.stateProvider, KEYKEEPER_JOINING_SEEN, userId, organizationId, mark);
   }
+}
+
+/** The newest mark seen for each organization, kept under `definition`. */
+export async function newestSeen(
+  stateProvider: StateProvider,
+  definition: UserKeyDefinition<Record<string, JoiningMark>>,
+  userId: UserId,
+): Promise<Record<string, JoiningMark>> {
+  return (await firstValueFrom(stateProvider.getUser(userId, definition).state$)) ?? {};
+}
+
+/**
+ * Records `mark` as the newest for this organization under `definition` if
+ * it's newer than what's there, and says whether it's current: not older
+ * than the newest. Joining seals keep theirs under KEYKEEPER_JOINING_SEEN, a
+ * family's invite link its settings' under KEYKEEPER_FAMILY_LINK_SEEN.
+ */
+export async function seeNewest(
+  stateProvider: StateProvider,
+  definition: UserKeyDefinition<Record<string, JoiningMark>>,
+  userId: UserId,
+  organizationId: string,
+  mark: JoiningMark,
+): Promise<boolean> {
+  const newer = (seen: Record<string, JoiningMark> | null) => {
+    const newest = seen?.[organizationId];
+    return newest == null || compareJoiningMarks(mark, newest) > 0;
+  };
+  const after = await stateProvider.getUser(userId, definition).update(
+    (seen) => ({
+      ...(seen ?? {}),
+      [organizationId]: { sealedAt: mark.sealedAt, nonce: mark.nonce },
+    }),
+    { shouldUpdate: newer },
+  );
+  const newest = after?.[organizationId];
+  return newest != null && compareJoiningMarks(mark, newest) >= 0;
 }

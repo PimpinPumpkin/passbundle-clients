@@ -43,6 +43,8 @@
   <app-keykeeper-install-token-prompt [organization]="organization" [members]="dataSource.data" />
   <!-- Keykeeper: opening this page lets in anyone waiting. -->
   <app-keykeeper-members-joining [organization]="organization" (joined)="load(organization)" />
+  <!-- Keykeeper: a family's invite link, and everyone waiting with their fingerprint phrase and Confirm -->
+  <app-keykeeper-family-waiting [organization]="organization" (confirmed)="load(organization)" />
 
   <div class="tw-mb-4">
     @if (showUserManagementControls()) {

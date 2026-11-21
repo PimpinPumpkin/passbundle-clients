@@ -151,6 +151,7 @@ import {
   CollectionDialogTabType,
   openCollectionDialog,
 } from "../../admin-console/organizations/shared/components/collection-dialog";
+import { KeykeeperLegacyContactSuggestionComponent } from "../../keykeeper/family/legacy-contact-suggestion.component";
 import { KeykeeperTwoStepNeededComponent } from "../../keykeeper/joining/two-step-needed.component";
 import { KeykeeperAcceptRoleComponent } from "../../keykeeper/organizations/accept-role.component";
 import { KeykeeperTwoStepNudgeComponent } from "../../keykeeper/two-step-nudge/two-step-nudge.component";
@@ -187,6 +188,7 @@ type EmptyStateMap = Record<EmptyStateType, EmptyStateItem>;
   templateUrl: "vault.component.html",
   imports: [
     KeykeeperTwoStepNeededComponent,
+    KeykeeperLegacyContactSuggestionComponent,
     KeykeeperTwoStepNudgeComponent,
     KeykeeperAcceptRoleComponent,
     VaultOrganizationUserNotificationsComponent,
