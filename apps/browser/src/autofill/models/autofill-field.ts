@@ -116,6 +116,13 @@ export default class AutofillField {
    */
   maxLength?: number | null;
 
+  /**
+   * Keykeeper: the field's `inputmode` and `pattern` attributes, when it has
+   * them, which can mark a PIN (keykeeper/pin-fields.ts).
+   */
+  inputMode?: string;
+  pattern?: string;
+
   dataSetValues?: string;
 
   rel?: string | null;
