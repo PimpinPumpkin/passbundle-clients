@@ -5,6 +5,7 @@ import { firstValueFrom } from "rxjs";
 // eslint-disable-next-line no-restricted-imports
 import { UserVerificationDialogComponent } from "@bitwarden/auth/angular";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import { TokenService } from "@bitwarden/common/auth/abstractions/token.service";
 import { UserVerificationService } from "@bitwarden/common/auth/abstractions/user-verification/user-verification.service.abstraction";
 import { VerificationType } from "@bitwarden/common/auth/enums/verification-type";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
@@ -31,6 +32,10 @@ import { KeykeeperConfirmApprovalDialogComponent } from "./confirm-approval-dial
  *   verification offers it: a code by email.
  *
  * No PIN: our apps don't take one for this either.
+ *
+ * A session that began from another device's approval never approves one
+ * (`fromApproval`): the server refuses it, so the dialog says so up front and
+ * never asks for this confirmation.
  */
 @Injectable({ providedIn: "root" })
 export class KeykeeperApprovalConfirmation {
@@ -39,7 +44,30 @@ export class KeykeeperApprovalConfirmation {
     private biometricsService: BiometricsService,
     private dialogService: DialogService,
     private userVerificationService: UserVerificationService,
+    private tokenService: TokenService,
   ) {}
+
+  /**
+   * Whether this browser's session began from another device's approval, as
+   * its access token says (`keykeeper_signin: "authrequest"`, which
+   * passbundle-server keeps from refresh to refresh until the person signs in
+   * again). Such a session can't approve a "Sign in with a device" request:
+   * the server refuses it, as our apps know from the same claim
+   * (passbundle-apps, `Session::from_approval`). It may still deny one.
+   * Read without checking the token's signature: it decides only what the
+   * dialog offers, and the server checks it again. False for a token that
+   * doesn't say, or that can't be read.
+   */
+  async fromApproval(): Promise<boolean> {
+    try {
+      const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
+      const claims: Record<string, unknown> | null =
+        await this.tokenService.decodeAccessToken(userId);
+      return claims?.["keykeeper_signin"] === "authrequest";
+    } catch {
+      return false;
+    }
+  }
 
   async confirm(): Promise<boolean> {
     const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));

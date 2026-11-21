@@ -51,6 +51,7 @@ describe("LoginApprovalDialogComponent", () => {
     validationService = mock<ValidationService>();
     confirmation = mock<KeykeeperApprovalConfirmation>();
     confirmation.confirm.mockResolvedValue(true);
+    confirmation.fromApproval.mockResolvedValue(false);
 
     accountService.activeAccount$ = of({
       id: "test-user-id" as UserId,
@@ -327,6 +328,93 @@ describe("LoginApprovalDialogComponent", () => {
       expect(text).not.toContain("Unknown location");
       // Upstream's line, as it was: the address.
       expect(text).toContain("(203.0.113.7)");
+    });
+  });
+
+  // Keykeeper: a session that began from another device's approval can't
+  // approve one (the server refuses it), so it's told so up front, as our apps
+  // do, and offered Deny and Close, never the confirmation (DESIGN.md,
+  // "Approving a sign-in from another device", "The web vault and the
+  // extension").
+  describe("a session from another device's approval", () => {
+    const waiting = new AuthRequestResponse({
+      id: "test-request-id",
+      publicKey: testPublicKey,
+      requestDeviceType: "Chrome",
+      requestDeviceTypeValue: 9,
+      requestIpAddress: "203.0.113.7",
+      creationDate: new Date().toISOString(),
+      requestApproved: null,
+      responseDate: null,
+    });
+
+    const opened = async (fromApproval: boolean) => {
+      i18nService.t.mockImplementation((key: string) => key);
+      confirmation.fromApproval.mockResolvedValue(fromApproval);
+      apiService.getAuthRequest.mockResolvedValue(waiting);
+      authRequestService.getFingerprintPhrase.mockResolvedValue("test-phrase");
+      authRequestService.approveOrDenyAuthRequest.mockResolvedValue(waiting);
+      // As the dialog service opens it: closable.
+      dialogRef.disableClose = false;
+      await component.ngOnInit();
+      fixture.detectChanges();
+      const el: HTMLElement = fixture.nativeElement;
+      const buttons = () =>
+        Array.from(el.querySelectorAll("button[bitButton]")) as HTMLButtonElement[];
+      return {
+        note: el.querySelector("[data-testid=keykeeper-login-approval-from-approval]"),
+        button: (label: string) => buttons().find((b) => b.textContent!.trim() === label),
+        labels: () => buttons().map((b) => b.textContent!.trim()),
+        text: el.textContent!.replace(/\s+/g, " "),
+      };
+    };
+
+    it("says up front that it can't approve here, in our apps' words, with no Confirm access", async () => {
+      const { note, labels, text } = await opened(true);
+
+      expect(note).not.toBeNull();
+      expect(note!.textContent).toContain("keykeeperApprovalSessionCantApprove");
+      expect(labels()).not.toContain("confirmAccess");
+      // The request itself still shows, so the person can tell what to deny.
+      expect(text).toContain("test-phrase");
+      expect(text).toContain("(203.0.113.7)");
+    });
+
+    it("offers Deny, which denies without a confirmation, and Close, which answers nothing", async () => {
+      const shown = await opened(true);
+      expect(shown.labels()).toEqual(["denyAccess", "close"]);
+
+      shown.button("close")!.click();
+      // Closed with no answer: the extension and Settings, Devices count only
+      // true or false as one, so the request stays waiting.
+      expect(dialogRef.close).toHaveBeenCalledTimes(1);
+      expect(typeof dialogRef.close.mock.calls[0][0]).not.toBe("boolean");
+      expect(authRequestService.approveOrDenyAuthRequest).not.toHaveBeenCalled();
+
+      await component.denyLogin();
+      expect(confirmation.confirm).not.toHaveBeenCalled();
+      expect(authRequestService.approveOrDenyAuthRequest).toHaveBeenCalledTimes(1);
+      expect(authRequestService.approveOrDenyAuthRequest).toHaveBeenCalledWith(false, waiting);
+    });
+
+    it("never asks for the confirmation or sends an approval", async () => {
+      await opened(true);
+      apiService.getAuthRequest.mockClear();
+
+      await component.approveLogin();
+
+      expect(confirmation.confirm).not.toHaveBeenCalled();
+      expect(authRequestService.approveOrDenyAuthRequest).not.toHaveBeenCalled();
+      expect(apiService.getAuthRequest).not.toHaveBeenCalled();
+      expect(dialogRef.close).not.toHaveBeenCalled();
+    });
+
+    it("is read as the dialog opens: a master password or single sign-on session sees Confirm access and no note", async () => {
+      const { note, labels } = await opened(false);
+
+      expect(confirmation.fromApproval).toHaveBeenCalledTimes(1);
+      expect(note).toBeNull();
+      expect(labels()).toEqual(["confirmAccess", "denyAccess"]);
     });
   });
 });

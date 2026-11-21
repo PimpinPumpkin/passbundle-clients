@@ -66,19 +66,32 @@
         <span class="tw-font-medium">{{ "time" | i18n }}</span>
         <p>{{ requestTimeText }}</p>
       </div>
+      <!-- Keykeeper: a session that began from another device's approval
+           can't approve one, so it's told so before anything is asked, in our
+           apps' words (DESIGN.md, "Approving a sign-in from another device",
+           "The web vault and the extension"). -->
+      @if (keykeeperFromApproval) {
+        <bit-callout type="info" data-testid="keykeeper-login-approval-from-approval">
+          <p class="tw-mb-0">{{ "keykeeperApprovalSessionCantApprove" | i18n }}</p>
+        </bit-callout>
+      }
     </ng-container>
   </ng-container>
 
   <ng-container bitDialogFooter>
-    <button
-      bitButton
-      type="button"
-      buttonType="primary"
-      [bitAction]="approveLogin"
-      [disabled]="loading"
-    >
-      {{ "confirmAccess" | i18n }}
-    </button>
+    <!-- Keykeeper: no Confirm access for a session from an approval; Deny,
+         which it may do, and Close instead. -->
+    @if (!keykeeperFromApproval) {
+      <button
+        bitButton
+        type="button"
+        buttonType="primary"
+        [bitAction]="approveLogin"
+        [disabled]="loading"
+      >
+        {{ "confirmAccess" | i18n }}
+      </button>
+    }
     <button
       bitButton
       type="button"
@@ -88,5 +101,10 @@
     >
       {{ "denyAccess" | i18n }}
     </button>
+    @if (keykeeperFromApproval) {
+      <button bitButton type="button" buttonType="secondary" bitDialogClose>
+        {{ "close" | i18n }}
+      </button>
+    }
   </ng-container>
 </bit-dialog>

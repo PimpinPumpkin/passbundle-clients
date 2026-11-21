@@ -17,6 +17,7 @@ import {
   DialogRef,
   AsyncActionsModule,
   ButtonModule,
+  CalloutModule,
   DialogModule,
   DialogService,
   IconModule,
@@ -42,6 +43,7 @@ export interface LoginApprovalDialogParams {
   imports: [
     AsyncActionsModule,
     ButtonModule,
+    CalloutModule,
     CommonModule,
     DialogModule,
     IconModule,
@@ -58,6 +60,12 @@ export class LoginApprovalDialogComponent implements OnInit, OnDestroy {
   loading = true;
   readableDeviceTypeName?: string;
   requestTimeText?: string;
+  /**
+   * Keykeeper: this session began from another device's approval, so it
+   * can't approve one (the server refuses it). The dialog says so up front,
+   * and offers Deny and Close, never the confirmation.
+   */
+  keykeeperFromApproval = false;
 
   constructor(
     @Inject(DIALOG_DATA) private params: LoginApprovalDialogParams,
@@ -123,6 +131,8 @@ export class LoginApprovalDialogComponent implements OnInit, OnDestroy {
       this.updateTimeText();
     }, RequestTimeUpdate);
 
+    this.keykeeperFromApproval = await this.keykeeperConfirmation.fromApproval();
+
     this.loading = false;
   }
 
@@ -140,6 +150,11 @@ export class LoginApprovalDialogComponent implements OnInit, OnDestroy {
   };
 
   approveLogin = async () => {
+    // Keykeeper: a session from an approval isn't offered this, and never
+    // asks for the confirmation: the server would refuse it.
+    if (this.keykeeperFromApproval) {
+      return;
+    }
     // Keykeeper: the person proves it's them before the key is sent, as in
     // our apps (KeykeeperApprovalConfirmation). Otherwise nothing is sent,
     // and the request stays waiting. Denying asks nothing.
