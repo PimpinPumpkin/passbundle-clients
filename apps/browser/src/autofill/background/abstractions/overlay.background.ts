@@ -261,7 +261,8 @@ export type OverlayBackgroundExtensionMessageHandlers = {
   updateFocusedFieldData: ({ message, sender }: BackgroundOnMessageHandlerParams) => void;
   updateIsFieldCurrentlyFocused: ({ message, sender }: BackgroundOnMessageHandlerParams) => void;
   checkIsFieldCurrentlyFocused: () => boolean;
-  updateIsFieldCurrentlyFilling: ({ message }: BackgroundMessageParam) => void;
+  // Keykeeper: with the tab that says it.
+  updateIsFieldCurrentlyFilling: ({ message, sender }: BackgroundOnMessageHandlerParams) => void;
   checkIsFieldCurrentlyFilling: () => boolean;
   getAutofillInlineMenuVisibility: () => void;
   openAutofillInlineMenu: ({ message, sender }: BackgroundOnMessageHandlerParams) => Promise<void>;

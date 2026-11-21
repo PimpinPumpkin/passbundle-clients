@@ -200,6 +200,8 @@ export class OverlayBackground implements OverlayBackgroundInterface {
   private allFieldData: AutofillField[] = [];
   private isFieldCurrentlyFocused: boolean = false;
   private isFieldCurrentlyFilling: boolean = false;
+  // Keykeeper: the tab whose fill set isFieldCurrentlyFilling.
+  private keykeeperFillingTabId: number | undefined;
   private isInlineMenuButtonVisible: boolean = false;
   private isInlineMenuListVisible: boolean = false;
   private showPasskeysLabelsWithinInlineMenu: boolean = false;
@@ -222,7 +224,9 @@ export class OverlayBackground implements OverlayBackgroundInterface {
     updateIsFieldCurrentlyFocused: ({ message, sender }) =>
       this.updateIsFieldCurrentlyFocused(message, sender),
     checkIsFieldCurrentlyFocused: () => this.checkIsFieldCurrentlyFocused(),
-    updateIsFieldCurrentlyFilling: ({ message }) => this.updateIsFieldCurrentlyFilling(message),
+    // Keykeeper: with the tab that says it (removePageDetails).
+    updateIsFieldCurrentlyFilling: ({ message, sender }) =>
+      this.updateIsFieldCurrentlyFilling(message, sender),
     checkIsFieldCurrentlyFilling: () => this.checkIsFieldCurrentlyFilling(),
     getAutofillInlineMenuVisibility: () => this.getInlineMenuVisibility(),
     openAutofillInlineMenu: ({ message, sender }) =>
@@ -454,6 +458,15 @@ export class OverlayBackground implements OverlayBackgroundInterface {
 
     if (this.portKeyForTab[tabId]) {
       delete this.portKeyForTab[tabId];
+    }
+
+    // Keykeeper: a fill says it has ended a moment after it does
+    // (content/autofill-init.ts). A tab closed, or sent to another page,
+    // before then never says so, and no field in any tab opened its menu
+    // again until another fill ended. Its fill ends with its page.
+    if (this.isFieldCurrentlyFilling && this.keykeeperFillingTabId === tabId) {
+      this.isFieldCurrentlyFilling = false;
+      this.keykeeperFillingTabId = undefined;
     }
 
     this.clearGeneratedPassword$.next();
@@ -3438,8 +3451,13 @@ export class OverlayBackground implements OverlayBackgroundInterface {
    *
    * @param message - The message received from the web page
    */
-  private updateIsFieldCurrentlyFilling(message: OverlayBackgroundExtensionMessage) {
+  private updateIsFieldCurrentlyFilling(
+    message: OverlayBackgroundExtensionMessage,
+    sender?: chrome.runtime.MessageSender,
+  ) {
     this.isFieldCurrentlyFilling = message.isFieldCurrentlyFilling ?? false;
+    // Keykeeper: which tab is filling (removePageDetails).
+    this.keykeeperFillingTabId = this.isFieldCurrentlyFilling ? sender?.tab?.id : undefined;
   }
 
   /**
