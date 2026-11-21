@@ -68,12 +68,11 @@
       </div>
       <!-- Keykeeper: a session that began from another device's approval
            can't approve one, so it's told so before anything is asked, in our
-           apps' words and the server's (DESIGN.md, "Approving a sign-in from
-           another device", "The web vault and the extension"). -->
+           apps' words (DESIGN.md, "Approving a sign-in from another device",
+           "The web vault and the extension"). -->
       @if (keykeeperFromApproval) {
         <bit-callout type="info" data-testid="keykeeper-login-approval-from-approval">
-          <p>{{ "keykeeperApprovalSessionCantApprove" | i18n }}</p>
-          <p class="tw-mb-0">{{ "keykeeperApprovalSessionApproveFrom" | i18n }}</p>
+          <p class="tw-mb-0">{{ "keykeeperApprovalSessionCantApprove" | i18n }}</p>
         </bit-callout>
       }
     </ng-container>

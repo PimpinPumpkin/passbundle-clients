@@ -1431,9 +1431,6 @@
   "keykeeperApprovalSessionCantApprove": {
     "message": "This device signed in with another device's approval, so it can't approve \"Sign in with a device\" requests. To approve them here, sign out, then sign in with your master password or single sign-on."
   },
-  "keykeeperApprovalSessionApproveFrom": {
-    "message": "Approve sign-ins from a device where you signed in with your master password or single sign-on, not one another device approved."
-  },
   "keykeeperApproveSignInEmailLater": {
     "message": "They asked for a code by email instead, which can be sent after $TIME$. Deny it if this isn't you.",
     "placeholders": {

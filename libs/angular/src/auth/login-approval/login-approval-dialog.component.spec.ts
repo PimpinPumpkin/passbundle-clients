@@ -369,12 +369,11 @@ describe("LoginApprovalDialogComponent", () => {
       };
     };
 
-    it("says up front that it can't approve here, in our apps' words and the server's, with no Confirm access", async () => {
+    it("says up front that it can't approve here, in our apps' words, with no Confirm access", async () => {
       const { note, labels, text } = await opened(true);
 
       expect(note).not.toBeNull();
       expect(note!.textContent).toContain("keykeeperApprovalSessionCantApprove");
-      expect(note!.textContent).toContain("keykeeperApprovalSessionApproveFrom");
       expect(labels()).not.toContain("confirmAccess");
       // The request itself still shows, so the person can tell what to deny.
       expect(text).toContain("test-phrase");
