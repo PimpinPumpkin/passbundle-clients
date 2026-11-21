@@ -1241,6 +1241,61 @@ describe("OverlayBackground", () => {
       });
     });
 
+    // Keykeeper: a list opens in two steps (its init, then its own page), and
+    // items sent between the two were lost: a login saved from the save prompt
+    // as the menu opened was missing from it until something changed again.
+    describe("Keykeeper: items that change while a list opens", () => {
+      const sentNames = (port: chrome.runtime.Port) =>
+        (port.postMessage as jest.Mock).mock.calls
+          .map(([message]) => message)
+          .filter((message) => message.command === "updateAutofillInlineMenuListCiphers")
+          .map((message) => message.ciphers.map((cipher: { name: string }) => cipher.name));
+
+      /** The list's port connects, and the background sends it its init. */
+      async function openList() {
+        triggerPortOnConnectEvent(createPortSpyMock(AutofillOverlayPort.List));
+        await flushPromises();
+        return overlayBackground["inlineMenuListPort"];
+      }
+
+      /** The list's own page has loaded, with the init, and connects its port. */
+      async function listPageReady() {
+        triggerPortOnConnectEvent(createPortSpyMock(AutofillOverlayPort.ListMessageConnector));
+        await flushPromises();
+      }
+
+      beforeEach(() => {
+        overlayBackground["focusedFieldData"] = createFocusedFieldDataMock({ tabId: tab.id });
+        cipherService.sortCiphersByLastUsedThenName.mockReturnValue(-1);
+        getTabFromCurrentWindowIdSpy.mockResolvedValue(tab);
+      });
+
+      it("sends the list's page a login saved while the list opened", async () => {
+        const list = await openList();
+        // The save lands: the list is sent the login before its page can show it.
+        cipherService.getAllDecryptedForUrl.mockResolvedValue([loginCipher1]);
+        await overlayBackground.updateOverlayCiphers();
+        await flushPromises();
+        (list.postMessage as jest.Mock).mockClear();
+
+        await listPageReady();
+
+        expect(sentNames(list)).toEqual([["name-1"]]);
+      });
+
+      it("sends the list's page nothing more when nothing changed after its init", async () => {
+        cipherService.getAllDecryptedForUrl.mockResolvedValue([loginCipher1]);
+        await overlayBackground.updateOverlayCiphers();
+        await flushPromises();
+        const list = await openList();
+        (list.postMessage as jest.Mock).mockClear();
+
+        await listPageReady();
+
+        expect(sentNames(list)).toEqual([]);
+      });
+    });
+
     it.each([
       {
         description: "for the standard inline menu path",

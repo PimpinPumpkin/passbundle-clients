@@ -589,6 +589,8 @@ export class OverlayBackground implements OverlayBackgroundInterface {
    * @param tab - The current tab
    */
   private async updateInlineMenuListCiphers(tab: chrome.tabs.Tab) {
+    // Keykeeper: counted for keykeeperSendListItemsMissedWhileOpening.
+    this.keykeeperListItemsSent++;
     const ciphers = await this.getInlineMenuCipherData();
     this.postMessageToPort(this.inlineMenuListPort, {
       command: "updateAutofillInlineMenuListCiphers",
@@ -597,6 +599,38 @@ export class OverlayBackground implements OverlayBackgroundInterface {
       showPasskeysLabels: this.showPasskeysLabelsWithinInlineMenu,
       focusedFieldHasValue: await this.checkFocusedFieldHasValue(tab),
     });
+  }
+
+  /** Keykeeper: how many times the list's items were sent to it. */
+  private keykeeperListItemsSent = 0;
+  /** Keykeeper: the list port whose page is opening, and the count when its init was made. */
+  private keykeeperListOpening: { port: chrome.runtime.Port; itemsSent: number } | null = null;
+
+  /**
+   * Keykeeper: a list opens in two steps. The background sends its frame the
+   * init, with the items as they are then, and the frame then loads the list's
+   * own page, which shows them. Items sent to the list in between (a login
+   * saved from the save prompt landing as the menu opens, say) reached a frame
+   * that couldn't show them yet and were lost, so the list showed the items
+   * from before until they changed again. The page connects its own port once
+   * it has the init: send it the items again then, if they were sent since the
+   * init was made.
+   */
+  private async keykeeperSendListItemsMissedWhileOpening(port: chrome.runtime.Port) {
+    const opening = this.keykeeperListOpening;
+    const tab = port.sender?.tab;
+    if (
+      !opening ||
+      !tab ||
+      opening.port !== this.inlineMenuListPort ||
+      opening.port.sender?.tab?.id !== tab.id
+    ) {
+      return;
+    }
+    this.keykeeperListOpening = null;
+    if (opening.itemsSent !== this.keykeeperListItemsSent) {
+      await this.updateInlineMenuListCiphers(tab);
+    }
   }
 
   /**
@@ -3764,6 +3798,11 @@ export class OverlayBackground implements OverlayBackgroundInterface {
 
     const isInlineMenuListPort = port.name === AutofillOverlayPort.List;
     const isInlineMenuButtonPort = port.name === AutofillOverlayPort.Button;
+    // Keykeeper: the list's own page connects this port once it has the init.
+    if (port.name === AutofillOverlayPort.ListMessageConnector) {
+      await this.keykeeperSendListItemsMissedWhileOpening(port);
+      return;
+    }
     if (!isInlineMenuListPort && !isInlineMenuButtonPort) {
       return;
     }
@@ -3797,6 +3836,10 @@ export class OverlayBackground implements OverlayBackgroundInterface {
     );
     const extensionOrigin = iframeUrl ? new URL(iframeUrl).origin : null;
 
+    // Keykeeper: the items the init below carries are as of now.
+    if (isInlineMenuListPort) {
+      this.keykeeperListOpening = { port, itemsSent: this.keykeeperListItemsSent };
+    }
     this.postMessageToPort(port, {
       command: `initAutofillInlineMenu${isInlineMenuListPort ? "List" : "Button"}`,
       iframeUrl,
