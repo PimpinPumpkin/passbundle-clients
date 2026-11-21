@@ -4,7 +4,11 @@ import { of } from "rxjs";
 // This import has been flagged as unallowed for this class. It may be involved in a circular dependency loop.
 // eslint-disable-next-line no-restricted-imports
 import { UserVerificationDialogComponent } from "@bitwarden/auth/angular";
+// This import has been flagged as unallowed for this class. It may be involved in a circular dependency loop.
+// eslint-disable-next-line no-restricted-imports
+import { decodeJwtTokenToJson } from "@bitwarden/auth/common";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
+import { TokenService } from "@bitwarden/common/auth/abstractions/token.service";
 import { UserVerificationService } from "@bitwarden/common/auth/abstractions/user-verification/user-verification.service.abstraction";
 import { VerificationType } from "@bitwarden/common/auth/enums/verification-type";
 import { mockAccountInfoWith } from "@bitwarden/common/spec";
@@ -21,6 +25,7 @@ describe("KeykeeperApprovalConfirmation", () => {
   let biometricsService: MockProxy<BiometricsService>;
   let dialogService: MockProxy<DialogService>;
   let userVerificationService: MockProxy<UserVerificationService>;
+  let tokenService: MockProxy<TokenService>;
   let passwordDialog: jest.SpyInstance;
   let upstreamDialog: jest.SpyInstance;
   let confirmation: KeykeeperApprovalConfirmation;
@@ -42,6 +47,7 @@ describe("KeykeeperApprovalConfirmation", () => {
     dialogService = mock<DialogService>();
     userVerificationService = mock<UserVerificationService>();
     userVerificationService.hasMasterPassword.mockResolvedValue(true);
+    tokenService = mock<TokenService>();
     passwordDialog = jest.spyOn(KeykeeperConfirmApprovalDialogComponent, "open");
     passwordDialogCloses(true);
     upstreamDialog = jest.spyOn(UserVerificationDialogComponent, "open");
@@ -50,6 +56,7 @@ describe("KeykeeperApprovalConfirmation", () => {
       biometricsService,
       dialogService,
       userVerificationService,
+      tokenService,
     );
   });
 
@@ -133,5 +140,50 @@ describe("KeykeeperApprovalConfirmation", () => {
       upstreamDialog.mockResolvedValue(result);
       expect(await confirmation.confirm()).toBe(false);
     }
+  });
+
+  // A session that began from another device's approval can't approve one,
+  // so the dialog says so before asking anything (DESIGN.md, "Approving a
+  // sign-in from another device", "The web vault and the extension").
+  describe("whether this session began from another device's approval", () => {
+    /** An access token as passbundle-server issues it, with these claims (unsigned here). */
+    const accessToken = (claims: Record<string, unknown>) =>
+      [
+        { alg: "RS256", typ: "JWT" },
+        { sub: userId, email: "ana@example.test", ...claims },
+      ]
+        .map((part) => Buffer.from(JSON.stringify(part)).toString("base64url"))
+        .concat("signature")
+        .join(".");
+    const signedInWith = (claims: Record<string, unknown>) =>
+      tokenService.decodeAccessToken.mockImplementation(async () =>
+        decodeJwtTokenToJson(accessToken(claims)),
+      );
+
+    it("is when the access token says so", async () => {
+      signedInWith({ keykeeper_signin: "authrequest" });
+
+      expect(await confirmation.fromApproval()).toBe(true);
+      expect(tokenService.decodeAccessToken).toHaveBeenCalledWith(userId);
+    });
+
+    it("isn't for the master password, single sign-on, an API key, or a token that doesn't say", async () => {
+      for (const claims of [
+        { keykeeper_signin: "password" },
+        { keykeeper_signin: "sso" },
+        { keykeeper_signin: "userapikey" },
+        { keykeeper_signin: null },
+        {},
+      ]) {
+        signedInWith(claims);
+        expect(await confirmation.fromApproval()).toBe(false);
+      }
+    });
+
+    it("isn't when the access token can't be read: the server still decides", async () => {
+      tokenService.decodeAccessToken.mockRejectedValue(new Error("Access token not found."));
+
+      expect(await confirmation.fromApproval()).toBe(false);
+    });
   });
 });
