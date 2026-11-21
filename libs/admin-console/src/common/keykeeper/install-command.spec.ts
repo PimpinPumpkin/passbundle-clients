@@ -3,6 +3,7 @@ import {
   installCommand,
   installOptionsFor,
   installSteps,
+  phoneSettings,
   shellLiteral,
 } from "./install-command";
 
@@ -224,4 +225,40 @@ describe("the organization's browser autofill setting in the command", () => {
       expect(steps?.command).not.toMatch(/autofill/i);
     }
   });
+});
+
+describe("phoneSettings", () => {
+  const parts = { secret: token.replace("a", "s"), fingerprint: token.replace("a", "f") };
+
+  it("is the server and the fingerprint, under the keys the phone apps read", () => {
+    expect(phoneSettings("https://vault.example.com/", parts)).toEqual([
+      { key: "server_url", value: "https://vault.example.com" },
+      { key: "org_key_fingerprint", value: parts.fingerprint },
+    ]);
+  });
+
+  it("takes the server the Windows command takes", () => {
+    expect(phoneSettings("https://[::1]:8443/vault", parts)?.[0].value).toBe(
+      "https://[::1]:8443/vault",
+    );
+  });
+
+  it("is nothing without a fingerprint", () => {
+    expect(phoneSettings("https://vault.example.com", null)).toBeNull();
+    expect(phoneSettings("https://vault.example.com")).toBeNull();
+  });
+
+  it.each(["", "short", `${parts.fingerprint}A`, `${parts.fingerprint.slice(0, 42)}'`])(
+    "is nothing for a fingerprint that isn't one: %p",
+    (fingerprint) => {
+      expect(phoneSettings("https://vault.example.com", { ...parts, fingerprint })).toBeNull();
+    },
+  );
+
+  it.each(["http://vault.example.com", "https://vault.example.com/a b", "https://"])(
+    "is nothing for a server address that isn't plain HTTPS: %p",
+    (bad) => {
+      expect(phoneSettings(bad, parts)).toBeNull();
+    },
+  );
 });

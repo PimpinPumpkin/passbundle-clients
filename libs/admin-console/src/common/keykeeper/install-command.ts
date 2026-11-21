@@ -147,6 +147,33 @@ export function installSteps(
   };
 }
 
+/** One value a phone's MDM sets for our app, by the key the app reads it from. */
+export type PhoneSetting = { key: string; value: string };
+
+/**
+ * What a phone's MDM sets for our app, next to the install command: the
+ * server, and the organization's key fingerprint, the one key the app
+ * enrolls people's account recovery to at unlock. The keys are the ones the
+ * apps read (passbundle-apps: Android's managed configuration,
+ * app_restrictions.xml, and the iPhone app's managed app configuration), and
+ * the values are the command's, checked the same way. Null when there's no
+ * fingerprint, or either value isn't what it should be. See DESIGN.md,
+ * "Enrolling at unlock", "Our apps".
+ */
+export function phoneSettings(
+  serverUrl: string,
+  parts?: InstallCommandParts | null,
+): PhoneSetting[] | null {
+  const url = serverUrl.replace(/\/+$/, "");
+  if (parts == null || !SERVER_URL.test(url) || !TOKEN.test(parts.fingerprint)) {
+    return null;
+  }
+  return [
+    { key: "server_url", value: url },
+    { key: "org_key_fingerprint", value: parts.fingerprint },
+  ];
+}
+
 /** The token, and the join secret and fingerprint when there are any, are what they should be. */
 function checkedToken(token: string, parts?: InstallCommandParts | null): boolean {
   return (
