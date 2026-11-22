@@ -1,5 +1,14 @@
 import { mock } from "jest-mock-extended";
-import { BehaviorSubject, Observable, filter, firstValueFrom, map, of, throwError } from "rxjs";
+import {
+  BehaviorSubject,
+  Observable,
+  filter,
+  firstValueFrom,
+  map,
+  of,
+  throwError,
+  timeout,
+} from "rxjs";
 
 // This import has been flagged as unallowed for this class. It may be involved in a circular dependency loop.
 // eslint-disable-next-line no-restricted-imports
@@ -2052,6 +2061,103 @@ describe("Cipher Service", () => {
 
       expect(again.login.fido2Credentials).toHaveLength(1);
       expect(backgroundDecryptions()).toBe(1);
+    });
+  });
+
+  // Keykeeper: the browser extension's storage announces only changes (chrome.storage.onChanged).
+  // A write that leaves the items as they were, such as a sync of a vault with no items yet, isn't
+  // announced, and the views it emptied waited for it for good: the save prompt asked for the
+  // site's logins and never showed (DESIGN.md, "A save prompt that waited for good on an empty
+  // vault (upstream race)").
+  describe("a write that leaves the items as they were (Keykeeper)", () => {
+    const loginId = "9ff8c0b2-1d3e-4f8c-9b2d-1d3e4f8c0b41" as CipherId;
+    const stored = {
+      ...cipherData,
+      id: loginId,
+      organizationId: null,
+      folderId: null,
+    } as CipherData;
+    const view = () => {
+      const v = new CipherView();
+      v.id = loginId;
+      v.name = "Sign in";
+      v.login = new LoginView();
+      return v;
+    };
+
+    /** The decrypted items as the save prompt and the menu read them, once there are any. */
+    const readable = () =>
+      firstValueFrom(
+        cipherService.cipherViews$(mockUserId).pipe(
+          filter((views) => views != null),
+          timeout(2000),
+        ),
+      );
+
+    let storage: jest.SpyInstance;
+
+    beforeEach(() => {
+      sdkCrudFeatureFlag$.next(false);
+      keyService.cipherDecryptionKeys$.mockReturnValue(
+        of({ userKey: makeSymmetricCryptoKey(64) as UserKey, orgKeys: {} } as CipherDecryptionKeys),
+      );
+      stateProvider.singleUser.getFake(mockUserId, DECRYPTED_CIPHERS).nextState({});
+      stateProvider.singleUser.getFake(mockUserId, FAILED_DECRYPTED_CIPHERS).nextState([]);
+      // As the extension's storage does: writing what's stored already tells no one.
+      const encrypted = stateProvider.singleUser.getFake(mockUserId, ENCRYPTED_CIPHERS);
+      const write = encrypted.update.bind(encrypted);
+      storage = jest.spyOn(encrypted, "update").mockImplementation(async (configure, options) => {
+        const current = await firstValueFrom(encrypted.state$);
+        if (current != null) {
+          const next = configure(JSON.parse(JSON.stringify(current)), null);
+          if (JSON.stringify(next) === JSON.stringify(current)) {
+            return current;
+          }
+        }
+        return write(configure, options);
+      });
+    });
+
+    afterEach(() => storage.mockRestore());
+
+    it("leaves an empty vault readable after a second sync", async () => {
+      // The sign-in's first sync: no items yet, decrypted.
+      stateProvider.singleUser.getFake(mockUserId, ENCRYPTED_CIPHERS).nextState({});
+      expect(await readable()).toEqual([]);
+
+      // The second sync brings the same empty vault.
+      await cipherService.replace({}, mockUserId);
+
+      expect(await readable()).toEqual([]);
+    });
+
+    it("leaves the items readable after saving a login as it's stored already", async () => {
+      cipherEncryptionService.decryptManyLegacy.mockResolvedValue([[view()], []]);
+      stateProvider.singleUser
+        .getFake(mockUserId, ENCRYPTED_CIPHERS)
+        .nextState({ [loginId]: stored });
+      expect((await readable()).map((c) => c.id)).toEqual([loginId]);
+
+      await cipherService.upsert([stored], mockUserId);
+
+      expect((await readable()).map((c) => c.id)).toEqual([loginId]);
+    });
+
+    it("asks to decrypt again only after a write that changed nothing", async () => {
+      cipherEncryptionService.decryptManyLegacy.mockResolvedValue([[view()], []]);
+      stateProvider.singleUser.getFake(mockUserId, ENCRYPTED_CIPHERS).nextState({});
+      await readable();
+      // The private trigger.
+      const again = jest.spyOn((cipherService as any).keykeeperDecryptAgain$, "next");
+
+      // A change is announced by the storage, as before.
+      await cipherService.replace({ [loginId]: stored }, mockUserId);
+      expect((await readable()).map((c) => c.id)).toEqual([loginId]);
+      expect(again).not.toHaveBeenCalled();
+
+      // The same items again aren't.
+      await cipherService.upsert([stored], mockUserId);
+      expect(again).toHaveBeenCalledTimes(1);
     });
   });
 
