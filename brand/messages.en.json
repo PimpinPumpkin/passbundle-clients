@@ -2508,5 +2508,18 @@
   },
   "keykeeperMspLinkCodesThen": {
     "message": "Its owner then confirms one of your admins there, after comparing fingerprint phrases. That admin uses Confirm client on its row, and the rest of your staff get in as in any client, without its owner comparing each one. It keeps its own plan, so it isn't counted in your seats."
+  },
+  "keykeeperAlreadyInOrganization": {
+    "message": "$NAME$ is already in $ORGANIZATION$.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "Dana (dana@northwind.example)"
+      },
+      "organization": {
+        "content": "$2",
+        "example": "Acme Dental"
+      }
+    }
   }
 }

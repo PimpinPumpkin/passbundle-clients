@@ -11,6 +11,7 @@ import { firstValueFrom } from "rxjs";
 
 import { ClientMspStaff, OrganizationUserService } from "@bitwarden/admin-console/common";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
+import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
 import { ToastService } from "@bitwarden/components";
@@ -28,7 +29,10 @@ import { confirmLine, waitingStaff, who } from "./msp-link";
  * own owners and admins to confirm by hand. Confirm sends upstream's confirm
  * request, with the organization's key encrypted to that same public key, the
  * one the phrase was made from. Nothing here confirms anyone on its own
- * (DESIGN.md, "An organization that already uses PassBundle").
+ * (DESIGN.md, "An organization that already uses PassBundle"). When the
+ * server refuses a confirm because another device let the person in a moment
+ * before, a fresh read says so, and the page says they're already in
+ * (DESIGN.md, "Joining").
  */
 @Component({
   selector: "app-keykeeper-client-msp-confirm",
@@ -99,6 +103,7 @@ export class KeykeeperClientMspConfirmComponent {
     private readonly mspApi: KeykeeperMspApiService,
     private readonly organizationUserService: OrganizationUserService,
     private readonly toastService: ToastService,
+    private readonly i18nService: I18nService,
   ) {
     effect(() => {
       const people = this.waiting()
@@ -113,12 +118,13 @@ export class KeykeeperClientMspConfirmComponent {
     if (person.publicKey == null || person.publicKey === "") {
       return;
     }
+    const organization = this.organization();
     this.busy.set(true);
     try {
       // The key the phrase shown was made from, never a second answer.
       await firstValueFrom(
         this.organizationUserService.confirmUser(
-          this.organization(),
+          organization,
           person.memberId,
           Utils.fromB64ToArray(person.publicKey),
         ),
@@ -126,7 +132,23 @@ export class KeykeeperClientMspConfirmComponent {
       this.toastService.showToast({ variant: "success", message: `Confirmed ${person.email}` });
       this.confirmed.emit();
     } catch (e) {
-      this.toastService.showToast({ variant: "error", message: plainErrorMessage(e) });
+      // Another device (an MSP admin's console, or an owner's in the
+      // background) can let them in a moment before this one, and the server
+      // refuses this confirm. Only a fresh read says they're in, never the
+      // refusal; anything else shows as it is.
+      if (await this.mspApi.isConfirmed(organization.id, person.memberId)) {
+        this.toastService.showToast({
+          variant: "info",
+          message: this.i18nService.t(
+            "keykeeperAlreadyInOrganization",
+            who(person),
+            organization.name,
+          ),
+        });
+        this.confirmed.emit();
+      } else {
+        this.toastService.showToast({ variant: "error", message: plainErrorMessage(e) });
+      }
     } finally {
       this.busy.set(false);
     }

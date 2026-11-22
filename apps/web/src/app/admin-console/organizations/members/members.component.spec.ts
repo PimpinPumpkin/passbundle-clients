@@ -17,6 +17,7 @@ import {
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { OrganizationMetadataServiceAbstraction } from "@bitwarden/common/billing/abstractions/organization-metadata.service.abstraction";
+import { translate } from "@bitwarden/common/billing/keykeeper/plan-messages.spec-util";
 import { OrganizationBillingMetadataResponse } from "@bitwarden/common/billing/models/response/organization-billing-metadata.response";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
@@ -379,6 +380,66 @@ describe("MembersComponent", () => {
 
       expect(mockMemberActionsService.getPublicKeyForConfirm).toHaveBeenCalled();
       expect(mockLogService.warning).toHaveBeenCalledWith("Public key not found");
+    });
+  });
+
+  describe("Keykeeper: a confirm another device made a moment before", () => {
+    const mockPublicKey = new Uint8Array([1, 2, 3, 4]);
+
+    /** Confirm, refused by the server; then the fresh read answers with this status. */
+    async function confirmRefused(statusNow: OrganizationUserStatusType) {
+      // Ours from brand/messages.en.json (a key that isn't there fails), upstream's as their keys.
+      mockI18nService.t.mockImplementation((key: string, ...values: string[]) =>
+        key.startsWith("keykeeper") ? translate(key, ...values) : key,
+      );
+      mockMemberActionsService.getPublicKeyForConfirm.mockResolvedValue(mockPublicKey);
+      mockMemberActionsService.confirmUser.mockResolvedValue({
+        success: false,
+        error: "User in invalid state",
+      });
+      mockApiService.send.mockResolvedValue({ id: mockUser.id, status: statusNow });
+      mockMemberService.loadUsers.mockClear();
+
+      await component.confirm(mockUser, mockOrg);
+
+      expect(mockMemberActionsService.confirmUser).toHaveBeenCalledWith(
+        mockUser,
+        mockPublicKey,
+        mockOrg,
+      );
+    }
+
+    /** Read fresh, with upstream's request for one member's details. */
+    const expectFreshRead = () =>
+      expect(mockApiService.send).toHaveBeenCalledWith(
+        "GET",
+        `/organizations/${mockOrgId}/users/${mockUser.id}`,
+        null,
+        true,
+        true,
+      );
+    const toasts = () => mockToastService.showToast.mock.calls.map((c) => c[0]);
+
+    it("says the person is already in, with no error, when a fresh read shows them confirmed", async () => {
+      await confirmRefused(OrganizationUserStatusType.Confirmed);
+
+      expect(toasts()).toEqual([
+        { variant: "info", message: "Test User is already in Test Organization." },
+      ]);
+      expect(mockLogService.error).not.toHaveBeenCalled();
+      // The list reads again, and shows them confirmed.
+      expect(mockMemberService.loadUsers).toHaveBeenCalledWith(mockOrg);
+      expectFreshRead();
+    });
+
+    it("still shows the server's refusal when a fresh read shows them waiting", async () => {
+      await confirmRefused(OrganizationUserStatusType.Accepted);
+
+      expect(toasts()).toEqual([{ variant: "error", message: "User in invalid state" }]);
+      expect(mockLogService.error).toHaveBeenCalledWith("User in invalid state");
+      expect(mockMemberService.loadUsers).not.toHaveBeenCalled();
+      // It asked, and the answer wasn't "confirmed": the refusal alone settles nothing.
+      expectFreshRead();
     });
   });
 
