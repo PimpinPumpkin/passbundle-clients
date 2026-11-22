@@ -20,7 +20,9 @@ import {
   take,
 } from "rxjs";
 
+import { KeykeeperMspRequests } from "@bitwarden/admin-console/common";
 import { UserNamePipe } from "@bitwarden/angular/pipes/user-name.pipe";
+import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
 import { PolicyApiServiceAbstraction } from "@bitwarden/common/admin-console/abstractions/policy/policy-api.service.abstraction";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
@@ -150,6 +152,8 @@ export class MembersComponent {
   private memberExportService = inject(MemberExportService);
   // Keykeeper: what someone could see, when removing or revoking them.
   private keykeeperOffboarding = inject(KeykeeperOffboardingService);
+  // Keykeeper: whether someone is confirmed now, after a refused confirm.
+  private keykeeperRequests = new KeykeeperMspRequests(inject(ApiService));
   private configService = inject(ConfigService);
 
   private userId$: Observable<UserId> = this.accountService.activeAccount$.pipe(getUserId);
@@ -379,6 +383,18 @@ export class MembersComponent {
     }
 
     const result = await this.memberActionsService.confirmUser(user, publicKeyResult, organization);
+    // Keykeeper: another device can let them in a moment before this one, and
+    // the server refuses this confirm. Only a fresh read says they're in, never
+    // the refusal; anything else shows as before (DESIGN.md, "Joining").
+    if (!result.success && (await this.keykeeperRequests.isConfirmed(organization.id, user.id))) {
+      const name = this.userNamePipe.transform(user);
+      this.toastService.showToast({
+        variant: "info",
+        message: this.i18nService.t("keykeeperAlreadyInOrganization", name, organization.name),
+      });
+      await sideEffect();
+      return;
+    }
     await this.handleMemberActionResult(result, "hasBeenConfirmed", user, sideEffect);
   }
 

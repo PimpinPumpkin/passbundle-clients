@@ -14,6 +14,7 @@ import { firstValueFrom } from "rxjs";
 
 import { OrganizationUserService, PendingMember } from "@bitwarden/admin-console/common";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
+import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
 import {
@@ -117,6 +118,7 @@ export class KeykeeperFamilyWaitingComponent implements OnInit {
   private readonly organizationUserService = inject(OrganizationUserService);
   private readonly fingerprints = inject(LegacyCompatKeyService);
   private readonly toastService = inject(ToastService);
+  private readonly i18nService = inject(I18nService);
   private readonly destroyRef = inject(DestroyRef);
 
   ngOnInit() {
@@ -169,7 +171,20 @@ export class KeykeeperFamilyWaitingComponent implements OnInit {
       this.waiting.update((list) => list.filter((x) => x.p.memberId !== w.p.memberId));
       this.confirmed.emit();
     } catch (e) {
-      this.toastService.showToast({ variant: "error", message: plainErrorMessage(e) });
+      // Another device (an owner's or admin's web vault or extension, in the
+      // background) can let them in a moment before this one, and the server
+      // refuses this confirm. Only a fresh read says they're in, never the
+      // refusal; anything else shows as it is (DESIGN.md, "Joining").
+      if (await this.api.isConfirmed(org.id, w.p.memberId)) {
+        this.toastService.showToast({
+          variant: "info",
+          message: this.i18nService.t("keykeeperAlreadyInOrganization", w.p.email, org.name),
+        });
+        this.waiting.update((list) => list.filter((x) => x.p.memberId !== w.p.memberId));
+        this.confirmed.emit();
+      } else {
+        this.toastService.showToast({ variant: "error", message: plainErrorMessage(e) });
+      }
     } finally {
       this.busy.set(false);
     }
