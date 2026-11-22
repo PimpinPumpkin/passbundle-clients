@@ -10,6 +10,7 @@ import { Organization } from "@bitwarden/common/admin-console/models/domain/orga
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { AuthService } from "@bitwarden/common/auth/abstractions/auth.service";
 import { AuthenticationStatus } from "@bitwarden/common/auth/enums/authentication-status";
+import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { SyncService } from "@bitwarden/common/platform/sync";
 import { UserId } from "@bitwarden/common/types/guid";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
@@ -52,6 +53,8 @@ function setup() {
     of({ key: `org-key-of-${organization.id}`, defaultUserCollectionName: undefined }),
   );
   requests.confirmOnItsOwn.mockResolvedValue(undefined);
+  // Read fresh after a refused confirm: nobody else confirmed them, unless a test says so.
+  requests.isConfirmed.mockResolvedValue(false);
   const syncService = mock<SyncService>();
   // What the checks vouch for is join-checks.spec.ts's; here, whoever the server lets in automatically.
   const joinChecks = mock<KeykeeperJoinChecks>();
@@ -227,6 +230,88 @@ describe("MSP background work", () => {
     requests.list.mockResolvedValue([]);
     await work.run();
     expect(requests.organizationsWaiting).not.toHaveBeenCalled();
+  });
+
+  describe("two devices confirming the same person at once", () => {
+    /** The server's answer to the slower of two confirms, as upstream's API service throws it. */
+    const crossed = () => new ErrorResponse({ message: "User in invalid state" }, 400);
+
+    it("says nothing in the console when the server refused its confirm and a fresh read shows them confirmed", async () => {
+      const { work, requests, joinChecks } = setup();
+      requests.pending.mockResolvedValue([member("dental", "ana"), member("dental", "ben")]);
+      requests.confirmOnItsOwn.mockImplementation(async (_org, memberId) => {
+        if (memberId === "ben") {
+          throw crossed();
+        }
+      });
+      requests.isConfirmed.mockImplementation(async (_org, memberId) => memberId === "ben");
+      const letIn: unknown[] = [];
+      work.letIn$.subscribe((l) => letIn.push(l));
+
+      expect(await work.confirmPending("msp-1")).toEqual({ confirmed: 1, failed: [] });
+      // Read again only for the one refused.
+      expect(requests.isConfirmed.mock.calls).toEqual([["dental", "ben"]]);
+      // This device didn't let ben in, so it neither says so nor remembers a seal for him.
+      expect(letIn).toEqual([{ email: "ana@example.test", organizationName: "Acme Dental" }]);
+      expect(joinChecks.markLetIn.mock.calls.map((c) => c[1].memberId)).toEqual(["ana"]);
+    });
+
+    it("still says it couldn't confirm someone when a fresh read shows them not confirmed", async () => {
+      const { work, requests } = setup();
+      requests.pending.mockResolvedValue([member("dental", "ben")]);
+      requests.confirmOnItsOwn.mockRejectedValue(crossed());
+
+      expect(await work.confirmPending("msp-1")).toEqual({
+        confirmed: 0,
+        failed: ["ben@example.test in Acme Dental: User in invalid state"],
+      });
+      // It asked, and the answer wasn't "confirmed": the refusal alone settles nothing.
+      expect(requests.isConfirmed).toHaveBeenCalledWith("dental", "ben");
+    });
+
+    it("leaves a crossed confirm out of what the background work reports, and keeps any other refusal", async () => {
+      const { work, requests } = setup();
+      requests.organizationsWaiting.mockResolvedValue({
+        pending: [member("dental", "ben"), member("dental", "cy")],
+        joining: [],
+      });
+      requests.list.mockResolvedValue([]);
+      requests.confirmOnItsOwn.mockImplementation(async (_org, memberId) => {
+        throw memberId === "ben"
+          ? crossed()
+          : new ErrorResponse(
+              { message: "Only Owners can confirm Managers, Admins or Owners" },
+              400,
+            );
+      });
+      requests.isConfirmed.mockImplementation(async (_org, memberId) => memberId === "ben");
+
+      expect(await work.run()).toEqual([
+        "cy@example.test in Acme Dental: Only Owners can confirm Managers, Admins or Owners",
+      ]);
+      expect(requests.isConfirmed.mock.calls).toEqual([
+        ["dental", "ben"],
+        ["dental", "cy"],
+      ]);
+    });
+
+    it("reads again only after the server refused the confirm, not when this device failed before sending it", async () => {
+      const { work, requests, organizationUserService } = setup();
+      requests.pending.mockResolvedValue([member("dental", "ben")]);
+      organizationUserService.buildConfirmRequest.mockImplementation(() => {
+        throw new Error("This browser doesn't have the organization's key");
+      });
+      requests.isConfirmed.mockResolvedValue(true);
+
+      expect(await work.confirmPending("msp-1")).toEqual({
+        confirmed: 0,
+        failed: [
+          "ben@example.test in Acme Dental: This browser doesn't have the organization's key",
+        ],
+      });
+      expect(requests.confirmOnItsOwn).not.toHaveBeenCalled();
+      expect(requests.isConfirmed).not.toHaveBeenCalled();
+    });
   });
 
   it("only MSP admins write templates", async () => {

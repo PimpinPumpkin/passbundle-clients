@@ -15,9 +15,10 @@ import { KeykeeperMspApiService } from "./msp-api.service";
  * that already uses PassBundle: a one-time code for its owner, shown once,
  * which works once and for 7 days, and the codes nobody has used yet, to
  * revoke. Its owner enters the code on its Members page, sees who would be
- * added, and says yes; then they confirm the MSP's people there, comparing
- * fingerprint phrases (DESIGN.md, "An organization that already uses
- * PassBundle").
+ * added, and says yes; then they confirm one of the MSP's admins there,
+ * comparing fingerprint phrases, and once that admin confirms the client, the
+ * rest of the staff get in as in any client, with no phrase compared
+ * (DESIGN.md, "An organization that already uses PassBundle").
  */
 @Component({
   selector: "app-keykeeper-msp-link-codes",
@@ -31,11 +32,8 @@ import { KeykeeperMspApiService } from "./msp-api.service";
           Give its owner a code. They enter it on their organization's Members page, see who from
           {{ msp().name }} would be added, and say yes. A code works once, for 7 days.
         </p>
-        <p bitTypography="body2">
-          Your staff then wait for its owner to confirm them there, after comparing fingerprint
-          phrases. Once one of your admins is confirmed, they use Confirm client on its row, and the
-          rest of your staff get in as in any client. It keeps its own plan, so it isn't counted in
-          your seats.
+        <p bitTypography="body2" data-testid="msp-link-codes-then">
+          {{ "keykeeperMspLinkCodesThen" | i18n }}
         </p>
         <form class="tw-flex tw-items-end tw-gap-2" (submit)="make($event)">
           <bit-form-field disableMargin class="tw-grow">

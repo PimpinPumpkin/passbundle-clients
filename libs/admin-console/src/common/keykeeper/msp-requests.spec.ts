@@ -164,3 +164,39 @@ describe("confirming someone on its own", () => {
     );
   });
 });
+
+describe("reading whether someone is confirmed now", () => {
+  const setUp = () => {
+    const apiService = mock<ApiService>();
+    return { apiService, requests: new KeykeeperMspRequests(apiService) };
+  };
+
+  it("asks the server fresh for that member, with upstream's request for one member's details", async () => {
+    const { apiService, requests } = setUp();
+    apiService.send.mockResolvedValue({ id: "member-1", status: 2 });
+    expect(await requests.isConfirmed(ORG, "member-1")).toBe(true);
+    expect(apiService.send).toHaveBeenCalledWith(
+      "GET",
+      `/organizations/${ORG}/users/member-1`,
+      null,
+      true,
+      true,
+    );
+  });
+
+  it("is no for anyone invited, waiting for the key, or revoked, or an answer without a status", async () => {
+    const { apiService, requests } = setUp();
+    for (const answer of [{ status: 0 }, { status: 1 }, { status: -1 }, {}, null]) {
+      apiService.send.mockResolvedValueOnce(answer);
+      expect(await requests.isConfirmed(ORG, "member-1")).toBe(false);
+    }
+  });
+
+  it("is no when the server can't be asked or refuses", async () => {
+    const { apiService, requests } = setUp();
+    apiService.send.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    expect(await requests.isConfirmed(ORG, "member-1")).toBe(false);
+    apiService.send.mockRejectedValueOnce(new Error("The specified user isn't a member"));
+    expect(await requests.isConfirmed(ORG, "member-1")).toBe(false);
+  });
+});

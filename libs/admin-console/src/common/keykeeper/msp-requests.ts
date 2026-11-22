@@ -26,6 +26,9 @@ import {
   TwoStepNudgeKind,
 } from "./msp-types";
 
+/** Upstream's membership status for someone confirmed, who has the organization's key. */
+const CONFIRMED = 2;
+
 /**
  * Only the proof's own field for a request's body: the code when there is
  * one, otherwise the master password hash. Upstream's request also has a
@@ -73,6 +76,28 @@ export class KeykeeperMspRequests {
       true,
       false,
     );
+  }
+
+  /**
+   * Whether the member is confirmed in the organization now, read fresh with
+   * upstream's request for one member's details, which owners and admins may
+   * make. False for any other answer, or when the server can't be asked. It
+   * tells a confirm that another device made a moment before this one from a
+   * real refusal (DESIGN.md, "Joining").
+   */
+  async isConfirmed(organizationId: string, memberId: string): Promise<boolean> {
+    try {
+      const member = await this.apiService.send(
+        "GET",
+        `/organizations/${organizationId}/users/${memberId}`,
+        null,
+        true,
+        true,
+      );
+      return member?.status === CONFIRMED;
+    } catch {
+      return false;
+    }
   }
 
   /** Memberships waiting for an org key in every organization where the person can confirm them. */
