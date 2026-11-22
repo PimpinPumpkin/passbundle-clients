@@ -6,6 +6,7 @@ import {
   firstValueFrom,
   map,
   Observable,
+  startWith,
   Subject,
   switchMap,
   tap,
@@ -93,6 +94,25 @@ export class CipherService implements CipherServiceAbstraction {
   private clearCipherViewsForUser$: Subject<UserId> = new Subject<UserId>();
 
   /**
+   * Keykeeper: decrypts the stored items again for the given user, after a write that left them
+   * as they were. The browser extension's storage announces only changes (chrome.storage.onChanged),
+   * so after such a write nothing refilled the views it had emptied, and `cipherViews$` stayed
+   * empty until the items changed. With no items yet, a sync writes the same empty vault again
+   * (`replace` writes an empty one even when it's stored already), and the save prompt, which
+   * reads the site's logins from it, never showed (DESIGN.md, "A save prompt that waited for
+   * good on an empty vault (upstream race)").
+   */
+  private keykeeperDecryptAgain$: Subject<UserId> = new Subject<UserId>();
+
+  /** Keykeeper: a source for the decrypting `combineLatest`s, once at first and then on each ask. */
+  private keykeeperDecryptAgainFor$(userId: UserId): Observable<UserId> {
+    return this.keykeeperDecryptAgain$.pipe(
+      filter((id) => id === userId),
+      startWith(userId),
+    );
+  }
+
+  /**
    * Observable exposing the feature flag status for using the SDK for cipher CRUD operations.
    */
   private readonly sdkCipherCrudEnabled$: Observable<boolean> = this.configService.getFeatureFlag$(
@@ -144,6 +164,8 @@ export class CipherService implements CipherServiceAbstraction {
         this.encryptedCiphersState(userId).state$,
         this.localData$(userId),
         this.keyService.cipherDecryptionKeys$(userId),
+        // Keykeeper: and again after a write that changed nothing (updateEncryptedCipherState).
+        this.keykeeperDecryptAgainFor$(userId),
       ]).pipe(
         filter(([ciphers, _, keys]) => ciphers != null && keys != null), // Skip if ciphers haven't been loaded yor synced yet
         switchMap(() => this.getAllDecryptedIncludingPartials(userId)),
@@ -181,6 +203,8 @@ export class CipherService implements CipherServiceAbstraction {
       this.encryptedCiphersState(userId).state$,
       this.localData$(userId),
       this.keyService.cipherDecryptionKeys$(userId, true),
+      // Keykeeper: and again after a write that changed nothing (updateEncryptedCipherState).
+      this.keykeeperDecryptAgainFor$(userId),
     ]).pipe(
       filter(([cipherDataState, _, keys]) => cipherDataState != null && keys != null),
       map(([cipherDataState, localData]) =>
@@ -1260,9 +1284,12 @@ export class CipherService implements CipherServiceAbstraction {
 
     await this.clearCache(userId);
 
+    // Keykeeper: what was stored just before this write (a copy: `update` may change `current`).
+    const before: { stored?: string | null } = {};
     const updatedCiphers = await this.stateProvider
       .getUser(userId, ENCRYPTED_CIPHERS)
       .update((current) => {
+        before.stored = current == null ? null : JSON.stringify(current);
         const result = update(current ?? {});
         return result;
       });
@@ -1270,6 +1297,12 @@ export class CipherService implements CipherServiceAbstraction {
     // Some state storage providers (e.g. Electron) don't update the state immediately, wait for next tick
     // Otherwise, subscribers to cipherViews$ can get stale data
     await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Keykeeper: a write that left the items as they were may not be announced (the extension's
+    // storage tells only of changes), and the views cleared above would wait for it for good.
+    if (before.stored != null && before.stored === JSON.stringify(updatedCiphers)) {
+      this.keykeeperDecryptAgain$.next(userId);
+    }
     return updatedCiphers;
   }
 
