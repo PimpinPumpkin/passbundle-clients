@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, input, output, signal } f
 
 import { LinkPreview } from "@bitwarden/admin-console/common";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
+import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { plainErrorMessage } from "@bitwarden/common/platform/keykeeper/plain-errors";
 import { DialogService, ToastService } from "@bitwarden/components";
 
@@ -9,16 +10,26 @@ import { SharedModule } from "../../shared";
 import { KeykeeperMspRemovedDialogComponent } from "../offboarding/msp-removed-dialog.component";
 
 import { KeykeeperMspApiService } from "./msp-api.service";
-import { joinButton, joiningLine, previewSentences, readLinkCode, who } from "./msp-link";
+import {
+  joinButton,
+  joinedMessage,
+  joiningLine,
+  previewSentences,
+  readLinkCode,
+  Translate,
+} from "./msp-link";
 
 /**
  * Keykeeper: on an organization's Members page, below where "Your MSP" shows,
  * its own owners enter a code an MSP gave them to join the organization to
  * that MSP, or to move it there from the MSP it has now. Before anything
  * changes, the page says which MSP it is and what joining means; only "Join"
- * (or "Move") changes anything. The MSP's people then wait for an owner here
- * to confirm them, under the banner, after comparing fingerprint phrases
- * (DESIGN.md, "An organization that already uses PassBundle").
+ * (or "Move") changes anything. An owner here then confirms one of the MSP's
+ * admins, under the banner, after comparing fingerprint phrases; once that
+ * admin confirms the client in the console, the rest of the MSP's people are
+ * let in automatically, with no phrase compared, where the organization lets
+ * people in without approval (DESIGN.md, "An organization that already uses
+ * PassBundle").
  */
 @Component({
   selector: "app-keykeeper-client-msp-join",
@@ -117,16 +128,18 @@ export class KeykeeperClientMspJoinComponent {
 
   protected readonly sentences = computed(() => {
     const p = this.preview();
-    return p == null ? [] : previewSentences(p, this.organization().name);
+    return p == null ? [] : previewSentences(p, this.organization().name, this.t);
   });
 
   protected readonly line = joiningLine;
   protected readonly button = joinButton;
+  private readonly t: Translate = (key, ...values) => this.i18nService.t(key, ...values);
 
   constructor(
     private readonly mspApi: KeykeeperMspApiService,
     private readonly dialogService: DialogService,
     private readonly toastService: ToastService,
+    private readonly i18nService: I18nService,
   ) {}
 
   protected cancel() {
@@ -164,13 +177,9 @@ export class KeykeeperClientMspJoinComponent {
         this.typed(),
         preview.current != null,
       );
-      const people = preview.adding.map((p) => who(p)).join(", ");
       this.toastService.showToast({
         variant: "success",
-        message:
-          result.added > 0
-            ? `${result.msp.name} now manages ${this.organization().name}. Confirm ${people} below once you've compared their phrases.`
-            : `${result.msp.name} now manages ${this.organization().name}.`,
+        message: joinedMessage(result, preview, this.organization().name, this.t),
       });
       this.cancel();
       this.joined.emit();

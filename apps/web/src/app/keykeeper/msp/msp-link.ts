@@ -1,11 +1,16 @@
 // Keykeeper: an organization that already uses PassBundle joins an MSP, or
 // moves from one MSP to another, with a one-time code the MSP gives its owner
 // (DESIGN.md, "An organization that already uses PassBundle"). The words the
-// owner reads before saying yes, which of the MSP's people wait for them to
-// confirm, and the code as people type it. The server checks everything
+// owner reads before saying yes, which of the MSP's people they may confirm
+// by hand, and the code as people type it. The server checks everything
 // again; nothing here decides who gets in.
 
-import { ClientMspStaff, LinkPerson, LinkPreview } from "@bitwarden/admin-console/common";
+import {
+  ClientMspStaff,
+  LinkPerson,
+  LinkPreview,
+  LinkResult,
+} from "@bitwarden/admin-console/common";
 
 /** Crockford's base32, as the server makes codes: no I, L, O, or U. */
 const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -57,13 +62,22 @@ export function joiningLine(person: LinkPerson): string {
   return `${who(person)}, ${asRole(person.role)}`;
 }
 
+/** Our sentences by message key, with their values (upstream's I18nService.t). */
+export type Translate = (key: string, ...values: string[]) => string;
+
 /**
  * What joining with this code means, in plain sentences, before anything
- * changes: who's added and that they wait for an owner here, what the
- * organization keeps, and that the MSP can be removed. For a move, that the
- * MSP it has now goes first.
+ * changes: who's added; that an owner here confirms one of the MSP's admins
+ * first, comparing phrases, and that the rest of its people, and anyone it
+ * adds later, are let in automatically after that, with no phrase compared
+ * (DESIGN.md, "Joining"); what the organization keeps; and that the MSP can
+ * be removed. For a move, that the MSP it has now goes first.
  */
-export function previewSentences(preview: LinkPreview, organizationName: string): string[] {
+export function previewSentences(
+  preview: LinkPreview,
+  organizationName: string,
+  t: Translate,
+): string[] {
   const msp = preview.msp.name;
   const sentences: string[] = [];
   if (preview.current != null) {
@@ -74,9 +88,10 @@ export function previewSentences(preview: LinkPreview, organizationName: string)
   }
   sentences.push(
     preview.adding.length === 0
-      ? `Nobody from ${msp} is added now. Its people who are added later wait for you the same way.`
-      : `${msp}'s people below are added to ${organizationName}. None of them can open its items until an owner here confirms each of them on this page, after comparing their fingerprint phrase with what they read you.`,
+      ? t("keykeeperMspJoinNobodyNow", msp, organizationName)
+      : t("keykeeperMspJoinAddedWait", msp, organizationName),
   );
+  sentences.push(t("keykeeperMspJoinThenAutomatic", msp, organizationName));
   if (preview.stayingOut.length > 0) {
     sentences.push(
       `You removed or revoked ${preview.stayingOut.map((p) => who(p)).join(", ")} here before. They stay out until you invite them again.`,
@@ -87,6 +102,34 @@ export function previewSentences(preview: LinkPreview, organizationName: string)
   );
   sentences.push(`You can remove ${msp} at any time, on this page.`);
   return sentences;
+}
+
+/**
+ * The notice once the organization joined or moved: whom an owner here
+ * confirms now. One of the MSP's admins, who are owners here, after comparing
+ * their phrase; the rest are let in after that with no phrase compared. With
+ * none of its admins added, nobody on the MSP's side can let anyone in, so
+ * each person added waits for an owner here.
+ */
+export function joinedMessage(
+  result: LinkResult,
+  preview: LinkPreview,
+  organizationName: string,
+  t: Translate,
+): string {
+  const msp = result.msp.name;
+  if (result.added === 0) {
+    return `${msp} now manages ${organizationName}.`;
+  }
+  const admins = preview.adding.filter((p) => p.role === "owner");
+  if (admins.length === 1) {
+    return t("keykeeperMspJoinedConfirmAdmin", msp, organizationName, who(admins[0]));
+  }
+  if (admins.length > 1) {
+    return t("keykeeperMspJoinedConfirmAnAdmin", msp, organizationName);
+  }
+  const people = preview.adding.map((p) => who(p)).join(", ");
+  return `${msp} now manages ${organizationName}. Confirm ${people} below once you've compared their phrases.`;
 }
 
 /** What the button says: join, or move. */

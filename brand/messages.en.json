@@ -2436,5 +2436,77 @@
         "example": "server_url"
       }
     }
+  },
+  "keykeeperMspJoinAddedWait": {
+    "message": "$MSP$'s people below are added to $ORGANIZATION$. None of them can open its items until they're confirmed. First an owner here confirms one of $MSP$'s admins, on this page, after comparing their fingerprint phrase with what they read you.",
+    "placeholders": {
+      "msp": {
+        "content": "$1",
+        "example": "Northwind IT"
+      },
+      "organization": {
+        "content": "$2",
+        "example": "Acme Dental"
+      }
+    }
+  },
+  "keykeeperMspJoinNobodyNow": {
+    "message": "Nobody from $MSP$ is added now. People it adds later can't open $ORGANIZATION$'s items until they're confirmed. First an owner here confirms one of $MSP$'s admins, on this page, after comparing their fingerprint phrase with what they read you.",
+    "placeholders": {
+      "msp": {
+        "content": "$1",
+        "example": "Northwind IT"
+      },
+      "organization": {
+        "content": "$2",
+        "example": "Acme Dental"
+      }
+    }
+  },
+  "keykeeperMspJoinThenAutomatic": {
+    "message": "Once that admin confirms $ORGANIZATION$ in their MSP console, the rest of $MSP$'s people, and anyone it adds later, are let in automatically, without anyone here comparing their phrases, as long as $ORGANIZATION$ lets people in when they accept an invitation (Settings, Joining and security). Each one is listed under What $MSP$ did here, on this page.",
+    "placeholders": {
+      "msp": {
+        "content": "$1",
+        "example": "Northwind IT"
+      },
+      "organization": {
+        "content": "$2",
+        "example": "Acme Dental"
+      }
+    }
+  },
+  "keykeeperMspJoinedConfirmAdmin": {
+    "message": "$MSP$ now manages $ORGANIZATION$. Confirm $ADMIN$ below once you've compared their phrase.",
+    "placeholders": {
+      "msp": {
+        "content": "$1",
+        "example": "Northwind IT"
+      },
+      "organization": {
+        "content": "$2",
+        "example": "Acme Dental"
+      },
+      "admin": {
+        "content": "$3",
+        "example": "Dana (dana@northwind.example)"
+      }
+    }
+  },
+  "keykeeperMspJoinedConfirmAnAdmin": {
+    "message": "$MSP$ now manages $ORGANIZATION$. Confirm one of its admins below once you've compared their phrase.",
+    "placeholders": {
+      "msp": {
+        "content": "$1",
+        "example": "Northwind IT"
+      },
+      "organization": {
+        "content": "$2",
+        "example": "Acme Dental"
+      }
+    }
+  },
+  "keykeeperMspLinkCodesThen": {
+    "message": "Its owner then confirms one of your admins there, after comparing fingerprint phrases. That admin uses Confirm client on its row, and the rest of your staff get in as in any client, without its owner comparing each one. It keeps its own plan, so it isn't counted in your seats."
   }
 }
