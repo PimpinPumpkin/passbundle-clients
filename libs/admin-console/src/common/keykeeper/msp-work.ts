@@ -195,7 +195,8 @@ export class KeykeeperMspWork {
   /**
    * Confirms, with upstream's confirm request, those of `pending` that this
    * device may let in on its own (join-checks.ts), saying so to the server.
-   * A member someone else confirmed in the meantime fails and is reported.
+   * A confirm the server refuses is reported, unless a fresh read shows the
+   * member confirmed now: another device got there first.
    */
   private async confirm(waiting: PendingMember[]): Promise<ConfirmResult> {
     if (waiting.length === 0) {
@@ -228,7 +229,20 @@ export class KeykeeperMspWork {
             Utils.fromB64ToArray(p.publicKey),
           ),
         );
-        await this.requests.confirmOnItsOwn(organization.id, p.memberId, request);
+        try {
+          await this.requests.confirmOnItsOwn(organization.id, p.memberId, request);
+        } catch (e) {
+          // Two devices can confirm the same person at the same moment (the
+          // MSP console as it opens and an owner's web vault in the
+          // background), and the server refuses the slower one. That's no
+          // failure if a fresh read shows them confirmed now; the refusal
+          // alone never says so. This device didn't let them in, so it
+          // neither says it did nor remembers a seal as used.
+          if (await this.requests.isConfirmed(organization.id, p.memberId)) {
+            continue;
+          }
+          throw e;
+        }
         result.confirmed++;
         await this.joinChecks.markLetIn(userId, p);
         this.letIn.next({ email: p.email, organizationName: organization.name });
